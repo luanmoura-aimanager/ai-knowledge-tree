@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Knowledge Tree — DS / ML / DL / AI Engineering</title>
+<style>
+  :root {
+    --bg: #0a0e1f;
+    --bg-2: #0f1530;
+    --card: #141a35;
+    --card-2: #1a2148;
+    --border: #242b52;
+    --border-strong: #353e75;
+    --fg: #e6e9f5;
+    --fg-dim: #9aa3c7;
+    --fg-mute: #6c7596;
+    --accent: #7aa2f7;
+    --good: #9ece6a;
+    --partial: #e0af68;
+    --gap: #6c7596;
+    --hot: #f7768e;
+    --pa: #e0af68; /* A Foundations */
+    --pb: #f7768e; /* B Statistics */
+    --pc: #ff9e64; /* C Classical ML */
+    --pd: #7aa2f7; /* D Deep Learning */
+    --pe: #bb9af7; /* E NLP / LLMs */
+    --pf: #7dcfff; /* F PGMs */
+    --pg: #73daca; /* G Time Series */
+    --ph: #ff7eb6; /* H RL */
+    --pi: #9ece6a; /* I MLOps */
+    --pj: #c0caf5; /* J AI Engineering */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(180deg, #0a0e1f 0%, #0c1128 100%);
+    color: var(--fg);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+
+  /* ============ Hero ============ */
+  header.hero { padding: 56px 0 32px; }
+  .hero h1 {
+    font-size: 2.6rem;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, #7aa2f7 0%, #bb9af7 50%, #f7768e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.02em;
+  }
+  .hero p {
+    color: var(--fg-dim);
+    font-size: 1.05rem;
+    max-width: 760px;
+    margin: 0;
+  }
+  .quick-nav { display: flex; gap: 6px; margin-top: 24px; flex-wrap: wrap; }
+  .quick-nav a {
+    width: 32px; height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-dim);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: 0.15s;
+  }
+  .quick-nav a:hover {
+    background: var(--card-2);
+    color: var(--fg);
+    border-color: var(--accent);
+  }
+
+  /* ============ Dashboard ============ */
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 24px 0;
+  }
+  .big-stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .big-stat::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent-bar, var(--accent));
+  }
+  .big-stat.covered { --accent-bar: var(--good); }
+  .big-stat.partial { --accent-bar: var(--partial); }
+  .big-stat.gap     { --accent-bar: var(--gap); }
+  .big-stat.hot     { --accent-bar: var(--hot); }
+  .big-stat.conn    { --accent-bar: var(--accent); }
+  .big-num {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--fg);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .big-label {
+    color: var(--fg-dim);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+  }
+  .big-sub {
+    color: var(--fg-mute);
+    font-size: 0.78rem;
+    margin-top: 4px;
+  }
+
+  /* ============ Filter bar ============ */
+  .filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(10, 14, 31, 0.9);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+    margin: 8px 0 32px;
+  }
+  .filter-wrap {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg);
+    font-size: 0.92rem;
+    padding: 9px 14px;
+    outline: none;
+    transition: 0.15s;
+    font-family: inherit;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--fg-mute); }
+  .filter-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-buttons button {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: 0.15s;
+    font-family: inherit;
+  }
+  .filter-buttons button:hover { color: var(--fg); border-color: var(--accent); }
+  .filter-buttons button.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .filter-buttons button[data-filter="covered"].active { background: var(--good); border-color: var(--good); }
+  .filter-buttons button[data-filter="partial"].active { background: var(--partial); border-color: var(--partial); }
+  .filter-buttons button[data-filter="gap"].active { background: var(--gap); border-color: var(--gap); color: var(--fg); }
+  .filter-buttons button[data-filter="hot"].active { background: var(--hot); border-color: var(--hot); }
+  .filter-buttons button[data-filter="hot-gap"].active { background: linear-gradient(135deg, var(--hot), var(--partial)); border-color: var(--hot); }
+
+  /* ============ Pillar ============ */
+  .pillar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin: 0 0 28px;
+    overflow: hidden;
+    transition: opacity 0.2s;
+    scroll-margin-top: 80px;
+  }
+  .pillar.dimmed { opacity: 0.25; }
+  .pillar-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 18px;
+    padding: 22px 28px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--pillar-color) 18%, transparent), transparent 70%);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .pillar-letter {
+    width: 52px; height: 52px;
+    background: var(--pillar-color);
+    color: var(--bg);
+    font-size: 1.7rem;
+    font-weight: 800;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--pillar-color) 40%, transparent);
+  }
+  .pillar-title h2 {
+    margin: 0 0 4px;
+    font-size: 1.35rem;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+  .pillar-title p {
+    margin: 0;
+    color: var(--fg-dim);
+    font-size: 0.88rem;
+  }
+  .pillar-stats { text-align: right; min-width: 200px; }
+  .stat-pct {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--pillar-color);
+    line-height: 1;
+  }
+  .stat-counts {
+    color: var(--fg-mute);
+    font-size: 0.78rem;
+    margin: 4px 0 8px;
+  }
+  .stat-bar {
+    height: 6px;
+    background: var(--card-2);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+  }
+  .stat-bar .seg { height: 100%; transition: width 0.3s; }
+  .stat-bar .seg.covered { background: var(--good); }
+  .stat-bar .seg.partial { background: var(--partial); }
+  .stat-bar .seg.gap     { background: var(--gap); opacity: 0.4; }
+
+  /* ============ Subsections ============ */
+  .subsections {
+    padding: 22px 28px 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 22px;
+  }
+  .subsection.hidden { display: none; }
+  .subsection h4 {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .subsection h4 .sub-id {
+    color: var(--pillar-color);
+    font-weight: 800;
+    margin-right: 6px;
+  }
+  .subsection h4 .conn-count {
+    float: right;
+    color: var(--fg-mute);
+    font-weight: 500;
+    font-size: 0.78rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .subsection h4 .conn-count.has { color: var(--accent); }
+  .subsection h4 .chevron {
+    float: right;
+    color: var(--fg-mute);
+    font-size: 0.85rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    transition: transform 0.2s ease;
+    margin-left: 8px;
+    line-height: 1.2;
+  }
+  .subsection h4 { cursor: pointer; user-select: none; }
+  .subsection h4:hover .chevron { color: var(--accent); }
+  .subsection.collapsed h4 .chevron { transform: rotate(-90deg); }
+  .subsection.collapsed h4 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  .subsection.collapsed .topics { display: none; }
+
+  /* Pillar collapse */
+  .pillar-header { cursor: pointer; user-select: none; }
+  .pillar-stats .pillar-chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    background: var(--card-2);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--fg-dim);
+    margin-left: 10px;
+    vertical-align: middle;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.25s ease;
+  }
+  .pillar-header:hover .pillar-chev {
+    background: var(--card);
+    border-color: var(--accent);
+    color: var(--fg);
+  }
+  .pillar.body-collapsed .pillar-chev { transform: rotate(-90deg); }
+  .pillar.body-collapsed .subsections { display: none; }
+  .pillar.body-collapsed .pillar-header { border-bottom: none; }
+
+  .topics { display: flex; flex-direction: column; gap: 2px; }
+
+  /* ============ Topic ============ */
+  .topic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    color: var(--fg);
+    transition: 0.12s;
+    cursor: default;
+    position: relative;
+  }
+  .topic:hover { background: var(--card-2); }
+  .topic.hidden { display: none; }
+  .topic .icon {
+    flex: 0 0 16px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  .topic[data-status="0"] { color: var(--fg-mute); }
+  .topic[data-status="0"] .icon { color: var(--gap); }
+  .topic[data-status="1"] .icon { color: var(--good); }
+  .topic[data-status="2"] .icon { color: var(--partial); }
+  .topic[data-status="2"] { color: var(--fg-dim); }
+  .topic .name { flex: 1; }
+  .topic .hot-flame { color: var(--hot); font-size: 0.82rem; font-weight: 700; }
+  .topic[data-hot="1"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px; bottom: 8px;
+    width: 2px;
+    background: var(--hot);
+    border-radius: 1px;
+  }
+
+  /* ============ Connections graph ============ */
+  .connections-section { margin: 56px 0 48px; }
+  .connections-section h2 {
+    font-size: 1.5rem;
+    margin: 0 0 6px;
+    color: var(--fg);
+  }
+  .conn-intro {
+    color: var(--fg-dim);
+    margin: 0 0 22px;
+    font-size: 0.95rem;
+    max-width: 760px;
+  }
+  .conn-graph-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    height: 720px;
+  }
+  .conn-graph-wrap svg { width: 100%; height: 100%; display: block; }
+  .conn-graph .node { cursor: pointer; transition: 0.15s; }
+  .conn-graph .node circle { stroke: var(--bg); stroke-width: 2; }
+  .conn-graph .node text {
+    font-size: 12px;
+    fill: var(--bg);
+    pointer-events: none;
+    font-weight: 800;
+  }
+  .conn-graph .node.dim { opacity: 0.18; }
+  .conn-graph .node.active circle { stroke: var(--fg); stroke-width: 3; }
+  .conn-graph .link { fill: none; stroke: var(--fg-mute); stroke-opacity: 0.35; }
+  .conn-graph .link.within { stroke-opacity: 0.18; }
+  .conn-graph .link.highlight { stroke-opacity: 0.95; stroke-width: 2.5; }
+  .conn-graph .link.dim { stroke-opacity: 0.05; }
+  .conn-graph .link.kind-shared-concept { stroke: var(--accent);  }
+  .conn-graph .link.kind-uses           { stroke: var(--partial); }
+  .conn-graph .link.kind-alternative    { stroke: var(--hot);     }
+  .conn-graph .link.kind-generalizes    { stroke: var(--good);    }
+  .conn-graph .pillar-label-group { pointer-events: none; }
+  .conn-graph .pillar-label {
+    font-size: 12px;
+    font-weight: 800;
+    pointer-events: none;
+    letter-spacing: 0.03em;
+  }
+  .conn-graph .pillar-label-bg {
+    pointer-events: none;
+  }
+  .graph-hint {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    background: rgba(10, 14, 31, 0.8);
+    backdrop-filter: blur(6px);
+    color: var(--fg-mute);
+    font-size: 0.78rem;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .conn-legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 0.84rem;
+    color: var(--fg-dim);
+    margin-top: 12px;
+    padding: 0 4px;
+  }
+  .conn-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .conn-legend .swatch { width: 24px; height: 2px; border-radius: 1px; display: inline-block; }
+
+  /* Side panel for selected subsection */
+  .conn-panel {
+    position: relative;
+    margin-top: 16px;
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-color, var(--accent)) 12%, var(--card-2)) 0%,
+      var(--card-2) 65%);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    padding: 22px 24px;
+    display: none;
+    overflow: hidden;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.35),
+      0 0 28px color-mix(in srgb, var(--panel-color, var(--accent)) 12%, transparent);
+  }
+  .conn-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--panel-color, var(--accent));
+  }
+  .conn-panel.show { display: block; }
+  .conn-panel-actions { display: flex; gap: 8px; align-items: center; }
+  .conn-panel-goto {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.15s;
+  }
+  .conn-panel-goto:hover { background: var(--fg); }
+
+  /* Scroll-target flash on subsections (and pillars) */
+  @keyframes flash-glow {
+    0%   { box-shadow: 0 0 0 0 var(--flash-color, var(--accent)); background-color: color-mix(in srgb, var(--flash-color, var(--accent)) 14%, transparent); }
+    60%  { box-shadow: 0 0 0 14px transparent; background-color: color-mix(in srgb, var(--flash-color, var(--accent)) 8%, transparent); }
+    100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+  }
+  .subsection.flash-highlight {
+    animation: flash-glow 1.6s ease-out;
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin: -4px -8px;
+  }
+  .conn-panel-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .conn-panel .eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    margin-bottom: 4px;
+  }
+  .conn-panel h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--fg);
+  }
+  .conn-panel h3 .sid {
+    font-weight: 800;
+    margin-right: 8px;
+    color: var(--panel-color);
+  }
+  .conn-panel-close {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .conn-panel-close:hover { color: var(--fg); border-color: var(--accent); }
+  .conn-panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .conn-panel-grid h4 {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-dim);
+    font-weight: 600;
+  }
+  .conn-panel-grid ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 14px;
+    font-size: 0.88rem;
+  }
+  .conn-panel-grid li { padding: 3px 0; }
+  .conn-panel-grid .dir-label {
+    font-size: 0.72rem;
+    color: var(--fg-mute);
+    margin-bottom: 4px;
+  }
+  .conn-panel-grid .sid-tag {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .conn-panel-grid .empty {
+    color: var(--fg-mute);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+  @media (max-width: 720px) {
+    .conn-panel-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ Trilhas ============ */
+  .paths { margin: 48px 0; }
+  .paths h2 { font-size: 1.5rem; margin: 0 0 6px; color: var(--fg); }
+  .paths-intro {
+    color: var(--fg-dim);
+    margin: 0 0 22px;
+    font-size: 0.95rem;
+  }
+  .paths-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .path-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid var(--path-color, var(--accent));
+  }
+  .path-card h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--fg); }
+  .path-card .desc { color: var(--fg-dim); font-size: 0.85rem; margin: 0 0 12px; }
+  .path-card .pillars { display: flex; flex-wrap: wrap; gap: 4px; }
+  .path-card .pillars span {
+    font-size: 0.72rem;
+    background: var(--card-2);
+    color: var(--fg-dim);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .path-card .status-line {
+    margin-top: 12px;
+    font-size: 0.78rem;
+    color: var(--fg-mute);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .path-card .mini-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--card-2);
+    border-radius: 2px;
+    overflow: hidden;
+    display: flex;
+  }
+  .path-card .mini-bar .seg { height: 100%; }
+
+  /* ============ Footer ============ */
+  footer.foot {
+    margin: 64px 0 32px;
+    padding: 24px 0;
+    border-top: 1px solid var(--border);
+    color: var(--fg-mute);
+    font-size: 0.82rem;
+  }
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .icon { width: 18px; text-align: center; font-weight: 700; }
+
+  @media (max-width: 720px) {
+    .hero h1 { font-size: 1.8rem; }
+    .pillar-header { grid-template-columns: 1fr; padding: 18px; }
+    .pillar-stats { text-align: left; min-width: 0; }
+    .subsections { padding: 18px; gap: 16px; }
+    .conn-graph-wrap { height: 520px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <h1>🌳 AI Knowledge Tree</h1>
+    <p>Mapa interativo da DAG completa de Data Science, Machine Learning, Deep Learning e <strong>AI Engineering</strong>. 10 pilares (A → J), 200+ tópicos, e as conexões cruzadas que ligam VAEs em Generative DL e Bayesian DL, Kalman em PGMs e Time Series, RAG em LLMs e AI Engineering, e por aí.</p>
+    <nav class="quick-nav" id="quick-nav"></nav>
+  </header>
+
+  <section class="dashboard" id="dashboard"></section>
+
+  <div class="filter-bar">
+    <div class="container filter-wrap">
+      <input type="text" class="search-input" id="search" placeholder="🔍 Buscar tópico (ex: diffusion, kalman, RAG, MCP)...">
+      <div class="filter-buttons" id="filters">
+        <button data-filter="all" class="active">Todos</button>
+        <button data-filter="covered">✓ Cobertos</button>
+        <button data-filter="partial">◐ Parciais</button>
+        <button data-filter="gap">○ Gaps</button>
+        <button data-filter="hot">★ Hot</button>
+        <button data-filter="hot-gap">🎯 Hot Gaps</button>
+      </div>
+      <div class="filter-buttons" style="margin-left: auto;">
+        <button type="button" onclick="setAllCollapsed(false)" title="Expandir todas as subseções">▾ Expandir tudo</button>
+        <button type="button" onclick="setAllCollapsed(true)" title="Recolher todas as subseções">▸ Recolher tudo</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="pillars-container"></main>
+
+  <section class="connections-section" id="connections">
+    <h2>Conexões entre pilares</h2>
+    <p class="conn-intro">Grafo force-directed dos 60+ subseções, agrupados por pilar e ligados por conceitos compartilhados, dependências e generalizações. <strong>Arraste</strong> nós para reposicionar, <strong>scroll</strong> para dar zoom, <strong>clique</strong> para ver tópicos e conexões.</p>
+    <div class="conn-graph-wrap">
+      <svg id="conn-graph" class="conn-graph"></svg>
+      <div class="graph-hint">💡 arraste · scroll zoom · clique para detalhes</div>
+    </div>
+    <div class="conn-legend">
+      <span><span class="swatch" style="background: var(--accent)"></span>Conceito compartilhado</span>
+      <span><span class="swatch" style="background: var(--partial)"></span>Usa / depende de</span>
+      <span><span class="swatch" style="background: var(--good)"></span>Generaliza</span>
+      <span><span class="swatch" style="background: var(--hot)"></span>Alternativa</span>
+      <span><span class="swatch" style="background: var(--fg-mute); opacity: 0.5"></span>Sequência interna ao pilar</span>
+    </div>
+    <div class="conn-panel" id="conn-panel"></div>
+  </section>
+
+  <section class="paths">
+    <h2>Trilhas sugeridas</h2>
+    <p class="paths-intro">Caminhos curados que atravessam a DAG, conectando pilares em sequência didática para perfis distintos.</p>
+    <div class="paths-grid" id="paths-grid"></div>
+  </section>
+
+  <footer class="foot">
+    <div class="legend">
+      <span><span class="icon" style="color:var(--good)">✓</span> Coberto no AI ML Theory</span>
+      <span><span class="icon" style="color:var(--partial)">◐</span> Cobertura parcial</span>
+      <span><span class="icon" style="color:var(--gap)">○</span> Gap (não coberto)</span>
+      <span><span class="icon" style="color:var(--hot)">★</span> Tópico hot / fronteira (2023-2025)</span>
+    </div>
+    <div>Gerado a partir de <code>src/lib/dag.ts</code> · arquivo único auto-contido (D3 via CDN) · <a href="README.md" style="color: var(--accent); text-decoration: none;">README.md</a> · <a href="CLAUDE.md" style="color: var(--accent); text-decoration: none;">CLAUDE.md</a></div>
+  </footer>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ============================================================
+// DATA — mirrors src/lib/dag.ts
+// status: 0=gap, 1=covered, 2=partial   |  3rd value = hot (1=true)
+// ============================================================
+const PILLARS = [
+  {
+    letter: 'A', color: 'var(--pa)',
+    name: 'Foundations',
+    shortName: 'Foundations',
+    tagline: 'Math, prob, opt, numerical, DSA',
+    subs: [
+      { id: 'A1', name: 'Linear algebra', topics: [
+        ['Vector spaces, norms, basis', 1],
+        ['Matrix calculus, chain rule', 1],
+        ['Eigendecomposition, SVD', 0],
+        ['Matrix factorizations (LU, QR, Cholesky)', 0],
+        ['Pseudo-inverse, least squares', 0],
+        ['Tensor algebra, einsum', 0],
+      ]},
+      { id: 'A2', name: 'Probability & info theory', topics: [
+        ['Distributions (Bernoulli, Gaussian, exp. family)', 1],
+        ['Bayes rule, conditional probability', 1],
+        ['Entropy, KL divergence, mutual information', 1],
+        ['Cross-entropy, MLE', 1],
+        ['MAP, conjugate priors', 0],
+        ['Concentration inequalities', 0],
+        ['Markov chains, stochastic processes', 0],
+        ['Information geometry', 0, 1],
+      ]},
+      { id: 'A3', name: 'Optimization theory', topics: [
+        ['Gradient descent, SGD, momentum', 1],
+        ['Adam family (Adam, AdamW, RMSProp)', 1],
+        ['Convex optimization (Boyd)', 0],
+        ['KKT, Lagrangian duality', 0],
+        ['Newton, BFGS, L-BFGS', 0],
+        ['Proximal methods', 0],
+        ['Bayesian optimization', 0, 1],
+      ]},
+      { id: 'A4', name: 'Numerical methods', topics: [
+        ['Numerical stability (log-sum-exp)', 1],
+        ['Iterative solvers (CG, GMRES)', 0],
+        ['Mixed-precision arithmetic', 0, 1],
+      ]},
+      { id: 'A5', name: 'Data structures & algorithms', topics: [
+        ['Complexity analysis (Big-O, amortized)', 0],
+        ['Core DSA (arrays, hashmaps, trees, heaps)', 0],
+        ['Algorithm paradigms (DP, greedy, D&C)', 0],
+        ['Graph algorithms (BFS/DFS, Dijkstra, MST)', 0],
+        ['Probabilistic structures (Bloom, HLL)', 0],
+      ]},
+    ]
+  },
+  {
+    letter: 'B', color: 'var(--pb)',
+    name: 'Statistics & Causal Inference',
+    shortName: 'Stats & Causal',
+    tagline: 'Frequentist, Bayesian, causal, experimental design',
+    subs: [
+      { id: 'B1', name: 'Frequentist inference', topics: [
+        ['MLE', 1],
+        ['Method of moments, MAP', 0],
+        ['Estimator properties', 0],
+        ['Fisher information, Cramér-Rao', 0],
+        ['Hypothesis testing (z, t, χ², ANOVA)', 0],
+        ['Multiple testing (Bonferroni, BH-FDR)', 0],
+      ]},
+      { id: 'B2', name: 'Bayesian inference', topics: [
+        ['Prior / likelihood / posterior', 0],
+        ['Conjugate families', 0],
+        ['Hierarchical Bayesian models', 0],
+        ['Posterior predictive checks', 0],
+      ]},
+      { id: 'B3', name: 'Resampling & validation', topics: [
+        ['Bootstrap, jackknife', 0],
+        ['Permutation tests', 0],
+        ['Cross-validation strategies', 0],
+      ]},
+      { id: 'B4', name: 'Experimental design', topics: [
+        ['A/B testing (CUPED, sequential)', 0],
+        ['Power analysis, sample-size', 0],
+        ['Multi-armed bandits', 0, 1],
+        ['Contextual bandits', 0, 1],
+      ]},
+      { id: 'B5', name: 'Causal inference', topics: [
+        ['Structural causal models (Pearl)', 0],
+        ['DAGs, d-separation', 0],
+        ['do-calculus, identifiability', 0],
+        ['Counterfactuals & potential outcomes', 0],
+        ['Propensity scores, IPW', 0],
+        ['Instrumental variables', 0],
+        ['Diff-in-differences, synthetic controls', 0],
+        ['Double / debiased ML', 0, 1],
+        ['Causal forests, meta-learners', 0, 1],
+        ['Causal representation learning', 0, 1],
+      ]},
+    ]
+  },
+  {
+    letter: 'C', color: 'var(--pc)',
+    name: 'Classical Machine Learning',
+    shortName: 'Classical ML',
+    tagline: 'Linear, kernel, tree, clustering, rec sys, ANN',
+    subs: [
+      { id: 'C1', name: 'Linear & GLMs', topics: [
+        ['Linear regression (OLS, MLE)', 1],
+        ['Logistic regression', 1],
+        ['Softmax / multinomial', 1],
+        ['Regularization (L1/L2/ElasticNet)', 2],
+        ['GLMs (Poisson, Gamma)', 0],
+      ]},
+      { id: 'C2', name: 'Margin & kernel methods', topics: [
+        ['Support Vector Machines', 0],
+        ['Kernel trick & RKHS', 0],
+        ['Gaussian processes', 0],
+      ]},
+      { id: 'C3', name: 'Tree-based methods', topics: [
+        ['Decision trees', 0],
+        ['Random forests', 0],
+        ['Gradient boosting (XGBoost, LightGBM, CatBoost)', 0],
+      ]},
+      { id: 'C4', name: 'Instance & probabilistic', topics: [
+        ['k-NN', 0],
+        ['Naive Bayes', 0],
+        ['LDA / QDA', 0],
+      ]},
+      { id: 'C5', name: 'Unsupervised learning', topics: [
+        ['k-means, k-medoids', 0],
+        ['DBSCAN, HDBSCAN', 0],
+        ['Hierarchical clustering', 0],
+        ['GMM + EM', 0],
+        ['PCA (linear)', 0],
+        ['t-SNE, UMAP', 0],
+      ]},
+      { id: 'C6', name: 'Anomaly detection', topics: [
+        ['Isolation Forest', 0],
+        ['One-class SVM', 0],
+        ['Autoencoder-based AD', 0],
+      ]},
+      { id: 'C7', name: 'Ensembles', topics: [
+        ['Bagging, boosting, stacking', 0],
+        ['AutoML platforms', 0, 1],
+      ]},
+      { id: 'C8', name: 'Recommendation systems', topics: [
+        ['Collaborative filtering', 0],
+        ['Matrix factorization (SVD, ALS, NMF)', 0],
+        ['Two-tower / neural CF', 0, 1],
+        ['Sequential rec (SASRec, BERT4Rec)', 0, 1],
+      ]},
+      { id: 'C9', name: 'Approximate nearest neighbor', topics: [
+        ['LSH, MinHash', 0],
+        ['HNSW, IVF, Product Quantization', 0],
+        ['Vector DBs (FAISS, Pinecone, pgvector)', 0, 1],
+      ]},
+      { id: 'C10', name: 'Evaluation & selection', topics: [
+        ['Metrics (precision/recall, ROC/AUC, calibration)', 0],
+        ['Probability calibration (Platt, isotonic)', 0],
+        ['HPO search (grid, random, BO)', 0],
+      ]},
+    ]
+  },
+  {
+    letter: 'D', color: 'var(--pd)',
+    name: 'Deep Learning — Core & Tracks',
+    shortName: 'Deep Learning',
+    tagline: 'MLPs, CV, sequence, generative, SSL, GNN, training systems',
+    subs: [
+      { id: 'D1', name: 'Core building blocks', topics: [
+        ['Perceptron → MLPs', 1],
+        ['Backpropagation, autodiff', 1],
+        ['Universal approximation', 1],
+        ['Activations (ReLU, GELU, Swish)', 1],
+        ['Initialization (Xavier, He)', 1],
+        ['Normalization (BN, LN, RMSNorm)', 1],
+        ['Regularization (dropout, weight decay)', 1],
+        ['Optimizers (SGD, Adam, AdamW)', 1],
+      ]},
+      { id: 'D2', name: 'Computer Vision', topics: [
+        ['Convolution & pooling intuition', 2],
+        ['CNN architectures (LeNet → ResNet → ConvNeXt)', 0],
+        ['Object detection (R-CNN, YOLO, DETR)', 0],
+        ['Segmentation (U-Net, Mask R-CNN)', 0],
+        ['Segment Anything (SAM, SAM 2)', 0, 1],
+        ['Vision Transformers (ViT, Swin, DeiT)', 0],
+        ['Self-supervised vision (DINO, MAE)', 0, 1],
+        ['3D / neural rendering (NeRF, Gaussian Splatting)', 0, 1],
+      ]},
+      { id: 'D3', name: 'Sequence modeling', topics: [
+        ['Word embeddings (word2vec, GloVe)', 2],
+        ['RNN, LSTM, GRU', 0],
+        ['Seq2seq + attention (Bahdanau, Luong)', 0],
+        ['Transformer (encoder/decoder)', 1],
+        ['State Space Models — S4, Mamba, Mamba-2', 0, 1],
+        ['Linear / sub-quadratic attention', 0, 1],
+        ['RWKV, Hyena, RetNet', 0, 1],
+        ['Hybrid arch (Jamba, Griffin)', 0, 1],
+      ]},
+      { id: 'D4', name: 'Generative modeling', topics: [
+        ['Autoencoders', 0],
+        ['Variational Autoencoders (VAE, β-VAE, VQ-VAE)', 0],
+        ['GANs (DCGAN, StyleGAN, BigGAN)', 0],
+        ['Normalizing flows', 0],
+        ['Diffusion models (DDPM, DDIM, EDM)', 0, 1],
+        ['Latent diffusion (Stable Diffusion)', 0, 1],
+        ['Flow matching, rectified flow', 0, 1],
+        ['Consistency models', 0, 1],
+      ]},
+      { id: 'D5', name: 'Self-supervised learning', topics: [
+        ['Contrastive (SimCLR, MoCo, CLIP)', 0],
+        ['Non-contrastive (BYOL, DINO)', 0],
+        ['Masked Language Modeling', 2],
+        ['Masked image modeling (MAE, BEiT)', 0],
+      ]},
+      { id: 'D6', name: 'Graph Neural Networks', topics: [
+        ['Message passing framework', 0],
+        ['GCN, GraphSAGE, GAT', 0],
+        ['Graph Transformers', 0, 1],
+        ['Equivariant / geometric DL', 0, 1],
+      ]},
+      { id: 'D7', name: 'Training systems', topics: [
+        ['Mixed precision (FP16, BF16, FP8)', 0, 1],
+        ['Distributed training (DDP, FSDP, ZeRO)', 0, 1],
+        ['Pipeline & tensor parallelism', 0, 1],
+        ['Gradient checkpointing', 0],
+        ['Compilation (torch.compile, XLA, Triton)', 0, 1],
+        ['FlashAttention v1/v2/v3', 0, 1],
+      ]},
+    ]
+  },
+  {
+    letter: 'E', color: 'var(--pe)',
+    name: 'NLP & Language Models',
+    shortName: 'NLP & LLMs',
+    tagline: 'Tokenization, LLMs, alignment, agents — espinha do AI ML Theory',
+    subs: [
+      { id: 'E1', name: 'Classical NLP', topics: [
+        ['Tokenization (BPE, WordPiece, SentencePiece)', 1],
+        ['n-gram LM, smoothing', 0],
+        ['POS tagging, NER (HMM/CRF era)', 0],
+        ['Parsing (dependency, constituency)', 0],
+        ['Topic models (LDA, NMF)', 0],
+        ['Information retrieval (TF-IDF, BM25)', 0],
+      ]},
+      { id: 'E2', name: 'Pre-Transformer neural NLP', topics: [
+        ['Word embeddings (word2vec, GloVe, fastText)', 2],
+        ['ELMo, contextual embeddings', 0],
+        ['Seq2seq + attention', 0],
+      ]},
+      { id: 'E3', name: 'Transformer LMs', topics: [
+        ['Encoder-only (BERT, RoBERTa)', 0],
+        ['Encoder-decoder (T5, BART)', 0],
+        ['Decoder-only / GPT family', 1],
+        ['Positional encodings (RoPE, ALiBi)', 1],
+        ['Mixture of Experts (Mixtral, DeepSeek-V3)', 0, 1],
+        ['Grouped Query Attention, MQA', 0, 1],
+      ]},
+      { id: 'E4', name: 'Training LLMs', topics: [
+        ['Pretraining, data curation', 1],
+        ['Scaling laws (Kaplan, Chinchilla)', 0, 1],
+        ['Supervised fine-tuning (SFT)', 1],
+        ['RLHF (PPO end-to-end)', 1],
+        ['DPO, IPO, KTO, ORPO', 1],
+        ['GRPO', 1],
+        ['Constitutional AI / RLAIF', 1],
+        ['Parameter-efficient FT (LoRA, QLoRA, DoRA)', 0, 1],
+      ]},
+      { id: 'E5', name: 'Inference & serving', topics: [
+        ['Decoding (greedy, beam, top-k, top-p)', 1],
+        ['KV cache', 1],
+        ['Speculative decoding', 1, 1],
+        ['Quantization (GPTQ, AWQ, GGUF)', 0, 1],
+        ['Inference engines (vLLM, TGI, SGLang)', 0, 1],
+      ]},
+      { id: 'E6', name: 'LLM agents & retrieval', topics: [
+        ['RAG fundamentals', 0],
+        ['Advanced RAG (HyDE, rerankers, graph RAG)', 0],
+        ['Tool use, function calling', 0],
+        ['ReAct, Reflexion agents', 0],
+        ['Chain-of-Thought, self-consistency', 0],
+        ['Test-time compute (o1, DeepSeek-R1)', 0, 1],
+        ['Multi-agent systems (AutoGen, CrewAI)', 0],
+      ]},
+      { id: 'E7', name: 'Multimodal', topics: [
+        ['Vision-Language (CLIP, BLIP-2)', 0],
+        ['LMMs (LLaVA, GPT-4V)', 0],
+        ['Audio LLMs (Whisper, Wav2Vec)', 0],
+        ['Text-to-image (DALL-E, SD, Midjourney)', 0],
+        ['Text-to-video (Sora, Veo)', 0, 1],
+      ]},
+      { id: 'E8', name: 'Interpretability & alignment science', topics: [
+        ['Probing & linear classifiers', 2],
+        ['Mechanistic interpretability (circuits)', 1, 1],
+        ['Sparse Autoencoders (SAEs)', 0, 1],
+        ['Activation patching', 2],
+        ['Representation engineering', 0, 1],
+        ['Scalable oversight, weak-to-strong', 0, 1],
+      ]},
+    ]
+  },
+  {
+    letter: 'F', color: 'var(--pf)',
+    name: 'Probabilistic Graphical Models',
+    shortName: 'PGMs',
+    tagline: 'Bayes nets, MRFs, HMM, VI, MCMC, latent variable models',
+    subs: [
+      { id: 'F1', name: 'Directed models', topics: [
+        ['Bayesian networks', 0],
+        ['Plate notation', 0],
+        ['d-separation', 0],
+      ]},
+      { id: 'F2', name: 'Undirected models', topics: [
+        ['Markov random fields', 0],
+        ['Conditional random fields (CRF)', 0],
+        ['Factor graphs', 0],
+      ]},
+      { id: 'F3', name: 'Temporal graphical models', topics: [
+        ['Hidden Markov Models (HMM)', 0],
+        ['Kalman & extended Kalman filters', 0],
+        ['Particle filters / sequential MC', 0],
+      ]},
+      { id: 'F4', name: 'Exact inference', topics: [
+        ['Variable elimination', 0],
+        ['Belief propagation', 0],
+        ['Junction tree', 0],
+      ]},
+      { id: 'F5', name: 'Approximate inference', topics: [
+        ['Mean-field variational inference', 0],
+        ['Stochastic VI (SVI)', 0, 1],
+        ['Amortized VI (encoder networks)', 0, 1],
+        ['Normalizing flow posteriors', 0, 1],
+      ]},
+      { id: 'F6', name: 'Sampling', topics: [
+        ['Rejection & importance sampling', 0],
+        ['MCMC (Metropolis-Hastings)', 0],
+        ['Gibbs sampling', 0],
+        ['Hamiltonian MC, NUTS', 0],
+        ['Langevin dynamics, SGLD', 0, 1],
+      ]},
+      { id: 'F7', name: 'Latent variable models', topics: [
+        ['EM algorithm', 0],
+        ['LDA topic model', 0],
+        ['Probabilistic PCA, factor analysis', 0],
+      ]},
+      { id: 'F8', name: 'Modern Bayesian DL', topics: [
+        ['VAE (cross-ref D4)', 0],
+        ['MC dropout, deep ensembles', 0],
+        ['Bayesian neural networks', 0],
+        ['Uncertainty, conformal prediction', 0],
+      ]},
+    ]
+  },
+  {
+    letter: 'G', color: 'var(--pg)',
+    name: 'Time Series & Forecasting',
+    shortName: 'Time Series',
+    tagline: 'ARIMA, state-space, DL forecasting, TS foundation models',
+    subs: [
+      { id: 'G1', name: 'Classical statistical TS', topics: [
+        ['Stationarity, ACF/PACF, ADF/KPSS', 0],
+        ['ARIMA family (AR, MA, SARIMA)', 0],
+        ['Exponential smoothing (Holt-Winters, ETS)', 0],
+        ['State-space + Kalman filtering', 0],
+        ['VAR, VECM, cointegration', 0],
+        ['GARCH (volatility)', 0],
+        ['Spectral analysis (Fourier, wavelets)', 0],
+      ]},
+      { id: 'G2', name: 'ML for time series', topics: [
+        ['Feature engineering (lags, rolling, Fourier)', 0],
+        ['XGBoost/LightGBM forecasting', 0],
+        ['Hierarchical / grouped forecasting', 0],
+        ['Prophet, Greykite', 0],
+      ]},
+      { id: 'G3', name: 'Deep learning for TS', topics: [
+        ['DeepAR (probabilistic, RNN-based)', 0],
+        ['N-BEATS, N-HiTS', 0],
+        ['Temporal Fusion Transformer (TFT)', 0],
+        ['Informer, Autoformer, FEDformer', 0],
+        ['PatchTST, iTransformer', 0, 1],
+        ['TS foundation models (TimeGPT, Chronos, Lag-Llama)', 0, 1],
+      ]},
+      { id: 'G4', name: 'Anomaly & change-point', topics: [
+        ['Statistical (IQR, ESD, CUSUM)', 0],
+        ['Deep AD (LSTM-AE, Transformer-AE)', 0],
+      ]},
+      { id: 'G5', name: 'Causal time series', topics: [
+        ['Granger causality', 0],
+        ['CausalImpact (Bayesian structural TS)', 0],
+        ['Synthetic control for TS', 0, 1],
+      ]},
+    ]
+  },
+  {
+    letter: 'H', color: 'var(--ph)',
+    name: 'Reinforcement Learning',
+    shortName: 'RL',
+    tagline: 'MDPs, deep RL, model-based, RLHF',
+    subs: [
+      { id: 'H1', name: 'RL foundations', topics: [
+        ['MDPs, Bellman equations', 0],
+        ['Value iteration, policy iteration', 0],
+        ['Monte Carlo & TD methods', 0],
+        ['Q-learning, SARSA', 0],
+      ]},
+      { id: 'H2', name: 'Deep RL', topics: [
+        ['DQN family (Double, Dueling, Rainbow)', 0],
+        ['Policy gradient (REINFORCE)', 1],
+        ['Actor-critic (A2C, A3C)', 2],
+        ['PPO', 1],
+        ['DDPG, TD3, SAC', 0],
+        ['GRPO', 1],
+      ]},
+      { id: 'H3', name: 'Model-based RL', topics: [
+        ['Dyna-Q, planning', 0],
+        ['MuZero, AlphaZero', 0, 1],
+        ['World models (Dreamer)', 0, 1],
+      ]},
+      { id: 'H4', name: 'Exploration', topics: [
+        ['ε-greedy, UCB, Thompson sampling', 0],
+        ['Intrinsic motivation, RND', 0],
+      ]},
+      { id: 'H5', name: 'Beyond standard RL', topics: [
+        ['Imitation learning, behavioral cloning', 0],
+        ['Inverse RL', 0],
+        ['Offline RL (CQL, IQL)', 0, 1],
+        ['Multi-agent RL', 0],
+        ['Hierarchical RL', 0],
+      ]},
+      { id: 'H6', name: 'RL ↔ LLMs', topics: [
+        ['RLHF end-to-end', 1],
+        ['DPO, IPO, KTO, RLAIF', 1],
+        ['Process reward models', 1],
+        ['Reward hacking', 1],
+        ['Verifier-guided / RLVR (R1 style)', 0, 1],
+      ]},
+    ]
+  },
+  {
+    letter: 'I', color: 'var(--pi)',
+    name: 'MLOps & Production Systems',
+    shortName: 'MLOps',
+    tagline: 'Data, training infra, deployment, monitoring',
+    subs: [
+      { id: 'I1', name: 'Data engineering', topics: [
+        ['ETL/ELT pipelines (Airflow, Dagster, Prefect)', 0],
+        ['Feature stores (Feast, Tecton)', 0],
+        ['Data versioning (DVC, lakeFS)', 0],
+        ['Data quality & drift detection', 0],
+      ]},
+      { id: 'I2', name: 'Training infrastructure', topics: [
+        ['Experiment tracking (W&B, MLflow)', 0],
+        ['HPO orchestration (Optuna, Ray Tune)', 0],
+        ['Distributed orchestrators (Ray, DeepSpeed)', 0],
+      ]},
+      { id: 'I3', name: 'Deployment & serving', topics: [
+        ['Classical serving (TF Serving, TorchServe)', 0],
+        ['LLM serving (vLLM, TGI, Ollama)', 0, 1],
+        ['Quantization, distillation, pruning', 0],
+        ['Edge / on-device (ONNX, CoreML)', 0],
+      ]},
+      { id: 'I4', name: 'Monitoring & governance', topics: [
+        ['Performance monitoring (latency, throughput, p99)', 0],
+        ['Concept drift, data drift', 0],
+        ['LLM evals (lm-eval, MMLU, HELM)', 0],
+        ['Safety evals, red-teaming', 0, 1],
+        ['Cost monitoring (token economics)', 0],
+      ]},
+    ]
+  },
+  {
+    letter: 'J', color: 'var(--pj)',
+    name: 'AI Engineering',
+    shortName: 'AI Engineering',
+    tagline: 'RAG, agents, MCP, production, Cloud AI — roadmap do AI Eng Journey',
+    subs: [
+      { id: 'J1', name: 'Fundamentos (RAG, tool_use, agentes)', topics: [
+        ['RAG do zero (pypdf, ChromaDB, embeddings)', 0],
+        ['Native tool_use (Claude API, schema injection)', 0],
+        ['ReAct loop manual', 0],
+        ['LangChain (@tool, create_react_agent, memória)', 0],
+        ['LangGraph (StateGraph, nodes, edges, routers)', 0],
+      ]},
+      { id: 'J2', name: 'Pensamento de sistemas', topics: [
+        ['MCP — protocolo, servidores, integrações', 0, 1],
+        ['Desenhar um servidor MCP (granularidade, versionamento)', 0, 1],
+        ['Evaluation — LLM-as-judge, datasets, regressão', 0],
+        ['RAG de produção (chunking, hybrid search, rerank)', 0],
+        ['Data Lake × Warehouse × Lakehouse', 0],
+      ]},
+      { id: 'J3', name: 'Production grade & integração enterprise', topics: [
+        ['API design (FastAPI, streaming, async, versioning)', 0],
+        ['Camada de governança (auth, rate limiting, cost attribution)', 0],
+        ['Deployment (Docker, CI/CD, env config, secrets)', 0],
+        ['Observabilidade (tracing, latência, LangSmith)', 0],
+        ['Surfaces (Slack/Teams/Outlook integration)', 0],
+        ['Security thread (prompt injection, data exfiltration)', 0, 1],
+        ['Multi-source ingestion (REST + S3 + DB)', 0],
+        ['ELT × ETL + dbt mental model', 0],
+      ]},
+      { id: 'J4', name: 'Padrões avançados', topics: [
+        ['Quando NÃO fine-tunar (prompting + RAG + long context)', 0],
+        ['LoRA / QLoRA (sessão única, não-caixa-preta)', 0, 1],
+        ['DSPy, prompt optimization, context engineering', 0, 1],
+        ['Multi-agent (supervisor, worker, handoffs, shared memory)', 0, 1],
+        ['Custo & latência (caching, model routing, prompt compression)', 0, 1],
+      ]},
+      { id: 'J5', name: 'Data platform para IA', topics: [
+        ['dbt em profundidade', 0],
+        ['Orquestração (Dagster ou Airflow)', 0],
+        ['Data contracts', 0],
+        ['Vector infra em escala (pgvector × managed)', 0, 1],
+        ['Hybrid search, embedding lifecycle', 0, 1],
+        ['Event-driven & streaming para IA (Kafka, CDC)', 0],
+        ['Feature stores & embedding stores (Feast)', 0],
+      ]},
+      { id: 'J6', name: 'Cloud AI & integração enterprise', topics: [
+        ['AWS Bedrock end-to-end (KB, Agents, Guardrails)', 0, 1],
+        ['Managed × self-hosted LangGraph (tradeoffs)', 0],
+        ['Identidade & segurança (IAM, VPC, SSO, OAuth)', 0],
+        ['API gateway, service mesh, multi-tenancy', 0],
+        ['Cost & FinOps para IA (caching tiers, reserved capacity)', 0, 1],
+      ]},
+      { id: 'J7', name: 'Skills de arquiteto', topics: [
+        ['AI governance (LGPD/GDPR para sistemas IA)', 0],
+        ['Red teaming, prompt injection em escala', 0, 1],
+        ['Reference architectures, ADRs, C4 diagrams', 0],
+        ['System design para IA (architect-interview style)', 0],
+        ['Capacity / cost modeling', 0],
+      ]},
+    ]
+  },
+];
+
+// ============================================================
+// CONNECTIONS — mirrors src/lib/dag.ts CONNECTIONS
+// kind: shared-concept | uses | alternative | generalizes
+// ============================================================
+const CONNECTIONS = [
+  // ---- A. Foundations radiating outward
+  { from: 'A1', to: 'C5',  label: 'SVD ⇒ PCA',                              kind: 'uses' },
+  { from: 'A1', to: 'C8',  label: 'Matrix factorization for rec sys',       kind: 'uses' },
+  { from: 'A2', to: 'E4',  label: 'KL divergence (RLHF penalty)',           kind: 'shared-concept' },
+  { from: 'A2', to: 'F1',  label: 'Bayes rule ⇒ Bayes nets',                kind: 'generalizes' },
+  { from: 'A2', to: 'B2',  label: 'Probability ⇒ Bayesian inference',      kind: 'uses' },
+  { from: 'A3', to: 'D1',  label: 'Optimization powers training',          kind: 'uses' },
+  { from: 'A3', to: 'H2',  label: 'Policy gradient is gradient descent',   kind: 'uses' },
+  { from: 'A5', to: 'D6',  label: 'Graph algorithms ⇒ GNNs',                kind: 'uses' },
+  { from: 'A4', to: 'D7',  label: 'Numerical stability ⇒ mixed precision', kind: 'uses' },
+
+  // ---- B. Statistics & Causal
+  { from: 'B2', to: 'F5',  label: 'Bayesian inference ⇒ VI',                kind: 'uses' },
+  { from: 'B2', to: 'F6',  label: 'Bayesian inference ⇒ MCMC',              kind: 'uses' },
+  { from: 'B4', to: 'H4',  label: 'Bandits ↔ RL exploration',               kind: 'shared-concept' },
+  { from: 'B5', to: 'G5',  label: 'Causal inference for TS',                kind: 'shared-concept' },
+
+  // ---- C. Classical ML bridges to DL
+  { from: 'C1', to: 'D1',  label: 'Linear → MLPs',                          kind: 'generalizes' },
+  { from: 'C5', to: 'D5',  label: 'PCA → representation learning',          kind: 'generalizes' },
+  { from: 'C7', to: 'G2',  label: 'XGBoost on time series',                 kind: 'uses' },
+  { from: 'C8', to: 'C9',  label: 'Rec sys uses ANN search',                kind: 'uses' },
+  { from: 'C9', to: 'E6',  label: 'Vector DBs power RAG',                   kind: 'uses' },
+  { from: 'C9', to: 'J5',  label: 'Vector infra in data platform',          kind: 'uses' },
+
+  // ---- D. Deep Learning cross-links
+  { from: 'D1', to: 'D2',  label: 'Core ⇒ CNNs',                            kind: 'uses' },
+  { from: 'D1', to: 'D3',  label: 'Core ⇒ sequence models',                 kind: 'uses' },
+  { from: 'D2', to: 'D3',  label: 'ViT applies Transformer to images',     kind: 'uses' },
+  { from: 'D3', to: 'E3',  label: 'Transformer ⇒ LLMs',                     kind: 'generalizes' },
+  { from: 'D4', to: 'F5',  label: 'VAEs use variational inference',         kind: 'uses' },
+  { from: 'D4', to: 'F8',  label: 'VAE / Bayesian DL overlap',              kind: 'shared-concept' },
+  { from: 'D5', to: 'E7',  label: 'CLIP bridges vision + language',         kind: 'shared-concept' },
+  { from: 'D6', to: 'E6',  label: 'Graph RAG',                              kind: 'uses' },
+  { from: 'D7', to: 'E5',  label: 'FlashAttention ⇒ fast inference',        kind: 'uses' },
+  { from: 'D7', to: 'I3',  label: 'Training systems ⇒ deployment',          kind: 'uses' },
+
+  // ---- E. NLP / LLMs
+  { from: 'E1', to: 'F3',  label: 'HMM/CRF era of NLP',                     kind: 'shared-concept' },
+  { from: 'E1', to: 'F7',  label: 'LDA is a latent variable model',         kind: 'shared-concept' },
+  { from: 'E1', to: 'E6',  label: 'BM25 / TF-IDF in RAG',                   kind: 'uses' },
+  { from: 'E3', to: 'G3',  label: 'Transformers for time series',           kind: 'shared-concept' },
+  { from: 'E4', to: 'H6',  label: 'RLHF / DPO are RL on LMs',               kind: 'shared-concept' },
+  { from: 'E5', to: 'I3',  label: 'LLM serving (vLLM, TGI)',                kind: 'shared-concept' },
+  { from: 'E6', to: 'J1',  label: 'RAG fundamentals overlap',               kind: 'shared-concept' },
+  { from: 'E6', to: 'J2',  label: 'Tool use ↔ MCP',                         kind: 'shared-concept' },
+  { from: 'E7', to: 'D2',  label: 'Multimodal needs vision',                kind: 'uses' },
+  { from: 'E8', to: 'I4',  label: 'Mech interp ⇒ safety evals',             kind: 'uses' },
+  { from: 'E8', to: 'J7',  label: 'Interp ⇒ governance',                    kind: 'uses' },
+
+  // ---- F. PGMs ↔ Time Series
+  { from: 'F3', to: 'G1',  label: 'Kalman = state-space TS',                kind: 'shared-concept' },
+  { from: 'F5', to: 'F8',  label: 'VI powers Bayesian DL',                  kind: 'uses' },
+
+  // ---- G. Time Series ↔ DL
+  { from: 'G3', to: 'D3',  label: 'DL forecasting uses sequence models',   kind: 'uses' },
+
+  // ---- H. RL ↔ LLMs
+  { from: 'H1', to: 'H6',  label: 'RL foundations ⇒ RLHF',                  kind: 'generalizes' },
+  { from: 'H5', to: 'J4',  label: 'Multi-agent RL ↔ multi-agent LLM',       kind: 'shared-concept' },
+
+  // ---- I. MLOps ↔ AI Engineering
+  { from: 'I1', to: 'J5',  label: 'Data eng ↔ AI data platform',            kind: 'shared-concept' },
+  { from: 'I3', to: 'J3',  label: 'Deployment in production',               kind: 'shared-concept' },
+  { from: 'I3', to: 'J6',  label: 'Cloud AI extends serving',               kind: 'uses' },
+  { from: 'I4', to: 'J7',  label: 'Monitoring ⇒ governance',                kind: 'uses' },
+
+  // ---- J. AI Engineering internal flow
+  { from: 'J1', to: 'J2',  label: 'Fundamentos → sistemas',                 kind: 'uses' },
+  { from: 'J2', to: 'J3',  label: 'Sistemas → produção',                    kind: 'uses' },
+  { from: 'J3', to: 'J4',  label: 'Produção → padrões avançados',           kind: 'uses' },
+  { from: 'J3', to: 'J5',  label: 'Produção → data platform',               kind: 'uses' },
+  { from: 'J5', to: 'J6',  label: 'Data platform → Cloud AI',               kind: 'uses' },
+  { from: 'J6', to: 'J7',  label: 'Cloud → arquiteto',                      kind: 'uses' },
+];
+
+// ============================================================
+// PATHS — curated reading sequences across the DAG
+// ============================================================
+const PATHS = [
+  {
+    name: '🎓 LLM Researcher',
+    desc: 'Espinha clássica de LLMs: math → DL → Transformers → alignment.',
+    pillars: ['A2','A3','D1','D3','E3','E4','E8','H6'],
+    color: 'var(--pe)',
+  },
+  {
+    name: '🛠️ AI Engineer (applied)',
+    desc: 'O roadmap do AI Eng Journey: RAG → MCP → produção → cloud.',
+    pillars: ['E6','J1','J2','J3','J4','J5','J6','J7'],
+    color: 'var(--pj)',
+  },
+  {
+    name: '📈 Causal & Experimental DS',
+    desc: 'Estatística rigorosa + causal inference para decisão de produto.',
+    pillars: ['A2','B1','B2','B4','B5','G5'],
+    color: 'var(--pb)',
+  },
+  {
+    name: '🏭 ML Platform / MLOps',
+    desc: 'Dados, treino distribuído, serving e monitoring em escala.',
+    pillars: ['A5','D7','E5','I1','I2','I3','I4'],
+    color: 'var(--pi)',
+  },
+  {
+    name: '🔬 Frontier Researcher',
+    desc: 'Tópicos ★ 2023–2025: SSMs, diffusion, SAEs, R1-style RL, MCP.',
+    pillars: ['D3','D4','D7','E4','E6','E8','H6','J2'],
+    color: 'var(--pf)',
+  },
+  {
+    name: '👁️ Computer Vision',
+    desc: 'Da CNN ao SAM/NeRF, com cruzamento para SSL e multimodal.',
+    pillars: ['D2','D5','E7'],
+    color: 'var(--pd)',
+  },
+];
+
+// ============================================================
+// Helpers
+// ============================================================
+const STATUS_GLYPH = { 0: '○', 1: '✓', 2: '◐' };
+const ALL_SUBS = PILLARS.flatMap(p => p.subs.map(s => ({ ...s, pillar: p })));
+const SUB_BY_ID = Object.fromEntries(ALL_SUBS.map(s => [s.id, s]));
+
+function connsFor(id) {
+  return {
+    out: CONNECTIONS.filter(c => c.from === id),
+    in:  CONNECTIONS.filter(c => c.to === id),
+  };
+}
+function neighborsOf(id) {
+  const set = new Set([id]);
+  CONNECTIONS.forEach(c => {
+    if (c.from === id) set.add(c.to);
+    if (c.to === id) set.add(c.from);
+  });
+  const sub = SUB_BY_ID[id];
+  if (sub) {
+    const i = sub.pillar.subs.findIndex(s => s.id === id);
+    if (i > 0) set.add(sub.pillar.subs[i - 1].id);
+    if (i < sub.pillar.subs.length - 1) set.add(sub.pillar.subs[i + 1].id);
+  }
+  return set;
+}
+
+// ============================================================
+// Render: cards / dashboard / pillars
+// ============================================================
+function renderTopic(t) {
+  const [name, status, hot = 0] = t;
+  return `<div class="topic" data-status="${status}" data-hot="${hot}" data-name="${name.toLowerCase()}">
+    <span class="icon">${STATUS_GLYPH[status]}</span>
+    <span class="name">${name}</span>
+    ${hot ? '<span class="hot-flame">★</span>' : ''}
+  </div>`;
+}
+function renderSubsection(s) {
+  const c = connsFor(s.id);
+  const total = c.out.length + c.in.length;
+  const hasConn = total > 0;
+  return `<div class="subsection" data-sub-id="${s.id}">
+    <h4 onclick="toggleSub(this.parentElement)" title="Clique para recolher/expandir">
+      <span class="chevron">▾</span>${hasConn ? `<span class="conn-count has" title="${total} conexão(ões) cruzadas">🔗 ${total}</span>` : ''}
+      <span class="sub-id">${s.id}</span>${s.name}
+    </h4>
+    <div class="topics">${s.topics.map(renderTopic).join('')}</div>
+  </div>`;
+}
+function pillarStats(p) {
+  const all = p.subs.flatMap(s => s.topics);
+  const cov = all.filter(t => t[1] === 1).length;
+  const par = all.filter(t => t[1] === 2).length;
+  const gap = all.filter(t => t[1] === 0).length;
+  const hot = all.filter(t => t[2]).length;
+  const total = all.length;
+  return { total, cov, par, gap, hot,
+           pctCov: (cov/total*100).toFixed(0),
+           pctPar: (par/total*100).toFixed(0),
+           pctGap: (gap/total*100).toFixed(0),
+           pctTotal: ((cov + par*0.5)/total*100).toFixed(0) };
+}
+function renderPillar(p) {
+  const s = pillarStats(p);
+  return `<section class="pillar" id="${p.letter}" style="--pillar-color: ${p.color}">
+    <header class="pillar-header" onclick="togglePillar('${p.letter}')" title="Clique para recolher/expandir o pilar inteiro">
+      <div class="pillar-letter">${p.letter}</div>
+      <div class="pillar-title">
+        <h2>${p.name}</h2>
+        <p>${p.tagline}</p>
+      </div>
+      <div class="pillar-stats">
+        <div class="stat-pct">${s.pctTotal}% <span class="pillar-chev">▾</span></div>
+        <div class="stat-counts">${s.cov}/${s.total} cobertos · ${s.par} parciais · ${s.hot} hot</div>
+        <div class="stat-bar">
+          <div class="seg covered" style="width:${s.pctCov}%"></div>
+          <div class="seg partial" style="width:${s.pctPar}%"></div>
+          <div class="seg gap" style="width:${s.pctGap}%"></div>
+        </div>
+      </div>
+    </header>
+    <div class="subsections">
+      ${p.subs.map(renderSubsection).join('')}
+    </div>
+  </section>`;
+}
+function globalStats() {
+  const all = PILLARS.flatMap(p => p.subs.flatMap(s => s.topics));
+  return {
+    total: all.length,
+    cov: all.filter(t => t[1] === 1).length,
+    par: all.filter(t => t[1] === 2).length,
+    gap: all.filter(t => t[1] === 0).length,
+    hot: all.filter(t => t[2]).length,
+    hotGap: all.filter(t => t[2] && t[1] === 0).length,
+  };
+}
+function renderDashboard() {
+  const s = globalStats();
+  const pctOverall = ((s.cov + s.par*0.5) / s.total * 100).toFixed(0);
+  const nSubs = PILLARS.reduce((n, p) => n + p.subs.length, 0);
+  document.getElementById('dashboard').innerHTML = `
+    <div class="big-stat">
+      <div class="big-num">${s.total}</div>
+      <div class="big-label">Tópicos totais</div>
+      <div class="big-sub">${PILLARS.length} pilares · ${nSubs} subseções</div>
+    </div>
+    <div class="big-stat covered">
+      <div class="big-num">${s.cov}</div>
+      <div class="big-label">✓ Cobertos</div>
+      <div class="big-sub">${pctOverall}% do mapa</div>
+    </div>
+    <div class="big-stat partial">
+      <div class="big-num">${s.par}</div>
+      <div class="big-label">◐ Parciais</div>
+      <div class="big-sub">mencionados, não aprofundados</div>
+    </div>
+    <div class="big-stat gap">
+      <div class="big-num">${s.gap}</div>
+      <div class="big-label">○ Gaps</div>
+      <div class="big-sub">candidatos a expansão</div>
+    </div>
+    <div class="big-stat hot">
+      <div class="big-num">${s.hot}</div>
+      <div class="big-label">★ Hot</div>
+      <div class="big-sub">${s.hotGap} são hot gaps</div>
+    </div>
+    <div class="big-stat conn">
+      <div class="big-num">${CONNECTIONS.length}</div>
+      <div class="big-label">🔗 Conexões</div>
+      <div class="big-sub">cruzadas entre pilares</div>
+    </div>
+  `;
+}
+function renderQuickNav() {
+  document.getElementById('quick-nav').innerHTML =
+    PILLARS.map(p => `<a href="#${p.letter}" title="${p.name}">${p.letter}</a>`).join('');
+}
+function renderPaths() {
+  const grid = document.getElementById('paths-grid');
+  grid.innerHTML = PATHS.map(path => {
+    const subs = PILLARS.flatMap(p => p.subs.filter(s => path.pillars.includes(s.id)));
+    const all = subs.flatMap(s => s.topics);
+    const cov = all.filter(t => t[1] === 1).length;
+    const par = all.filter(t => t[1] === 2).length;
+    const total = all.length || 1;
+    const pctCov = cov / total * 100;
+    const pctPar = par / total * 100;
+    const pctGap = 100 - pctCov - pctPar;
+    return `<div class="path-card" style="--path-color: ${path.color}">
+      <h3>${path.name}</h3>
+      <p class="desc">${path.desc}</p>
+      <div class="pillars">${path.pillars.map(id => `<span>${id}</span>`).join('')}</div>
+      <div class="status-line">
+        ${cov}/${total} cobertos
+        <div class="mini-bar">
+          <div class="seg" style="width:${pctCov}%; background:var(--good)"></div>
+          <div class="seg" style="width:${pctPar}%; background:var(--partial)"></div>
+          <div class="seg" style="width:${pctGap}%; background:var(--gap); opacity:0.4"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// Filters
+// ============================================================
+const state = { filter: 'all', query: '' };
+function applyFilters() {
+  const q = state.query.toLowerCase().trim();
+  document.querySelectorAll('.topic').forEach(t => {
+    const status = t.dataset.status;
+    const hot = t.dataset.hot === '1';
+    const name = t.dataset.name;
+    let show = true;
+    switch (state.filter) {
+      case 'covered': show = (status === '1'); break;
+      case 'partial': show = (status === '2'); break;
+      case 'gap':     show = (status === '0'); break;
+      case 'hot':     show = hot; break;
+      case 'hot-gap': show = (hot && status === '0'); break;
+    }
+    if (show && q && !name.includes(q)) show = false;
+    t.classList.toggle('hidden', !show);
+  });
+  document.querySelectorAll('.subsection').forEach(s => {
+    const visible = s.querySelectorAll('.topic:not(.hidden)').length;
+    s.classList.toggle('hidden', visible === 0);
+  });
+  document.querySelectorAll('.pillar').forEach(p => {
+    const visible = p.querySelectorAll('.subsection:not(.hidden)').length;
+    p.classList.toggle('dimmed', visible === 0);
+  });
+}
+function setupHandlers() {
+  document.getElementById('filters').addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    state.filter = e.target.dataset.filter;
+    document.querySelectorAll('#filters button').forEach(b => b.classList.toggle('active', b === e.target));
+    applyFilters();
+  });
+  document.getElementById('search').addEventListener('input', e => {
+    state.query = e.target.value;
+    applyFilters();
+  });
+}
+
+// ============================================================
+// D3 force-directed connections graph
+// ============================================================
+function renderConnectionsGraph() {
+  const wrap = document.querySelector('.conn-graph-wrap');
+  const svgEl = document.getElementById('conn-graph');
+  const width = wrap.clientWidth || 1200;
+  const height = wrap.clientHeight || 720;
+
+  // Nodes — subsections
+  const nodes = PILLARS.flatMap(p => p.subs.map(s => ({
+    id: s.id,
+    name: s.name,
+    pillar: p,
+    topicCount: s.topics.length,
+    hotCount: s.topics.filter(t => t[2]).length,
+  })));
+
+  // Links — within-pillar sequence + cross-pillar connections
+  const withinLinks = PILLARS.flatMap(p =>
+    p.subs.slice(0, -1).map((s, i) => ({
+      source: s.id, target: p.subs[i + 1].id, kind: 'within'
+    }))
+  );
+  const crossLinks = CONNECTIONS.map(c => ({
+    source: c.from, target: c.to, kind: c.kind, label: c.label
+  }));
+  const links = [...withinLinks, ...crossLinks];
+
+  // Anchor positions — 5×2 grid of pillars.
+  // Top row sits a bit lower than a pure centered grid would put it, to
+  // leave clear breathing room above for the pillar labels.
+  const cols = 5;
+  const colW = width / cols;
+  const topRowY = 240;
+  const bottomRowY = height - 180;
+  const pillarPos = {};
+  PILLARS.forEach((p, i) => {
+    const rowIdx = Math.floor(i / cols);
+    pillarPos[p.letter] = {
+      x: colW * ((i % cols) + 0.5),
+      y: rowIdx === 0 ? topRowY : bottomRowY,
+    };
+  });
+  nodes.forEach(n => {
+    const pos = pillarPos[n.pillar.letter];
+    n.x = pos.x + (Math.random() - 0.5) * 60;
+    n.y = pos.y + (Math.random() - 0.5) * 60;
+  });
+
+  const svg = d3.select(svgEl)
+    .attr('viewBox', `0 0 ${width} ${height}`)
+    .attr('width', width)
+    .attr('height', height);
+  svg.selectAll('*').remove();
+
+  const root = svg.append('g').attr('class', 'graph-root');
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.4, 3])
+    .on('zoom', e => root.attr('transform', e.transform));
+  svg.call(zoom);
+
+  // Pillar labels as auto-sized card pills (rect sized to text bbox).
+  // Top row gets a larger offset so labels clear the topmost nodes (the
+  // bottom row already has empty space above its clusters).
+  const labelGroups = root.append('g').attr('class', 'pillar-labels')
+    .selectAll('g').data(PILLARS).join('g')
+      .attr('class', 'pillar-label-group')
+      .attr('transform', (d, i) => {
+        const isTopRow = Math.floor(i / cols) === 0;
+        const yOffset = isTopRow ? 195 : 150;
+        return `translate(${pillarPos[d.letter].x},${pillarPos[d.letter].y - yOffset})`;
+      });
+
+  labelGroups.append('text')
+    .attr('class', 'pillar-label')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .attr('fill', d => `var(--p${d.letter.toLowerCase()})`)
+    .text(d => `${d.letter}. ${d.shortName || d.name}`);
+
+  // Insert background rect behind each label, sized to its text bbox
+  labelGroups.each(function(d) {
+    const g = d3.select(this);
+    const txt = g.select('text').node();
+    const bbox = txt.getBBox();
+    const padX = 10, padY = 4;
+    g.insert('rect', 'text')
+      .attr('class', 'pillar-label-bg')
+      .attr('x', bbox.x - padX)
+      .attr('y', bbox.y - padY)
+      .attr('width', bbox.width + padX * 2)
+      .attr('height', bbox.height + padY * 2)
+      .attr('rx', (bbox.height + padY * 2) / 2)
+      .attr('fill', `var(--p${d.letter.toLowerCase()})`)
+      .attr('fill-opacity', 0.16)
+      .attr('stroke', `var(--p${d.letter.toLowerCase()})`)
+      .attr('stroke-opacity', 0.45)
+      .attr('stroke-width', 1);
+  });
+
+  // Links
+  const linkSel = root.append('g').attr('class', 'links').attr('fill', 'none')
+    .selectAll('path').data(links).join('path')
+      .attr('class', d => `link ${d.kind === 'within' ? 'within' : 'cross'} kind-${d.kind}`);
+
+  // Nodes
+  const nodeSel = root.append('g').attr('class', 'nodes')
+    .selectAll('g').data(nodes).join('g')
+      .attr('class', 'node');
+
+  nodeSel.append('circle')
+    .attr('r', d => 14 + Math.min(d.topicCount, 12))
+    .attr('fill', d => getComputedStyle(document.documentElement).getPropertyValue('--p' + d.pillar.letter.toLowerCase()).trim() || d.pillar.color)
+    .attr('fill-opacity', 0.9);
+  nodeSel.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .text(d => d.id);
+  nodeSel.append('title').text(d => `${d.id} — ${d.name}\n${d.topicCount} tópicos${d.hotCount ? ' · ' + d.hotCount + ' hot' : ''}`);
+
+  let selected = null;
+  function setActive(id) {
+    selected = id;
+    const set = id ? neighborsOf(id) : new Set();
+    svg.selectAll('.node')
+      .classed('dim', d => !!id && !set.has(d.id))
+      .classed('active', d => d.id === id);
+    svg.selectAll('.link')
+      .classed('highlight', d => {
+        if (!id) return false;
+        const s = (d.source.id ?? d.source);
+        const t = (d.target.id ?? d.target);
+        return s === id || t === id;
+      })
+      .classed('dim', d => {
+        if (!id) return false;
+        const s = (d.source.id ?? d.source);
+        const t = (d.target.id ?? d.target);
+        return s !== id && t !== id;
+      });
+    renderConnPanel(id);
+  }
+
+  nodeSel
+    .on('mouseenter', (_, d) => { if (!selected) setActive(d.id); })
+    .on('mouseleave', () => { if (!selected) setActive(null); })
+    .on('click', (e, d) => {
+      e.stopPropagation();
+      setActive(selected === d.id ? null : d.id);
+    });
+  svg.on('click', () => setActive(null));
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id)
+      .distance(l => l.kind === 'within' ? 55 : 150)
+      .strength(l => l.kind === 'within' ? 0.85 : 0.12))
+    .force('charge', d3.forceManyBody().strength(-360))
+    .force('collide', d3.forceCollide().radius(d => 24 + Math.min(d.topicCount, 12)))
+    .force('x', d3.forceX(n => pillarPos[n.pillar.letter].x).strength(0.22))
+    .force('y', d3.forceY(n => pillarPos[n.pillar.letter].y).strength(0.32))
+    .on('tick', () => {
+      linkSel.attr('d', d => {
+        const s = d.source, t = d.target;
+        const dx = (t.x ?? 0) - (s.x ?? 0);
+        const dy = (t.y ?? 0) - (s.y ?? 0);
+        const dr = Math.sqrt(dx*dx + dy*dy) * 1.2;
+        return `M${s.x},${s.y}A${dr},${dr} 0 0,1 ${t.x},${t.y}`;
+      });
+      nodeSel.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+    });
+
+  const drag = d3.drag()
+    .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+    .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+    .on('end',   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; });
+  nodeSel.call(drag);
+}
+
+function renderConnPanel(id) {
+  const panel = document.getElementById('conn-panel');
+  if (!id) {
+    panel.classList.remove('show');
+    panel.innerHTML = '';
+    panel.style.removeProperty('--panel-color');
+    return;
+  }
+  const sub = SUB_BY_ID[id];
+  if (!sub) { panel.classList.remove('show'); return; }
+  const { out, in: inc } = connsFor(id);
+  const pillarColor = getComputedStyle(document.documentElement).getPropertyValue('--p' + sub.pillar.letter.toLowerCase()).trim();
+  panel.style.setProperty('--panel-color', pillarColor);
+
+  const outHtml = out.length === 0 ? '' : `
+    <div class="dir-label">→ saindo:</div>
+    <ul>${out.map(c => `<li><span class="sid-tag">${c.to}</span>${c.label}</li>`).join('')}</ul>`;
+  const inHtml = inc.length === 0 ? '' : `
+    <div class="dir-label">← entrando:</div>
+    <ul>${inc.map(c => `<li><span class="sid-tag">${c.from}</span>${c.label}</li>`).join('')}</ul>`;
+  const empty = out.length + inc.length === 0
+    ? '<div class="empty">Esta subseção ainda não tem conexões cruzadas definidas.</div>'
+    : '';
+
+  panel.innerHTML = `
+    <div class="conn-panel-head">
+      <div>
+        <div class="eyebrow">${sub.pillar.letter}. ${sub.pillar.name}</div>
+        <h3 style="--panel-color: ${pillarColor}"><span class="sid">${sub.id}</span>${sub.name}</h3>
+      </div>
+      <div class="conn-panel-actions">
+        <button class="conn-panel-goto" onclick="scrollToSub('${sub.id}')" title="Ir para essa subseção na lista">Ver subseção →</button>
+        <button class="conn-panel-close" aria-label="fechar" onclick="document.getElementById('conn-panel').classList.remove('show')">✕</button>
+      </div>
+    </div>
+    <div class="conn-panel-grid">
+      <div>
+        <h4>Tópicos (${sub.topics.length})</h4>
+        <ul>
+          ${sub.topics.map(t => `<li><span style="color: var(--fg-mute); margin-right: 6px;">${STATUS_GLYPH[t[1]]}</span>${t[0]}${t[2] ? ' <span style="color: var(--hot);">★</span>' : ''}</li>`).join('')}
+        </ul>
+      </div>
+      <div>
+        <h4>Conexões (${out.length + inc.length})</h4>
+        ${outHtml}${inHtml}${empty}
+      </div>
+    </div>
+  `;
+  panel.classList.add('show');
+}
+
+// ============================================================
+// Scroll to a subsection card and flash-highlight it
+// ============================================================
+function scrollToSub(id) {
+  const el = document.querySelector(`.subsection[data-sub-id="${id}"]`);
+  if (!el) return;
+  const sub = SUB_BY_ID[id];
+  const color = sub
+    ? getComputedStyle(document.documentElement).getPropertyValue('--p' + sub.pillar.letter.toLowerCase()).trim()
+    : 'var(--accent)';
+  el.style.setProperty('--flash-color', color);
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('flash-highlight');
+  // force reflow so the animation re-triggers
+  void el.offsetWidth;
+  el.classList.add('flash-highlight');
+  setTimeout(() => el.classList.remove('flash-highlight'), 1700);
+}
+window.scrollToSub = scrollToSub;
+
+// ============================================================
+// Collapse / expand
+// ============================================================
+function toggleSub(el) { el.classList.toggle('collapsed'); }
+function togglePillar(letter) {
+  const p = document.getElementById(letter);
+  if (p) p.classList.toggle('body-collapsed');
+}
+function setAllCollapsed(collapsed) {
+  document.querySelectorAll('.subsection').forEach(s =>
+    s.classList.toggle('collapsed', collapsed)
+  );
+}
+window.toggleSub = toggleSub;
+window.togglePillar = togglePillar;
+window.setAllCollapsed = setAllCollapsed;
+
+// ============================================================
+// Boot
+// ============================================================
+function renderAll() {
+  renderQuickNav();
+  renderDashboard();
+  document.getElementById('pillars-container').innerHTML = PILLARS.map(renderPillar).join('');
+  renderPaths();
+  renderConnectionsGraph();
+}
+renderAll();
+setupHandlers();
+
+// Re-render graph on resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderConnectionsGraph, 200);
+});
+</script>
+</body>
+</html>

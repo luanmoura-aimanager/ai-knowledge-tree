@@ -1,0 +1,150 @@
+---
+title: "Inner products, orthogonality, Cauchy–Schwarz"
+pillar: A
+subId: A1
+lessonId: inner-products
+order: 6
+estimatedMinutes: 22
+goal: "Define the inner product, prove the Cauchy–Schwarz inequality step by step from positivity of a quadratic, and use it to give precise meaning to angle and orthogonality."
+prerequisites: ["norms"]
+---
+
+A norm tells you how long a vector is. An **inner product** tells you how two
+vectors relate: the angle between them, whether they are perpendicular, how much
+one points along another. Almost every geometric statement later in the course
+(projections, least squares, orthogonal attention directions) is an inner-product
+statement, and they all rest on one inequality we will prove carefully here.
+
+## Definition
+
+An **inner product** on a real vector space $V$ is a rule $\langle u, v\rangle$
+assigning a real number to each pair of vectors, with three properties:
+
+1. **Symmetry:** $\langle u, v\rangle = \langle v, u\rangle$.
+2. **Linearity in the first slot:** $\langle \alpha u + \beta w,\, v\rangle = \alpha\langle u,v\rangle + \beta\langle w,v\rangle$.
+3. **Positive definiteness:** $\langle v, v\rangle \ge 0$, with equality only when $v = 0$.
+
+On $\mathbb{R}^n$ the standard choice is the dot product
+$\langle u, v\rangle = u^\top v = \sum_i u_i v_i$. Property 3 lets us define a
+length from the inner product, the **induced norm**:
+
+$$
+\lVert v\rVert = \sqrt{\langle v, v\rangle}.
+$$
+
+For the dot product this is exactly the Euclidean norm from the previous lesson.
+
+## The inequality everything depends on
+
+**Cauchy–Schwarz inequality.** For all $u, v \in V$,
+
+$$
+|\langle u, v\rangle| \;\le\; \lVert u\rVert\,\lVert v\rVert,
+$$
+
+with equality if and only if $u$ and $v$ are scalar multiples of each other.
+
+The proof is short once you see the trick: build a quantity that *must* be
+nonnegative (a squared length), expand it, and read off the inequality.
+
+*Proof.* If $v = 0$ both sides are $0$ and the statement holds. So assume
+$v \neq 0$, and consider the vector $u - t v$ for a real number $t$ we will choose
+later. By positive definiteness its squared length is nonnegative:
+
+**Step 1: start from a square that cannot be negative.**
+
+$$
+0 \;\le\; \lVert u - t v\rVert^2 \;=\; \langle u - tv,\; u - tv\rangle.
+$$
+
+**Step 2: expand using symmetry and linearity.**
+
+$$
+\langle u - tv,\, u - tv\rangle
+= \langle u,u\rangle - 2t\,\langle u,v\rangle + t^2\langle v,v\rangle
+= \lVert u\rVert^2 - 2t\,\langle u,v\rangle + t^2 \lVert v\rVert^2.
+$$
+
+So for *every* real $t$,
+
+$$
+\lVert v\rVert^2\, t^2 \;-\; 2\langle u,v\rangle\, t \;+\; \lVert u\rVert^2 \;\ge\; 0.
+$$
+
+**Step 3: a nonnegative quadratic has nonpositive discriminant.** The left side
+is a quadratic $at^2 + bt + c$ in $t$ with $a = \lVert v\rVert^2 > 0$. A
+parabola that opens upward and never goes below zero can touch zero at most once,
+which means its discriminant $b^2 - 4ac$ is $\le 0$. Here
+
+$$
+b^2 - 4ac = \big(2\langle u,v\rangle\big)^2 - 4\,\lVert v\rVert^2\,\lVert u\rVert^2 \;\le\; 0.
+$$
+
+**Step 4: solve for the inequality.** Divide by $4$ and rearrange:
+
+$$
+\langle u,v\rangle^2 \;\le\; \lVert u\rVert^2\,\lVert v\rVert^2.
+$$
+
+Taking square roots (both sides nonnegative) gives
+$|\langle u,v\rangle| \le \lVert u\rVert\,\lVert v\rVert$, the claim.
+
+**Equality.** The discriminant is zero exactly when the quadratic has a real root
+$t^\star$, i.e. $\lVert u - t^\star v\rVert^2 = 0$, which by positive
+definiteness forces $u = t^\star v$. So equality holds precisely when $u$ and $v$
+are parallel. $\qquad\blacksquare$
+
+## Angle and orthogonality
+
+Cauchy–Schwarz says the ratio
+$\langle u,v\rangle / (\lVert u\rVert\,\lVert v\rVert)$ always lies in
+$[-1, 1]$. That is exactly the range of cosine, so we may *define* the angle
+$\theta$ between two nonzero vectors by
+
+$$
+\cos\theta = \frac{\langle u, v\rangle}{\lVert u\rVert\,\lVert v\rVert}.
+$$
+
+The definition is only legitimate because the inequality guarantees the
+right-hand side is a valid cosine. Two vectors are **orthogonal** when
+$\langle u, v\rangle = 0$, i.e. $\theta = 90^\circ$. This single condition is the
+seed of projections, the normal equations of least squares, and the orthogonality
+of principal components later in the course.
+
+A companion fact, proved in one line from the expansion above with $t = -1$, is
+the **triangle inequality** for the induced norm:
+$\lVert u + v\rVert \le \lVert u\rVert + \lVert v\rVert$. So the induced norm is
+genuinely a norm in the sense of the previous lesson.
+
+## Check it on arrays
+
+Cauchy–Schwarz is a claim you can stress-test: for many random pairs the ratio
+$|\langle u,v\rangle| / (\lVert u\rVert\lVert v\rVert)$ should never exceed $1$,
+and it should hit $1$ exactly when the two vectors are parallel.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# 100000 random pairs in R^5: the ratio must stay <= 1.
+U = rng.normal(size=(100_000, 5))
+V = rng.normal(size=(100_000, 5))
+dots = np.einsum("ij,ij->i", U, V)
+ratio = np.abs(dots) / (np.linalg.norm(U, axis=1) * np.linalg.norm(V, axis=1))
+print("max ratio over 100k random pairs:", ratio.max())   # < 1
+
+# Parallel vectors saturate the bound (ratio == 1):
+u = np.array([1.0, 2.0, 3.0])
+v = -4.0 * u
+print("parallel ratio:", abs(u @ v) / (np.linalg.norm(u) * np.linalg.norm(v)))  # 1.0
+
+# Orthogonal vectors: inner product is 0, angle 90 degrees.
+a = np.array([1.0, 0.0]); b = np.array([0.0, 1.0])
+print("orthogonal dot:", a @ b, "-> angle", np.degrees(np.arccos(a @ b)))
+```
+
+The random ratios crowd under $1$ but never cross it; the parallel pair sits
+exactly at $1$ (the equality case of the proof); the orthogonal pair gives $0$.
+The next lesson turns orthogonality into a construction, Gram–Schmidt, that
+manufactures an orthonormal basis from any basis.

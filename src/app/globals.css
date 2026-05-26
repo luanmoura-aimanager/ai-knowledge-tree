@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+/* ----- Design tokens ------------------------------------------------------ */
+/*
+ * Dark, Linear-style palette. Same tokens used in the dashboard prototype.
+ * Pillar colors live in dag.ts so they stay co-located with the data, but
+ * the surface chrome (bg, borders, text) is defined here.
+ */
+:root {
+  --bg: #0a0e1f;
+  --bg-2: #0f1530;
+  --card: #141a35;
+  --card-2: #1a2148;
+  --border: #242b52;
+  --border-strong: #353e75;
+  --fg: #e6e9f5;
+  --fg-dim: #9aa3c7;
+  --fg-mute: #6c7596;
+  --accent: #7aa2f7;
+  --good: #9ece6a;
+  --partial: #e0af68;
+  --gap: #6c7596;
+  --hot: #f7768e;
+
+  /* Pillar colors (mirror dag.ts): used by the connections graph + path cards. */
+  --pa: #e0af68;
+  --pb: #f7768e;
+  --pc: #ff9e64;
+  --pd: #7aa2f7;
+  --pe: #bb9af7;
+  --pf: #7dcfff;
+  --pg: #73daca;
+  --ph: #ff7eb6;
+  --pi: #9ece6a;
+  --pj: #c0caf5;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-fg-dim: var(--fg-dim);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-partial: var(--partial);
+  --color-gap: var(--gap);
+  --color-hot: var(--hot);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html, body { height: 100%; }
+
+body {
+  background: linear-gradient(180deg, #0a0e1f 0%, #0c1128 100%);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* ----- Reusable surface components --------------------------------------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.btn:hover { color: var(--fg); border-color: var(--accent); }
+.btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ----- Topic chip --------------------------------------------------------- */
+
+.topic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  transition: 0.12s;
+  position: relative;
+}
+.topic:hover { background: var(--card-2); }
+.topic[data-status="gap"]      { color: var(--fg-mute); }
+.topic[data-status="gap"] .ic  { color: var(--gap); }
+.topic[data-status="covered"]  .ic { color: var(--good); }
+.topic[data-status="partial"]  .ic { color: var(--partial); }
+.topic[data-status="partial"]  { color: var(--fg-dim); }
+.topic .ic { flex: 0 0 16px; font-weight: 700; text-align: center; }
+.topic .name { flex: 1; }
+.topic .flame { color: var(--hot); font-size: 0.82rem; font-weight: 700; }
+.topic[data-hot="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--hot);
+  border-radius: 1px;
+}
+
+/* ----- Pillar stat bar (tricolor) ---------------------------------------- */
+.statbar { height: 6px; background: var(--card-2); border-radius: 3px; display: flex; overflow: hidden; }
+.statbar .seg { height: 100%; transition: width 0.3s; }
+.statbar .seg.cov { background: var(--good); }
+.statbar .seg.par { background: var(--partial); }
+.statbar .seg.gap { background: var(--gap); opacity: 0.4; }
+
+/* ----- Connections graph SVG --------------------------------------------- */
+.conn-graph .node { cursor: pointer; transition: 0.15s; }
+.conn-graph .node circle { stroke: var(--bg); stroke-width: 2; }
+.conn-graph .node text {
+  font-size: 11px;
+  fill: var(--fg);
+  pointer-events: none;
+  font-weight: 600;
+}
+.conn-graph .node.dim { opacity: 0.18; }
+.conn-graph .link {
+  stroke: var(--fg-mute);
+  stroke-opacity: 0.35;
+  fill: none;
+}
+.conn-graph .link.within { stroke-opacity: 0.18; }
+.conn-graph .link.highlight { stroke: var(--accent); stroke-opacity: 0.95; stroke-width: 2.5; }
+.conn-graph .link.dim { stroke-opacity: 0.05; }
+.conn-graph .link.kind-shared-concept { stroke: var(--accent);   }
+.conn-graph .link.kind-uses           { stroke: var(--partial);  }
+.conn-graph .link.kind-alternative    { stroke: var(--hot);      }
+.conn-graph .link.kind-generalizes    { stroke: var(--good);     }
+
+.conn-graph .node.active circle { stroke: var(--fg); stroke-width: 3; }
+.conn-graph .pillar-label-group { pointer-events: none; }
+.conn-graph .pillar-label {
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+  letter-spacing: 0.03em;
+}
+.conn-graph .pillar-label-bg { pointer-events: none; }
+
+/* ----- Subsection collapse (per-subsection) ------------------------------ */
+.subsection h4 { cursor: pointer; user-select: none; }
+.subsection h4 .chevron {
+  float: right;
+  color: var(--fg-mute);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: transform 0.2s ease;
+  margin-left: 8px;
+}
+.subsection h4:hover .chevron { color: var(--accent); }
+.subsection h4 .conn-count { font-weight: 500; text-transform: none; letter-spacing: 0; }
+.subsection h4 .conn-count.has { color: var(--accent); }
+.subsection.collapsed h4 .chevron { transform: rotate(-90deg); }
+.subsection.collapsed h4 { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.subsection.collapsed .topics { display: none; }
+
+/* ----- Pillar collapse (per-pillar) -------------------------------------- */
+.pillar-header { cursor: pointer; user-select: none; }
+.pillar-chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  border-radius: 8px;
+  color: var(--fg-dim);
+  margin-left: 10px;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.25s ease;
+}
+.pillar-header:hover .pillar-chev {
+  background: var(--card);
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.pillar.body-collapsed .pillar-chev { transform: rotate(-90deg); }
+.pillar.body-collapsed .subsections { display: none; }
+.pillar.body-collapsed .pillar-header { border-bottom: none; }
+
+/* ----- Side panel tint + scroll-target flash ----------------------------- */
+.conn-panel {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel-color, var(--accent)) 12%, var(--card-2)) 0%,
+    var(--card-2) 65%);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.35),
+    0 0 28px color-mix(in srgb, var(--panel-color, var(--accent)) 12%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+.conn-panel::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--panel-color, var(--accent));
+}
+
+@keyframes flash-glow {
+  0%   { box-shadow: 0 0 0 0 var(--flash-color, var(--accent)); background-color: color-mix(in srgb, var(--flash-color, var(--accent)) 14%, transparent); }
+  60%  { box-shadow: 0 0 0 14px transparent; background-color: color-mix(in srgb, var(--flash-color, var(--accent)) 8%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+}
+.subsection.flash-highlight {
+  animation: flash-glow 1.6s ease-out;
+  border-radius: 8px;
+}
+
+/* ----- MDX study-page prose ---------------------------------------------- */
+.mdx-body { color: var(--fg); line-height: 1.7; font-size: 1rem; max-width: 760px; }
+.mdx-body h2 { font-size: 1.5rem; font-weight: 700; margin: 2rem 0 0.75rem; }
+.mdx-body h3 { font-size: 1.2rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+.mdx-body h4 { font-size: 1.05rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+.mdx-body p { margin: 0.85rem 0; }
+.mdx-body a { color: var(--accent); text-decoration: underline; }
+.mdx-body ul, .mdx-body ol { margin: 0.85rem 0; padding-left: 1.5rem; }
+.mdx-body li { margin: 0.3rem 0; }
+.mdx-body ul { list-style: disc; }
+.mdx-body ol { list-style: decimal; }
+.mdx-body strong { color: var(--fg); font-weight: 700; }
+.mdx-body blockquote {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--fg-dim);
+}
+.mdx-body code:not(pre code) {
+  background: var(--card-2);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: var(--font-mono);
+}
+.mdx-body :where(.katex-display) { overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; }
+.mdx-body table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+.mdx-body th, .mdx-body td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.mdx-body th { background: var(--card-2); }

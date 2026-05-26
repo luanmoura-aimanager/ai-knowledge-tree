@@ -1,0 +1,316 @@
+---
+title: "Linear algebra"
+pillar: A
+subId: A1
+order: 1
+estimatedMinutes: 55
+goal: "Build linear algebra rigorously from vector spaces to the SVD: norms and the Cauchy–Schwarz inequality, matrix calculus in a fixed layout convention, the spectral theorem for symmetric matrices, the singular value decomposition and its low-rank optimality, the factorizations that solve linear systems, least squares via the normal equations and the Moore–Penrose pseudo-inverse, and the index calculus behind einsum. Code at the end checks the constructions on real arrays."
+prerequisites: []
+---
+
+Linear algebra is the language the rest of this course is written in. A neural
+network is a composition of affine maps and nonlinearities; training differentiates
+through that composition; the geometry of the loss is set by eigenvalues and
+singular values. This page develops the subject to the depth those later
+arguments require: precise definitions, the theorems that matter, and proofs of
+the ones used constantly. The convention throughout is real scalars,
+$\mathbb{F} = \mathbb{R}$; the complex case differs only in replacing transpose
+by conjugate transpose.
+
+## 1. Vector spaces, basis, dimension
+
+A **vector space** over $\mathbb{R}$ is a set $V$ with addition and scalar
+multiplication satisfying the usual eight axioms (associativity and commutativity
+of addition, an additive identity $0$ and inverses, and the scalar laws
+$1v = v$, $(\alpha\beta)v = \alpha(\beta v)$, $\alpha(u+v)=\alpha u+\alpha v$,
+$(\alpha+\beta)v = \alpha v + \beta v$). The axioms exist to license one move: any
+finite **linear combination** $\sum_i c_i v_i$ is again in $V$.
+
+A set $\{v_1,\dots,v_k\}$ is **linearly independent** if
+
+$$ \sum_{i=1}^{k} c_i v_i = 0 \quad\Longrightarrow\quad c_1 = \cdots = c_k = 0, $$
+
+i.e. the only way to write $0$ is trivially. Their **span** is the set of all
+their linear combinations. A **basis** is a linearly independent spanning set;
+every $v \in V$ then has *unique* coordinates $c_i$ in that basis (two
+representations would subtract to a nontrivial relation, contradicting
+independence).
+
+**Dimension is well defined.** Any two bases of $V$ have the same size. This
+rests on the *Steinitz exchange lemma*: if $\{v_1,\dots,v_m\}$ is independent and
+$\{w_1,\dots,w_n\}$ spans $V$, then $m \le n$ (each $v_i$ can be swapped in for
+some $w_j$ while preserving spanning). Applying it both ways to two bases forces
+their sizes equal; that common number is $\dim V$. For $\mathbb{R}^n$ the standard
+basis $e_1,\dots,e_n$ gives $\dim \mathbb{R}^n = n$.
+
+A matrix $A \in \mathbb{R}^{m\times n}$ is a linear map $\mathbb{R}^n \to
+\mathbb{R}^m$. Its **column space** (range) and **null space** (kernel) satisfy the
+**rank–nullity theorem**,
+
+$$ \dim(\ker A) + \operatorname{rank}(A) = n, $$
+
+which is the bookkeeping identity behind solvability of linear systems: $Ax = b$
+is solvable iff $b$ lies in the column space, and the solution set is a coset of
+$\ker A$.
+
+## 2. Norms, inner products, Cauchy–Schwarz
+
+A **norm** $\lVert\cdot\rVert : V \to \mathbb{R}_{\ge 0}$ satisfies positivity
+($\lVert x\rVert = 0 \iff x = 0$), homogeneity ($\lVert \alpha x\rVert = |\alpha|\,\lVert x\rVert$),
+and the triangle inequality ($\lVert x+y\rVert \le \lVert x\rVert + \lVert y\rVert$).
+The $p$-norms are
+
+$$ \lVert x\rVert_p = \Big(\sum_i |x_i|^p\Big)^{1/p}, \qquad \lVert x\rVert_\infty = \max_i |x_i|. $$
+
+The cases $p=1$ (sparsity, L1 regularization), $p=2$ (Euclidean length), and
+$p=\infty$ recur constantly.
+
+An **inner product** $\langle\cdot,\cdot\rangle$ is symmetric, bilinear, and
+positive definite ($\langle x,x\rangle > 0$ for $x\neq 0$). On $\mathbb{R}^n$ the
+standard one is $\langle x,y\rangle = x^\top y$, and it induces the Euclidean norm
+$\lVert x\rVert_2 = \sqrt{\langle x,x\rangle}$.
+
+**Cauchy–Schwarz inequality.** For any inner product,
+
+$$ |\langle x,y\rangle| \le \lVert x\rVert\,\lVert y\rVert, $$
+
+with equality iff $x,y$ are linearly dependent.
+
+*Proof.* If $y = 0$ both sides vanish. Otherwise, for every $t \in \mathbb{R}$
+positive definiteness gives
+
+$$ 0 \le \langle x - ty,\, x - ty\rangle = \lVert x\rVert^2 - 2t\,\langle x,y\rangle + t^2\lVert y\rVert^2. $$
+
+This quadratic in $t$ is nonnegative for all $t$, so its discriminant is
+$\le 0$: $\;4\langle x,y\rangle^2 - 4\lVert x\rVert^2\lVert y\rVert^2 \le 0$,
+which is the claim. Equality forces the quadratic to have a real root $t^\star$,
+i.e. $x = t^\star y$. $\qquad\blacksquare$
+
+Cauchy–Schwarz is what lets the angle $\cos\theta = \langle x,y\rangle/(\lVert x\rVert\lVert y\rVert)$
+be defined, and it is the inequality behind "the gradient is the steepest
+direction" in A3. Vectors with $\langle x,y\rangle = 0$ are **orthogonal**; an
+**orthonormal** set is orthogonal with unit norms, and collecting orthonormal
+columns gives an **orthogonal matrix** $Q$ with $Q^\top Q = I$, hence
+$\lVert Qx\rVert_2 = \lVert x\rVert_2$ (orthogonal maps are isometries).
+
+## 3. Matrix calculus and the chain rule
+
+Derivatives of vector- and matrix-valued expressions need a fixed **layout
+convention**, or the chain rule stops composing cleanly. Use the **numerator
+layout**: for $f:\mathbb{R}^n\to\mathbb{R}^m$, the Jacobian $\partial f/\partial x$
+is the $m\times n$ matrix with entries $(\partial f/\partial x)_{ij} =
+\partial f_i/\partial x_j$. For scalar $f$, the gradient is the column vector
+$\nabla f = (\partial f/\partial x)^\top$.
+
+Three identities carry most of the weight; each follows by differentiating a
+single entry.
+
+- **Linear form.** $f(x) = a^\top x \Rightarrow \nabla f = a$. Entry $j$:
+  $\partial(\sum_i a_i x_i)/\partial x_j = a_j$.
+- **Quadratic form.** $f(x) = x^\top A x \Rightarrow \nabla f = (A + A^\top)x$,
+  which is $2Ax$ when $A$ is symmetric. Entry $k$: differentiate
+  $\sum_{i,j} A_{ij} x_i x_j$, picking up one term where $i=k$ and one where $j=k$.
+- **Affine map.** $f(x) = Wx + b \Rightarrow \partial f/\partial x = W$.
+  Differentiating an affine map in its input recovers its linear part.
+
+The **chain rule** in numerator layout is plain matrix multiplication, in the
+order the maps compose. For $z = g(y)$, $y = h(x)$,
+
+$$ \frac{\partial z}{\partial x} = \frac{\partial z}{\partial y}\,\frac{\partial y}{\partial x}. $$
+
+A single neural-network layer $y = Wx + b$ followed by a scalar loss $L$ has
+$\partial L/\partial x = (\partial L/\partial y)\,W$, and stacking these products
+across layers, right to left, is exactly what backpropagation accumulates
+(pillar D). Choosing numerator layout is not cosmetic: mixing conventions
+silently transposes one factor and breaks every chain-rule expansion downstream.
+
+## 4. Eigendecomposition and the spectral theorem
+
+A scalar $\lambda$ and nonzero $v$ with $Av = \lambda v$ are an **eigenvalue** and
+**eigenvector**: $A$ acts as pure scaling along $v$. Eigenvalues are the roots of
+the characteristic polynomial $\det(A - \lambda I) = 0$. A general $A$ may fail to
+have a full set of independent eigenvectors, but the symmetric case — the one
+that dominates ML, since covariance matrices, Hessians, and Gram matrices are all
+symmetric — is perfectly behaved.
+
+**Spectral theorem (real symmetric).** If $A = A^\top \in \mathbb{R}^{n\times n}$,
+then $A$ has $n$ real eigenvalues and an orthonormal basis of eigenvectors:
+
+$$ A = Q\Lambda Q^\top, \qquad Q^\top Q = I,\quad \Lambda = \operatorname{diag}(\lambda_1,\dots,\lambda_n). $$
+
+*Two key steps.* Eigenvalues are real: if $Av = \lambda v$ then
+$\lambda \lVert v\rVert^2 = v^\top A v$ is real (a symmetric quadratic form), and
+$\lVert v\rVert^2 > 0$, so $\lambda \in \mathbb{R}$. Eigenvectors of distinct
+eigenvalues are orthogonal: from $Av_1=\lambda_1 v_1$, $Av_2=\lambda_2 v_2$,
+
+$$ \lambda_1 v_2^\top v_1 = v_2^\top A v_1 = (A v_2)^\top v_1 = \lambda_2 v_2^\top v_1, $$
+
+so $(\lambda_1-\lambda_2)\,v_2^\top v_1 = 0$, forcing $v_2^\top v_1 = 0$. (Repeated
+eigenvalues are handled by orthonormalizing within each eigenspace.) The
+decomposition says a symmetric map is, in the right orthonormal frame, just
+independent scalings along orthogonal axes. A symmetric $A$ is **positive
+semidefinite** ($x^\top A x \ge 0$ for all $x$) iff every $\lambda_i \ge 0$, the
+test used to certify convexity in A3.
+
+## 5. Singular value decomposition
+
+Eigendecomposition needs a square, ideally symmetric, matrix. The **SVD**
+applies to *any* $A \in \mathbb{R}^{m\times n}$:
+
+$$ A = U\Sigma V^\top, \qquad U \in \mathbb{R}^{m\times m},\ V \in \mathbb{R}^{n\times n}\ \text{orthogonal},\ \Sigma \in \mathbb{R}^{m\times n}\ \text{diagonal}, $$
+
+with **singular values** $\sigma_1 \ge \sigma_2 \ge \cdots \ge 0$ on the diagonal
+of $\Sigma$.
+
+*Construction.* $A^\top A$ is symmetric positive semidefinite, so by the spectral
+theorem $A^\top A = V\Lambda V^\top$ with $\lambda_i \ge 0$. Set
+$\sigma_i = \sqrt{\lambda_i}$ and, for $\sigma_i > 0$, define $u_i = Av_i/\sigma_i$.
+The $u_i$ are orthonormal:
+
+$$ u_i^\top u_j = \frac{v_i^\top A^\top A v_j}{\sigma_i \sigma_j} = \frac{\lambda_j\, v_i^\top v_j}{\sigma_i\sigma_j} = \delta_{ij}. $$
+
+Completing $\{u_i\}$ to an orthonormal basis of $\mathbb{R}^m$ gives $U$, and
+$Av_i = \sigma_i u_i$ assembles into $A = U\Sigma V^\top$. Geometrically: every
+linear map is a rotation/reflection ($V^\top$), an axiswise scaling ($\Sigma$),
+and another rotation/reflection ($U$). The number of nonzero $\sigma_i$ is
+$\operatorname{rank}(A)$; the columns of $V$ with $\sigma_i = 0$ span $\ker A$.
+
+**Low-rank optimality (Eckart–Young).** Truncating to the top $k$ singular
+values, $A_k = \sum_{i=1}^k \sigma_i u_i v_i^\top$, is the *best* rank-$k$
+approximation in both the spectral and Frobenius norms:
+
+$$ \min_{\operatorname{rank}(B)\le k} \lVert A - B\rVert_F = \lVert A - A_k\rVert_F = \Big(\textstyle\sum_{i>k}\sigma_i^2\Big)^{1/2}. $$
+
+This single fact underlies PCA (pillar C), low-rank adapters like LoRA (pillar E),
+and compression generally: keep the directions with the largest singular values,
+discard the rest. PCA is exactly the SVD of the centered data matrix; the squared
+singular values are the variances along the principal axes.
+
+## 6. Matrix factorizations for solving systems
+
+Solving $Ax = b$ or fitting least squares almost never inverts a matrix
+explicitly — inversion is slower and less stable than a factorization plus
+back-substitution.
+
+- **LU** ($A = LU$, lower × upper triangular, with partial pivoting $PA = LU$):
+  the matrix form of Gaussian elimination, $O(n^3)$ to factor and $O(n^2)$ per
+  right-hand side afterward. The general-purpose solver for square systems.
+- **QR** ($A = QR$, $Q$ orthogonal, $R$ upper triangular): built by
+  Gram–Schmidt or Householder reflections. Because $Q$ is an isometry, QR solves
+  least squares stably (next section) without forming $A^\top A$.
+- **Cholesky** ($A = LL^\top$ for symmetric positive definite $A$): half the cost
+  of LU and numerically stable without pivoting. The default for covariance
+  matrices, Gaussian-process kernels, and the normal equations when conditioning
+  allows.
+
+The throughline: pick the factorization that exploits the structure you have
+(square, overdetermined, symmetric positive definite), then solve by triangular
+substitution.
+
+## 7. Pseudo-inverse and least squares
+
+When $A \in \mathbb{R}^{m\times n}$ is tall ($m > n$), $Ax = b$ usually has no
+solution; we minimize the residual instead:
+
+$$ x^\star = \arg\min_x \lVert Ax - b\rVert_2^2. $$
+
+The objective $L(x) = (Ax-b)^\top(Ax-b)$ is convex with gradient (using §3)
+$\nabla L = 2A^\top(Ax - b)$. Setting it to zero gives the **normal equations**
+
+$$ A^\top A\, x^\star = A^\top b. $$
+
+Geometrically, $Ax^\star$ is the orthogonal projection of $b$ onto the column
+space of $A$, and the residual $b - Ax^\star$ is orthogonal to that space — which
+is precisely $A^\top(b - Ax^\star) = 0$. When $A$ has full column rank,
+$A^\top A$ is invertible and $x^\star = (A^\top A)^{-1}A^\top b$.
+
+The **Moore–Penrose pseudo-inverse** $A^+$ packages this for any $A$, most
+cleanly through the SVD: if $A = U\Sigma V^\top$, then
+
+$$ A^+ = V\Sigma^+ U^\top, \qquad (\Sigma^+)_{ii} = \begin{cases} 1/\sigma_i & \sigma_i > 0\\ 0 & \sigma_i = 0,\end{cases} $$
+
+and $x^\star = A^+ b$ gives the least-squares solution — and, when there are
+infinitely many, the one of *minimum norm*. Inverting only the nonzero singular
+values is also why the pseudo-inverse is the stable way to solve rank-deficient
+or ill-conditioned problems: it never divides by a (near-)zero $\sigma_i$.
+
+## 8. Tensor algebra and einsum
+
+Beyond vectors and matrices, ML operates on higher-order **tensors** (a minibatch
+of token embeddings is order 3: batch × sequence × feature). Index notation with
+the **Einstein summation convention** — sum over any index repeated in a term —
+expresses these operations without a zoo of named functions. Matrix product:
+
+$$ C_{ik} = \sum_j A_{ij} B_{jk} \;\equiv\; A_{ij}B_{jk}, $$
+
+with the repeated $j$ implicitly summed. A batched product, an attention score, a
+trace, an outer product, and a tensor contraction are all one notation with
+different index patterns. `numpy.einsum("ij,jk->ik", A, B)` writes the matrix
+product literally; dropping an index from the output sums over it
+(`"ij->i"` is a row sum), and adding a batch index (`"bij,bjk->bik"`) batches the
+contraction. This is the notation the attention mechanism in pillar E is most
+cleanly written in.
+
+## 9. Computational checks
+
+The SVD reconstruction and its rank-$k$ truncation, least squares by three routes
+that must agree, and einsum reproducing matrix multiply — each ties a section
+above to an array computation.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+A = rng.normal(size=(6, 4))
+
+# --- SVD: reconstruct, and check Eckart-Young rank-2 error = sqrt(sum of dropped sigma^2)
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+recon = U @ np.diag(s) @ Vt
+print("reconstruction error:", np.linalg.norm(A - recon))      # ~0
+
+k = 2
+A_k = U[:, :k] @ np.diag(s[:k]) @ Vt[:k]
+print("rank-2 error  :", round(np.linalg.norm(A - A_k, "fro"), 6))
+print("predicted (E-Y):", round(np.sqrt((s[k:]**2).sum()), 6))  # must match
+```
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+A = rng.normal(size=(20, 3))     # tall: overdetermined
+b = rng.normal(size=20)
+
+x_normal = np.linalg.solve(A.T @ A, A.T @ b)   # normal equations
+x_pinv   = np.linalg.pinv(A) @ b               # Moore-Penrose (via SVD)
+x_lstsq  = np.linalg.lstsq(A, b, rcond=None)[0]
+
+print("normal eqns :", x_normal.round(5))
+print("pseudo-inv  :", x_pinv.round(5))
+print("lstsq       :", x_lstsq.round(5))       # all three agree
+
+# residual is orthogonal to the column space: A^T (b - A x) = 0
+r = b - A @ x_pinv
+print("A^T residual (should be ~0):", np.abs(A.T @ r).max())
+```
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+A = rng.normal(size=(4, 5))
+B = rng.normal(size=(5, 3))
+
+print("einsum == matmul:", np.allclose(np.einsum("ij,jk->ik", A, B), A @ B))
+
+# batched contraction: 8 independent (4x5)(5x3) products
+Ab = rng.normal(size=(8, 4, 5))
+Bb = rng.normal(size=(8, 5, 3))
+batched = np.einsum("bij,bjk->bik", Ab, Bb)
+print("batched shape:", batched.shape)                          # (8, 4, 3)
+print("matches loop :", np.allclose(batched[3], Ab[3] @ Bb[3]))
+```
+
+Every construction above — the SVD factors, the agreement of the three
+least-squares routes, the orthogonality of the residual, einsum reproducing the
+matrix product — is a statement proved in the text, now confirmed numerically.
