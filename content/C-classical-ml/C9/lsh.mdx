@@ -1,0 +1,157 @@
+---
+title: "Locality-sensitive hashing"
+pillar: C
+subId: C9
+lessonId: lsh
+order: 2
+estimatedMinutes: 16
+goal: "Hash similar points to the same bucket with high probability, with MinHash for Jaccard and SimHash for cosine."
+prerequisites: ["ann-problem"]
+---
+
+**Locality-sensitive hashing (LSH)** is the simplest family of approximate
+nearest-neighbor methods: design a hash function whose **collision
+probability** is monotone in the similarity between two points. Similar
+points land in the same bucket with high probability; dissimilar points
+land in different buckets. Lookup is then just a bucket fetch.
+
+## The defining property
+
+A family $\mathcal{H}$ of hash functions is **$(r_1, r_2, p_1, p_2)$-locality
+sensitive** for a distance $d$ if:
+
+- For $d(x, y) \le r_1$: $\Pr_{h \sim \mathcal{H}}(h(x) = h(y)) \ge p_1$.
+- For $d(x, y) \ge r_2$: $\Pr_{h \sim \mathcal{H}}(h(x) = h(y)) \le p_2$.
+
+With $r_1 < r_2$ and $p_1 > p_2$, the gap between $p_1$ and $p_2$ can be
+amplified by combining several hashes (next section).
+
+## MinHash for Jaccard similarity
+
+For set-valued data (documents as sets of $k$-shingles, users as sets of
+liked items), Jaccard similarity is $J(A, B) = |A \cap B|/|A \cup B|$.
+
+**MinHash** picks a random permutation $\pi$ of the universe and defines
+$h_\pi(A) = \min_{a \in A}\pi(a)$. The key fact:
+
+$$
+\Pr_\pi(h_\pi(A) = h_\pi(B)) = J(A, B).
+$$
+
+The collision probability *equals* the Jaccard similarity, by symmetry of
+permutations over union.
+
+In practice, instead of true permutations, use $k$ universal hash
+functions and take the minimum hash value of items in $A$ under each. A
+document is summarized by a length-$k$ MinHash signature; estimated
+Jaccard is the fraction of matching positions.
+
+## SimHash for cosine similarity
+
+For vector-valued data with cosine similarity, **SimHash** uses random
+hyperplanes:
+
+$$
+h_w(x) = \operatorname{sign}(w^\top x), \qquad w \sim \mathcal{N}(0, I).
+$$
+
+A standard result:
+
+$$
+\Pr_w(h_w(x) = h_w(y)) = 1 - \frac{\theta(x, y)}{\pi},
+$$
+
+where $\theta$ is the angle between $x$ and $y$. Smaller angle (more
+similar) means higher collision probability. With $k$ random hyperplanes,
+each point gets a $k$-bit signature; **Hamming distance** between
+signatures estimates angular distance.
+
+## $p$-stable LSH for $\ell_2$
+
+For Euclidean distance, use random projections plus quantization:
+
+$$
+h_{w, b, r}(x) = \left\lfloor \frac{w^\top x + b}{r}\right\rfloor,
+$$
+
+with $w$ from a $p$-stable distribution (Gaussian for $\ell_2$, Cauchy for
+$\ell_1$), $b$ uniform in $[0, r]$, and bucket width $r$. Points within
+roughly distance $r$ of each other collide with high probability;
+distant points do not.
+
+## Amplification: AND-OR construction
+
+A single hash has weak collision guarantees. Combine multiple:
+
+- **AND**: concatenate $k$ hashes into one composite. Two points collide
+  only if all $k$ component hashes agree. The collision probability of
+  similar points becomes $p_1^k$; dissimilar becomes $p_2^k$. The ratio
+  $(p_1/p_2)^k$ grows.
+- **OR**: build $L$ hash tables with independent composites. Two points
+  collide if they agree in *any* table. The collision probability becomes
+  $1 - (1 - p^k)^L$.
+
+Tuning $k$ and $L$ trades recall against precision and against the size
+of the candidate set retrieved.
+
+## Limits
+
+- **Memory**: $L$ tables of $n$ entries each, plus the original vectors.
+- **Recall ceiling**: high-recall regimes (>95%) require expensive AND-OR
+  combinations; graph methods (HNSW) tend to dominate at high recall.
+- **Tuning**: $k$, $L$, and $r$ all need calibration on the actual data
+  distribution.
+
+LSH is conceptually elegant and memory-light at moderate recall, which
+made it the workhorse before graph methods matured.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Cosine LSH (SimHash): k random hyperplanes per signature
+n, d = 5000, 64
+X = rng.normal(size=(n, d))
+X /= np.linalg.norm(X, axis=1, keepdims=True)         # unit norm
+queries = rng.normal(size=(50, d)); queries /= np.linalg.norm(queries, axis=1, keepdims=True)
+
+def simhash(X, normals):
+    return (X @ normals.T > 0).astype(np.uint8)
+
+def signatures_match(sig_a, sig_b):
+    return (sig_a == sig_b).sum(axis=-1)
+
+# Single table, vary k (signature length)
+def recall_for_k(k_bits, table_count):
+    recall_total = 0; count = 0
+    for query in queries:
+        true_top10 = np.argsort(-X @ query)[:10]      # by cosine similarity
+        # OR over `table_count` tables
+        candidate_mask = np.zeros(n, dtype=bool)
+        for _ in range(table_count):
+            normals = rng.normal(size=(k_bits, d))
+            H = simhash(X, normals)
+            hq = simhash(query[None, :], normals)[0]
+            # Match if signature agrees on ALL bits
+            same = (H == hq).all(axis=1)
+            candidate_mask |= same
+        if candidate_mask.sum() < 10: continue
+        cand_idx = np.where(candidate_mask)[0]
+        ann_top10 = cand_idx[np.argsort(-(X[cand_idx] @ query))[:10]]
+        recall_total += len(set(ann_top10) & set(true_top10)) / 10
+        count += 1
+    return recall_total / max(count, 1), candidate_mask.sum() / n
+
+print(f"{'k_bits':>8}  {'L tables':>8}  {'recall@10':>10}  {'cand. fraction':>15}")
+for k_bits in [4, 8, 12]:
+    for L in [1, 4, 16]:
+        r, frac = recall_for_k(k_bits, L)
+        print(f"{k_bits:>8}  {L:>8}  {r:>10.3f}  {frac:>15.4f}")
+```
+
+Longer signatures cut the candidate set; more tables (OR amplification)
+boost recall. The next lesson covers an inverted-index approach (IVF) that
+scales to billions of vectors.

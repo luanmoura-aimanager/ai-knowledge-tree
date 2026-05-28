@@ -1,0 +1,175 @@
+---
+title: "Gradient boosting"
+pillar: C
+subId: C3
+lessonId: gradient-boosting
+order: 7
+estimatedMinutes: 20
+goal: "Frame boosting as functional gradient descent in loss space and fit trees to negative gradients."
+prerequisites: ["adaboost", "A3/gradient-descent"]
+---
+
+AdaBoost minimizes a specific loss (exponential) with a specific weak
+learner. **Gradient boosting** generalizes both: pick any differentiable loss,
+pick any weak learner, and at each round fit the learner to the negative
+gradient of the loss with respect to the current predictions. The result is
+the dominant tabular learner of the last decade.
+
+## Functional gradient descent
+
+Gradient descent in parameter space updates parameters by stepping along the
+negative gradient. **Functional gradient descent** treats the *predictor*
+itself as the optimization variable.
+
+For a loss $\sum_i \ell(y_i, F(x_i))$ and a current additive predictor
+$F_{t-1}$, the gradient with respect to the predictions is
+
+$$
+g_i = \left.\frac{\partial \ell(y_i, F)}{\partial F}\right|_{F = F_{t-1}(x_i)}.
+$$
+
+The negative gradient $-g_i$ points in the direction the prediction at $x_i$
+should move to reduce the loss. Boosting **fits a weak learner $h_t$ to
+$-g_i$** (least-squares regression of features to negative gradients), then
+takes a step:
+
+$$
+F_t(x) = F_{t-1}(x) + \eta\, h_t(x),
+$$
+
+with a small learning rate $\eta$ (typically 0.01-0.1). Iterate.
+
+## Reading common losses
+
+The recipe specializes the loss to fit the task:
+
+| Task | Loss | Negative gradient $-g_i$ (a.k.a. **pseudo-residual**) |
+|---|---|---|
+| Regression | Squared error $\tfrac{1}{2}(y - F)^2$ | $y_i - F_{t-1}(x_i)$ (the actual residual) |
+| Regression | Absolute error $|y - F|$ | $\operatorname{sign}(y_i - F_{t-1}(x_i))$ |
+| Binary class. | Log-loss $\log(1 + e^{-yF})$ (logistic) | $y_i / (1 + e^{y_i F_{t-1}(x_i)})$ |
+| Binary class. | Exponential loss $e^{-yF}$ | recovers AdaBoost |
+
+So **gradient-boosted regression trees** with squared loss simply fit each
+new tree to the *residuals* of the previous ensemble. The exponential loss
+recovers AdaBoost exactly. Log-loss boosting is what production binary
+classifiers use under names like GBT, GBM, LightGBM, XGBoost.
+
+## Weak learners: shallow trees
+
+Each $h_t$ is usually a **depth-4-to-8 regression tree** (regardless of
+classification or regression task; the tree fits the pseudo-residuals). Why
+shallow:
+
+- Shallow trees are weak learners, leaving plenty of structure for later
+  rounds.
+- Deep trees would overshoot, ruining the gradient-step interpretation.
+- Sequential dependence means slow rounds compound; cheap weak learners keep
+  total time manageable.
+
+A few hundred to a few thousand shallow trees is typical.
+
+## Regularization
+
+Three knobs to prevent overfitting:
+
+- **Learning rate $\eta$**: smaller is safer (more rounds needed, but better
+  generalization). The standard prescription is "fit as many trees as your
+  budget allows with the smallest $\eta$ that still trains in budget".
+- **Subsampling**: at each round, fit $h_t$ to a random subsample of the
+  data (stochastic gradient boosting). Lowers variance, adds noise.
+- **Tree complexity**: depth, min leaf size, leaf $L_2$ penalty. Each round's
+  tree is the local "step", so its complexity is the step size.
+
+## Strengths
+
+- State of the art on most tabular benchmarks, often beating deep learning by
+  a wide margin.
+- Handles mixed types, missing values, and irrelevant features.
+- Predictions are bounded by training-data range, so well-behaved on
+  interpolation.
+
+## Limits
+
+- Sequential, not embarrassingly parallel. Each round needs the previous.
+- Many hyperparameters to tune.
+- Cumulative training cost can be large.
+
+The next lesson covers the production-grade variants (XGBoost, LightGBM)
+that squeeze speed and accuracy out of this template.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Regression target with structure + noise
+n = 600
+X = rng.uniform(-3, 3, size=(n, 2))
+y_clean = np.sin(X[:, 0]) + 0.3 * X[:, 1]**2
+y = y_clean + 0.3 * rng.normal(size=n)
+
+def simple_regression_tree(X, y, max_depth=4):
+    """Tiny depth-bounded regression tree on MSE, returns predict()."""
+    class Node:
+        def __init__(self): self.leaf = self.f = self.t = self.L = self.R = None
+    def split(X, y):
+        n, d = X.shape; best = (None, None, -1); parent_var = np.var(y) * n
+        for j in range(d):
+            vals = np.unique(X[:, j])
+            for t in (vals[:-1] + vals[1:]) / 2:
+                m = X[:, j] <= t
+                if m.sum() < 2 or (~m).sum() < 2: continue
+                gain = parent_var - np.var(y[m]) * m.sum() - np.var(y[~m]) * (~m).sum()
+                if gain > best[2]: best = (j, t, gain)
+        return best
+    def build(X, y, depth):
+        node = Node()
+        if depth == 0 or len(y) < 4 or np.var(y) < 1e-8:
+            node.leaf = float(np.mean(y)); return node
+        j, t, gain = split(X, y)
+        if j is None or gain <= 0:
+            node.leaf = float(np.mean(y)); return node
+        m = X[:, j] <= t; node.f, node.t = j, t
+        node.L = build(X[m], y[m], depth - 1); node.R = build(X[~m], y[~m], depth - 1)
+        return node
+    root = build(X, y, max_depth)
+    def predict(Xq):
+        out = np.zeros(len(Xq))
+        for i, x in enumerate(Xq):
+            node = root
+            while node.leaf is None:
+                node = node.L if x[node.f] <= node.t else node.R
+            out[i] = node.leaf
+        return out
+    return predict
+
+def gradient_boost(X, y, T=100, eta=0.1, max_depth=3):
+    F = np.full(len(y), np.mean(y))
+    init = np.mean(y)
+    preds = []
+    for _ in range(T):
+        resid = y - F                                 # pseudo-residual for squared loss
+        tree = simple_regression_tree(X, resid, max_depth=max_depth)
+        F = F + eta * tree(X)
+        preds.append(tree)
+    return init, eta, preds
+
+def gb_predict(init, eta, preds, Xq):
+    F = np.full(len(Xq), init)
+    for t in preds:
+        F = F + eta * t(Xq)
+    return F
+
+idx = rng.permutation(n); tr, te = idx[:400], idx[400:]
+init, eta, trees = gradient_boost(X[tr], y[tr], T=60, eta=0.1, max_depth=3)
+y_hat_te = gb_predict(init, eta, trees, X[te])
+rmse_te = np.sqrt(np.mean((y_hat_te - y[te])**2))
+print(f"GB test RMSE: {rmse_te:.3f}  (noise sd 0.30, so RMSE ~0.30 is near-optimal)")
+```
+
+The boosted ensemble drives the test RMSE near the irreducible noise floor.
+The next lesson upgrades this template with second-order information and
+clever engineering: XGBoost and LightGBM.

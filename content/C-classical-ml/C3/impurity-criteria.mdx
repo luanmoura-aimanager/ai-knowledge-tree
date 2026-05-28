@@ -1,0 +1,140 @@
+---
+title: "Impurity criteria and splits"
+pillar: C
+subId: C3
+lessonId: impurity-criteria
+order: 2
+estimatedMinutes: 16
+goal: "Choose splits with Gini, entropy, or MSE; understand information gain and overfitting on noisy data."
+prerequisites: ["decision-trees", "A2/entropy"]
+---
+
+A decision tree's quality depends on its splits, and a split's quality depends
+on how *pure* the children are. Three classic impurity measures cover most
+cases: **Gini** and **entropy** for classification, **MSE** for regression.
+Each is the local objective that motivates the greedy training of the previous
+lesson.
+
+## Gini impurity
+
+For a node with class proportions $p_1, \dots, p_K$,
+
+$$
+\text{Gini} = 1 - \sum_{k=1}^K p_k^2.
+$$
+
+It is the probability of misclassification under a stochastic decision rule
+that predicts class $k$ with probability $p_k$. Gini is 0 when one class
+dominates ($p_k = 1$ for one $k$) and maximized at the uniform distribution
+($\text{Gini} = 1 - 1/K$).
+
+## Entropy and information gain
+
+For the same proportions,
+
+$$
+H = -\sum_{k=1}^K p_k \log_2 p_k.
+$$
+
+This is the Shannon entropy in bits. It equals 0 for pure nodes and $\log_2 K$
+at the uniform distribution. The **information gain** of a split is the
+expected reduction in entropy:
+
+$$
+\text{IG} = H(\text{parent}) - \frac{|S_L|}{|S|} H(S_L) - \frac{|S_R|}{|S|} H(S_R).
+$$
+
+Trees built with information gain are called **ID3 / C4.5** trees in the
+classical literature.
+
+Gini and entropy track each other closely; the binary case
+$\text{Gini} = 2p(1 - p)$ and $H = -p\log_2 p - (1-p)\log_2(1-p)$ both peak at
+$p = 0.5$. They differ in computational cost (Gini is cheaper, no logarithm)
+and in marginal sensitivity to small probabilities (entropy is more
+sensitive). In practice the trees they produce are nearly indistinguishable.
+
+## MSE for regression
+
+For a node with target values $y_1, \dots, y_n$, the **mean squared error**
+impurity is the variance:
+
+$$
+\text{MSE} = \frac{1}{n}\sum_{i=1}^n (y_i - \bar y)^2.
+$$
+
+The optimal leaf prediction is the mean $\bar y$ (which is exactly OLS for a
+constant predictor). A split reduces MSE by partitioning the data into two
+groups whose individual variances sum to less than the parent variance.
+
+**Mean absolute error (MAE)** can replace MSE for more robust regression
+trees, but the closed-form best leaf becomes the median rather than the mean.
+
+## Why information-gain-style criteria favor balanced splits
+
+A split is more useful when its two children are both reasonably large. A
+split that isolates a single point gives high purity in that child but very
+small $|S_L|$ in the weighted sum, so the gain is dominated by the other
+child. Gain criteria automatically discount tiny-child splits, mitigating one
+common failure mode.
+
+## Overfitting and noise
+
+Without limits, recursive splitting drives every leaf to perfect purity by
+isolating noise. Even a single mislabeled point can drive several extra
+splits. The remedies are the subject of the next lesson:
+
+- **Max depth** (cap recursion).
+- **Min samples per leaf** (refuse small leaves).
+- **Min impurity decrease** (refuse splits that barely help).
+- **Cost-complexity pruning** (remove subtrees that don't justify their size).
+
+The right amount of regularization is found by cross-validation.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def gini(labels):
+    p = np.bincount(labels) / len(labels)
+    return 1 - np.sum(p**2)
+
+def entropy(labels):
+    p = np.bincount(labels) / len(labels)
+    nz = p[p > 0]
+    return -np.sum(nz * np.log2(nz))
+
+# Both impurities peak at the uniform distribution and vanish at purity
+for p in [0.0, 0.1, 0.5, 0.9, 1.0]:
+    n = 1000
+    y = (rng.random(n) < p).astype(int)
+    print(f"p={p}: gini={gini(y):.3f}, entropy={entropy(y):.3f} bits")
+
+# Information gain of a useful split vs a useless one
+y_parent = np.concatenate([np.zeros(100), np.ones(100)]).astype(int)
+y_left_good = np.zeros(100, dtype=int)
+y_right_good = np.ones(100, dtype=int)
+y_left_bad = np.concatenate([np.zeros(50), np.ones(50)]).astype(int)
+y_right_bad = np.concatenate([np.zeros(50), np.ones(50)]).astype(int)
+
+ig_good = entropy(y_parent) - 0.5 * entropy(y_left_good) - 0.5 * entropy(y_right_good)
+ig_bad = entropy(y_parent) - 0.5 * entropy(y_left_bad) - 0.5 * entropy(y_right_bad)
+print(f"\nperfect split IG = {ig_good:.3f} bits  (= H(parent), one full bit recovered)")
+print(f"useless split IG = {ig_bad:.3f} bits  (no information)")
+
+# MSE impurity for regression
+y_reg_parent = rng.normal(size=200)
+y_reg_left = y_reg_parent[y_reg_parent < 0]
+y_reg_right = y_reg_parent[y_reg_parent >= 0]
+parent_var = np.var(y_reg_parent)
+weighted_child = (len(y_reg_left) * np.var(y_reg_left) + len(y_reg_right) * np.var(y_reg_right)) / len(y_reg_parent)
+print(f"\nregression MSE parent: {parent_var:.3f}, after split: {weighted_child:.3f}, reduction: {parent_var - weighted_child:.3f}")
+```
+
+The two classification criteria behave as advertised; the perfect split
+recovers a full bit of information while the uninformative one yields zero;
+and the regression split halves the variance on a symmetric distribution. The
+next lesson controls the resulting tree size so it generalizes instead of
+memorizing.

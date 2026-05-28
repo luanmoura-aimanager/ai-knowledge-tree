@@ -1,0 +1,136 @@
+---
+title: "Soft-margin SVM and hinge loss"
+pillar: C
+subId: C2
+lessonId: soft-margin-svm
+order: 3
+estimatedMinutes: 18
+goal: "Relax separability with slack variables, get the hinge-loss primal, and tune the regularization C."
+prerequisites: ["hard-margin-svm"]
+---
+
+Hard-margin SVM is infeasible on nonseparable data and brittle near outliers.
+The **soft-margin** SVM relaxes the constraints with slack variables, charging
+a penalty for every margin violation. Rewriting the slack penalty as a loss
+gives the **hinge loss**, which is what production SVMs actually minimize.
+
+## Slack variables
+
+For each example, introduce a nonnegative slack $\xi_i \ge 0$ that absorbs any
+margin shortfall:
+
+$$
+y_i(w^\top x_i + b) \ge 1 - \xi_i.
+$$
+
+Three regimes:
+
+- $\xi_i = 0$: the constraint holds with room to spare; the point sits outside
+  or on the margin.
+- $0 < \xi_i \le 1$: the point is inside the margin band but on the correct
+  side.
+- $\xi_i > 1$: the point is misclassified.
+
+The total violation $\sum_i \xi_i$ should be small.
+
+## The QP
+
+$$
+\min_{w, b, \boldsymbol\xi}\; \tfrac{1}{2}\lVert w\rVert^2 + C\sum_i \xi_i \quad \text{s.t.}\quad y_i(w^\top x_i + b) \ge 1 - \xi_i,\ \ \xi_i \ge 0.
+$$
+
+The regularization knob $C > 0$ trades margin width against constraint
+violation:
+
+- Large $C$: heavy penalty on violations, narrow margin, close to hard-margin.
+- Small $C$: tolerates violations, wider margin, more bias.
+
+The problem is convex (quadratic objective + affine constraints).
+
+## Hinge loss: same problem, no slacks
+
+Minimize over $\xi_i$ for fixed $(w, b)$. The optimal slack is
+$\xi_i = \max(0, 1 - y_i(w^\top x_i + b))$: just enough to satisfy the
+constraint, zero if not needed. Substituting,
+
+$$
+\min_{w, b}\; \tfrac{1}{2}\lVert w\rVert^2 + C \sum_i \max\big(0,\ 1 - y_i(w^\top x_i + b)\big).
+$$
+
+The per-example loss
+
+$$
+\ell_{\text{hinge}}(z) = \max(0, 1 - z), \qquad z = y(w^\top x + b),
+$$
+
+is the **hinge loss**. It is zero on correctly classified points outside the
+margin ($z \ge 1$), and grows linearly inside the margin and across the
+boundary.
+
+The soft-margin SVM is **regularized hinge-loss minimization**, the same shape
+as L2-regularized logistic regression but with hinge instead of cross-entropy.
+
+## Convex but not differentiable
+
+The hinge is not differentiable at $z = 1$ (the kink). Standard remedies:
+
+- **Subgradient descent**: replace the derivative at the kink with any value in
+  the subdifferential (typically $-y x$ if $z < 1$ else $0$).
+- **Proximal / smoothing**: replace the hinge with a smoothed version (e.g.
+  squared hinge).
+- **Dual / SMO**: solve the dual QP, as in the original SVM literature.
+
+For small to medium problems, the dual is standard; for large ones, stochastic
+subgradient descent on the primal (Pegasos) is the workhorse.
+
+## Choosing C
+
+$C$ is the central hyperparameter. Cross-validate over $C \in \{10^{-3}, \dots, 10^3\}$
+on a log scale. Larger $C$ may help on clean, well-separated data; smaller $C$
+helps when outliers or label noise are present. The trade is exactly the
+bias-variance tradeoff with a different parameterization: $1/C$ plays the role
+of $\lambda$ in ridge.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Nonseparable 2D data: two overlapping Gaussians
+n = 200
+X = np.vstack([rng.normal([0.8, 0], scale=1.0, size=(n//2, 2)),
+               rng.normal([-0.8, 0], scale=1.0, size=(n//2, 2))])
+y = np.array([1.0] * (n//2) + [-1.0] * (n//2))
+
+def soft_margin_svm(X, y, C=1.0, lr=0.01, steps=5000):
+    n, d = X.shape
+    w = np.zeros(d)
+    b = 0.0
+    for _ in range(steps):
+        margins = y * (X @ w + b)
+        viol = margins < 1.0                            # which points violate
+        grad_w = w - C * (y[viol, None] * X[viol]).sum(axis=0)
+        grad_b = - C * y[viol].sum()
+        w -= lr * grad_w / n
+        b -= lr * grad_b / n
+    return w, b
+
+# Sweep C: more weight on violations -> tighter margin
+for C in [0.01, 1.0, 100.0]:
+    w, b = soft_margin_svm(X, y, C=C, lr=0.1)
+    margin = 1.0 / np.linalg.norm(w)
+    acc = np.mean(np.sign(X @ w + b) == y)
+    viol = np.mean(y * (X @ w + b) < 1.0)
+    print(f"C={C:>6}: margin={margin:.3f}, accuracy={acc:.3f}, fraction with violation={viol:.3f}")
+
+# Verify the hinge-loss equivalence: optimal slack is max(0, 1 - y(w^T x + b))
+w, b = soft_margin_svm(X, y, C=1.0, lr=0.1)
+hinge_loss = np.maximum(0, 1 - y * (X @ w + b)).sum()
+print(f"\ntotal hinge loss = {hinge_loss:.3f}  (= sum of optimal slacks)")
+```
+
+Larger $C$ tightens the margin and reduces the fraction of margin violations;
+the total hinge loss equals the sum of optimal slacks. The next lesson casts
+the SVM in its dual form, where the support-vector structure becomes explicit.

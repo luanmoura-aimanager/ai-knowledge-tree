@@ -1,0 +1,144 @@
+---
+title: "The SVM dual and support vectors"
+pillar: C
+subId: C2
+lessonId: svm-dual
+order: 4
+estimatedMinutes: 20
+goal: "Form the SVM dual, identify support vectors via complementary slackness, and read sparsity off KKT."
+prerequisites: ["soft-margin-svm", "A3/duality"]
+---
+
+The SVM primal is a constrained QP over $w$ and $b$. The **dual** is a QP over
+one multiplier $\alpha_i$ per training example, with a structure that makes
+two things explicit: the solution is sparse in $\alpha$, and it depends on the
+data only through inner products. The second fact is what kernel methods
+exploit.
+
+## Forming the dual
+
+Start with the soft-margin primal:
+
+$$
+\min_{w, b, \xi}\; \tfrac{1}{2}\lVert w\rVert^2 + C\sum_i \xi_i \quad \text{s.t.}\quad y_i(w^\top x_i + b) \ge 1 - \xi_i,\ \ \xi_i \ge 0.
+$$
+
+Introduce multipliers $\alpha_i \ge 0$ for the margin constraints and $\mu_i \ge 0$
+for the nonnegativity of slack. The Lagrangian is
+
+$$
+\mathcal{L} = \tfrac{1}{2}\lVert w\rVert^2 + C\sum_i \xi_i - \sum_i \alpha_i\big(y_i(w^\top x_i + b) - 1 + \xi_i\big) - \sum_i \mu_i \xi_i.
+$$
+
+Stationarity:
+
+$$
+\frac{\partial \mathcal{L}}{\partial w} = w - \sum_i \alpha_i y_i x_i = 0, \quad \frac{\partial \mathcal{L}}{\partial b} = -\sum_i \alpha_i y_i = 0, \quad \frac{\partial \mathcal{L}}{\partial \xi_i} = C - \alpha_i - \mu_i = 0.
+$$
+
+So $w = \sum_i \alpha_i y_i x_i$, $\sum_i \alpha_i y_i = 0$, and $0 \le \alpha_i \le C$
+(eliminating $\mu_i = C - \alpha_i$).
+
+Substituting back gives the **dual QP**:
+
+$$
+\max_{\alpha}\; \sum_i \alpha_i - \tfrac{1}{2}\sum_{i, j} \alpha_i \alpha_j y_i y_j\, x_i^\top x_j \quad \text{s.t.}\quad 0 \le \alpha_i \le C,\ \sum_i \alpha_i y_i = 0.
+$$
+
+The data enters only through the inner products $x_i^\top x_j$, which is the
+hook the kernel trick will exploit.
+
+## Three regimes of $\alpha_i$ (KKT)
+
+The complementary slackness conditions classify every training example into
+exactly one bucket:
+
+- **$\alpha_i = 0$**: the constraint $y_i(w^\top x_i + b) \ge 1$ is slack
+  (strict inequality). The point sits outside the margin and contributes
+  nothing to $w$.
+- **$0 < \alpha_i < C$**: the constraint is tight, $y_i(w^\top x_i + b) = 1$.
+  The point lies exactly on the margin boundary. These are the **margin
+  support vectors**.
+- **$\alpha_i = C$**: the constraint is tight *with positive slack*, so the
+  point is inside the margin or misclassified. These are the **bound support
+  vectors**, the noisy or hard-to-classify points.
+
+Only the support vectors have $\alpha_i > 0$, and only they contribute to $w$.
+The classifier is sparse in examples: most training points are forgotten after
+fitting.
+
+## Recovering $w$ and $b$
+
+The weight vector is
+
+$$
+w = \sum_{i \in SV} \alpha_i y_i x_i,
+$$
+
+a linear combination of the support vectors. The bias $b$ is recovered from any
+**margin support vector** ($0 < \alpha_i < C$): such a point satisfies
+$y_i(w^\top x_i + b) = 1$, so $b = y_i - w^\top x_i$. In practice average across
+all margin support vectors for stability.
+
+## Why the dual is interesting
+
+Three reasons:
+
+- **Sparsity**: only support vectors matter at prediction time, so the model
+  size is the number of SVs, not the dataset size.
+- **Kernelization**: the dual depends on data only via inner products, so
+  replacing $x_i^\top x_j$ with a kernel $k(x_i, x_j)$ lifts the SVM to any
+  reproducing kernel Hilbert space without ever forming the lifted features.
+- **Algorithms**: dual coordinate ascent (SMO) is the basis of LIBSVM and
+  remains competitive on small to medium problems.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Mildly nonseparable data
+n_per = 40
+X_pos = rng.normal([1.2, 0.5], scale=0.8, size=(n_per, 2))
+X_neg = rng.normal([-1.2, -0.5], scale=0.8, size=(n_per, 2))
+X = np.vstack([X_pos, X_neg])
+y = np.array([1.0] * n_per + [-1.0] * n_per)
+
+def svm_dual(X, y, C=1.0, lr=1e-3, steps=20000):
+    K = X @ X.T
+    Q = (y[:, None] * y[None, :]) * K
+    n = len(y)
+    alpha = np.zeros(n)
+    for _ in range(steps):
+        grad = 1 - Q @ alpha
+        alpha = alpha + lr * grad
+        alpha = np.clip(alpha, 0, C)
+        # project onto sum(y * alpha) = 0
+        s = (y @ alpha) / (y @ y)
+        alpha -= s * y
+        alpha = np.clip(alpha, 0, C)
+    return alpha
+
+C = 1.0
+alpha = svm_dual(X, y, C=C)
+w = (alpha * y) @ X
+margin_sv = (alpha > 1e-4) & (alpha < C - 1e-4)
+b = np.mean(y[margin_sv] - X[margin_sv] @ w)
+
+# Classify and check the three buckets
+n_zero = int(np.sum(alpha < 1e-4))
+n_margin = int(np.sum(margin_sv))
+n_bound = int(np.sum(alpha > C - 1e-4))
+print(f"alpha = 0      : {n_zero} / {len(y)}  (outside margin)")
+print(f"0 < alpha < C  : {n_margin}            (on margin)")
+print(f"alpha = C      : {n_bound}            (inside margin or misclassified)")
+print(f"accuracy: {np.mean(np.sign(X @ w + b) == y):.3f}")
+print(f"margin = 1/||w||: {1.0 / np.linalg.norm(w):.3f}")
+```
+
+The training set splits cleanly into the three KKT buckets; only the support
+vectors (margin + bound) shape the decision boundary. The next lesson exploits
+the dual's inner-product structure to lift the SVM into nonlinear feature
+spaces via the kernel trick.

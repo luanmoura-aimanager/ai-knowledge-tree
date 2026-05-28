@@ -1,0 +1,173 @@
+---
+title: "Vector databases"
+pillar: C
+subId: C9
+lessonId: vector-databases
+order: 5
+estimatedMinutes: 14
+goal: "Compare FAISS, pgvector, and managed vector DBs along recall, throughput, and operational cost."
+prerequisites: ["hnsw", "ivf-pq"]
+---
+
+A vector database is the production wrapping of an ANN index: the index
+algorithms (HNSW, IVF-PQ) plus persistence, replication, scaling, hybrid
+filtering, and integration with the rest of the data stack. Different
+products optimize for different points on the cost / recall / latency
+curve. The right choice depends on workload, scale, and existing
+infrastructure.
+
+## What a vector database adds on top of an ANN library
+
+- **Persistence**: index survives restarts.
+- **Replication and sharding**: scale horizontally.
+- **Hybrid queries**: combine vector similarity with metadata filters
+  ("nearest by embedding, but only among items in category X").
+- **Online insert / update / delete**.
+- **Operations**: monitoring, backups, multi-tenancy.
+
+A bare ANN library (FAISS, hnswlib) provides only the index core; you
+must build the rest yourself.
+
+## FAISS (Facebook AI Similarity Search)
+
+The canonical open-source ANN library. Implements every index family:
+flat exhaustive, IVF, IVF-PQ, HNSW, OPQ, IVFADC, etc. Used inside
+Facebook's recommendation stack and as the engine behind many vector
+DBs.
+
+**Strengths**: best-in-class algorithmic coverage, fast, GPU support.
+**Limits**: a library, not a service. No persistence, no replication, no
+hybrid filtering. You wrap it in your own service layer.
+
+When to use: you have a large team that can build the operational layer
+and need the algorithmic flexibility.
+
+## pgvector
+
+A Postgres extension adding a `vector` column type and IVFFlat / HNSW
+indices. Embeddings live in the same database as your application data,
+so hybrid queries (`SELECT ... WHERE category = 'foo' ORDER BY embedding <-> $query LIMIT 10`)
+are trivial SQL. Inherits Postgres replication, transactions, and
+operational maturity.
+
+**Strengths**: SQL ergonomics, hybrid queries are first-class,
+operational simplicity (it's just Postgres). Excellent default for
+small-to-medium catalogs (~1-10M vectors).
+
+**Limits**: scaling above ~100M vectors per shard becomes painful;
+specialized vector DBs win at extreme scale.
+
+When to use: you already have Postgres and your vector catalog is in
+the millions, not billions.
+
+## Managed vector DBs
+
+Pinecone, Weaviate, Qdrant, Milvus, Vespa, Zilliz Cloud, MongoDB Atlas
+Vector Search. Each makes different trade-offs:
+
+- **Pinecone**: serverless, simple API, fully managed. Pricey at scale,
+  great for prototypes and small-to-medium production loads.
+- **Weaviate**: open source + managed, modules for hybrid search and
+  generative integration, schema-driven.
+- **Qdrant**: open source, written in Rust, fast, strong payload-
+  filtering. Available as managed.
+- **Milvus / Zilliz**: high-scale focus, multiple index types per
+  collection, distributed by design.
+- **Vespa**: hybrid retrieval + ranking system, used at Yahoo / TikTok
+  scale. Highest throughput at the cost of operational complexity.
+
+Decision factors: scale, hybrid query requirements, ops budget, latency
+target, cost.
+
+## Hybrid retrieval
+
+The "vector + metadata filter" combination matters more than naive ANN.
+Two approaches:
+
+- **Pre-filter** then ANN over the filtered subset. Bad for high
+  selectivity filters because the index loses most of its efficacy.
+- **Post-filter**: ANN over the full set then drop violators. Bad
+  recall if the filter is restrictive (most ANN results may be
+  filtered out).
+- **Integrated**: index structures that incorporate metadata into the
+  graph or list traversal (Vespa, Qdrant, Milvus's hybrid). Best
+  performance but vendor-specific.
+
+For most workloads, post-filter is fine. For demanding ones, evaluate
+the vendor's specific hybrid implementation.
+
+## Throughput vs latency
+
+A single-vector lookup is fast (<10 ms for 100M vectors with HNSW).
+Throughput (queries per second per machine) is the operational metric
+you measure. Vector DBs usually serve 10^3-10^4 QPS per machine for a
+single index. Sharding gets you linear throughput scaling.
+
+## Cost model
+
+- **CPU / RAM dominant**: HNSW is memory-bound (~$M$ pointers + vector
+  per item). IVF-PQ is compute-bound (table lookups) but lighter on
+  RAM.
+- **Index build**: HNSW is $O(n \log n)$ to build, expensive for big
+  collections. IVF-PQ requires training k-means once, then is fast.
+- **Updates**: continuous indexes are HNSW-friendly; daily-batch
+  rebuilds are IVF-PQ-friendly.
+
+## Decision tree (rough)
+
+- Tens of thousands of vectors: linear scan or pgvector.
+- A few million, mostly read: pgvector with HNSW, or Pinecone for
+  managed simplicity.
+- Tens to hundreds of millions: Qdrant, Weaviate, Milvus, or
+  self-hosted FAISS + HNSW.
+- Billions of vectors: FAISS with IVF-PQ on dedicated infra, or
+  Vespa-like systems.
+
+The vector DB market is young. Re-evaluate annually.
+
+## Check it on arrays
+
+This is a demo of `pgvector`-style integration: filter first by
+metadata, then ANN-rank the survivors. The same pattern is what a vector
+DB does internally.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n, d = 20000, 64
+X = rng.normal(size=(n, d))
+# Metadata: each item has a category 0-4
+categories = rng.integers(0, 5, size=n)
+
+queries = rng.normal(size=(50, d))
+query_filter = rng.integers(0, 5, size=50)               # filter each query to one category
+
+# Pre-filter: drop non-matching items, ANN over the rest
+def hybrid_search(query, target_category, k=10):
+    mask = categories == target_category
+    cand_idx = np.where(mask)[0]
+    if len(cand_idx) == 0: return np.array([])
+    d2 = ((X[cand_idx] - query)**2).sum(axis=1)
+    return cand_idx[np.argsort(d2)[:k]]
+
+# Post-filter: do ANN first, then filter
+def post_filter_search(query, target_category, k=10, over_fetch=100):
+    d2 = ((X - query)**2).sum(axis=1)
+    top = np.argsort(d2)[:over_fetch]
+    keep = top[categories[top] == target_category]
+    return keep[:k]
+
+# Compare: pre-filter is better when category is restrictive; post-filter loses recall
+for q_idx in range(5):
+    pre = set(hybrid_search(queries[q_idx], query_filter[q_idx], k=10).tolist())
+    post = set(post_filter_search(queries[q_idx], query_filter[q_idx], k=10, over_fetch=100).tolist())
+    print(f"query {q_idx}: pre-filter found {len(pre)}, post-filter found {len(post)}; "
+          f"overlap = {len(pre & post)}")
+```
+
+When the filter is selective (here, 1 of 5 categories), pre-filter
+recovers more relevant neighbors than post-filter. This closes the C9
+ANN track; the final C10 lessons cover the evaluation and selection
+machinery that ties everything together.

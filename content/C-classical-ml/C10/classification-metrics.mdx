@@ -1,0 +1,188 @@
+---
+title: "Classification metrics"
+pillar: C
+subId: C10
+lessonId: classification-metrics
+order: 1
+estimatedMinutes: 16
+goal: "Define precision, recall, F1, ROC curves, and AUC; choose the metric that matches the cost structure."
+prerequisites: []
+---
+
+Accuracy is a terrible metric for most real classification problems: under
+class imbalance, a constant predictor can hit 99% accuracy and be useless.
+The standard alternatives, **precision, recall, F1, ROC-AUC, PR-AUC**, all
+emphasize different aspects of model behavior. Picking the right one means
+matching the metric to the cost of mistakes in your problem.
+
+## The confusion matrix
+
+For binary classification with a threshold producing predicted positives and
+negatives:
+
+|               | Predicted + | Predicted - |
+|---------------|-------------|-------------|
+| **Actual +**  | TP          | FN          |
+| **Actual -**  | FP          | TN          |
+
+- **TP** = true positives
+- **FP** = false positives
+- **FN** = false negatives
+- **TN** = true negatives
+
+Every metric below is a function of these four counts.
+
+## Accuracy and its failure on imbalance
+
+$\text{Accuracy} = (TP + TN)/(TP + FP + FN + TN)$.
+
+The fatal flaw: on a 99/1 imbalanced dataset, predicting "always 0" gives
+99% accuracy. Use accuracy only when classes are roughly balanced and false
+positives cost the same as false negatives.
+
+## Precision and recall
+
+$$
+\text{Precision} = \frac{TP}{TP + FP}, \qquad \text{Recall} = \frac{TP}{TP + FN}.
+$$
+
+- **Precision**: of the items I flagged positive, how many actually were?
+  High precision = low false alarms.
+- **Recall** (sensitivity, true positive rate): of the actually positive
+  items, how many did I catch? High recall = few misses.
+
+Precision and recall are in tension: lowering the threshold catches more
+positives (recall up) at the cost of more false positives (precision down).
+
+## F1 score
+
+The harmonic mean of precision and recall:
+
+$$
+F_1 = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}}.
+$$
+
+F1 collapses precision and recall into one number with equal weight. F1 is
+useful as a single metric to optimize, especially under imbalance, but it
+hides the precision-recall tradeoff. **F$_\beta$** generalizes: $\beta < 1$
+favors precision, $\beta > 1$ favors recall.
+
+## ROC curve and AUC
+
+Vary the classifier's threshold and trace **TPR** (recall) against **FPR**
+($FP / (FP + TN)$). The result is the **ROC curve**. The **area under the
+ROC curve (AUC-ROC)** is the probability that a randomly chosen positive
+gets a higher score than a randomly chosen negative.
+
+Properties:
+
+- AUC = 1: perfect ranking.
+- AUC = 0.5: random.
+- AUC < 0.5: worse than random (flip your scores).
+
+AUC is **threshold-independent**: it measures ranking quality, not
+calibration or operating point. Convenient when the threshold will be
+chosen later by downstream cost.
+
+## Precision-recall curve and PR-AUC
+
+Plot precision vs recall as the threshold varies. The **PR-AUC** is the
+area under it. Important property:
+
+- PR curves are **sensitive to class imbalance** in a way ROC is not. On
+  severely imbalanced datasets, ROC-AUC can look great even when the
+  classifier is useless in the relevant operating range.
+
+**Use PR-AUC for imbalanced positive classes** (rare positives): fraud
+detection, anomaly detection, retrieval. **Use ROC-AUC for balanced
+problems** or when you care about overall ranking quality.
+
+## Multi-class extensions
+
+- **Macro-average**: compute the metric per class, then average. Treats
+  every class equally regardless of size.
+- **Micro-average**: aggregate TP/FP/FN/TN across all classes, then
+  compute the metric. Dominated by frequent classes.
+- **Weighted-average**: per-class metric weighted by class frequency.
+
+Pick macro for fair-across-class treatment, micro for overall accuracy,
+weighted when classes are imbalanced but treated proportionally.
+
+## When to use what
+
+| Problem | Metric |
+|---|---|
+| Balanced classes, equal costs | Accuracy |
+| Imbalanced positives | PR-AUC, recall at high precision |
+| Imbalanced negatives, ranking matters | ROC-AUC |
+| Cost-sensitive (FP and FN have known costs) | Optimize expected cost directly |
+| Need a single number | F1 or F$_\beta$ |
+| Multi-class fairness across classes | Macro-F1 |
+
+The honest answer is usually "report several and use the one that matches
+the real cost structure of mistakes". A single number rarely tells the
+whole story.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Imbalanced binary problem: 5% positive class
+n = 5000
+y = (rng.random(n) < 0.05).astype(int)
+# Synthetic scores: noisy version of y
+scores = y + 0.7 * rng.normal(size=n)
+
+def confusion(y_true, y_pred):
+    tp = int(((y_pred == 1) & (y_true == 1)).sum())
+    fp = int(((y_pred == 1) & (y_true == 0)).sum())
+    fn = int(((y_pred == 0) & (y_true == 1)).sum())
+    tn = int(((y_pred == 0) & (y_true == 0)).sum())
+    return tp, fp, fn, tn
+
+def metrics_at_threshold(y_true, scores, thr):
+    y_pred = (scores >= thr).astype(int)
+    tp, fp, fn, tn = confusion(y_true, y_pred)
+    prec = tp / max(tp + fp, 1)
+    rec = tp / max(tp + fn, 1)
+    f1 = 2 * prec * rec / max(prec + rec, 1e-9)
+    return prec, rec, f1, tp + tn / max(n, 1)
+
+for thr in [0.0, 0.5, 1.0, 1.5]:
+    prec, rec, f1, _ = metrics_at_threshold(y, scores, thr)
+    acc = ((scores >= thr).astype(int) == y).mean()
+    print(f"thr={thr:>4.1f}: precision={prec:.3f}, recall={rec:.3f}, F1={f1:.3f}, accuracy={acc:.3f}")
+
+def auc_roc(y_true, scores):
+    # Sort by descending score; trace TPR, FPR
+    order = np.argsort(-scores)
+    y_sorted = y_true[order]
+    tpr = np.cumsum(y_sorted) / max(y_sorted.sum(), 1)
+    fpr = np.cumsum(1 - y_sorted) / max((1 - y_sorted).sum(), 1)
+    # Trapezoidal area
+    integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    return integrate(tpr, fpr)
+
+def auc_pr(y_true, scores):
+    order = np.argsort(-scores)
+    y_sorted = y_true[order]
+    tp = np.cumsum(y_sorted)
+    fp = np.cumsum(1 - y_sorted)
+    precision = tp / np.maximum(tp + fp, 1)
+    recall = tp / max(y_true.sum(), 1)
+    integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    return integrate(precision, recall)
+
+print(f"\nROC-AUC: {auc_roc(y, scores):.3f}")
+print(f"PR-AUC:  {auc_pr(y, scores):.3f}")
+
+# An always-zero predictor: 95% accuracy but 0% recall
+print(f"\ntrivial all-zero classifier: accuracy={1 - y.mean():.3f}, recall=0.000")
+```
+
+The always-zero classifier has high accuracy but useless recall on the
+imbalanced data; PR-AUC reflects the actual ranking quality more honestly
+than accuracy. The next lesson covers the regression analogs.

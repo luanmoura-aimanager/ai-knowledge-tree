@@ -1,0 +1,153 @@
+---
+title: "IVF and product quantization"
+pillar: C
+subId: C9
+lessonId: ivf-pq
+order: 3
+estimatedMinutes: 16
+goal: "Partition the space with coarse clusters and compress residuals with product quantization for billion-scale search."
+prerequisites: ["ann-problem", "C5/kmeans"]
+---
+
+For billion-vector scale, LSH and graph methods get memory-bound. **IVF
+(inverted file index)** + **PQ (product quantization)** is the family that
+serves the largest real-world ANN indices: Facebook's FAISS production
+deployments, Google's ScaNN. The trick is two-stage: first partition the
+space into clusters, then compress vectors within each cluster.
+
+## IVF: coarse partition with k-means
+
+Run k-means with $K$ centroids (typically $K = \sqrt n$). Each database
+vector is stored in the inverted list of its nearest centroid. At query
+time:
+
+1. Find the $\texttt{nprobe}$ centroids nearest to the query (a small
+   exact NN search over $K$ centroids).
+2. Search exhaustively within the $\texttt{nprobe}$ inverted lists.
+
+If centroids are uniformly distributed and `nprobe` is small, the search
+touches only $n \cdot \texttt{nprobe}/K$ vectors instead of $n$. Higher
+`nprobe` boosts recall at the cost of more distance computations.
+
+This is the **inverted-index** part: a list per centroid, queried by
+proximity to the centroid.
+
+## PQ: product quantization compression
+
+Naive IVF still stores full vectors and computes full distances against
+them. **Product quantization** compresses each vector into a short
+codebook lookup.
+
+Split each $d$-dimensional vector into $m$ sub-vectors of length $d/m$.
+Train a separate k-means codebook of $K_s$ centroids ($K_s = 256$ is
+standard) on each sub-vector. A vector is represented by $m$ bytes:
+the centroid index for each sub-vector.
+
+At query time, precompute the distance from each query sub-vector to all
+$K_s$ centroids of that sub-codebook (a $K_s$-entry lookup table per
+sub-vector). The distance to a stored vector is the sum of $m$ table
+lookups: very fast.
+
+PQ achieves $d/m$ bytes per vector (versus 4 bytes per float for a raw
+$d$-dimensional vector). For $d = 128$, $m = 16$ gives 16 bytes per
+vector: 8× compression.
+
+## IVF + PQ together
+
+Combine: IVF for coarse partition, PQ for compressed residual within each
+list. At each centroid $c_k$, store residuals $x - c_k$ for vectors
+assigned there, compressed with PQ. Query:
+
+1. Find `nprobe` nearest centroids.
+2. For each inverted list, precompute the residual-PQ lookup tables.
+3. Sum table entries to score every PQ code in the list.
+
+Memory: $m$ bytes per vector + $K m K_s d$ bytes of codebooks. At
+$n = 10^9$, $m = 16$: 16 GB for vectors, fits in a single machine's RAM.
+
+## Trade-offs
+
+| Knob | Larger → | Smaller → |
+|---|---|---|
+| $K$ (centroids) | More precise partition, more centroid distances | Cheaper centroid search, coarser partition |
+| `nprobe` | Higher recall, slower query | Lower recall, faster query |
+| $m$ (PQ subspaces) | Faster query, more memory per vector | Slower query (more compression), less memory |
+| $K_s$ (sub-centroids) | Tighter codebook (default 256) | Coarser quantization |
+
+The recall-QPS curve at billion scale is dominated by IVF-PQ variants
+(IVFFlat, IVFPQ, OPQ). FAISS's defaults are good starting points.
+
+## OPQ (optimized product quantization)
+
+PQ's sub-vector split assumes the data is independent across sub-vectors,
+which is wrong. **OPQ** prepends an orthogonal rotation $R$ to align the
+data with the sub-vector axes, then applies PQ. The rotation is learned
+to minimize quantization error. OPQ typically beats PQ on real data with
+no extra serving cost (the rotation is applied once per query).
+
+## When IVF-PQ vs HNSW
+
+- **Billion scale and memory matters**: IVF-PQ (compressed) wins on
+  memory and is competitive on speed.
+- **Tens of millions and high recall**: HNSW (next lesson) dominates the
+  recall-QPS Pareto curve.
+- **Updates / inserts**: HNSW handles online insert; IVF-PQ requires
+  periodic retraining of centroids and codebooks for best quality.
+
+Both are first-class citizens of FAISS.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n, d = 20000, 32
+X = rng.normal(size=(n, d)).astype(np.float32)
+queries = rng.normal(size=(50, d)).astype(np.float32)
+
+def kmeans_simple(X, k, n_iter=30, rng=rng):
+    centers = X[rng.choice(len(X), k, replace=False)].copy()
+    for _ in range(n_iter):
+        d2 = ((X[:, None] - centers[None, :])**2).sum(axis=2)
+        z = d2.argmin(axis=1)
+        for j in range(k):
+            if (z == j).sum() > 0:
+                centers[j] = X[z == j].mean(axis=0)
+    d2 = ((X[:, None] - centers[None, :])**2).sum(axis=2)
+    return z, centers
+
+# IVF: cluster the database
+K = 64
+ivf_assign, centroids = kmeans_simple(X, K, n_iter=10)
+inverted_lists = {k: np.where(ivf_assign == k)[0] for k in range(K)}
+
+def ivf_search(query, nprobe=4, k=10):
+    # find the nprobe nearest centroids
+    d2_centroids = ((centroids - query)**2).sum(axis=1)
+    probes = np.argsort(d2_centroids)[:nprobe]
+    # exhaustive search inside the chosen lists
+    candidates = np.concatenate([inverted_lists[p] for p in probes])
+    d2 = ((X[candidates] - query)**2).sum(axis=1)
+    return candidates[np.argsort(d2)[:k]]
+
+# Recall@10 vs nprobe
+def true_knn(q, k=10):
+    return np.argsort(((X - q)**2).sum(axis=1))[:k]
+
+print(f"{'nprobe':>8}  {'recall@10':>10}  {'fraction of vectors visited':>30}")
+for nprobe in [1, 2, 4, 8, 16]:
+    recalls = []
+    visited_fracs = []
+    for q in queries:
+        ann = set(ivf_search(q, nprobe=nprobe, k=10).tolist())
+        truth = set(true_knn(q, k=10).tolist())
+        recalls.append(len(ann & truth) / 10)
+        visited_fracs.append(sum(len(inverted_lists[p]) for p in np.argsort(((centroids - q)**2).sum(axis=1))[:nprobe]) / n)
+    print(f"{nprobe:>8}  {np.mean(recalls):>10.3f}  {np.mean(visited_fracs):>30.3f}")
+```
+
+Increasing `nprobe` raises recall while visiting a small fraction of the
+database. The next lesson covers the graph-based alternative that often
+beats IVF at moderate scale: HNSW.

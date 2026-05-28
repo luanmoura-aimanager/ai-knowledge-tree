@@ -1,0 +1,111 @@
+---
+title: "Elastic net"
+pillar: C
+subId: C1
+lessonId: elastic-net
+order: 6
+estimatedMinutes: 16
+goal: "Combine L1 and L2 to get sparsity with correlated-feature stability."
+prerequisites: ["lasso"]
+---
+
+LASSO is great until features are correlated. Then it picks one of the
+correlated pair almost at random and discards the rest, which is unstable
+across resamples and uninterpretable. **Elastic net** mixes L1 and L2 so the
+selection is sparse *and* the correlated coefficients stay together.
+
+## The objective
+
+$$
+\hat\beta = \arg\min_\beta\; \frac{1}{2n}\lVert \mathbf{y} - X\beta\rVert^2 + \lambda\!\left(\alpha\,\lVert\beta\rVert_1 + \frac{1-\alpha}{2}\,\lVert\beta\rVert_2^2\right),
+$$
+
+with $\alpha \in [0, 1]$ controlling the L1/L2 mix:
+
+- $\alpha = 1$: pure LASSO.
+- $\alpha = 0$: pure ridge.
+- $\alpha = 0.5$: equal mix, a common default.
+
+The L1 piece gives sparsity (corners of the penalty ball lie on axes), and the
+L2 piece smooths the geometry along correlated directions, so the path is
+stable.
+
+## Proximal solver
+
+Splitting elastic net into a smooth and a nonsmooth part:
+
+- **Smooth part:** $\frac{1}{2n}\lVert\mathbf{y} - X\beta\rVert^2 + \frac{\lambda(1-\alpha)}{2}\lVert\beta\rVert^2$.
+- **Nonsmooth part:** $\lambda\alpha\,\lVert\beta\rVert_1$.
+
+The smooth gradient is $\frac{1}{n}X^\top(X\beta - y) + \lambda(1-\alpha)\beta$;
+the prox of the L1 piece is still soft-thresholding at level $\eta\lambda\alpha$.
+The combined ISTA update is:
+
+$$
+\beta^{(k+1)} = \operatorname{soft}\!\left(\beta^{(k)} - \eta\!\left[\tfrac{1}{n}X^\top(X\beta^{(k)} - y) + \lambda(1-\alpha)\beta^{(k)}\right],\ \eta\lambda\alpha\right).
+$$
+
+The L2 term acts as additional shrinkage *before* the soft threshold, which is
+what stabilizes the correlated-feature behavior.
+
+## Grouping effect
+
+For two perfectly correlated columns, LASSO assigns the entire weight to one
+and zero to the other. Elastic net spreads the weight evenly across them
+because the L2 piece penalizes unequal magnitudes among correlated features.
+Formally: if $X_j = X_k$, the elastic-net solution satisfies $\hat\beta_j = \hat\beta_k$
+(no such guarantee for LASSO).
+
+## Choosing the hyperparameters
+
+Two knobs: $\lambda$ (overall strength) and $\alpha$ (sparsity vs grouping).
+The pragmatic approach is to fix $\alpha$ at a reasonable value (0.5 is a
+common default) and cross-validate over $\lambda$. For genuinely sparse
+problems with uncorrelated features, $\alpha$ closer to 1 is fine. With many
+correlated groups, lower $\alpha$.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 200, 50
+# Two correlated columns + sparse signal
+A = rng.normal(size=(n, d)) / np.sqrt(n)
+A[:, 1] = A[:, 0] + 0.01 * rng.normal(size=n)        # nearly identical to col 0
+beta_true = np.zeros(d)
+beta_true[0] = 2.0
+beta_true[1] = 2.0                                    # equal weight on the pair
+beta_true[5] = -1.5
+beta_true[20] = 1.0
+y = A @ beta_true + 0.05 * rng.normal(size=n)
+
+def soft(v, t): return np.sign(v) * np.maximum(np.abs(v) - t, 0.0)
+
+def elastic_net(A, y, lam, alpha, steps=2000):
+    n = A.shape[0]
+    L = np.linalg.eigvalsh(A.T @ A / n).max() + lam * (1 - alpha)
+    eta = 1.0 / L
+    b = np.zeros(A.shape[1])
+    for _ in range(steps):
+        grad = A.T @ (A @ b - y) / n + lam * (1 - alpha) * b
+        b = soft(b - eta * grad, eta * lam * alpha)
+    return b
+
+beta_lasso = elastic_net(A, y, lam=0.05, alpha=1.0)         # pure LASSO
+beta_enet  = elastic_net(A, y, lam=0.05, alpha=0.5)         # elastic net
+
+print("LASSO       coef[0,1]:", np.round(beta_lasso[:2], 3), " (often one ~0)")
+print("Elastic net coef[0,1]:", np.round(beta_enet[:2], 3), " (split evenly)")
+
+# Total magnitude on the correlated pair: same for both, but elastic net spreads it
+print(f"LASSO       |b0|+|b1| = {np.abs(beta_lasso[:2]).sum():.3f}")
+print(f"Elastic net |b0|+|b1| = {np.abs(beta_enet[:2]).sum():.3f}")
+print(f"LASSO       diff(b0,b1) = {abs(beta_lasso[0] - beta_lasso[1]):.3f}")
+print(f"Elastic net diff(b0,b1) = {abs(beta_enet[0] - beta_enet[1]):.3f}  (smaller)")
+```
+
+LASSO collapses the correlated pair onto one coefficient; elastic net splits
+them evenly, recovering the grouping. The next lesson switches from regression
+to classification with logistic regression.

@@ -1,0 +1,129 @@
+---
+title: "Linear regression as maximum likelihood"
+pillar: C
+subId: C1
+lessonId: linear-regression-mle
+order: 2
+estimatedMinutes: 18
+goal: "Show that OLS is the MLE under Gaussian noise, and recover the noise variance from the residuals."
+prerequisites: ["linear-regression-ols", "A2/mle"]
+---
+
+The previous lesson derived OLS from a geometric loss. The same estimator falls
+out of a likelihood once you say what the noise distribution is. Under Gaussian
+noise, **OLS is the maximum-likelihood estimator**, and the residuals deliver an
+MLE for the noise variance for free.
+
+## The probabilistic model
+
+Replace the loss-only model with a generative assumption: targets are noisy
+linear functions of features,
+
+$$
+y_i \mid x_i \sim \mathcal{N}(x_i^\top \beta,\ \sigma^2),
+$$
+
+with independent errors across examples. The unknowns are now $\beta$ and the
+noise variance $\sigma^2$.
+
+## The likelihood
+
+The Gaussian PDF gives the likelihood of each observation:
+
+$$
+p(y_i \mid x_i, \beta, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(y_i - x_i^\top\beta)^2}{2\sigma^2}\right).
+$$
+
+By independence, the joint log-likelihood is
+
+$$
+\ell(\beta, \sigma^2) = -\frac{n}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i - x_i^\top\beta)^2.
+$$
+
+## MLE for $\beta$: same as OLS
+
+The only $\beta$-dependent term is the sum of squared residuals, with a negative
+sign and positive scalar prefactor. Maximizing $\ell$ in $\beta$ is the same as
+*minimizing* the sum of squared residuals:
+
+$$
+\hat\beta_{\text{MLE}} = \arg\min_\beta \sum_i (y_i - x_i^\top\beta)^2 = \hat\beta_{\text{OLS}}.
+$$
+
+The OLS estimator is the MLE under Gaussian noise. This is why squared-error
+loss is the default for regression: it is the negative log-likelihood of a
+Gaussian, the noise model nothing else has a reason to disagree with by default.
+
+## MLE for $\sigma^2$
+
+Substitute $\hat\beta$ back into $\ell$ and differentiate with respect to
+$\sigma^2$. Setting the derivative to zero,
+
+$$
+\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2\sigma^4}\sum_i r_i^2 = 0
+\implies \hat\sigma^2_{\text{MLE}} = \frac{1}{n}\sum_{i=1}^n r_i^2,
+$$
+
+where $r_i = y_i - x_i^\top\hat\beta$ are the residuals. The MLE for noise
+variance is the mean squared residual. The **unbiased** estimator divides by
+$n - d$ instead of $n$ (the same correction that turned sample-variance into
+$n - 1$ for a single sample):
+
+$$
+\hat\sigma^2_{\text{unbiased}} = \frac{1}{n - d}\sum_i r_i^2.
+$$
+
+The $n - d$ correction accounts for the degrees of freedom lost to fitting $d$
+coefficients.
+
+## Why this matters
+
+Having the likelihood gives you, in addition to point estimates:
+
+- **Confidence intervals** on each $\hat\beta_j$ via the Fisher information,
+  which for linear regression equals $\sigma^2 (X^\top X)^{-1}$.
+- **Hypothesis tests** (t-tests for individual coefficients, F-tests for groups).
+- **Model comparison** via likelihood-ratio tests and information criteria (AIC,
+  BIC).
+- The bridge to **ridge regression** as MAP under a Gaussian prior on $\beta$,
+  and to **LASSO** as MAP under a Laplace prior.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n, d = 500, 3
+X = np.column_stack([np.ones(n), rng.normal(size=(n, d - 1))])
+beta_true = np.array([1.0, 2.5, -0.8])
+sigma_true = 0.7
+y = X @ beta_true + sigma_true * rng.normal(size=n)
+
+# MLE for beta = OLS
+beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
+print("beta_hat:", np.round(beta_hat, 3), " true:", beta_true)
+
+# MLE vs unbiased noise variance
+r = y - X @ beta_hat
+sigma2_mle = np.mean(r**2)
+sigma2_unbiased = np.sum(r**2) / (n - d)
+print(f"sigma^2 MLE      = {sigma2_mle:.4f}")
+print(f"sigma^2 unbiased = {sigma2_unbiased:.4f}")
+print(f"true sigma^2     = {sigma_true**2:.4f}")
+
+# Coefficient standard errors via Fisher info
+cov_beta = sigma2_unbiased * np.linalg.inv(X.T @ X)
+se = np.sqrt(np.diag(cov_beta))
+print("std errors:", np.round(se, 4))
+for j, (b, s, bt) in enumerate(zip(beta_hat, se, beta_true)):
+    lo, hi = b - 1.96 * s, b + 1.96 * s
+    inside = lo <= bt <= hi
+    print(f"  beta_{j}: 95% CI [{lo:.3f}, {hi:.3f}] contains truth? {inside}")
+```
+
+The MLE for $\beta$ recovers the OLS estimate, the MLE noise variance is slightly
+biased low (the unbiased version with $n - d$ is closer to truth), and the 95%
+confidence intervals from the Fisher information cover the true coefficients.
+The next lesson tackles the universal tradeoff every estimator faces:
+bias and variance.

@@ -1,0 +1,167 @@
+---
+title: "k-means++ and choosing k"
+pillar: C
+subId: C5
+lessonId: kmeans-init-and-k
+order: 2
+estimatedMinutes: 14
+goal: "Use k-means++ for a smarter initialization and pick k with the elbow method or silhouette score."
+prerequisites: ["kmeans"]
+---
+
+Random initialization is the main cause of bad k-means results: Lloyd
+converges to a local minimum, and a bad start lands in a bad basin.
+**k-means++** picks initial centers far apart, with a probabilistic
+correctness guarantee. **Elbow** and **silhouette** are the two standard ways
+to pick the number of clusters $k$ when the truth is unknown.
+
+## k-means++
+
+Pick the first center uniformly at random. For each subsequent center, pick a
+point with probability proportional to its squared distance to the nearest
+already-chosen center:
+
+$$
+\Pr(\text{pick } x_i) = \frac{D(x_i)^2}{\sum_j D(x_j)^2}, \qquad D(x) = \min_k \lVert x - \mu_k\rVert.
+$$
+
+Repeat until $k$ centers are chosen, then run Lloyd's algorithm.
+
+The intuition: a point that is currently poorly served by existing centers
+gets a higher chance of becoming the next center. Far-apart initial centers
+make Lloyd less likely to get stuck.
+
+**Theorem** (Arthur & Vassilvitskii). k-means++ initialization gives an
+$O(\log k)$-approximation in expectation to the optimal inertia, *before*
+running Lloyd. After Lloyd, performance is typically much better than random
+initialization with the same compute budget.
+
+## Choosing $k$: the elbow method
+
+Plot inertia (WCSS) versus $k$:
+
+- $k = 1$: inertia is the total variance.
+- $k = n$: inertia is zero.
+- As $k$ grows, inertia decreases monotonically.
+
+The plot usually has an "elbow" where additional clusters stop helping
+much. Pick $k$ at the elbow.
+
+**Caveats.** The elbow is subjective and is often not sharp. The method
+fails when the data lacks a clear cluster structure (the plot is a smooth
+curve with no kink).
+
+## Silhouette score
+
+For each point $i$:
+
+- $a_i$ = average distance to other points in the same cluster.
+- $b_i$ = minimum over other clusters of the average distance to points in
+  that cluster.
+
+The **silhouette score** for point $i$ is
+
+$$
+s_i = \frac{b_i - a_i}{\max(a_i, b_i)} \in [-1, 1].
+$$
+
+It is +1 when the point is much closer to its own cluster than to any other,
+0 when it is borderline, and negative when it would fit better in a different
+cluster.
+
+The average silhouette across all points measures clustering quality. Sweep
+$k$ and pick the maximum.
+
+## Other validation criteria
+
+- **Gap statistic**: compare clustering inertia to inertia on uniform-random
+  null data. Picks the $k$ where the gap (in log inertia) is largest.
+- **Information criteria (BIC, AIC)**: for model-based clusterings (GMM),
+  balance fit and complexity automatically.
+- **Domain knowledge**: often the most reliable. If you know the data should
+  have 5 clusters, use 5.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Three blobs of differing sizes
+n = [200, 150, 100]
+centers_true = [[2.0, 0], [-2.0, 0], [0.0, 2.0]]
+X = np.vstack([rng.normal(loc=c, scale=0.5, size=(n_c, 2)) for c, n_c in zip(centers_true, n)])
+n_total = len(X)
+
+def kmeans_plus_plus_init(X, k, rng):
+    n = len(X)
+    idx = [int(rng.integers(n))]
+    for _ in range(1, k):
+        d2 = np.min(((X[:, None] - X[idx][None, :])**2).sum(axis=2), axis=1)
+        probs = d2 / d2.sum()
+        idx.append(int(rng.choice(n, p=probs)))
+    return X[idx].copy()
+
+def kmeans(X, k, init, max_iter=100):
+    mu = init.copy()
+    for _ in range(max_iter):
+        d2 = ((X[:, None] - mu[None, :])**2).sum(axis=2)
+        z = d2.argmin(axis=1)
+        mu_new = np.array([X[z == j].mean(axis=0) if (z == j).sum() > 0 else mu[j] for j in range(k)])
+        if np.allclose(mu, mu_new): break
+        mu = mu_new
+    inertia = np.sum((X - mu[z])**2)
+    return mu, z, inertia
+
+# Compare k-means++ to random init over multiple trials
+inertias_rand = []
+inertias_kpp = []
+for seed in range(50):
+    r = np.random.default_rng(seed)
+    init_rand = X[r.choice(len(X), size=3, replace=False)]
+    init_kpp = kmeans_plus_plus_init(X, 3, r)
+    inertias_rand.append(kmeans(X, 3, init_rand)[-1])
+    inertias_kpp.append(kmeans(X, 3, init_kpp)[-1])
+print(f"random init       mean inertia: {np.mean(inertias_rand):.2f}, std: {np.std(inertias_rand):.2f}")
+print(f"k-means++ init    mean inertia: {np.mean(inertias_kpp):.2f}, std: {np.std(inertias_kpp):.2f}")
+
+# Elbow: sweep k and plot inertia
+ks = range(1, 8)
+inertias = []
+for k in ks:
+    init = kmeans_plus_plus_init(X, k, np.random.default_rng(0))
+    _, _, ine = kmeans(X, k, init)
+    inertias.append(ine)
+print("\nk, inertia:")
+for k, ine in zip(ks, inertias):
+    print(f"  {k}: {ine:.2f}")
+
+# Silhouette score
+def silhouette(X, z):
+    n = len(X); s = np.zeros(n)
+    for c in np.unique(z):
+        in_c = z == c
+        for i in np.where(in_c)[0]:
+            same = X[in_c]; same = same[same.tolist() != X[i].tolist()] if False else same
+            # average to others in same cluster (exclude self)
+            a = np.mean(np.linalg.norm(X[in_c & (np.arange(n) != i)] - X[i], axis=1)) if (in_c.sum() > 1) else 0
+            other_dists = []
+            for c2 in np.unique(z):
+                if c2 == c: continue
+                other_dists.append(np.mean(np.linalg.norm(X[z == c2] - X[i], axis=1)))
+            b = min(other_dists)
+            s[i] = (b - a) / max(a, b) if max(a, b) > 0 else 0
+    return s.mean()
+
+print("\nsilhouette score by k:")
+for k in [2, 3, 4, 5]:
+    init = kmeans_plus_plus_init(X, k, np.random.default_rng(0))
+    _, z, _ = kmeans(X, k, init)
+    print(f"  k={k}: {silhouette(X, z):.3f}")
+```
+
+k-means++ gives lower mean inertia with much less variance across trials,
+the elbow at $k = 3$ is visible, and the silhouette score peaks at the true
+$k$. The next lesson swaps cluster means for actual data points to handle
+non-Euclidean metrics: k-medoids.

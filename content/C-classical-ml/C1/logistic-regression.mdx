@@ -1,0 +1,144 @@
+---
+title: "Logistic regression"
+pillar: C
+subId: C1
+lessonId: logistic-regression
+order: 7
+estimatedMinutes: 22
+goal: "Build logistic regression from log-odds, write its log-likelihood, and fit it with IRLS or gradient descent."
+prerequisites: ["A2/mle", "A2/exponential-family"]
+---
+
+Linear regression returns a real number; classification needs a probability.
+**Logistic regression** keeps the linear predictor but maps it to $[0, 1]$ via
+the **logistic** (sigmoid) function. The motivation is the exponential-family
+machinery from A2: the logistic is the natural inverse link of the Bernoulli.
+
+## The model
+
+For binary labels $y_i \in \{0, 1\}$,
+
+$$
+\Pr(y_i = 1 \mid x_i) = \sigma(x_i^\top \beta), \qquad \sigma(z) = \frac{1}{1 + e^{-z}}.
+$$
+
+Equivalently, the **log-odds** are linear in the features:
+
+$$
+\log\frac{\Pr(y = 1 \mid x)}{\Pr(y = 0 \mid x)} = x^\top \beta.
+$$
+
+This is the **logit link**. From the exponential-family lesson, the Bernoulli's
+natural parameter *is* the log-odds: the logistic does not just look natural,
+it falls out of the Bernoulli's algebra.
+
+## The log-likelihood
+
+Treat each example as a Bernoulli trial with success probability
+$p_i = \sigma(x_i^\top\beta)$. The log-likelihood for one example is
+$y_i \log p_i + (1 - y_i)\log(1 - p_i)$; summing,
+
+$$
+\ell(\beta) = \sum_{i=1}^n y_i \log p_i + (1 - y_i)\log(1 - p_i).
+$$
+
+Equivalently, since $\log p_i = \log\sigma(x_i^\top\beta)$ simplifies via
+$\log\sigma(z) = -\log(1 + e^{-z})$,
+
+$$
+\ell(\beta) = \sum_i y_i\, x_i^\top\beta - \log(1 + e^{x_i^\top\beta}).
+$$
+
+The negative of $\ell$ is the **cross-entropy loss**.
+
+## Gradient and Hessian
+
+The sigmoid has a clean derivative: $\sigma'(z) = \sigma(z)(1 - \sigma(z))$.
+Direct computation gives
+
+$$
+\nabla \ell = X^\top(\mathbf{y} - \mathbf{p}), \qquad \nabla^2 \ell = -X^\top W X,
+$$
+
+with $W = \operatorname{diag}(p_i(1 - p_i))$. The Hessian is negative
+semidefinite, so the **log-likelihood is concave**: any stationary point is a
+global maximum. There is no closed form (the gradient equation
+$X^\top(\mathbf{y} - \sigma(X\beta)) = 0$ is nonlinear in $\beta$), so fitting
+is iterative.
+
+## Newton's method as IRLS
+
+Newton's method applied to maximizing $\ell$:
+
+$$
+\beta^{(t+1)} = \beta^{(t)} + (X^\top W^{(t)} X)^{-1} X^\top (\mathbf{y} - \mathbf{p}^{(t)}).
+$$
+
+Rewriting, define the **working response**
+$z_i = x_i^\top \beta^{(t)} + (y_i - p_i^{(t)}) / (p_i^{(t)}(1 - p_i^{(t)}))$.
+Each Newton step is then a **weighted least-squares** fit
+$\beta^{(t+1)} = (X^\top W X)^{-1} X^\top W \mathbf{z}$, hence the name
+**iteratively reweighted least squares (IRLS)**. Quadratic local convergence,
+the same as Newton on any smooth convex objective.
+
+For large $n$ or sparse features, plain gradient descent (or its variants from
+A3) is simpler and often faster per epoch.
+
+## Regularization
+
+Adding L2 gives **ridge logistic regression**:
+$\ell(\beta) - \frac{\lambda}{2}\lVert\beta\rVert^2$. Adding L1 gives **L1
+logistic regression** for sparse classifiers. Both are MAP under a Gaussian or
+Laplace prior on $\beta$, and both are fit with the same gradient/proximal
+machinery as their regression cousins.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 1000, 4
+X = np.column_stack([np.ones(n), rng.normal(size=(n, d - 1))])
+beta_true = np.array([-0.5, 1.5, -1.0, 0.7])
+p_true = 1 / (1 + np.exp(-X @ beta_true))
+y = (rng.random(n) < p_true).astype(float)
+
+def sigmoid(z): return 1 / (1 + np.exp(-z))
+
+def fit_irls(X, y, n_steps=10):
+    beta = np.zeros(X.shape[1])
+    for _ in range(n_steps):
+        p = sigmoid(X @ beta)
+        W = p * (1 - p) + 1e-8
+        z = X @ beta + (y - p) / W
+        beta = np.linalg.solve(X.T @ (W[:, None] * X), X.T @ (W * z))
+    return beta
+
+def fit_gd(X, y, lr=0.1, n_steps=2000):
+    beta = np.zeros(X.shape[1])
+    for _ in range(n_steps):
+        p = sigmoid(X @ beta)
+        beta += lr * X.T @ (y - p) / len(y)
+    return beta
+
+beta_irls = fit_irls(X, y)
+beta_gd = fit_gd(X, y)
+print("IRLS beta:", np.round(beta_irls, 3))
+print("GD   beta:", np.round(beta_gd, 3))
+print("true     :", beta_true)
+
+# Predictions
+p_hat = sigmoid(X @ beta_irls)
+acc = np.mean((p_hat > 0.5) == y)
+print(f"accuracy: {acc:.3f}")
+
+# Log-likelihood is concave: Hessian -X^T W X is NSD
+W = p_hat * (1 - p_hat)
+H = -X.T @ (W[:, None] * X)
+print("Hessian eigvals all <= 0:", np.all(np.linalg.eigvalsh(H) <= 1e-10))
+```
+
+IRLS converges in a handful of steps; gradient descent reaches the same
+solution more slowly; the Hessian's eigenvalues are nonpositive, confirming
+concavity. The next lesson generalizes to multi-class with the softmax.

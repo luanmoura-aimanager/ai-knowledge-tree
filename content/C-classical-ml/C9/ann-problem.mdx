@@ -1,0 +1,150 @@
+---
+title: "The approximate nearest neighbor problem"
+pillar: C
+subId: C9
+lessonId: ann-problem
+order: 1
+estimatedMinutes: 14
+goal: "State the ANN problem, see why exact NN is infeasible at scale, and define recall@k."
+prerequisites: ["C4/curse-of-dimensionality"]
+---
+
+A two-tower retrieval system maps every item in a catalog to a vector
+embedding and serves a user query by finding the items whose embeddings
+are closest to the user's. With billions of items, this nearest-neighbor
+search must be sub-millisecond. Exact nearest-neighbor search is
+impossible at that scale; **approximate nearest neighbor (ANN)** is the
+art of trading a small amount of recall for orders-of-magnitude speedup.
+
+## The exact problem
+
+Given a database of $n$ vectors $\{x_1, \dots, x_n\} \subset \mathbb{R}^d$
+and a query $q \in \mathbb{R}^d$, find the $k$ vectors with smallest
+$d(q, x_i)$ (typically Euclidean or cosine).
+
+The naive linear scan is $O(nd)$ per query. For $n = 10^9$ and $d = 128$,
+each query touches $1.28 \times 10^{11}$ floats. Even at memory bandwidth
+of 100 GB/s, that is over a second per query: untenable for any
+interactive system.
+
+## Why exact is infeasible at scale
+
+Three obstacles:
+
+- **Linear in $n$**: every query scans every vector. Doubling the catalog
+  doubles query latency.
+- **High dimensionality**: tree-based exact methods (k-d tree, ball tree)
+  degenerate to linear scan beyond ~20 dimensions.
+- **Memory bandwidth**: even reading every vector once costs $O(nd)$ memory
+  bandwidth, the bottleneck modern CPUs cannot avoid.
+
+The curse of dimensionality (C4) is the root cause: in high dimensions,
+the gap between the nearest and farthest neighbors shrinks, so any
+partition scheme has to look at most points to confirm the nearest.
+
+## The approximate version
+
+Approximate nearest neighbor relaxes the problem: return $k$ vectors that
+are *probably* among the true nearest, possibly missing some.
+
+The standard quality metric is **recall@k**:
+
+$$
+\text{recall@}k = \frac{|\text{ANN top-}k \cap \text{true top-}k|}{k}.
+$$
+
+Production targets are typically 95-99% recall@10. Going from 99% to
+99.9% often costs 10x more compute; the cliff is steep at the high end.
+
+The cost metric is **queries per second (QPS)** at a target recall, often
+plotted as a recall-QPS Pareto curve. Different indices dominate at
+different points on the curve.
+
+## Two algorithmic families
+
+The C9 lessons cover the two dominant families.
+
+**Hashing methods (next lesson)**. Hash points so that similar items
+collide in the same bucket. Query: hash the query, return bucket contents.
+Memory-light, conceptually simple, but recall lags graph methods at high
+accuracy.
+
+**Tree / inverted-index methods**. Partition the space hierarchically
+(IVF) or compress vectors (product quantization, PQ) so that distances can
+be evaluated cheaply. IVF + PQ scales to billions of vectors at modest
+memory cost.
+
+**Graph methods (HNSW)**. Build a navigable graph over the dataset;
+greedy search finds nearest neighbors in $O(\log n)$ steps. Best
+recall-QPS Pareto curve at moderate scale; memory-heavy.
+
+In practice, libraries (FAISS, ScaNN, hnswlib) implement all of these and
+let you pick by workload.
+
+## The dot-product version
+
+Most modern retrieval scores by **maximum inner product** instead of
+minimum distance. For unit-norm vectors, the two are equivalent (up to
+sign); for non-normalized vectors, they differ. ANN indices designed for
+inner-product search (MIPS, **maximum inner product search**) include
+direct adaptations of all three families.
+
+The two-tower lesson hinted at this: training with cosine or dot-product
+makes the ANN problem at serving time tractable.
+
+## Check it on arrays
+
+This gives a sense of the scale at which exact search breaks down.
+
+```python
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+
+d = 64
+
+def exact_knn(X, q, k=10):
+    d = np.sqrt(((X - q)**2).sum(axis=1))
+    return np.argsort(d)[:k]
+
+# Time exact search as the database grows
+print(f"{'n':>10}  {'time/query (ms)':>15}")
+for n in [10**3, 10**4, 10**5, 10**6]:
+    X = rng.normal(size=(n, d)).astype(np.float32)
+    q = rng.normal(size=d).astype(np.float32)
+    t = time.perf_counter()
+    for _ in range(20):
+        exact_knn(X, q, k=10)
+    elapsed = (time.perf_counter() - t) / 20 * 1000
+    print(f"{n:>10}  {elapsed:>15.2f}")
+
+# Recall@10 of a trivial ANN: hash to 64-bit signature, look up bucket
+def hyperplane_hash(X, normals):
+    return (X @ normals.T > 0).astype(np.uint8)
+
+n = 100_000
+X = rng.normal(size=(n, d))
+queries = rng.normal(size=(100, d))
+
+n_hashes = 16
+normals = rng.normal(size=(n_hashes, d))
+H = hyperplane_hash(X, normals)
+Hq = hyperplane_hash(queries, normals)
+
+# For each query, restrict the search to points with matching hash on >= 12 bits
+ann_recall_at_10 = []
+for i, q in enumerate(queries):
+    matches = np.sum(H == Hq[i], axis=1) >= 12
+    if matches.sum() < 10: continue
+    cand_idx = np.where(matches)[0]
+    d2 = ((X[cand_idx] - q)**2).sum(axis=1)
+    ann_top10 = cand_idx[np.argsort(d2)[:10]]
+    true_top10 = exact_knn(X, q, k=10)
+    ann_recall_at_10.append(len(set(ann_top10) & set(true_top10)) / 10)
+print(f"\ntrivial-LSH mean recall@10: {np.mean(ann_recall_at_10):.3f}  "
+      f"(rough first-try ANN)")
+```
+
+Exact search becomes slow even at $n = 10^6$; the trivial random-hyperplane
+LSH already gives meaningful recall. The next lesson covers LSH carefully.

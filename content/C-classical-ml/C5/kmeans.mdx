@@ -1,0 +1,130 @@
+---
+title: "k-means clustering"
+pillar: C
+subId: C5
+lessonId: kmeans
+order: 1
+estimatedMinutes: 18
+goal: "Run Lloyd's algorithm and see it as alternating minimization of the within-cluster sum of squares."
+prerequisites: []
+---
+
+**k-means** partitions $n$ points into $k$ clusters by minimizing the
+within-cluster sum of squared distances to cluster centers. **Lloyd's
+algorithm**, the standard solver, alternates two steps: assign each point to
+its closest center, then recompute each center as the mean of its assigned
+points. The algorithm is fast, scales well, and is the unsupervised baseline
+to beat.
+
+## The objective
+
+Given points $x_1, \dots, x_n \in \mathbb{R}^d$ and a number of clusters $k$,
+find cluster centers $\mu_1, \dots, \mu_k$ and assignments
+$z_i \in \{1, \dots, k\}$ minimizing
+
+$$
+J(\mu, z) = \sum_{i=1}^n \lVert x_i - \mu_{z_i}\rVert^2.
+$$
+
+This is the **within-cluster sum of squares (WCSS)** or **inertia**. The
+optimum jointly assigns each point to its closest center and places each
+center at the mean of its assigned points.
+
+## Lloyd's algorithm
+
+Initialize centers (next lesson handles this). Repeat until convergence:
+
+1. **Assignment step.** $z_i = \arg\min_k \lVert x_i - \mu_k\rVert^2$.
+2. **Update step.** $\mu_k = \frac{1}{|C_k|}\sum_{i \in C_k} x_i$.
+
+Each step *decreases* $J$ (or keeps it the same). Since $J$ is bounded below
+and the assignment space is finite, the algorithm converges in finitely many
+steps. The converged solution is a local minimum, not necessarily global.
+
+## Why each step decreases J
+
+**Assignment step.** For fixed centers, the optimal assignment is to the
+closest center. Any other assignment can only increase $\lVert x_i - \mu_{z_i}\rVert^2$.
+
+**Update step.** For fixed assignments, $\mu_k$ minimizing
+$\sum_{i \in C_k}\lVert x_i - \mu_k\rVert^2$ is the cluster mean, by
+differentiating and solving (or by recognizing OLS without features).
+
+## Cost and scalability
+
+Each iteration is $O(nkd)$ (compute distances from each point to each
+center). Number of iterations is usually small (tens to hundreds). For huge
+$n$, **mini-batch k-means** subsamples each step; **k-means|| (k-means
+parallel)** parallelizes the initialization across distributed data.
+
+## Hard assignment, EM intuition
+
+Lloyd is a **hard-assignment** algorithm: every point belongs entirely to one
+cluster. The Gaussian-mixture EM algorithm (later in C5) is the **soft**
+analog, where each point has a probability of belonging to each cluster. In
+the limit of zero covariance, GMM-EM degenerates to k-means.
+
+## Failure modes
+
+- **Local minima**: initialization matters. The next lesson uses k-means++.
+- **Spherical assumption**: k-means assumes clusters are isotropic blobs.
+  Elongated, curved, or differently-sized clusters confuse it.
+- **Sensitivity to scale**: distances dominate, so features need to be
+  scaled.
+- **k must be chosen**: the algorithm does not know "the right $k$"; pick it
+  by the elbow method, silhouette, or validation (next lesson).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Three Gaussian blobs in 2D
+n_per = 100
+centers_true = np.array([[2.0, 0.0], [-2.0, 0.0], [0.0, 2.0]])
+X = np.vstack([rng.normal(loc=c, scale=0.5, size=(n_per, 2)) for c in centers_true])
+
+def kmeans(X, k, max_iter=100, init=None, rng=rng):
+    n, d = X.shape
+    if init is None:
+        # random initialization
+        mu = X[rng.choice(n, size=k, replace=False)]
+    else:
+        mu = init.copy()
+    history = []
+    for _ in range(max_iter):
+        # assignment
+        d2 = ((X[:, None] - mu[None, :])**2).sum(axis=2)
+        z = d2.argmin(axis=1)
+        # update
+        mu_new = np.array([X[z == j].mean(axis=0) if (z == j).sum() > 0 else mu[j] for j in range(k)])
+        inertia = np.sum((X - mu_new[z])**2)
+        history.append(inertia)
+        if np.allclose(mu, mu_new):
+            break
+        mu = mu_new
+    return mu, z, history
+
+mu, z, hist = kmeans(X, k=3)
+print(f"converged in {len(hist)} iterations, final inertia: {hist[-1]:.2f}")
+print(f"learned centers (sorted by x):\n{mu[np.argsort(mu[:, 0])].round(2)}")
+print(f"true    centers (sorted by x):\n{centers_true[np.argsort(centers_true[:, 0])].round(2)}")
+
+# Inertia monotonically decreases
+print(f"inertia decreasing: {all(hist[i] >= hist[i+1] for i in range(len(hist) - 1))}")
+
+# Multiple random restarts to escape local minima
+best_inertia = float("inf")
+for seed in range(10):
+    rng_seed = np.random.default_rng(seed)
+    _, _, h = kmeans(X, k=3, rng=rng_seed)
+    if h[-1] < best_inertia: best_inertia = h[-1]
+print(f"best inertia over 10 random restarts: {best_inertia:.2f}")
+```
+
+Lloyd recovers the three blobs' centers, inertia is monotonically decreasing,
+and random restarts find similar minima. The next lesson tackles the two
+hardest practical questions: how to initialize the centers, and how to choose
+$k$.

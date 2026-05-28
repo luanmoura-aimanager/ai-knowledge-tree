@@ -1,0 +1,144 @@
+---
+title: "Hard-margin SVM"
+pillar: C
+subId: C2
+lessonId: hard-margin-svm
+order: 2
+estimatedMinutes: 20
+goal: "Define the geometric margin and derive the hard-margin SVM as a quadratic program."
+prerequisites: ["perceptron", "A3/kkt"]
+---
+
+The perceptron settles for *any* separating hyperplane. The **support vector
+machine (SVM)** demands a particular one: the hyperplane that maximizes the
+distance to the nearest training point. This **maximum-margin** formulation
+turns into a convex quadratic program, with a clean geometric story.
+
+## The margin
+
+For a hyperplane $\{x : w^\top x + b = 0\}$ with unit normal
+$\hat w = w / \lVert w \rVert$, the **signed distance** from a point $x$ to the
+hyperplane is $(w^\top x + b)/\lVert w\rVert$.
+
+For labels $y_i \in \{-1, +1\}$, the **geometric margin** of a point is
+
+$$
+\gamma_i = \frac{y_i\,(w^\top x_i + b)}{\lVert w\rVert}.
+$$
+
+It is positive when the point is on the correct side, negative otherwise. The
+**margin of the dataset** is $\gamma = \min_i \gamma_i$, the distance to the
+closest point.
+
+## The maximum-margin problem
+
+Maximizing the dataset margin subject to all points being correctly classified:
+
+$$
+\max_{w, b}\; \gamma \quad \text{s.t.} \quad \frac{y_i (w^\top x_i + b)}{\lVert w\rVert} \ge \gamma,\ \forall i.
+$$
+
+The objective is invariant under positive scaling of $(w, b)$, so fix the scale
+by requiring the closest point to satisfy $y_i(w^\top x_i + b) = 1$. Then
+$\gamma = 1/\lVert w\rVert$, and maximizing $\gamma$ is minimizing $\lVert w\rVert$.
+
+## The hard-margin SVM
+
+$$
+\min_{w, b}\; \tfrac{1}{2}\lVert w\rVert^2 \quad \text{s.t.}\quad y_i(w^\top x_i + b) \ge 1,\ \forall i.
+$$
+
+The factor $\tfrac{1}{2}$ is for derivative cleanness. The objective is convex
+quadratic and the constraints are affine, so this is a **convex quadratic
+program** (QP). It has a unique global solution whenever the data are
+**linearly separable**; otherwise the constraint set is empty and the problem
+is infeasible (which is what the next lesson fixes with slack).
+
+## KKT conditions and support vectors
+
+Form the Lagrangian with multipliers $\alpha_i \ge 0$:
+
+$$
+\mathcal{L} = \tfrac{1}{2}\lVert w\rVert^2 - \sum_i \alpha_i\big(y_i(w^\top x_i + b) - 1\big).
+$$
+
+Stationarity gives
+
+$$
+w = \sum_i \alpha_i y_i x_i, \qquad \sum_i \alpha_i y_i = 0.
+$$
+
+The first equation says the optimal $w$ is a **linear combination of the
+training points** (with $y_i$-signed weights). Complementary slackness says
+$\alpha_i = 0$ unless the margin constraint is tight, i.e. $y_i(w^\top x_i + b) = 1$.
+
+Points with $\alpha_i > 0$ sit exactly on the margin boundary. They are the
+**support vectors**, and they are the only data points that contribute to $w$.
+Everything else is irrelevant to the classifier; this is the SVM's celebrated
+sparsity-in-examples property.
+
+## What hard-margin can't handle
+
+Three failure modes drive the next lessons:
+
+- **Nonseparable data.** No feasible $(w, b)$ exists. **Soft margin** (next
+  lesson) introduces slack.
+- **Outliers near the boundary.** A single bad label forces the entire
+  hyperplane to compensate, hurting generalization. Soft margin also fixes this.
+- **Nonlinear separators.** The decision boundary is forced to be linear in $x$.
+  The **kernel trick** lifts the problem to a higher-dimensional space where
+  linear separation suffices.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Linearly separable 2D data
+n_per = 30
+X_pos = rng.normal(loc=[2.5, 1.0], scale=0.6, size=(n_per, 2))
+X_neg = rng.normal(loc=[-1.0, -1.0], scale=0.6, size=(n_per, 2))
+X = np.vstack([X_pos, X_neg])
+y = np.array([1.0] * n_per + [-1.0] * n_per)
+
+# Hard-margin SVM via projected gradient on the dual:
+#   max sum(alpha) - 0.5 alpha^T (y y^T * K) alpha   s.t. alpha >= 0, sum(y * alpha) = 0
+def hard_margin_dual(X, y, lr=1e-3, steps=20000):
+    K = X @ X.T                           # linear kernel
+    Q = (y[:, None] * y[None, :]) * K
+    n = len(y)
+    alpha = np.zeros(n)
+    for _ in range(steps):
+        grad = 1 - Q @ alpha
+        alpha = alpha + lr * grad
+        alpha = np.maximum(alpha, 0)      # alpha >= 0
+        # project to satisfy sum(y * alpha) = 0
+        alpha -= y * (y @ alpha) / (y @ y)
+        alpha = np.maximum(alpha, 0)
+    return alpha
+
+alpha = hard_margin_dual(X, y)
+
+# Recover w and b from the support vectors
+w = (alpha * y) @ X
+sv_idx = np.where(alpha > 1e-4)[0]
+print(f"support vectors: {len(sv_idx)} / {len(y)}")
+b = np.mean(y[sv_idx] - X[sv_idx] @ w)
+print(f"w = {w}, b = {b:.3f}")
+
+# Margin and accuracy
+margin = 1.0 / np.linalg.norm(w)
+print(f"geometric margin = {margin:.3f}")
+acc = np.mean(np.sign(X @ w + b) == y)
+print(f"training accuracy = {acc:.3f}")
+
+# The decision boundary passes between the two classes
+print("min positive margin:", np.min(y * (X @ w + b)))
+```
+
+The dual ascent identifies a handful of support vectors; the recovered weight
+vector classifies every training point correctly with a positive margin. The
+next lesson relaxes the hard constraints with slack variables so the SVM
+survives noisy and nonseparable data.
