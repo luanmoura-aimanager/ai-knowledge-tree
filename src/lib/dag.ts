@@ -1245,7 +1245,7 @@ export const CONNECTIONS: Connection[] = [
   { from: "I4", to: "J7", label: "Monitoring ⇒ governance", kind: "uses" },
 
   // ---- J. AI Engineering internal flow ----
-  { from: "J1", to: "J2", label: "Fundamentos → sistemas", kind: "uses" },
+  { from: "J1", to: "J2", label: "Fundamentals → systems", kind: "uses" },
   { from: "J2", to: "J3", label: "Systems → production", kind: "uses" },
   {
     from: "J3",

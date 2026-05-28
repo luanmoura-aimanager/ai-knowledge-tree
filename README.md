@@ -1,90 +1,148 @@
 # ai-knowledge-tree
 
-Site interativo mapeando a DAG completa de tópicos em Data Science, Machine Learning,
-Deep Learning e AI Engineering. Cada pilar (A → J) tem subseções, e subseções
-relacionadas entre pilares são conectadas explicitamente.
+A deployed Next.js study site mapping the full DAG of topics in Data Science,
+Machine Learning, Deep Learning, and AI Engineering. Each pillar (A → J) has
+subsections, each subsection is a discipline taught as an ordered sequence of
+atomic lessons, and subsections in different pillars are linked by explicit
+cross-pillar connections (e.g. `D4 ↔ F8` because VAEs sit in both Generative
+DL and Bayesian DL).
 
-Inspirado em [AI ML Theory](https://github.com/luanmoura/ai-math-theory) (que cobre
-a espinha de LLMs em profundidade) e [AI Eng Journey](../AI%20Eng%20Journey/)
-(que define o roadmap de engenharia de IA aplicada).
+Anonymous visitors see the whole map and read every page. Signed-in students
+get per-user progress: mark a lesson studied, resume where they left off, and
+the dashboard recolors to their own study state.
 
-## Pilares
+Inspired by [AI ML Theory](https://github.com/luanmoura/ai-math-theory) (the
+long-form LLM curriculum that seeds pillars A, C, D, E) and
+[AI Eng Journey](../AI%20Eng%20Journey/) (the applied roadmap behind pillar J).
 
-| ID | Nome | Origem |
-|----|------|--------|
-| A  | Foundations | math, prob, opt, numerical, DSA |
-| B  | Statistics & Causal Inference | frequentist, Bayesian, causal, design |
-| C  | Classical Machine Learning | linear, kernel, tree, clustering, rec sys, ANN |
-| D  | Deep Learning — Core & Tracks | MLPs, CV, sequence, generative, SSL, GNN |
-| E  | NLP & Language Models | espinha do AI ML Theory |
-| F  | Probabilistic Graphical Models | Bayes nets, HMM, VI, MCMC |
-| G  | Time Series & Forecasting | clássico → DL → foundation models |
-| H  | Reinforcement Learning | MDPs, deep RL, RLHF |
-| I  | MLOps & Production Systems | data, training infra, serving, monitoring |
-| J  | **AI Engineering** | roadmap do AI Eng Journey (RAG, agents, MCP, Cloud AI) |
+## Pillars
 
-## Front page
+| ID | Name | Coverage |
+|----|------|----------|
+| A | Foundations | Math, prob, opt, numerical, DSA |
+| B | Statistics & Causal Inference | Frequentist, Bayesian, causal, experimental design |
+| C | Classical Machine Learning | Linear, kernel, tree, clustering, rec sys, ANN |
+| D | Deep Learning: Core & Tracks | MLPs, CV, sequence, generative, SSL, GNN |
+| E | NLP & Language Models | The backbone of AI ML Theory |
+| F | Probabilistic Graphical Models | Bayes nets, HMM, VI, MCMC |
+| G | Time Series & Forecasting | Classical, DL, foundation models |
+| H | Reinforcement Learning | MDPs, deep RL, RLHF |
+| I | MLOps & Production Systems | Data, training infra, serving, monitoring |
+| J | **AI Engineering** | The AI Eng Journey roadmap (RAG, agents, MCP, Cloud AI) |
 
-**`content-dag-dashboard.html`** é a página principal — um único arquivo
-HTML auto-contido (D3 via CDN) que abre direto no navegador. Tem dashboard
-de stats, filtros, busca, todos os 10 pilares com collapse/expand, o grafo
-D3 force-directed das conexões e trilhas sugeridas.
+## How it's built
 
-```bash
-open content-dag-dashboard.html
-```
+The Next.js app is the **primary** front end. The homepage `/` is the dashboard:
+hero, big stats, sticky filter bar, all 10 pillars with three-level collapse,
+the D3 force-directed connections graph with click-to-pin panel, and the
+learning paths. Deep routes serve every discipline and lesson:
 
-## Páginas Next (em construção)
+- `/`: dashboard (the homepage *is* the dashboard)
+- `/connections`: standalone D3 graph page
+- `/pillar/[letter]`: pillar overview, lists subsections
+- `/pillar/[letter]/[subId]`: discipline overview, lists lessons
+- `/pillar/[letter]/[subId]/[lessonId]`: the lesson study page (MDX)
 
-A scaffold Next.js está em paralelo, para hospedar a camada de conteúdo
-longo (MDX por subseção) em rotas profundas:
-
-- `/` — vai espelhar o dashboard do HTML (ainda landing menor)
-- `/tree` — dashboard
-- `/connections` — grafo D3
-- `/pillar/[letter]/[sub-id]` — página por subseção *(planejada)*
+A single self-contained `content-dag-dashboard.html` is kept as an **offline
+export** (D3 via CDN, opens directly in a browser, no build). It is **not**
+wired into the Next.js build; regenerate its embedded `PILLARS` / `CONNECTIONS`
+/ `PATHS` literals only when you specifically want the offline file to stay in
+sync with `src/lib/dag.ts`.
 
 ## Stack
 
-- **HTML standalone** + JS + D3 v7 — a front page
-- Next.js 16, React 19, TypeScript — scaffold paralelo
-- Tailwind CSS v4
-- D3.js v7
-- MDX via `@next/mdx` (para futuras sessões de conteúdo, ainda não populadas)
+- **Next.js 16** (App Router, Turbopack) + **React 19** + **TypeScript strict**
+- **Tailwind CSS v4** (`@import "tailwindcss"` + `@theme inline`, with
+  `@tailwindcss/postcss`); design tokens and pillar colors in
+  `src/app/globals.css` as CSS variables
+- **D3 v7** for the connections graph
+- **MDX** rendered with `next-mdx-remote/rsc`; math via `remark-math` +
+  `rehype-katex`; structural diagrams via **Mermaid**; static code via
+  **Shiki**; runnable code via **Pyodide** (numpy preloaded)
+- **Auth.js v5** (NextAuth) + Google provider, **Neon Postgres** (Vercel
+  Marketplace) via `@auth/pg-adapter` for users and progress
 
-## Setup
+## Run locally
 
 ```bash
-# Front page — sem build:
-open content-dag-dashboard.html
-
-# Scaffold Next (quando trabalhar nas rotas profundas):
 npm install
-npm run dev   # http://localhost:3000
+npm run dev        # http://localhost:3000  (anonymous-only without env)
+npm run build
+npm run lint
 ```
 
-## Estrutura
+With no environment variables, the dashboard and every study page work; sign-in
+and progress tracking are simply hidden. To enable auth and progress, copy
+`.env.example` to `.env.local` and set `DATABASE_URL` + the `AUTH_*` keys.
+
+## Architecture
 
 ```
 ai-knowledge-tree/
-├── content/                # pasta para futuros .mdx (uma por pilar; vazias por ora)
-│   └── pillars.json        # manifest com metadados de cada pilar
+├── content-dag-dashboard.html      # offline export only (not built)
+├── schema.sql                      # Neon: Auth.js tables + progress
+├── .env.example                    # env template
+├── DEPLOY.md                       # Vercel + Neon + Google OAuth steps
+├── content/<pillar-slug>/<subId>/<lessonId>.mdx
+│   └── STYLE.md                    # BINDING voice/tone + lesson pedagogy
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx        # home
-│   │   ├── tree/           # dashboard view
-│   │   └── connections/    # grafo D3
-│   ├── components/         # PillarCard, TopicChip, FilterBar, ConnectionsGraph
-│   └── lib/
-│       └── dag.ts          # PILLARS + CONNECTIONS (fonte de verdade)
-└── public/
+│   │   ├── layout.tsx              # Header + globals.css + katex CSS
+│   │   ├── page.tsx                # home = the dashboard
+│   │   ├── connections/page.tsx    # standalone graph page
+│   │   ├── pillar/[letter]/        # pillar overview
+│   │   │   └── [subId]/            # discipline overview, lesson list
+│   │   │       └── [lessonId]/page.tsx   # the lesson study page
+│   │   ├── api/auth/[...nextauth]/route.ts
+│   │   └── actions/progress.ts     # setStatus / clearStatus
+│   ├── components/
+│   │   ├── Hero / DashboardStats / LearningPaths
+│   │   ├── PillarCard / TopicChip
+│   │   ├── FilterBar / CollapseController
+│   │   ├── ConnectionsGraph (D3)
+│   │   ├── LessonSidebar / PillarSidebar
+│   │   ├── StudyProgressControls
+│   │   └── mdx/ { MdxContent, MdxPre, CodeBlock, PyRunner, Mermaid }
+│   ├── lib/
+│   │   ├── types.ts
+│   │   ├── dag.ts                  # PILLARS + CONNECTIONS + PATHS (source of truth)
+│   │   ├── curriculum/{index,A,...}.ts  # per-subsection ordered Lesson[]
+│   │   ├── content.ts              # lesson resolve/load, prev/next
+│   │   ├── db.ts                   # guarded Neon pool
+│   │   └── progress.ts             # getProgressMap / getResume / isSignedIn
+│   ├── auth.ts                     # Auth.js config (guarded)
+│   └── types/next-auth.d.ts
+└── public/figures/<sub>/<name>.svg # generated plot assets
 ```
 
-## Próximos passos
+`src/lib/dag.ts` is the structural source of truth for pillars, subsections,
+topics, connections, and curated learning paths. Per-discipline ordered lesson
+lists live under `src/lib/curriculum/`; lesson prose lives under
+`content/<pillar-slug>/<subId>/<lessonId>.mdx`, and the file's presence flips
+the lesson from "coming soon" to "available".
 
-1. `npm install` e validar que o dev server sobe sem erros
-2. Popular `content/<pillar>/<subsection>/` com MDX (mover material do AI ML Theory)
-3. Expandir `CONNECTIONS` em `src/lib/dag.ts` com mais conexões cruzadas
-4. Sidebar de navegação por pilar (estilo AI ML Theory)
-5. Persistir progresso do usuário em localStorage
-6. Deploy (Vercel)
+## Authoring
+
+See `content/STYLE.md` for the binding voice/tone and lesson pedagogy. Each
+lesson is one atomic concept and follows the same arc: motivate, define on
+first use, derive step by step (no hand-waving), runnable numpy block at the
+end, one-sentence handoff to the next lesson.
+
+The curriculum-first authoring order is A → C → D → E → B → F → G → H → I → J.
+Pillar A is fully authored (71 lessons across A1–A5); pillar C is next.
+
+## Deploy
+
+See `DEPLOY.md` for the end-to-end Vercel + Neon + Google OAuth steps.
+
+## Conventions
+
+- **English** end-to-end (UI chrome, content, code identifiers, topic names)
+- **No em-dash** ("—") anywhere; replace with a colon, comma, semicolon, or
+  parentheses (see `content/STYLE.md` §2.1)
+- TypeScript strict; server components by default, `"use client"` only where
+  hooks or events are needed
+- Pillar IDs are single letters `A–J`; subsection IDs are `<letter><n>`,
+  uppercased
+- Status glyphs: `✓` covered/studied, `◐` partial/in-progress, `○` gap,
+  `★` hot

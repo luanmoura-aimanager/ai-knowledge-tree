@@ -1,4 +1,4 @@
-# Deploy — AI Knowledge Tree
+# Deploy: AI Knowledge Tree
 
 The app runs in two modes:
 
@@ -7,7 +7,7 @@ The app runs in two modes:
 - **Full** (DB + Google OAuth configured): visitors can sign in with Google and
   the dashboard reflects their own study progress.
 
-The steps below are **yours to run** — they need interactive auth and a Vercel
+The steps below are **yours to run**: they need interactive auth and a Vercel
 account. The Vercel CLI is not installed yet.
 
 ## 1. Install the Vercel CLI and link the project
@@ -66,5 +66,5 @@ vercel --prod           # promote to production
 ```
 
 Verify on the deployed URL: sign in with Google, mark a subsection studied,
-reload — the dashboard stats and per-subsection badges should reflect your
+reload: the dashboard stats and per-subsection badges should reflect your
 progress; sign out and they revert to the domain view.

@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 order: 3
 estimatedMinutes: 18
-goal: "Lay out the choices that turn a trained model into a service: how requests reach the model, why LLM serving needs batching and a KV cache, and where quantization and distillation buy headroom. Conceptual by design — no runnable code surface."
+goal: "Lay out the choices that turn a trained model into a service: how requests reach the model, why LLM serving needs batching and a KV cache, and where quantization and distillation buy headroom. Conceptual by design, with no runnable code surface."
 prerequisites: ["D7", "E5"]
 codeExempt: true
 ---
@@ -49,8 +49,8 @@ drive every modern LLM server:
 When a model is too large or too slow for the budget, three levers reduce its
 footprint without retraining from scratch:
 
-- **Quantization** stores weights (and sometimes activations) in fewer bits —
-  8-bit or 4-bit instead of 16. It cuts memory and bandwidth, which for
+- **Quantization** stores weights (and sometimes activations) in fewer bits,
+  for example 8-bit or 4-bit instead of 16. It cuts memory and bandwidth, which for
   memory-bound LLM decoding often means a direct latency win.
 - **Distillation** trains a smaller student model to imitate a larger teacher,
   trading some quality for a much cheaper forward pass.
