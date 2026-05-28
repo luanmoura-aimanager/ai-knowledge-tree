@@ -16,8 +16,8 @@ export async function Header() {
           🌳 AI Knowledge Tree
         </Link>
         <nav className="flex gap-1 text-sm items-center">
-          <NavLink href="/">Painel</NavLink>
-          <NavLink href="/connections">Conexões</NavLink>
+          <NavLink href="/">Dashboard</NavLink>
+          <NavLink href="/connections">Connections</NavLink>
           {dbEnabled() && <AuthControl session={session} />}
         </nav>
       </div>
@@ -35,7 +35,7 @@ function AuthControl({ session }: { session: Session | null }) {
         }}
       >
         <button className="btn ml-2" type="submit">
-          Sair ({session.user.name?.split(" ")[0] ?? "conta"})
+          Sign out ({session.user.name?.split(" ")[0] ?? "account"})
         </button>
       </form>
     );
@@ -48,7 +48,7 @@ function AuthControl({ session }: { session: Session | null }) {
       }}
     >
       <button className="btn active ml-2" type="submit">
-        Entrar com Google
+        Sign in with Google
       </button>
     </form>
   );

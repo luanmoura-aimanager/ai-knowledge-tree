@@ -8,10 +8,10 @@ import type { Path } from "@/lib/types";
 export function LearningPaths() {
   return (
     <div className="max-w-[1280px] mx-auto px-6 py-12">
-      <h2 className="text-2xl font-bold mb-1.5">Trilhas sugeridas</h2>
+      <h2 className="text-2xl font-bold mb-1.5">Suggested paths</h2>
       <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
-        Caminhos curados que atravessam a DAG, conectando pilares em sequência
-        didática para perfis distintos.
+        Curated reading sequences that cross the DAG, connecting pillars in a
+        didactic order for different reader profiles.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {PATHS.map((path) => (
@@ -55,7 +55,7 @@ function PathCard({ path }: { path: Path }) {
       </div>
       <div className="mt-auto">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
-          {cov}/{total} cobertos
+          {cov}/{total} covered
         </div>
         <div className="statbar">
           <div className="seg cov" style={{ width: `${pctCov}%` }} />

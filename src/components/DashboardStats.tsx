@@ -28,30 +28,30 @@ export function DashboardStats({
     const pct = total > 0 ? Math.round((studied / total) * 100) : 0;
     return (
       <Wrap>
-        <BigStat n={total} label="Lições" sub={`${s.nPillars} pilares`} />
+        <BigStat n={total} label="Lessons" sub={`${s.nPillars} pillars`} />
         <BigStat
           n={studied}
-          label="✓ Estudadas"
-          sub={`${pct}% do currículo`}
+          label="✓ Studied"
+          sub={`${pct}% of curriculum`}
           color="var(--good)"
         />
         <BigStat
           n={inProgress}
-          label="◐ Em progresso"
-          sub="retomar"
+          label="◐ In progress"
+          sub="resume"
           color="var(--partial)"
         />
         <BigStat
           n={remaining}
-          label="○ Restantes"
-          sub="a estudar"
+          label="○ Remaining"
+          sub="to study"
           color="var(--gap)"
         />
-        <BigStat n={s.total} label="Tópicos" sub="no domínio" />
+        <BigStat n={s.total} label="Topics" sub="in the domain" />
         <BigStat
           n={s.nConnections}
-          label="🔗 Conexões"
-          sub="cruzadas"
+          label="🔗 Connections"
+          sub="cross-pillar"
           color="var(--accent)"
         />
       </Wrap>
@@ -63,22 +63,22 @@ export function DashboardStats({
     <Wrap>
       <BigStat
         n={s.total}
-        label="Tópicos"
-        sub={`${s.nPillars} pilares · ${s.nSubsections} subseções`}
+        label="Topics"
+        sub={`${s.nPillars} pillars · ${s.nSubsections} subsections`}
       />
       <BigStat
         n={s.cov}
-        label="✓ Cobertos"
-        sub={`${pctOverall}% do mapa`}
+        label="✓ Covered"
+        sub={`${pctOverall}% of the map`}
         color="var(--good)"
       />
       <BigStat
         n={s.par}
-        label="◐ Parciais"
-        sub="mencionados"
+        label="◐ Partial"
+        sub="mentioned"
         color="var(--partial)"
       />
-      <BigStat n={s.gap} label="○ Gaps" sub="a expandir" color="var(--gap)" />
+      <BigStat n={s.gap} label="○ Gaps" sub="to expand" color="var(--gap)" />
       <BigStat
         n={s.hot}
         label="★ Hot"
@@ -87,8 +87,8 @@ export function DashboardStats({
       />
       <BigStat
         n={s.nConnections}
-        label="🔗 Conexões"
-        sub="cruzadas"
+        label="🔗 Connections"
+        sub="cross-pillar"
         color="var(--accent)"
       />
     </Wrap>

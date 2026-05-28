@@ -39,12 +39,12 @@ export default async function DisciplineOverviewPage({
         {sub.name}
       </h1>
       <p className="text-[var(--fg-dim)] mb-6">
-        {lessons.length} lições. Estude na ordem; cada uma assume a anterior.
+        {lessons.length} lessons. Study in order; each one assumes the previous.
       </p>
 
       {lessons.length === 0 ? (
         <div className="card p-6 text-[var(--fg-dim)]">
-          O currículo desta disciplina ainda está sendo definido.
+          The curriculum for this discipline is still being defined.
         </div>
       ) : (
         <ol className="flex flex-col gap-2 list-none p-0 m-0">
@@ -66,9 +66,9 @@ export default async function DisciplineOverviewPage({
                 </span>
                 <span className="text-xs shrink-0">
                   {available ? (
-                    <span className="text-[var(--good)]">disponível</span>
+                    <span className="text-[var(--good)]">available</span>
                   ) : (
-                    <span className="text-[var(--fg-mute)]">em breve</span>
+                    <span className="text-[var(--fg-mute)]">coming soon</span>
                   )}
                 </span>
               </>

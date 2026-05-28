@@ -28,18 +28,18 @@ export function PillarSidebar({
     const st = progress[subId];
     if (st === "studied")
       return (
-        <span className="text-[var(--good)]" title="estudado">
+        <span className="text-[var(--good)]" title="studied">
           ✓
         </span>
       );
     if (st === "in-progress")
       return (
-        <span className="text-[var(--partial)]" title="em progresso">
+        <span className="text-[var(--partial)]" title="in progress">
           ◐
         </span>
       );
     return (
-      <span className="text-[var(--fg-mute)] text-xs" title="não estudado">
+      <span className="text-[var(--fg-mute)] text-xs" title="not studied">
         ○
       </span>
     );
@@ -102,7 +102,7 @@ export function PillarSidebar({
 
         <div className="mt-5 pt-4 border-t border-[var(--border)] text-xs text-[var(--fg-dim)]">
           <Link href="/" className="hover:text-[var(--fg)] no-underline">
-            ← Voltar ao mapa
+            ← Back to map
           </Link>
         </div>
       </div>

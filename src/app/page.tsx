@@ -44,7 +44,7 @@ export default async function HomePage() {
             href={resumeHref}
             className="inline-flex items-center gap-2 btn active no-underline"
           >
-            ▶ Continuar: {resumeLabel}
+            ▶ Continue: {resumeLabel}
           </Link>
         </div>
       )}
@@ -61,10 +61,10 @@ export default async function HomePage() {
       </div>
 
       <section className="max-w-[1280px] mx-auto px-6 py-8">
-        <h2 className="text-2xl font-bold mb-1.5">Conexões cruzadas</h2>
+        <h2 className="text-2xl font-bold mb-1.5">Cross-pillar connections</h2>
         <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
-          Grafo force-directed das subseções. Arraste nós, dê scroll para zoom e
-          clique para fixar uma subseção e ver suas conexões.
+          Force-directed graph of subsections. Drag nodes, scroll to zoom, and
+          click to pin a subsection and see its connections.
         </p>
         <ConnectionsGraph />
       </section>
@@ -73,8 +73,8 @@ export default async function HomePage() {
 
       <footer className="max-w-[1280px] mx-auto px-6 py-10 border-t border-[var(--border)] text-sm text-[var(--fg-dim)]">
         <div className="flex gap-5 flex-wrap">
-          <span>✓ coberto</span>
-          <span>◐ parcial</span>
+          <span>✓ covered</span>
+          <span>◐ partial</span>
           <span>○ gap</span>
           <span className="text-[var(--hot)]">★ hot (2023–2025)</span>
         </div>

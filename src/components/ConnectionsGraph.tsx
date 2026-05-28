@@ -336,15 +336,15 @@ function Legend() {
   const kinds = [
     {
       id: "shared-concept",
-      label: "Conceito compartilhado",
+      label: "Shared concept",
       color: "var(--accent)",
     },
-    { id: "uses", label: "Usa / depende de", color: "var(--partial)" },
-    { id: "generalizes", label: "Generaliza", color: "var(--good)" },
-    { id: "alternative", label: "Alternativa", color: "var(--hot)" },
+    { id: "uses", label: "Uses / depends on", color: "var(--partial)" },
+    { id: "generalizes", label: "Generalizes", color: "var(--good)" },
+    { id: "alternative", label: "Alternative", color: "var(--hot)" },
     {
       id: "within",
-      label: "Sequência dentro do pilar",
+      label: "Sequence within pillar",
       color: "var(--fg-mute)",
     },
   ];
@@ -400,9 +400,9 @@ function SidePanel({ sub, onClose }: { sub: SubResult; onClose: () => void }) {
               fontWeight: 600,
             }}
           >
-            Ver subseção →
+            View subsection →
           </Link>
-          <button onClick={onClose} className="btn" aria-label="fechar">
+          <button onClick={onClose} className="btn" aria-label="close">
             ✕
           </button>
         </div>
@@ -411,7 +411,7 @@ function SidePanel({ sub, onClose }: { sub: SubResult; onClose: () => void }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
         <div>
           <h4 className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-2 font-semibold">
-            Tópicos ({sub.topics.length})
+            Topics ({sub.topics.length})
           </h4>
           <ul className="list-none p-0 m-0 space-y-1 text-sm">
             {sub.topics.map((t) => (
@@ -432,12 +432,12 @@ function SidePanel({ sub, onClose }: { sub: SubResult; onClose: () => void }) {
 
         <div>
           <h4 className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-2 font-semibold">
-            Conexões ({outgoing.length + incoming.length})
+            Connections ({outgoing.length + incoming.length})
           </h4>
           {outgoing.length > 0 && (
             <div className="mb-3">
               <div className="text-xs text-[var(--fg-mute)] mb-1">
-                → saindo:
+                → outgoing:
               </div>
               <ul className="list-none p-0 m-0 space-y-1 text-sm">
                 {outgoing.map((c) => (
@@ -454,7 +454,7 @@ function SidePanel({ sub, onClose }: { sub: SubResult; onClose: () => void }) {
           {incoming.length > 0 && (
             <div>
               <div className="text-xs text-[var(--fg-mute)] mb-1">
-                ← entrando:
+                ← incoming:
               </div>
               <ul className="list-none p-0 m-0 space-y-1 text-sm">
                 {incoming.map((c) => (
@@ -470,7 +470,7 @@ function SidePanel({ sub, onClose }: { sub: SubResult; onClose: () => void }) {
           )}
           {outgoing.length + incoming.length === 0 && (
             <p className="text-sm text-[var(--fg-mute)]">
-              (Esta subseção ainda não tem conexões cruzadas definidas.)
+              (This subsection has no cross-pillar connections defined yet.)
             </p>
           )}
         </div>

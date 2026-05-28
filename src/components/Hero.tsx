@@ -11,10 +11,10 @@ export function Hero() {
         🌳 AI Knowledge Tree
       </h1>
       <p className="text-[var(--fg-dim)] max-w-3xl leading-relaxed">
-        Mapa interativo da DAG completa de Data Science, Machine Learning, Deep
-        Learning e <strong>AI Engineering</strong>. 10 pilares (A → J), com as
-        conexões cruzadas que ligam VAEs em Generative DL e Bayesian DL, Kalman
-        em PGMs e Time Series, RAG em LLMs e AI Engineering.
+        Interactive map of the full DAG of Data Science, Machine Learning, Deep
+        Learning, and <strong>AI Engineering</strong>. 10 pillars (A → J), with
+        the cross-links that tie VAEs in Generative DL and Bayesian DL, Kalman
+        in PGMs and Time Series, RAG in LLMs and AI Engineering.
       </p>
 
       <div className="flex gap-1.5 flex-wrap mt-5">

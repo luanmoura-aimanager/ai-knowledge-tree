@@ -29,7 +29,7 @@ function getPyodide(): Promise<Pyodide> {
         const s = document.createElement("script");
         s.src = `${PYODIDE_URL}pyodide.js`;
         s.onload = () => resolve();
-        s.onerror = () => reject(new Error("Falha ao carregar Pyodide"));
+        s.onerror = () => reject(new Error("Failed to load Pyodide"));
         document.head.appendChild(s);
       });
     }
@@ -63,7 +63,7 @@ export function PyRunner({ code }: { code: string }) {
       if (result !== undefined && result !== null) {
         bufRef.current += String(result) + "\n";
       }
-      setOutput(bufRef.current.trimEnd() || "(sem saída)");
+      setOutput(bufRef.current.trimEnd() || "(no output)");
     } catch (e) {
       setOutput(String(e));
     } finally {
@@ -84,9 +84,9 @@ export function PyRunner({ code }: { code: string }) {
           style={{ padding: "4px 12px" }}
         >
           {status === "loading"
-            ? "Carregando runtime…"
+            ? "Loading runtime…"
             : status === "running"
-              ? "Executando…"
+              ? "Running…"
               : "▶ Run"}
         </button>
       </div>
@@ -96,7 +96,7 @@ export function PyRunner({ code }: { code: string }) {
       {output !== null && (
         <div className="border-t border-[var(--border)]">
           <div className="px-3 py-1 text-xs uppercase tracking-wider text-[var(--fg-mute)] bg-[var(--card-2)]">
-            saída
+            output
           </div>
           <pre className="m-0 p-4 text-sm overflow-x-auto bg-[#0a0e1f] text-[var(--good)] whitespace-pre-wrap">
             {output}

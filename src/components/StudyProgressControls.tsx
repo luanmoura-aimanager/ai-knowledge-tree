@@ -5,7 +5,7 @@ import { setStatus, clearStatus } from "@/app/actions/progress";
 import type { ProgressStatus } from "@/lib/progress";
 
 /**
- * "Marcar como estudado" controls on a lesson page. `itemKey` is the global
+ * "Mark as studied" controls on a lesson page. `itemKey` is the global
  * progress key ("subId/lessonId"). Calls the progress server actions and
  * reflects the new state optimistically. Only rendered for signed-in users.
  */
@@ -34,14 +34,14 @@ export function StudyProgressControls({
         disabled={pending}
         onClick={() => apply(status === "studied" ? null : "studied")}
       >
-        {status === "studied" ? "✓ Estudado" : "Marcar como estudado"}
+        {status === "studied" ? "✓ Studied" : "Mark as studied"}
       </button>
       <button
         className={`btn ${status === "in-progress" ? "active" : ""}`}
         disabled={pending}
         onClick={() => apply(status === "in-progress" ? null : "in-progress")}
       >
-        ◐ Em progresso
+        ◐ In progress
       </button>
     </div>
   );

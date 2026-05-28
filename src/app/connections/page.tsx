@@ -8,13 +8,13 @@ export default function ConnectionsPage() {
   return (
     <div className="max-w-[1280px] mx-auto px-6 py-12">
       <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-[#7aa2f7] via-[#bb9af7] to-[#f7768e] bg-clip-text text-transparent">
-        Conexões
+        Connections
       </h1>
       <p className="text-[var(--fg-dim)] max-w-2xl mb-8">
-        Grafo D3 force-directed das {nNodes} subseções em {PILLARS.length}{" "}
-        pilares, com {nCross} conexões cruzadas. As subseções se ligam dentro do
-        pilar (sequência) e entre pilares quando compartilham conceitos ou um
-        depende do outro.
+        D3 force-directed graph of {nNodes} subsections across {PILLARS.length}{" "}
+        pillars, with {nCross} cross-pillar connections. Subsections link within
+        a pillar (sequence) and across pillars when they share concepts or one
+        depends on another.
       </p>
 
       <ConnectionsGraph />
