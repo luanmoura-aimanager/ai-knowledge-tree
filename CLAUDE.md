@@ -24,7 +24,7 @@ pillars A/C/D/E) and `../AI Eng Journey/` (the applied roadmap behind pillar J).
 The homepage `/` **is** the dashboard, served by Next.js. It renders the hero,
 big stats, sticky filter bar, all 10 pillars with three-level collapse, the D3
 force-directed connections graph with click-to-pin panel, and the learning
-paths — the same experience the old standalone HTML had, now in React.
+paths, the same experience the old standalone HTML had, now in React.
 
 `content-dag-dashboard.html` is **retired as the front page**; it is kept only
 as an **offline export** (a single shareable file). It is not wired into the
@@ -89,7 +89,7 @@ ai-knowledge-tree/
 
 **Pillar → Subsection (discipline) → Lesson.** `dag.ts` defines pillars,
 subsections, topics, and connections (the map). `src/lib/curriculum/<letter>.ts`
-defines, per subsection, the **ordered `Lesson[]`** — the atomic study units
+defines, per subsection, the **ordered `Lesson[]`**, the atomic study units
 (one concept each). A lesson's prose is `content/<slug>/<subId>/<lessonId>.mdx`;
 its presence is its `contentStatus`. Routes: `/pillar/[letter]` (pillar overview)
 → `/pillar/[letter]/[subId]` (discipline overview, lists lessons) →
@@ -100,12 +100,12 @@ keyed `"subId/lessonId"` (see `lessonKey`).
 
 Everything structural reads from three exports:
 
-- `PILLARS: Pillar[]` — 10 pillars A → J. Each has `letter`, `slug`, `name`,
+- `PILLARS: Pillar[]`. 10 pillars A → J. Each has `letter`, `slug`, `name`,
   `shortName` (compact label for graph pills), `tagline`, `color` (hex), `subs[]`.
   Each subsection has a stable `id` (`"D4"`), `name`, and flat `topics`.
-- `CONNECTIONS: Connection[]` — cross-pillar edges `{ from, to, label, kind }`,
+- `CONNECTIONS: Connection[]`. Cross-pillar edges `{ from, to, label, kind }`,
   `kind ∈ "shared-concept" | "uses" | "alternative" | "generalizes"`.
-- `PATHS: Path[]` — curated reading sequences for the learning-paths grid.
+- `PATHS: Path[]`. Curated reading sequences for the learning-paths grid.
 
 Helpers: `getAllSubsections()`, `getSubsectionById(id)`, `pillarStats(p)`,
 `globalStats()`.
@@ -198,11 +198,11 @@ Fenced blocks are dispatched by language:
 
 Pillars **I** (MLOps) and **J** (AI Engineering) deployment/infra/governance
 material, plus infra-flavored D7 topics, have no natural code surface. Mark them
-`codeExempt: true` and keep them conceptual — do not force code onto them.
+`codeExempt: true` and keep them conceptual; do not force code onto them.
 
 ## Conventions
 
-- **TypeScript strict** — no `any`. Use the types in `src/lib/types.ts`.
+- **TypeScript strict**: no `any`. Use the types in `src/lib/types.ts`.
 - **Server components by default**; mark `"use client"` only where you need
   hooks/events (FilterBar, CollapseController, ConnectionsGraph, PyRunner,
   Mermaid, LessonSidebar, StudyProgressControls).
@@ -252,11 +252,11 @@ Auth + progress activate when `DATABASE_URL` + `AUTH_*` are set. See
 - **Stale single-file content.** Earlier seed files `content/<slug>/<subId>.mdx`
   (A1–A5, E3, I3) predate the lesson model and are no longer read by any route;
   mine them when splitting their discipline into lessons, then remove.
-- **No tests yet** — add them when behavior (not just rendering) is introduced.
+- **No tests yet**: add them when behavior (not just rendering) is introduced.
 
 ## Pointers to related work
 
-- `../ai-math-theory/content/` — 135 MDX files seeding pillars A/C/D/E (heavy
+- `../ai-math-theory/content/`: 135 MDX files seeding pillars A/C/D/E (heavy
   math, ~⅓ have code; needs STYLE.md pass + interactive code on migration).
-- `../AI Eng Journey/` — the roadmap behind pillar J (J1–J7).
-- `content-dag-dashboard.html` — the retired single-file dashboard (offline export).
+- `../AI Eng Journey/`: the roadmap behind pillar J (J1–J7).
+- `content-dag-dashboard.html`: the retired single-file dashboard (offline export).
