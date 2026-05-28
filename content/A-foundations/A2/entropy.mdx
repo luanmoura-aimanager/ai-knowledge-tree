@@ -1,0 +1,116 @@
+---
+title: "Shannon entropy"
+pillar: A
+subId: A2
+lessonId: entropy
+order: 14
+estimatedMinutes: 20
+goal: "Define entropy as expected surprise and derive its basic properties."
+prerequisites: ["common-distributions"]
+---
+
+How much uncertainty is in a distribution? A fair coin is more uncertain than a
+biased one; a uniform die more than a loaded one. **Shannon entropy** turns this
+intuition into a number, measured in bits, and it is the floor on how many bits per
+symbol any lossless code can achieve. It is also the backbone of the cross-entropy
+loss.
+
+## Surprise
+
+The **surprise** (or information content) of an outcome with probability $p$ is
+
+$$
+I(p) = \log\frac{1}{p} = -\log p.
+$$
+
+Three requirements force this form. Surprise should decrease in $p$ (certain events
+are unsurprising, $I(1) = 0$), be nonnegative, and be **additive for independent
+events**: seeing two independent outcomes of probability $p_1, p_2$ should surprise
+you by $I(p_1) + I(p_2)$. Since the joint probability is $p_1 p_2$, the function must
+satisfy $I(p_1 p_2) = I(p_1) + I(p_2)$, and the logarithm is the function that turns
+products into sums. With $\log_2$, surprise is in **bits**.
+
+## Entropy
+
+The **entropy** of a discrete distribution $p$ is the expected surprise:
+
+$$
+H(X) = \mathbb{E}[-\log p(X)] = -\sum_x p(x) \log p(x),
+$$
+
+with the convention $0 \log 0 = 0$ (vanishingly rare outcomes contribute nothing).
+With $\log_2$ it is in bits; with natural log, in nats. Entropy is a property of the
+distribution, not of any particular outcome.
+
+## The binary entropy function
+
+For a Bernoulli($q$) variable,
+
+$$
+H(q) = -q\log_2 q - (1-q)\log_2(1-q).
+$$
+
+It is 0 at $q = 0$ and $q = 1$ (no uncertainty) and peaks at $q = 1/2$ with
+$H(1/2) = 1$ bit. A fair coin carries exactly one bit; any bias reduces it.
+
+## Bounds
+
+**Entropy is nonnegative:** each term $-p(x)\log p(x) \ge 0$ because
+$0 \le p(x) \le 1$ makes $\log p(x) \le 0$.
+
+**Maximum at the uniform distribution.** Among all distributions on $K$ outcomes,
+entropy is largest for the uniform $p(x) = 1/K$, where $H = \log K$. This follows
+from Jensen's inequality applied to the concave $\log$:
+
+$$
+H(X) = \mathbb{E}\!\left[\log\frac{1}{p(X)}\right] \le \log \mathbb{E}\!\left[\frac{1}{p(X)}\right] = \log\!\left(\sum_x p(x)\frac{1}{p(x)}\right) = \log K.
+$$
+
+Equality holds when $1/p(X)$ is constant, i.e. $p$ is uniform. Uncertainty is
+maximized when no outcome is favored.
+
+## Differential entropy
+
+For a continuous density $f$, the analogue is the **differential entropy**
+$h(X) = -\int f(x)\log f(x)\,dx$. It can be negative and is not invariant under
+change of variables (a coordinate stretch shifts it by the log-Jacobian), so it
+behaves differently from discrete entropy. Among densities with a fixed variance
+$\sigma^2$, the Gaussian maximizes differential entropy at
+$\frac{1}{2}\log(2\pi e\sigma^2)$, a reason the Gaussian is the "least assuming"
+choice at fixed spread.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Binary entropy peaks at q = 0.5
+def H_bits(p):
+    p = np.asarray(p, float)
+    nz = p[p > 0]                       # skip zero-probability outcomes
+    return -np.sum(nz * np.log2(nz))
+
+for q in [0.0, 0.1, 0.5, 0.9, 1.0]:
+    dist = np.array([q, 1 - q])
+    print(f"H(Bernoulli({q})) = {H_bits(dist):.4f} bits")
+
+# Uniform over K outcomes has entropy log2(K); it is the maximum
+K = 8
+uniform = np.full(K, 1 / K)
+skewed = np.array([0.5] + [0.5 / (K - 1)] * (K - 1))
+print(f"H(uniform_{K}) = {H_bits(uniform):.4f} (log2 {K} = {np.log2(K):.4f})")
+print(f"H(skewed)    = {H_bits(skewed):.4f}  (< uniform)")
+
+# Entropy as expected surprise, estimated from samples
+rng = np.random.default_rng(13)
+probs = np.array([0.5, 0.25, 0.15, 0.10])
+samples = rng.choice(len(probs), size=500_000, p=probs)
+surprise = -np.log2(probs[samples])
+print("E[surprise] sampled:", round(surprise.mean(), 4),
+      " true H:", round(H_bits(probs), 4))
+```
+
+The binary entropy peaks at one bit for a fair coin, the uniform distribution
+attains the maximum $\log_2 K$, and average sampled surprise matches the entropy.
+The next lesson compares two distributions instead of summarizing one: the KL
+divergence.

@@ -1,0 +1,151 @@
+---
+title: "Graph representations, BFS, and DFS"
+pillar: A
+subId: A5
+lessonId: graph-traversal
+order: 10
+estimatedMinutes: 22
+goal: "Represent graphs and traverse them with breadth-first and depth-first search."
+prerequisites: ["arrays-hashing"]
+---
+
+A graph is a set of nodes connected by edges, and most network problems (web crawling,
+shortest paths, dependency analysis) reduce to walking it systematically.
+**Breadth-first search** explores nearest-first; **depth-first search** dives along
+one branch as far as possible. Most other graph algorithms are variants of these two
+traversals.
+
+## Representations
+
+A graph with $V$ vertices and $E$ edges can be stored two ways:
+
+- **Adjacency list.** A dictionary mapping each vertex to the list of its neighbors.
+  Memory: $O(V + E)$. Iterating a vertex's neighbors costs $O(\text{degree})$. The
+  default for sparse graphs.
+- **Adjacency matrix.** A $V \times V$ matrix $A$ with $A_{ij} = 1$ if there is an
+  edge $i \to j$. Memory: $O(V^2)$. Constant-time edge lookup, but most entries are
+  zero for sparse graphs. Useful when $E = \Theta(V^2)$ or when you need fast
+  edge-existence tests.
+
+Real graphs are usually sparse ($E \ll V^2$), so adjacency lists are the standard.
+
+## Breadth-first search
+
+**BFS** visits all vertices at distance 1 from the start, then all at distance 2,
+and so on. A FIFO queue holds vertices waiting to be visited:
+
+1. Mark the start as visited; enqueue it.
+2. While the queue is nonempty: dequeue a vertex; enqueue every unvisited neighbor,
+   marking it visited.
+
+Each vertex is enqueued and dequeued once ($O(V)$); each edge is examined once
+($O(E)$). Total: $O(V + E)$, linear in the graph size.
+
+BFS computes **shortest-path lengths in unweighted graphs** as a side effect:
+recording the depth at which each vertex is enqueued gives its distance from the
+start. It also finds the connected components by running once per unvisited vertex.
+
+## Depth-first search
+
+**DFS** uses a LIFO stack (or recursion) instead of a queue:
+
+1. Mark the current vertex as visited.
+2. For each unvisited neighbor, recurse on it.
+
+DFS produces a **DFS tree** of the parts of the graph it reaches, and classifies the
+remaining edges as **tree**, **back**, **forward**, or **cross** edges. The presence
+of a back edge in a DFS of a directed graph proves the graph has a cycle.
+
+DFS is also $O(V + E)$ and is the basis for:
+
+- **Topological sort** on a DAG (sort vertices so all edges go forward).
+- **Cycle detection.**
+- **Strongly connected components** (Tarjan's and Kosaraju's algorithms).
+
+## Choosing BFS vs DFS
+
+- For **shortest path in an unweighted graph**, BFS.
+- For **all-paths exploration, cycle detection, topological order**, DFS.
+- For **memory** on a graph with much wider levels than depth, DFS uses less; the
+  opposite favors BFS.
+
+The algorithms cover the same vertices and edges; they differ in the order and the
+auxiliary structures.
+
+## Check it on arrays
+
+```python
+from collections import deque, defaultdict
+
+# Adjacency list for a small directed graph.
+graph = {
+    "A": ["B", "C"],
+    "B": ["D"],
+    "C": ["D", "E"],
+    "D": ["F"],
+    "E": ["F"],
+    "F": [],
+}
+
+def bfs(g, start):
+    visited, order, dist, q = {start}, [], {start: 0}, deque([start])
+    while q:
+        u = q.popleft()
+        order.append(u)
+        for v in g[u]:
+            if v not in visited:
+                visited.add(v); dist[v] = dist[u] + 1
+                q.append(v)
+    return order, dist
+
+order, dist = bfs(graph, "A")
+print("BFS order:", order)
+print("BFS distances from A:", dist)
+
+def dfs(g, start):
+    visited, order = set(), []
+    def go(u):
+        visited.add(u); order.append(u)
+        for v in g[u]:
+            if v not in visited: go(v)
+    go(start)
+    return order
+
+print("DFS order:", dfs(graph, "A"))
+
+# Topological sort via DFS post-order on a DAG
+def topo_sort(g):
+    visited, stack = set(), []
+    def go(u):
+        visited.add(u)
+        for v in g[u]:
+            if v not in visited: go(v)
+        stack.append(u)                     # post-order: finished -> push
+    for u in g:
+        if u not in visited: go(u)
+    return list(reversed(stack))
+
+print("topological order:", topo_sort(graph))
+
+# Cycle detection via DFS in a directed graph: a back edge -> cycle
+def has_cycle(g):
+    visiting, done = set(), set()
+    def go(u):
+        visiting.add(u)
+        for v in g.get(u, []):
+            if v in visiting:  return True              # back edge
+            if v in done:      continue
+            if go(v):          return True
+        visiting.discard(u); done.add(u)
+        return False
+    return any(go(u) for u in g if u not in done)
+
+print("DAG cycle?", has_cycle(graph))                   # False
+cyclic = {"X": ["Y"], "Y": ["Z"], "Z": ["X"]}
+print("triangle cycle?", has_cycle(cyclic))             # True
+```
+
+BFS produces level-order vertices and shortest-path distances, DFS produces a
+depth-first walk and a topological sort, and the cycle detector flags a back edge in
+the triangle graph. The next lesson generalizes BFS to weighted edges with Dijkstra's
+algorithm.

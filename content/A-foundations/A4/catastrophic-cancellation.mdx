@@ -1,0 +1,103 @@
+---
+title: "Catastrophic cancellation"
+pillar: A
+subId: A4
+lessonId: catastrophic-cancellation
+order: 3
+estimatedMinutes: 18
+goal: "See how subtracting near-equal numbers destroys precision, and reformulate to avoid it."
+prerequisites: ["floating-point"]
+---
+
+The single most common way naive numerical code goes silently wrong is **catastrophic
+cancellation**: subtracting two nearly-equal floating-point numbers and losing most of
+the significant digits. The arithmetic operation is exact in IEEE-754, but the *input
+error* gets amplified by the magnitude of the operands divided by the magnitude of
+the result.
+
+## The mechanism
+
+Suppose $a$ and $b$ are floats with relative error $\varepsilon \le \varepsilon_{\text{machine}}/2$.
+Their absolute errors are $|a|\varepsilon$ and $|b|\varepsilon$, of comparable size
+when $a \approx b$. The subtraction $c = a - b$ is computed *exactly*, but the input
+errors propagate: $|\Delta c| \le |a|\varepsilon + |b|\varepsilon \approx 2|a|\varepsilon$,
+while the true result $|c|$ is small. The relative error of $c$ is then
+
+$$
+\frac{|\Delta c|}{|c|} \approx \frac{2|a|}{|c|}\,\varepsilon.
+$$
+
+If $a$ and $b$ agree to $k$ digits ($|c| \approx |a| \cdot 10^{-k}$), the relative
+error of $c$ grows by a factor of $10^k$, losing $k$ digits of precision. With double
+precision (~16 digits) and $a = 1$, $b = 1 - 10^{-15}$, the difference has at most one
+correct digit.
+
+## A worked example: the quadratic formula
+
+Solve $x^2 + bx + c = 0$ with $b = 10^7$, $c = 1$ via the standard formula. The two
+roots are $x = (-b \pm \sqrt{b^2 - 4c}) / 2$. For the root using $+$,
+$\sqrt{b^2 - 4c} \approx b$, so the numerator is $-b + b \approx 0$: massive
+cancellation. The other root, using $-$, is fine.
+
+The fix uses Vieta's identity $x_1 x_2 = c$: compute the well-conditioned root first,
+then get the other from $x_2 = c / x_1$. No subtraction of near-equal numbers, no
+cancellation.
+
+## A second example: $1 - \cos x$
+
+Near $x = 0$, $\cos x \approx 1 - x^2/2$, so $1 - \cos x \approx x^2/2$. Computing
+$1 - \cos x$ directly subtracts two nearly-equal numbers when $x$ is small. The
+half-angle identity $1 - \cos x = 2\sin^2(x/2)$ avoids the cancellation: $\sin(x/2)$
+is well-defined and small, and squaring preserves precision.
+
+The general repair pattern is **algebraic rearrangement**: rewrite the formula so the
+subtraction of near-equal quantities becomes a multiplication, a division, or a use of
+a stable library function.
+
+## Cancellation in summation
+
+Adding many positive numbers does not cancel, but adding numbers of *mixed sign* can.
+Computing a mean $\frac{1}{n}\sum (x_i - \mu)$ where $\mu = \frac{1}{n}\sum x_i$ is
+near zero by construction is a textbook case: the running sum is much larger than the
+final value. **Compensated summation** (Kahan summation) keeps a separate running
+error term and corrects it each step, recovering most of the lost precision.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# 1) Quadratic formula: catastrophic vs Vieta
+b, c = 1e7, 1.0
+naive_minus = (-b - np.sqrt(b**2 - 4*c)) / 2          # well-conditioned root
+naive_plus  = (-b + np.sqrt(b**2 - 4*c)) / 2          # cancels!
+vieta_plus  = c / naive_minus                          # stable form
+print(f"naive +root:  {naive_plus:.6e}")
+print(f"Vieta +root:  {vieta_plus:.6e}")
+print(f"check: x1*x2 = c?  {naive_minus * vieta_plus:.6e}  (should be {c})")
+
+# 2) 1 - cos(x) near zero: naive vs half-angle identity
+for x in [1e-4, 1e-6, 1e-8]:
+    naive = 1 - np.cos(x)
+    stable = 2 * np.sin(x/2)**2
+    truth = x**2 / 2                                   # leading Taylor term
+    print(f"x={x:.0e}: naive={naive:.4e}  stable={stable:.4e}  truth~{truth:.4e}")
+
+# 3) Cancellation in summation: mean of shifted data
+rng = np.random.default_rng(0)
+big = 1e10
+data = big + rng.normal(size=10_000)
+mu = data.mean()
+naive = np.mean(data - mu)                              # should be ~0
+print("naive mean of (data - mu):", naive, " (~0 ideal)")
+# Subtract the bulk first, then sum
+shifted = data - big
+mu_shift = shifted.mean()
+recovered = np.mean(shifted - mu_shift)
+print("after shifting bulk out:", recovered)
+```
+
+The naive quadratic formula loses ~7 digits on the cancelling root; the half-angle
+identity preserves precision while $1 - \cos$ collapses to zero; and shifting the
+bulk out of the data restores significance. The next lesson tackles the most common
+cancellation problem in machine learning: exponentials in softmax.

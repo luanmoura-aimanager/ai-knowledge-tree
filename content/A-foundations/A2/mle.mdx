@@ -1,0 +1,117 @@
+---
+title: "Maximum likelihood estimation"
+pillar: A
+subId: A2
+lessonId: mle
+order: 12
+estimatedMinutes: 22
+goal: "Set up a likelihood, maximize its log, and estimate parameters from data."
+prerequisites: ["common-distributions"]
+---
+
+Distributions come with parameters: the rate of a Poisson, the mean of a Gaussian.
+Given data and a chosen distribution family, **maximum likelihood** picks the
+parameter that makes the observed data as probable as possible. It is the default
+estimator behind logistic regression, Gaussian fits, and the cross-entropy loss of
+classification.
+
+## The likelihood function
+
+Suppose the data $x_1, \dots, x_n$ are i.i.d. from a distribution with PMF or PDF
+$p(x \mid \theta)$. The **likelihood** is the probability of the data viewed as a
+function of the parameter:
+
+$$
+L(\theta) = \prod_{i=1}^n p(x_i \mid \theta).
+$$
+
+The data are fixed; $\theta$ varies. The **maximum likelihood estimate (MLE)** is the
+maximizer
+
+$$
+\hat\theta = \arg\max_\theta L(\theta).
+$$
+
+## Why the log
+
+Products of many small probabilities underflow and are awkward to differentiate.
+Because $\log$ is strictly increasing, it does not move the maximizer, and it turns
+the product into a sum:
+
+$$
+\ell(\theta) = \log L(\theta) = \sum_{i=1}^n \log p(x_i \mid \theta).
+$$
+
+Maximize the **log-likelihood** $\ell$ instead. At an interior maximum its gradient
+vanishes:
+
+$$
+\nabla_\theta \ell(\theta) = \sum_{i=1}^n \nabla_\theta \log p(x_i \mid \theta) = 0.
+$$
+
+The summand $\nabla_\theta \log p(x_i \mid \theta)$ is the **score**; the MLE sets the
+total score to zero.
+
+## Worked example: the Gaussian
+
+For $\mathcal{N}(\mu, \sigma^2)$,
+
+$$
+\log p(x \mid \mu, \sigma^2) = -\frac{1}{2}\log(2\pi\sigma^2) - \frac{(x - \mu)^2}{2\sigma^2}.
+$$
+
+Summing and differentiating in $\mu$:
+
+$$
+\frac{\partial \ell}{\partial \mu} = \sum_i \frac{x_i - \mu}{\sigma^2} = 0 \implies \hat\mu = \frac{1}{n}\sum_i x_i,
+$$
+
+the sample mean. Differentiating in $\sigma^2$:
+
+$$
+\frac{\partial \ell}{\partial \sigma^2} = \sum_i\left(-\frac{1}{2\sigma^2} + \frac{(x_i - \mu)^2}{2\sigma^4}\right) = 0 \implies \hat\sigma^2 = \frac{1}{n}\sum_i (x_i - \hat\mu)^2,
+$$
+
+the (biased) sample variance with divisor $n$. The MLE recovers the natural
+plug-in estimators.
+
+## Properties
+
+Under regularity conditions, the MLE is **consistent** (converges to the true
+parameter as $n \to \infty$, by the law of large numbers applied to the score),
+**asymptotically normal**, and **asymptotically efficient** (it achieves the smallest
+possible variance, set by the Fisher information of a later lesson). It can be biased
+at finite $n$, as $\hat\sigma^2$ shows: dividing by $n - 1$ instead removes that bias.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(11)
+N = 100_000
+
+# Gaussian MLE: closed form equals sample mean and (1/n) sample variance
+true_mu, true_sigma = 2.0, 1.5
+data = rng.normal(true_mu, true_sigma, N)
+mu_hat = data.mean()
+sigma2_hat = ((data - mu_hat)**2).mean()    # divisor n (MLE)
+print("mu_hat:", round(mu_hat, 4), "  true", true_mu)
+print("sigma_hat:", round(np.sqrt(sigma2_hat), 4), "  true", true_sigma)
+
+# Poisson MLE for lambda is the sample mean: maximize sum(x log L - L)
+true_lam = 4.0
+counts = rng.poisson(true_lam, N)
+lam_hat = counts.mean()
+print("lambda_hat:", round(lam_hat, 4), "  true", true_lam)
+
+# Verify by a grid search on the log-likelihood
+grid = np.linspace(3.5, 4.5, 2001)
+# sum over data of (x log lam - lam), constant log(x!) dropped
+ll = counts.sum() * np.log(grid) - N * grid
+print("grid argmax:", round(grid[np.argmax(ll)], 4))
+```
+
+The closed-form Gaussian and Poisson estimators recover the true parameters, and the
+grid search confirms the Poisson MLE is the sample mean. The next lesson adds a prior
+on top of the likelihood, turning estimation into Bayesian inference.

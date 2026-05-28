@@ -1,0 +1,104 @@
+---
+title: "Convex sets"
+pillar: A
+subId: A3
+lessonId: convex-sets
+order: 2
+estimatedMinutes: 18
+goal: "Define convex sets, recognize them, and use the separating-hyperplane idea."
+prerequisites: []
+---
+
+Convexity is the property that makes optimization tractable: on a convex problem,
+any local minimum is global and there are no saddles to escape. The geometry starts
+with convex **sets**, the shapes a feasible region can take before the objective is
+even introduced.
+
+## Definition
+
+A set $C \subseteq \mathbb{R}^n$ is **convex** if the line segment between any two of
+its points stays inside it: for all $x, y \in C$ and $\theta \in [0, 1]$,
+
+$$
+\theta x + (1 - \theta) y \in C.
+$$
+
+The point $\theta x + (1-\theta)y$ is a **convex combination** of $x$ and $y$, tracing
+the segment from $y$ ($\theta = 0$) to $x$ ($\theta = 1$). A disk, a solid ball, a
+half-space, and the whole space are convex; a ring, a crescent, and a pair of
+separated blobs are not.
+
+The definition extends to any number of points: a convex set contains every convex
+combination $\sum_i \theta_i x_i$ with $\theta_i \ge 0$ and $\sum_i \theta_i = 1$.
+
+## Building blocks
+
+**Hyperplanes and half-spaces.** A **hyperplane** $\{x : a^\top x = b\}$ and a
+**half-space** $\{x : a^\top x \le b\}$ are convex. A half-space is the basic
+ingredient of linear constraints: each inequality $a^\top x \le b$ carves out one.
+
+**Norm balls.** $\{x : \lVert x - x_0\rVert \le r\}$ is convex for any norm, by the
+triangle inequality. The $\ell_1$, $\ell_2$, and $\ell_\infty$ balls are all convex,
+which is why their unit balls were the feasible regions in the norms lesson.
+
+## Operations that preserve convexity
+
+Convexity survives the operations used to assemble feasible regions:
+
+- **Intersection.** If $C_1, C_2$ are convex, so is $C_1 \cap C_2$. A segment lying
+  in both sets lies in their intersection. This extends to arbitrary intersections,
+  so a **polyhedron** $\{x : Ax \le b\}$, an intersection of half-spaces, is convex.
+- **Affine images.** If $C$ is convex, so is $\{Ax + b : x \in C\}$. Scaling,
+  rotating, projecting, and translating a convex set keep it convex.
+
+These rules let you certify convexity of a feasible region by construction, without
+checking the segment condition directly.
+
+## The separating hyperplane theorem
+
+**Theorem.** If $C$ and $D$ are disjoint convex sets, there exists a hyperplane
+separating them: a nonzero $a$ and scalar $b$ with $a^\top x \le b$ for all $x \in C$
+and $a^\top x \ge b$ for all $x \in D$.
+
+The picture is that two non-overlapping convex shapes can always be split by a flat
+wall. This is the geometric root of duality (a separating hyperplane becomes a dual
+certificate) and of support vector machines (the separating hyperplane is the
+classifier). The disjointness and convexity are both essential; non-convex sets can
+interlock so that no flat wall separates them.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Test convexity empirically: sample pairs, check midpoints stay inside.
+def is_convex_region(inside, sampler, trials=100_000):
+    P = sampler(trials)
+    Q = sampler(trials)
+    P, Q = P[inside(P)], Q[inside(Q)]
+    m = min(len(P), len(Q))
+    theta = rng.random((m, 1))
+    mid = theta * P[:m] + (1 - theta) * Q[:m]
+    return np.all(inside(mid))
+
+box = lambda n: rng.uniform(-2, 2, size=(n, 2))
+
+# L2 ball: convex
+in_ball = lambda X: np.linalg.norm(X, axis=1) <= 1.5
+print("L2 ball convex:", is_convex_region(in_ball, box))
+
+# Annulus (ring): NOT convex
+in_ring = lambda X: (np.linalg.norm(X, axis=1) >= 0.8) & (np.linalg.norm(X, axis=1) <= 1.5)
+print("annulus convex:", is_convex_region(in_ring, box))
+
+# Polyhedron {x : A x <= b} is convex (intersection of half-spaces)
+A = np.array([[1, 0], [0, 1], [-1, -1]]); b = np.array([1.0, 1.0, 1.0])
+in_poly = lambda X: np.all(X @ A.T <= b, axis=1)
+print("polyhedron convex:", is_convex_region(in_poly, box))
+```
+
+The midpoint test confirms the ball and polyhedron are convex and flags the ring as
+non-convex. With convex feasible regions defined, the next lesson puts a convex
+function on top of them.

@@ -1,0 +1,105 @@
+---
+title: "Newton's method"
+pillar: A
+subId: A3
+lessonId: newton-method
+order: 12
+estimatedMinutes: 22
+goal: "Derive Newton's method from a second-order model and analyze its quadratic convergence."
+prerequisites: ["gradient-descent", "A1/spectral-theorem"]
+---
+
+Gradient descent uses only the slope and so cannot tell a gently curving valley from a
+sharp one. **Newton's method** uses the curvature too: it fits a quadratic to the
+function and jumps to that quadratic's minimum. Near a solution it converges
+quadratically, doubling the number of correct digits each step, which makes it the
+template for second-order optimization.
+
+## Derivation from a quadratic model
+
+Approximate $f$ near $x_t$ by its second-order Taylor expansion:
+
+$$
+\hat f(x) = f(x_t) + \nabla f(x_t)^\top (x - x_t) + \tfrac{1}{2}(x - x_t)^\top \nabla^2 f(x_t)\,(x - x_t).
+$$
+
+This is a quadratic in $x$. Setting its gradient to zero,
+$\nabla \hat f(x) = \nabla f(x_t) + \nabla^2 f(x_t)(x - x_t) = 0$, and solving for $x$
+gives the **Newton step**:
+
+$$
+x_{t+1} = x_t - \big[\nabla^2 f(x_t)\big]^{-1} \nabla f(x_t).
+$$
+
+Where gradient descent uses a scalar step $\eta$, Newton uses the inverse Hessian as a
+matrix-valued step that rescales and rotates the gradient to match the local
+curvature. On a quadratic objective, the model is exact and Newton reaches the minimum
+in a **single step**.
+
+## Affine invariance
+
+Newton's method is **affine invariant**: applying a linear change of variables
+$x = Ay$ produces the same sequence of iterates (mapped through $A$). The condition
+number that crippled gradient descent does not affect Newton, because the inverse
+Hessian undoes the coordinate scaling. There is no learning rate to tune for
+conditioning.
+
+## Quadratic convergence
+
+Near a minimizer $x^\star$ where the Hessian is positive definite and Lipschitz, the
+Newton error obeys
+
+$$
+\lVert x_{t+1} - x^\star\rVert \le C\,\lVert x_t - x^\star\rVert^2.
+$$
+
+Once the error is small, squaring it each step means the count of accurate digits
+roughly doubles per iteration. This **quadratic** rate is far faster than the linear
+rate of gradient descent, but it is **local**: it holds only once the iterate is close
+enough that the quadratic model is trustworthy.
+
+## Practical cautions
+
+Two issues keep raw Newton from being used directly on large problems:
+
+- **Cost.** Forming and inverting the $n \times n$ Hessian is $O(n^3)$ per step,
+  infeasible when $n$ is in the millions. Solving $\nabla^2 f\, p = -\nabla f$ rather
+  than inverting, and quasi-Newton approximations (next lesson), address this.
+- **Non-convexity.** If the Hessian is not positive definite, the Newton step can
+  point uphill or toward a saddle. **Damped Newton** (a line search on the step) and
+  **trust-region** or Hessian-modification methods restore a descent guarantee far
+  from the optimum.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Strongly convex, non-quadratic: f(x) = sum(x_i - log x_i) on x > 0, min at all-ones.
+# grad = 1 - 1/x, Hessian = diag(1/x^2). Newton converges globally on (0, 2).
+f = lambda x: np.sum(x - np.log(x))
+grad = lambda x: 1 - 1 / x
+hess = lambda x: np.diag(1 / x**2)
+opt = np.ones(3)
+
+x_n = np.array([1.5, 0.5, 1.8])                  # inside the Newton basin (0, 2)
+x_g = x_n.copy()
+
+print("step |  Newton err     |  GD err (eta=0.4)")
+for t in range(8):
+    print(f"{t:>4} | {np.linalg.norm(x_n - opt):.2e}      | {np.linalg.norm(x_g - opt):.2e}")
+    x_n = x_n - np.linalg.solve(hess(x_n), grad(x_n))
+    x_g = x_g - 0.4 * grad(x_g)                   # gradient descent for contrast
+
+print("Newton final error:", f"{np.linalg.norm(x_n - opt):.2e}")
+
+# Single-step exactness on a quadratic: f = 0.5 x^T A x - b^T x
+A = np.array([[3.0, 1.0], [1.0, 2.0]]); b = np.array([1.0, -1.0])
+x = np.array([9.0, -4.0])
+x = x - np.linalg.solve(A, A @ x - b)            # one Newton step
+print("one Newton step error:", np.linalg.norm(x - np.linalg.solve(A, b)))
+```
+
+Newton's error collapses quadratically while gradient descent decays linearly, and a
+single Newton step solves the quadratic exactly. The next lesson approximates the
+Hessian from gradients to keep this speed without the $O(n^3)$ cost.

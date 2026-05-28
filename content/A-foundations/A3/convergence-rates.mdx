@@ -1,0 +1,120 @@
+---
+title: "Smoothness, strong convexity, and convergence rates"
+pillar: A
+subId: A3
+lessonId: convergence-rates
+order: 5
+estimatedMinutes: 24
+goal: "Use L-smoothness and strong convexity to prove sublinear and linear convergence rates."
+prerequisites: ["gradient-descent", "convex-functions"]
+---
+
+The descent lemma says gradient descent makes progress; it does not say how fast.
+The speed depends on two curvature bounds: an upper bound (smoothness) that caps how
+large a step is safe, and a lower bound (strong convexity) that guarantees the
+function is not too flat. Their ratio, the condition number, sets the rate.
+
+## The two curvature bounds
+
+$f$ is **$L$-smooth** if $\nabla^2 f \preceq L I$ (curvature at most $L$), giving the
+quadratic upper bound from the previous lesson. $f$ is **$\mu$-strongly convex** if
+$\nabla^2 f \succeq \mu I$ for some $\mu > 0$, equivalently
+
+$$
+f(y) \ge f(x) + \nabla f(x)^\top (y - x) + \frac{\mu}{2}\lVert y - x\rVert^2.
+$$
+
+The function is sandwiched between two quadratics: $\mu I \preceq \nabla^2 f \preceq L I$.
+Strong convexity forces a unique minimizer and a paraboloid-like bowl no flatter than
+curvature $\mu$.
+
+## The Polyak-Lojasiewicz inequality
+
+Strong convexity implies a bound relating the suboptimality to the gradient norm.
+Minimizing both sides of the strong-convexity inequality over $y$ (the right side is
+a quadratic in $y$, minimized at $y = x - \frac{1}{\mu}\nabla f(x)$) gives
+
+$$
+f(x^\star) \ge f(x) - \frac{1}{2\mu}\lVert \nabla f(x)\rVert^2, \quad\text{i.e.}\quad \lVert \nabla f(x)\rVert^2 \ge 2\mu\,(f(x) - f(x^\star)).
+$$
+
+A small objective gap forces a small gradient and vice versa: there are no flat
+near-optimal plateaus to stall on.
+
+## Linear convergence for strongly convex, smooth $f$
+
+Combine the descent lemma (with $\eta = 1/L$) and the PL inequality. Let
+$\Delta_t = f(x_t) - f(x^\star)$. The descent lemma gives
+$\Delta_{t+1} \le \Delta_t - \frac{1}{2L}\lVert\nabla f(x_t)\rVert^2$, and PL bounds
+the gradient term below by $2\mu\Delta_t$:
+
+$$
+\Delta_{t+1} \le \Delta_t - \frac{2\mu}{2L}\Delta_t = \left(1 - \frac{\mu}{L}\right)\Delta_t.
+$$
+
+Iterating,
+
+$$
+f(x_t) - f(x^\star) \le \left(1 - \frac{\mu}{L}\right)^t \big(f(x_0) - f(x^\star)\big).
+$$
+
+This is **linear convergence**: the gap shrinks by a constant factor each step, so
+reaching accuracy $\varepsilon$ takes $O\!\big(\frac{L}{\mu}\log\frac{1}{\varepsilon}\big)$
+iterations.
+
+## The condition number
+
+The ratio
+
+$$
+\kappa = \frac{L}{\mu} \ge 1
+$$
+
+is the **condition number** of the problem. It controls everything: the rate factor
+is $1 - 1/\kappa$, so a well-conditioned problem ($\kappa$ near 1) converges in few
+steps, while an ill-conditioned one ($\kappa$ large) crawls because the safe step
+size $1/L$ is tiny relative to the gentle curvature $\mu$ along the flat directions.
+For a quadratic, $\kappa$ is the ratio of largest to smallest Hessian eigenvalue, the
+same condition number from the SVD.
+
+## Sublinear rate without strong convexity
+
+If $f$ is convex and $L$-smooth but not strongly convex ($\mu = 0$), the rate drops to
+
+$$
+f(x_t) - f(x^\star) \le \frac{L\lVert x_0 - x^\star\rVert^2}{2t},
+$$
+
+an $O(1/t)$ **sublinear** rate. Reaching $\varepsilon$ now takes $O(1/\varepsilon)$
+steps, far more than the $\log(1/\varepsilon)$ of the strongly convex case. The lower
+curvature bound is what buys the exponential speedup.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Quadratic with controllable conditioning: f(x) = 0.5 x^T A x, A = diag(mu, L)
+def run(mu, L, steps=200):
+    A = np.diag([mu, L])
+    grad = lambda x: A @ x
+    eta = 1.0 / L
+    x = np.array([1.0, 1.0])
+    gaps = []
+    for _ in range(steps):
+        gaps.append(0.5 * x @ A @ x)             # f(x*) = 0
+        x = x - eta * grad(x)
+    return np.array(gaps)
+
+for mu, L in [(1.0, 2.0), (1.0, 10.0), (1.0, 100.0)]:
+    gaps = run(mu, L)
+    kappa = L / mu
+    # empirical contraction factor vs predicted (1 - 1/kappa)
+    ratio = (gaps[100] / gaps[50]) ** (1 / 50)
+    print(f"kappa={kappa:>5.0f}: empirical factor {ratio:.4f}, "
+          f"predicted <= {1 - 1/kappa:.4f}")
+```
+
+The per-step contraction factor stays at or below the predicted $1 - 1/\kappa$, and
+worsens as the condition number grows. The next lesson replaces the full gradient
+with a noisy estimate, the stochastic setting of real training.

@@ -1,0 +1,162 @@
+---
+title: "Bloom filters and HyperLogLog"
+pillar: A
+subId: A5
+lessonId: probabilistic-structures
+order: 13
+estimatedMinutes: 22
+goal: "Trade exactness for space with Bloom filters and cardinality sketches."
+prerequisites: ["arrays-hashing", "A2/common-distributions"]
+---
+
+Storing a set of $n$ items exactly takes $\Omega(n)$ bits in the worst case. If you
+only need approximate answers (member or not? how many distinct items?), you can do
+much better. **Bloom filters** and **HyperLogLog** are the two probabilistic
+structures every system engineer reaches for: tiny memory, a known controllable error
+rate, and zero per-element bookkeeping.
+
+## Bloom filters: approximate membership
+
+A **Bloom filter** answers "have you seen this item?" with two possible verdicts:
+**"probably yes"** or **"definitely no"**. False positives are possible; false
+negatives are impossible. The structure is a bit array of size $m$, all zero
+initially, and $k$ independent hash functions.
+
+**Insert** $x$: for each hash $h_i$, set bit $h_i(x) \bmod m$ to 1.
+**Query** $x$: return "yes" if all $k$ bits $h_i(x) \bmod m$ are 1, else "no".
+
+A "yes" can be wrong if those bits happen to all be set by other items; a "no" is
+always correct because inserting $x$ would have set those exact bits.
+
+## The false-positive rate
+
+After $n$ inserts into $m$ bits using $k$ hash functions, the probability a given bit
+is still 0 is approximately
+
+$$
+\left(1 - \frac{1}{m}\right)^{kn} \approx e^{-kn/m}.
+$$
+
+A query's false-positive rate (all $k$ randomly chosen bits set) is then
+
+$$
+p_{\text{fp}} \approx \left(1 - e^{-kn/m}\right)^k.
+$$
+
+Minimizing over $k$ for fixed $n, m$ gives $k = (m/n)\ln 2$, at which the bits are
+half ones and half zeros, and
+
+$$
+p_{\text{fp}} \approx (0.5)^k = (0.6185)^{m/n}.
+$$
+
+So with 10 bits per item ($m/n = 10$), the false-positive rate is about 0.8%, no
+matter how many items there are. The size scales with the *log* of the target error
+rate, not the number of items: orders of magnitude smaller than storing the set.
+
+## HyperLogLog: cardinality estimation
+
+A **HyperLogLog (HLL)** estimates the number of distinct items in a stream using a
+tiny fixed amount of memory (say 12 KB) for arbitrarily many items, with about 2%
+relative error.
+
+The trick: for each item $x$, compute a hash $h(x)$ as a binary string. Bucket items
+by the first $b$ bits, giving $m = 2^b$ buckets. Within each bucket, track the
+**maximum number of leading zeros** seen in the rest of the hash. The intuition: out
+of $n$ random binary strings, the maximum leading-zero count is roughly $\log_2 n$
+(seeing $k$ leading zeros has probability $2^{-k}$, so once you have seen $n$ items
+you expect a max around $\log_2 n$). Distinct counts beyond duplicates are what drive
+that maximum up; duplicates do not increase it.
+
+The HLL estimator is a harmonic mean across the $m$ buckets, with a small
+bias-correction constant:
+
+$$
+\hat n = \alpha_m\, m^2 \,\Big/\sum_{i=1}^m 2^{-M_i},
+$$
+
+where $M_i$ is the max leading-zero count in bucket $i$. The relative standard error
+is about $1.04/\sqrt m$, so 1024 buckets give about 3% error using only 1024 small
+counters.
+
+## Where these structures fit
+
+- **Bloom filter:** cache existence checks (avoid expensive disk lookups for keys
+  certainly absent), URL deduplication in crawlers, malware signature checks.
+- **HyperLogLog:** unique-visitor counts in analytics, distinct-IP counts in network
+  monitoring, anywhere exact counts cost more than approximate ones.
+
+Both pay a constant memory cost regardless of stream length, the property that makes
+them indispensable at scale.
+
+## Check it on arrays
+
+```python
+import math, hashlib
+
+# Bloom filter with k hash functions derived from two SHA hashes
+class BloomFilter:
+    def __init__(self, m, k):
+        self.m = m; self.k = k
+        self.bits = bytearray(m // 8 + 1)
+    def _hashes(self, x):
+        d = hashlib.sha256(str(x).encode()).digest()
+        h1 = int.from_bytes(d[:8], "big")
+        h2 = int.from_bytes(d[8:16], "big")
+        return [(h1 + i * h2) % self.m for i in range(self.k)]
+    def _set(self, idx): self.bits[idx // 8] |= 1 << (idx % 8)
+    def _get(self, idx): return (self.bits[idx // 8] >> (idx % 8)) & 1
+    def add(self, x):
+        for h in self._hashes(x): self._set(h)
+    def __contains__(self, x):
+        return all(self._get(h) for h in self._hashes(x))
+
+n = 10_000
+m_per_n = 10
+m = m_per_n * n
+k = max(1, int(round(m_per_n * math.log(2))))
+bf = BloomFilter(m, k)
+present = [f"item-{i}" for i in range(n)]
+absent  = [f"miss-{i}" for i in range(n)]
+for x in present: bf.add(x)
+
+fn = sum(1 for x in present if x not in bf)              # false negatives
+fp = sum(1 for x in absent  if x in bf)                  # false positives
+print(f"false negatives: {fn} (should be 0)")
+print(f"false positives: {fp}/{n} = {fp/n:.4f}  predicted ~ {(0.6185)**m_per_n:.4f}")
+
+# HyperLogLog
+class HLL:
+    def __init__(self, b=12):
+        self.b = b; self.m = 1 << b
+        self.M = [0] * self.m
+        self.alpha = 0.7213 / (1 + 1.079 / self.m)        # bias constant for m >= 128
+    def add(self, x):
+        h = int.from_bytes(hashlib.sha256(str(x).encode()).digest()[:8], "big")
+        j = h >> (64 - self.b)
+        w = (h << self.b) & ((1 << 64) - 1) | (1 << (self.b - 1))  # ensure nonzero
+        # Leading zeros + 1 of w in 64 - b bits
+        lz = 1
+        bits_left = 64 - self.b
+        for k in range(bits_left - 1, -1, -1):
+            if (h >> k) & 1: break
+            lz += 1
+        self.M[j] = max(self.M[j], lz)
+    def count(self):
+        Z = sum(2.0**(-m) for m in self.M)
+        E = self.alpha * self.m * self.m / Z
+        return E
+
+hll = HLL(b=12)                                           # m = 4096 buckets
+truth = 200_000
+for i in range(truth):
+    hll.add(f"x-{i}")
+    hll.add(f"x-{i}")                                     # duplicates do not change M
+est = hll.count()
+print(f"HLL estimate: {est:.0f}  truth: {truth}  rel error {abs(est-truth)/truth:.3f}")
+```
+
+The Bloom filter has zero false negatives and a false-positive rate within
+prediction, and HyperLogLog estimates 200,000 distinct items within a few percent
+using a few kilobytes. This closes the A5 data-structures track and pillar A as a
+whole: the next pillar (C, on calculus and analysis) builds on this foundation.

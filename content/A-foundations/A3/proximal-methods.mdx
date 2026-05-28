@@ -1,0 +1,107 @@
+---
+title: "Proximal gradient methods"
+pillar: A
+subId: A3
+lessonId: proximal-methods
+order: 14
+estimatedMinutes: 22
+goal: "Define the proximal operator and use proximal gradient descent for nonsmooth objectives like the L1 penalty."
+prerequisites: ["gradient-descent", "convex-functions"]
+---
+
+Gradient descent needs a gradient, but the most useful regularizer, the L1 penalty
+that produces sparsity, is not differentiable at zero. **Proximal methods** split the
+objective into a smooth part and a simple nonsmooth part, taking a gradient step on
+the first and a **proximal step** on the second. For the L1 penalty the proximal step
+is soft-thresholding, and the result is the LASSO solver ISTA.
+
+## The composite problem
+
+Many learning objectives have the form
+
+$$
+\min_x\; \underbrace{f(x)}_{\text{smooth}} + \underbrace{g(x)}_{\text{nonsmooth, simple}},
+$$
+
+where $f$ is convex and $L$-smooth (a data-fit loss) and $g$ is convex but possibly
+nondifferentiable (a regularizer like $\lambda\lVert x\rVert_1$). Plain gradient
+descent fails on $g$; the proximal operator handles it exactly.
+
+## The proximal operator
+
+The **proximal operator** of a function $g$ with step $\eta$ is
+
+$$
+\operatorname{prox}_{\eta g}(v) = \arg\min_x\left(g(x) + \frac{1}{2\eta}\lVert x - v\rVert^2\right).
+$$
+
+It returns the point that balances minimizing $g$ against staying near $v$. It
+generalizes projection: if $g$ is the indicator of a convex set (zero inside,
+$+\infty$ outside), the prox is exactly Euclidean projection onto that set.
+
+## Proximal gradient descent
+
+**Proximal gradient descent** alternates a gradient step on $f$ with a prox step on
+$g$:
+
+$$
+x_{t+1} = \operatorname{prox}_{\eta g}\!\big(x_t - \eta\,\nabla f(x_t)\big).
+$$
+
+The motivation mirrors the gradient-descent derivation: model $f$ by its linearization
+plus a proximity penalty, keep $g$ exact, and minimize. The minimizer of
+$f(x_t) + \nabla f(x_t)^\top(x - x_t) + \frac{1}{2\eta}\lVert x - x_t\rVert^2 + g(x)$
+is precisely the prox of $g$ applied to the gradient step. With $\eta \le 1/L$ it
+converges at the same $O(1/t)$ rate as smooth gradient descent, and an accelerated
+version (FISTA, Nesterov momentum on top) reaches $O(1/t^2)$.
+
+## Soft-thresholding for the L1 penalty
+
+For $g(x) = \lambda \lVert x\rVert_1$ the prox decouples across coordinates, and each
+solves $\min_{x_i}\lambda|x_i| + \frac{1}{2\eta}(x_i - v_i)^2$. The solution is the
+**soft-thresholding** operator:
+
+$$
+\operatorname{prox}_{\eta\lambda\lVert\cdot\rVert_1}(v)_i = \operatorname{sign}(v_i)\,\max(|v_i| - \eta\lambda,\ 0).
+$$
+
+It shrinks every coordinate toward zero by $\eta\lambda$ and sets to exactly zero
+anything smaller than the threshold. This is where L1's sparsity comes from
+mechanically: the prox step zeroes out small coordinates each iteration. Proximal
+gradient descent with this prox is **ISTA**, the iterative soft-thresholding algorithm
+for LASSO.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Sparse recovery: y = A x_true + noise, x_true mostly zero (n < d, underdetermined).
+n, d, k = 150, 200, 8
+A = rng.normal(size=(n, d)) / np.sqrt(n)
+x_true = np.zeros(d)
+x_true[rng.choice(d, k, replace=False)] = rng.normal(size=k) * 3
+y = A @ x_true + 0.01 * rng.normal(size=n)
+
+def soft_threshold(v, t):
+    return np.sign(v) * np.maximum(np.abs(v) - t, 0.0)
+
+L = np.linalg.eigvalsh(A.T @ A).max()              # smoothness of 0.5||Ax-y||^2
+eta = 1.0 / L
+lam = 0.1
+
+x = np.zeros(d)
+for _ in range(1500):
+    grad = A.T @ (A @ x - y)                       # gradient of the smooth part
+    x = soft_threshold(x - eta * grad, eta * lam)  # prox step
+
+print("recovered nonzeros:", int(np.sum(np.abs(x) > 1e-2)), " true:", k)
+print("support match:", np.array_equal(np.abs(x) > 1e-2, x_true != 0))
+print("reconstruction error:", round(np.linalg.norm(x - x_true), 4))
+```
+
+ISTA recovers the correct sparse support through repeated soft-thresholding, with
+small coordinates driven to exact zero. The final A3 lesson optimizes functions with
+no gradient at all, using a probabilistic surrogate: Bayesian optimization.

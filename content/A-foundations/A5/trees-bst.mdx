@@ -1,0 +1,133 @@
+---
+title: "Binary search trees and balancing"
+pillar: A
+subId: A5
+lessonId: trees-bst
+order: 4
+estimatedMinutes: 22
+goal: "Use a BST for ordered operations and see why balancing keeps them logarithmic."
+prerequisites: ["complexity-analysis"]
+---
+
+Hash maps give $O(1)$ unordered lookup but cannot answer "what is the smallest key
+greater than $x$?" A **binary search tree (BST)** keeps elements in order so that
+search, insert, and *successor* all run in $O(\log n)$, provided the tree stays
+balanced. The catch is in the proviso: without balancing, a BST can degenerate to a
+linked list. Self-balancing variants (AVL, red-black) restore the guarantee.
+
+## The BST property
+
+A **binary search tree** is a binary tree where every node satisfies:
+
+- all keys in its left subtree are **strictly less** than its key,
+- all keys in its right subtree are **strictly greater**.
+
+This recursive structure makes ordered operations natural. Searching for a key
+follows the comparison at each node: go left if the target is smaller, right if
+larger, stop on equality. The path traverses at most one node per level, so search
+costs $O(\text{height})$.
+
+## Operations
+
+**Search.** Start at the root, descend by comparison until the key is found or `None`
+is reached. $O(\text{height})$.
+
+**Insert.** Search for the key; when the search ends at a `None`, attach a new node
+there. The BST property is preserved by construction. $O(\text{height})$.
+
+**Delete.** Three cases for the deleted node:
+
+1. **Leaf:** detach it.
+2. **One child:** replace it with that child.
+3. **Two children:** find its **in-order successor** (the minimum of the right
+   subtree), copy the successor's key into the node, then delete the successor
+   (which has at most one child, reducing to case 1 or 2).
+
+**In-order traversal** visits left subtree, node, right subtree, yielding keys in
+sorted order in $O(n)$. Range queries follow the same template.
+
+## Why balance matters
+
+A BST built by inserting `1, 2, 3, 4, 5` in order produces a right-leaning chain of
+height $n$, on which all operations cost $O(n)$. The whole point of the structure
+collapses. The height in the **worst case is $\Theta(n)$**; in the **best case** (a
+fully balanced tree) it is $\Theta(\log n)$.
+
+A **self-balancing BST** maintains height $O(\log n)$ after every operation, by
+applying rotations: local rearrangements that preserve the BST property while
+reducing height. The most common are:
+
+- **AVL trees** keep the height difference of left and right subtrees at most 1 at
+  every node, giving the tightest balance at the cost of more rotations.
+- **Red-black trees** allow a looser invariant (no two consecutive red nodes on any
+  root-to-leaf path, equal black depths), trading slight worst-case height for fewer
+  rotations on average. They are the standard for `std::map` and language-level
+  ordered maps.
+
+The $O(\log n)$ guarantee for ordered operations is what BSTs buy.
+
+## Rotations
+
+A **left rotation** at node $x$ (with right child $y$) makes $y$ the new root and
+$x$ the new left child of $y$. The BST property is preserved because everything in
+$y$'s former left subtree is greater than $x$ (so it becomes $x$'s right subtree) and
+less than $y$ (so it sits on the correct side). A right rotation is the mirror.
+Self-balancing trees use one or two rotations per insert/delete to restore balance.
+
+## Check it on arrays
+
+```python
+class BSTNode:
+    __slots__ = ("key", "left", "right")
+    def __init__(self, key): self.key = key; self.left = self.right = None
+
+def insert(root, key):
+    if root is None: return BSTNode(key)
+    if key < root.key:  root.left  = insert(root.left, key)
+    elif key > root.key: root.right = insert(root.right, key)
+    return root
+
+def search(root, key):
+    while root is not None and root.key != key:
+        root = root.left if key < root.key else root.right
+    return root
+
+def in_order(root):
+    if root is None: return []
+    return in_order(root.left) + [root.key] + in_order(root.right)
+
+def height(root):
+    if root is None: return 0
+    return 1 + max(height(root.left), height(root.right))
+
+import random
+rng = random.Random(0)
+# Balanced insertion order: random permutation -> expected height O(log n)
+keys_random = list(range(2**10))
+rng.shuffle(keys_random)
+root_rand = None
+for k in keys_random: root_rand = insert(root_rand, k)
+print(f"random insert: n={2**10}, height={height(root_rand)}, log2(n)={10}")
+
+# Pathological insertion order: already sorted -> height = n
+root_bad = None
+for k in range(64): root_bad = insert(root_bad, k)
+print(f"sorted insert: n=64, height={height(root_bad)} (degenerate chain)")
+
+# Range query via in-order: keys between 100 and 110
+keys_sorted = in_order(root_rand)
+print("range query [100, 110]:", [k for k in keys_sorted if 100 <= k <= 110])
+
+# Successor of a key: leftmost node of right subtree
+def successor(root, key):
+    node = search(root, key)
+    if node is None or node.right is None: return None
+    cur = node.right
+    while cur.left: cur = cur.left
+    return cur.key
+print("successor of 500 in random tree:", successor(root_rand, 500))
+```
+
+The randomly built BST has height close to $\log_2 n$, while the sorted-insertion
+tree degenerates into a chain of height $n$. The next lesson moves from ordered
+structures to a partially ordered one optimized for fast extremes: the heap.

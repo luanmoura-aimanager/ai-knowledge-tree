@@ -1,0 +1,113 @@
+---
+title: "The log-sum-exp trick and stable softmax"
+pillar: A
+subId: A4
+lessonId: log-sum-exp
+order: 4
+estimatedMinutes: 18
+goal: "Derive the log-sum-exp shift and use it to compute softmax and log-likelihoods without overflow."
+prerequisites: ["catastrophic-cancellation"]
+---
+
+The softmax and the log-likelihood of a classifier both involve $\log \sum_i e^{x_i}$,
+which overflows for any moderately large $x_i$ and underflows for moderately negative
+ones. The **log-sum-exp trick** is a one-line algebraic identity that makes the
+expression stable for any inputs. Every deep-learning framework uses it internally.
+
+## The naive failure
+
+Computing $\sum_i e^{x_i}$ with float32: at $x = 100$, $e^x \approx 2.7 \times 10^{43}$,
+still finite, but $x = 1000$ gives $\infty$. Even before overflow, summing one huge
+$e^{x_i}$ with many tiny $e^{x_j}$ loses the small terms entirely. Softmax,
+$\text{softmax}(x)_i = e^{x_i}/\sum_j e^{x_j}$, returns $\text{NaN}$ or $0$ in those
+regimes.
+
+## The shift identity
+
+For any constant $c$,
+
+$$
+\log \sum_{i=1}^n e^{x_i} = c + \log \sum_{i=1}^n e^{x_i - c}.
+$$
+
+*Derivation.* Factor $e^c$ out of the sum:
+$\sum_i e^{x_i} = e^c \sum_i e^{x_i - c}$. Taking the log,
+$\log\sum_i e^{x_i} = c + \log\sum_i e^{x_i - c}$, where the right side uses
+$\log(ab) = \log a + \log b$. $\qquad\blacksquare$
+
+The identity holds for any $c$; the smart choice is $c = \max_i x_i$. Then $x_i - c \le 0$
+for all $i$, so each $e^{x_i - c} \in (0, 1]$, no term overflows, and at least one term
+equals 1 (avoiding underflow of the whole sum to zero). The shifted formula is
+**numerically stable for any input**.
+
+## Stable softmax
+
+The same shift carries through to softmax. Subtracting $c$ from every $x_i$ multiplies
+numerator and denominator by the same $e^{-c}$, leaving the ratio unchanged:
+
+$$
+\text{softmax}(x)_i = \frac{e^{x_i - c}}{\sum_j e^{x_j - c}}.
+$$
+
+With $c = \max_i x_i$, both numerator and denominator are well-scaled.
+
+## Log-softmax and the cross-entropy loss
+
+Training computes the **log-softmax** for the true class, not the softmax itself.
+Computing $\log \text{softmax}(x)_y = x_y - \log\sum_i e^{x_i}$ directly applies the
+shift:
+
+$$
+\log \text{softmax}(x)_y = (x_y - c) - \log \sum_i e^{x_i - c}.
+$$
+
+This avoids the lossy two-step "softmax then log", which can produce $\log 0 = -\infty$
+when a class has probability that underflowed. The fused `log_softmax` is the
+preferred building block, and the cross-entropy loss with logits in deep learning
+calls it internally.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+def logsumexp_naive(x):
+    return np.log(np.sum(np.exp(x)))
+
+def logsumexp_stable(x):
+    c = np.max(x)
+    return c + np.log(np.sum(np.exp(x - c)))
+
+def softmax_naive(x):
+    e = np.exp(x)
+    return e / e.sum()
+
+def softmax_stable(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+# Overflow regime
+x_big = np.array([1000.0, 1001.0, 1002.0])
+print(f"naive   logsumexp: {logsumexp_naive(x_big):.6f}")     # inf
+print(f"stable  logsumexp: {logsumexp_stable(x_big):.6f}")     # ~1002.407...
+print(f"naive   softmax:   {softmax_naive(x_big)}")            # nan
+print(f"stable  softmax:   {softmax_stable(x_big)}")           # finite
+
+# Underflow regime
+x_small = np.array([-1000.0, -1001.0, -1002.0])
+print(f"naive   softmax:   {softmax_naive(x_small)}")          # 0/0 -> nan
+print(f"stable  softmax:   {softmax_stable(x_small)}")         # correct
+
+# Verify the stable softmax matches the analytic answer
+x = np.array([1.0, 2.0, 3.0])
+analytic = np.exp(x) / np.exp(x).sum()
+print("agreement at moderate x:", np.allclose(softmax_stable(x), analytic))
+
+# Compare against numpy's library implementation
+print("matches np.exp normalization:", np.allclose(softmax_stable(x_big), softmax_stable(x_big - 500)))
+```
+
+The naive computations break in both extremes while the shifted versions return
+finite, correct answers. Shifting by the max is the entire fix, and the cost is one
+extra pass over the array. The next lesson moves from elementwise numerics to solving
+systems by repeated approximation.

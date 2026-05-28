@@ -1,0 +1,119 @@
+---
+title: "Conditioning and numerical stability"
+pillar: A
+subId: A4
+lessonId: conditioning-stability
+order: 2
+estimatedMinutes: 22
+goal: "Distinguish the conditioning of a problem from the stability of an algorithm, and bound error with the condition number."
+prerequisites: ["floating-point", "A1/svd"]
+---
+
+A numerical answer can be wrong for two reasons: the *problem itself* amplifies input
+perturbations (it is **ill-conditioned**), or the *algorithm* introduces excess
+rounding error (it is **unstable**). These are independent. A well-conditioned problem
+solved by an unstable algorithm gives a wrong answer; an ill-conditioned problem
+solved by the perfect algorithm still gives a wrong answer. Knowing which is which
+tells you whether to change the algorithm or change the problem.
+
+## Conditioning: a property of the problem
+
+The **condition number** of a problem measures how much the output changes when the
+input is perturbed. For a function $f(x)$, the relative condition number is
+
+$$
+\kappa = \lim_{\delta \to 0}\sup_{\lVert \Delta x\rVert \le \delta}\frac{\lVert f(x + \Delta x) - f(x)\rVert / \lVert f(x)\rVert}{\lVert \Delta x\rVert / \lVert x\rVert}.
+$$
+
+It is the worst-case ratio of relative output change to relative input change. If the
+input is known to floating-point precision $\varepsilon_{\text{machine}}$, the output
+is unavoidably uncertain by about $\kappa \cdot \varepsilon_{\text{machine}}$,
+regardless of how the computation is performed.
+
+## The condition number of a linear system
+
+For $Ax = b$ with $A$ invertible, perturbing $b$ by $\Delta b$ perturbs $x$ by
+$\Delta x = A^{-1}\Delta b$. The condition number of solving the system is
+
+$$
+\kappa(A) = \lVert A\rVert\,\lVert A^{-1}\rVert,
+$$
+
+and in the 2-norm equals the ratio of largest to smallest singular value:
+
+$$
+\kappa_2(A) = \frac{\sigma_{\max}}{\sigma_{\min}}.
+$$
+
+*Derivation.* From $b = Ax$, $\lVert b\rVert \le \lVert A\rVert\,\lVert x\rVert$, so
+$\lVert x\rVert \ge \lVert b\rVert/\lVert A\rVert$. From
+$\Delta x = A^{-1}\Delta b$, $\lVert \Delta x\rVert \le \lVert A^{-1}\rVert\,\lVert\Delta b\rVert$.
+Dividing,
+$$
+\frac{\lVert \Delta x\rVert}{\lVert x\rVert} \le \lVert A\rVert\,\lVert A^{-1}\rVert\,\frac{\lVert\Delta b\rVert}{\lVert b\rVert},
+$$
+identifying $\kappa(A)$ as the amplification factor. $\qquad\blacksquare$
+
+A matrix with $\kappa = 10^{12}$ loses 12 digits of precision: even the perfect
+solver, with double-precision input, returns only 4 correct digits.
+
+## Stability: a property of the algorithm
+
+An algorithm is **backward stable** if the computed answer is the exact answer to a
+slightly perturbed problem: $\hat y = f(x + \Delta x)$ with $\lVert \Delta x\rVert = O(\varepsilon_{\text{machine}})\lVert x\rVert$.
+Backward stability is the strongest practical guarantee, because combined with
+conditioning it yields the forward error bound
+
+$$
+\frac{\lVert \hat y - y\rVert}{\lVert y\rVert} \lesssim \kappa(\text{problem}) \cdot \varepsilon_{\text{machine}}.
+$$
+
+The total error is the product of problem conditioning and algorithm stability. A
+stable algorithm cannot improve a bad condition number; an unstable algorithm
+contaminates even a perfectly conditioned problem.
+
+## Two routes for least squares
+
+The normal equations $A^\top A x = A^\top b$ have condition number $\kappa(A^\top A) = \kappa(A)^2$:
+**squaring** the conditioning of the original problem. The QR or SVD routes (from
+the A1 least-squares lesson) keep the conditioning at $\kappa(A)$ rather than
+$\kappa(A)^2$. Both routes solve the same problem; their *stability* differs.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+eps = np.finfo(float).eps
+
+# Build a matrix with controlled condition number via the SVD.
+def make_A(n, kappa):
+    U = np.linalg.qr(rng.normal(size=(n, n)))[0]
+    V = np.linalg.qr(rng.normal(size=(n, n)))[0]
+    s = np.geomspace(1.0, 1.0 / kappa, n)
+    return U @ np.diag(s) @ V.T
+
+n = 50
+for kappa in [1e2, 1e6, 1e12]:
+    A = make_A(n, kappa)
+    x_true = rng.normal(size=n)
+    b = A @ x_true
+    x_hat = np.linalg.solve(A, b)
+    err = np.linalg.norm(x_hat - x_true) / np.linalg.norm(x_true)
+    bound = kappa * eps
+    print(f"kappa={kappa:>.0e}: rel error {err:.2e}, bound kappa*eps {bound:.2e}")
+
+# Squaring the conditioning: solve via normal equations vs QR
+A = make_A(n, 1e6)
+b = A @ rng.normal(size=n)
+x_normal = np.linalg.solve(A.T @ A, A.T @ b)             # uses kappa^2
+Q, R = np.linalg.qr(A); x_qr = np.linalg.solve(R, Q.T @ b)  # uses kappa
+truth = np.linalg.solve(A, b)
+print("normal-eq error:", np.linalg.norm(x_normal - truth))
+print("QR-route error: ", np.linalg.norm(x_qr - truth))
+```
+
+The relative error grows with the condition number as predicted, and the normal-
+equations route loses precision the QR route preserves. The next lesson zooms in on
+the most common source of stability loss: subtracting near-equal numbers.

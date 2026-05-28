@@ -1,0 +1,113 @@
+---
+title: "Convex functions and their tests"
+pillar: A
+subId: A3
+lessonId: convex-functions
+order: 3
+estimatedMinutes: 22
+goal: "Define convex functions and test convexity with the first- and second-order conditions."
+prerequisites: ["convex-sets", "A1/quadratic-forms"]
+---
+
+A convex function is one whose graph never dips below its chords. This single shape
+property has an outsized payoff: for a convex objective, every stationary point is a
+global minimum and gradient descent cannot get trapped. This lesson defines convexity
+and gives the two practical tests for it.
+
+## Definition
+
+A function $f: \mathbb{R}^n \to \mathbb{R}$ (with convex domain) is **convex** if for
+all $x, y$ and $\theta \in [0, 1]$,
+
+$$
+f(\theta x + (1-\theta)y) \le \theta f(x) + (1-\theta) f(y).
+$$
+
+The left side is the function at a point on the segment; the right side is the
+corresponding point on the chord. Convexity says the function lies on or below every
+chord. It is **strictly convex** if the inequality is strict for $x \neq y$ and
+$\theta \in (0,1)$. A function is **concave** if $-f$ is convex.
+
+A useful equivalent: $f$ is convex if and only if its **epigraph**
+$\{(x, t) : t \ge f(x)\}$, the region above the graph, is a convex set. This links
+function convexity back to the previous lesson's set convexity.
+
+## First-order condition
+
+If $f$ is differentiable, convexity is equivalent to the graph lying above all its
+tangent planes:
+
+$$
+f(y) \ge f(x) + \nabla f(x)^\top (y - x) \quad \text{for all } x, y.
+$$
+
+The right side is the first-order Taylor approximation at $x$. Convexity says this
+linear underestimate is a global lower bound, never an overestimate.
+
+**Why this makes optimization easy.** If $\nabla f(x^\star) = 0$, the bound becomes
+$f(y) \ge f(x^\star)$ for all $y$: the stationary point is a **global** minimum. For
+convex functions, the necessary first-order condition is also sufficient, and local
+minima are global.
+
+## Second-order condition
+
+If $f$ is twice differentiable, convexity is equivalent to a positive semidefinite
+Hessian everywhere:
+
+$$
+\nabla^2 f(x) \succeq 0 \quad \text{for all } x.
+$$
+
+Using the definiteness tests from quadratic forms, this is checkable: all eigenvalues
+of the Hessian are nonnegative at every point. Strict positive definiteness
+($\nabla^2 f \succ 0$) gives strict convexity. The Hessian being PSD is the curvature
+restatement of "curves upward in every direction".
+
+**Example.** A quadratic $f(x) = \tfrac{1}{2}x^\top A x + b^\top x$ has Hessian $A$,
+so it is convex if and only if $A \succeq 0$. The least-squares objective
+$\lVert Ax - b\rVert^2$ has Hessian $2A^\top A \succeq 0$, hence is always convex.
+
+## Operations that preserve convexity
+
+Convex functions are built from a small toolbox:
+
+- **Nonnegative weighted sums:** $\alpha f + \beta g$ is convex for $\alpha, \beta \ge 0$.
+- **Pointwise maximum:** $\max(f, g)$ is convex (the epigraph is an intersection).
+- **Affine composition:** $f(Ax + b)$ is convex if $f$ is.
+
+These rules certify convexity of composite objectives (a convex loss plus a convex
+regularizer stays convex) without returning to the definition.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+
+# Chord test: f(theta x + (1-theta) y) <= theta f(x) + (1-theta) f(y)
+def chord_holds(f, dim, trials=200_000):
+    x = rng.normal(size=(trials, dim))
+    y = rng.normal(size=(trials, dim))
+    th = rng.random((trials, 1))
+    lhs = f(th * x + (1 - th) * y)
+    rhs = th.ravel() * f(x) + (1 - th).ravel() * f(y)
+    return np.all(lhs <= rhs + 1e-9)
+
+f_quad = lambda X: np.sum(X**2, axis=1)          # convex
+f_exp  = lambda X: np.exp(X[:, 0])               # convex
+f_cos  = lambda X: np.cos(X[:, 0])               # not convex
+print("||x||^2 convex:", chord_holds(f_quad, 3))
+print("exp(x) convex: ", chord_holds(f_exp, 1))
+print("cos(x) convex: ", chord_holds(f_cos, 1))
+
+# Second-order test on a quadratic: Hessian = A, PSD <-> convex
+A = np.array([[2.0, 0.5], [0.5, 1.0]])           # symmetric
+print("eig(A):", np.linalg.eigvalsh(A), "-> all >= 0 -> convex")
+A_indef = np.array([[1.0, 0.0], [0.0, -1.0]])
+print("eig(A_indef):", np.linalg.eigvalsh(A_indef), "-> mixed -> not convex")
+```
+
+The chord test confirms the square and exponential are convex while the cosine is
+not, and the Hessian eigenvalue signs agree. The next lesson uses these convexity
+guarantees to analyze the first optimization algorithm: gradient descent.

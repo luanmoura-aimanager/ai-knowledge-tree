@@ -1,0 +1,126 @@
+---
+title: "Greedy algorithms and the exchange argument"
+pillar: A
+subId: A5
+lessonId: greedy
+order: 9
+estimatedMinutes: 18
+goal: "Use greedy choices where they are optimal, and prove it with an exchange argument."
+prerequisites: ["dynamic-programming"]
+---
+
+A **greedy** algorithm builds a solution one piece at a time, always taking the
+locally optimal choice with no backtracking. When this works, it is much simpler and
+faster than dynamic programming. When it does not work, it can confidently produce
+arbitrarily bad answers. The line between the two is the **exchange argument**, the
+standard proof that greedy is optimal for a given problem.
+
+## The pattern
+
+A greedy algorithm:
+
+1. Defines a **selection criterion** at each step (smallest weight, earliest finish,
+   largest ratio).
+2. Picks the locally best choice and commits to it.
+3. Reduces to a smaller subproblem on what remains.
+
+The seductive simplicity is the same shape that makes greedy go wrong: a locally
+optimal choice can lock you out of a globally better solution. Proving the strategy
+is correct is essential, not optional.
+
+## Activity selection: greedy works
+
+Given $n$ activities each with start time $s_i$ and finish time $f_i$, pick the
+**largest non-overlapping subset**. The greedy: sort by finish time and take the next
+activity that starts after the last chosen one finished.
+
+**Theorem (exchange).** The greedy choice is contained in some optimal solution.
+
+*Proof.* Let $g$ be the activity with the earliest finish time, and let $A$ be any
+optimal solution. If $g \in A$ we are done. Otherwise let $a \in A$ be the activity
+that finishes first. By the greedy criterion, $f_g \le f_a$, so $g$ ends no later
+than $a$. Replace $a$ in $A$ with $g$: the new set $A' = (A \setminus \{a\}) \cup \{g\}$
+has the same size as $A$, and $g$ does not overlap any of $A$'s other activities
+(they all start after $a$'s end, hence after $g$'s end). So $A'$ is also optimal and
+contains the greedy choice. $\qquad\blacksquare$
+
+By induction on the remaining problem, the full greedy solution is optimal. The
+running time is $O(n \log n)$, dominated by the sort.
+
+## Counterexample: 0/1 knapsack is not greedy
+
+The 0/1 knapsack problem (pick a subset of items with maximum total value subject to
+a weight budget) does **not** admit a value-per-weight greedy. Consider weights
+$[1, 5, 5]$, values $[10, 30, 30]$, budget 10. Value-per-weight ratios are
+$10, 6, 6$. Greedy takes item 1 (value 10, weight 1) then item 2 (value 30, weight
+6 total) for a total value of 40. The optimum takes items 2 and 3, weight 10, value
+60. The greedy lock-in cost half the answer.
+
+(The *fractional* knapsack, where items can be split, is solved by the same greedy,
+because the exchange argument goes through. The combinatorial 0/1 version needs DP.)
+
+## Huffman coding: a less obvious greedy
+
+Building an optimal prefix-free code from a frequency table: repeatedly merge the two
+lowest-frequency symbols into a tree node and re-insert it into the frequency
+priority queue. The resulting **Huffman tree** is provably an optimal prefix code,
+again by an exchange argument: any optimal tree can be rearranged so the two
+lowest-frequency symbols are siblings at the deepest level without increasing the
+weighted code length.
+
+## How to know
+
+Two checks before committing to a greedy:
+
+1. **Try an exchange.** Can the locally optimal choice be exchanged into any
+   solution without making it worse? If yes, greedy is plausible. If no, find a
+   counterexample.
+2. **Try matroid theory or the cut/cycle property.** For optimization on weighted
+   graphs and matroids (e.g. MSTs), there are general theorems guaranteeing greedy
+   optimality.
+
+If neither holds, fall back to DP.
+
+## Check it on arrays
+
+```python
+# Activity selection: greedy is optimal.
+def activity_select(intervals):
+    intervals = sorted(intervals, key=lambda x: x[1])     # by finish time
+    chosen, last_finish = [], -float("inf")
+    for s, f in intervals:
+        if s >= last_finish:
+            chosen.append((s, f))
+            last_finish = f
+    return chosen
+
+acts = [(1, 4), (3, 5), (0, 6), (5, 7), (3, 9), (5, 9),
+        (6, 10), (8, 11), (8, 12), (2, 14), (12, 16)]
+opt = activity_select(acts)
+print("activities chosen:", opt, " count:", len(opt))
+
+# 0/1 knapsack greedy gives a wrong answer
+items = [(1, 10), (5, 30), (5, 30)]                       # (weight, value)
+budget = 10
+def greedy_knapsack(items, budget):
+    items = sorted(items, key=lambda x: -x[1] / x[0])     # by value/weight
+    val, weight = 0, 0
+    for w, v in items:
+        if weight + w <= budget:
+            weight += w; val += v
+    return val
+print("0/1 greedy value:", greedy_knapsack(items, budget))   # 40 (suboptimal)
+
+def dp_knapsack(items, budget):
+    K = [[0] * (budget + 1) for _ in range(len(items) + 1)]
+    for i, (w, v) in enumerate(items, 1):
+        for c in range(budget + 1):
+            K[i][c] = K[i-1][c]
+            if w <= c: K[i][c] = max(K[i][c], K[i-1][c-w] + v)
+    return K[-1][-1]
+print("DP optimum:        ", dp_knapsack(items, budget))     # 60
+```
+
+Activity selection's greedy yields a maximal non-overlapping schedule, while the
+knapsack greedy is provably wrong on the example, fixed by DP. The next lesson
+introduces graphs and the two traversals every graph algorithm builds on.

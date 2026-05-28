@@ -1,0 +1,124 @@
+---
+title: "Bernoulli, Binomial, Poisson, Gaussian"
+pillar: A
+subId: A2
+lessonId: common-distributions
+order: 7
+estimatedMinutes: 24
+goal: "Know the defining stories, PMFs/PDFs, and moments of the workhorse distributions."
+prerequisites: ["variance-moments"]
+---
+
+A handful of distributions show up again and again because each models a simple,
+recurring mechanism: a single yes/no trial, a count of successes, a count of rare
+events, and the limiting bell curve that sums of anything tend toward. Knowing their
+stories and moments cold pays off everywhere downstream.
+
+## Bernoulli: one trial
+
+A **Bernoulli** random variable $X \in \{0, 1\}$ models a single trial with success
+probability $q$:
+
+$$
+P(X = 1) = q, \quad P(X = 0) = 1 - q, \qquad p_X(x) = q^x (1-q)^{1-x}.
+$$
+
+**Mean:** $\mathbb{E}[X] = 1 \cdot q + 0 \cdot (1-q) = q$.
+**Variance:** $\mathbb{E}[X^2] = q$ (since $X^2 = X$ for a 0/1 variable), so
+$\operatorname{Var}(X) = q - q^2 = q(1-q)$, maximized at $q = 1/2$.
+
+## Binomial: counting successes
+
+The **Binomial** $X \sim \text{Bin}(n, q)$ counts successes in $n$ independent
+Bernoulli($q$) trials. The PMF multiplies the probability of any specific sequence
+with $k$ successes, $q^k(1-q)^{n-k}$, by the number of such sequences:
+
+$$
+p_X(k) = \binom{n}{k} q^k (1-q)^{n-k}, \qquad k = 0, 1, \dots, n.
+$$
+
+Writing $X = \sum_{i=1}^n X_i$ as a sum of independent Bernoullis, linearity and
+(for independent terms) additivity of variance give
+
+$$
+\mathbb{E}[X] = nq, \qquad \operatorname{Var}(X) = nq(1-q),
+$$
+
+with no need to sum the PMF directly. The sum-of-indicators decomposition is the
+fast route to both moments.
+
+## Poisson: rare events
+
+The **Poisson** $X \sim \text{Pois}(\lambda)$ counts events in a fixed interval when
+they occur independently at an average rate $\lambda$. It arises as the limit of
+$\text{Bin}(n, \lambda/n)$ as $n \to \infty$ (many trials, each rarely succeeding):
+
+$$
+p_X(k) = \frac{\lambda^k e^{-\lambda}}{k!}, \qquad k = 0, 1, 2, \dots
+$$
+
+A defining feature is **equal mean and variance**:
+
+$$
+\mathbb{E}[X] = \lambda, \qquad \operatorname{Var}(X) = \lambda.
+$$
+
+This equality is a quick diagnostic: count data with variance much larger than its
+mean is "overdispersed" and not Poisson.
+
+## Gaussian: the bell curve
+
+The **Gaussian** (normal) $X \sim \mathcal{N}(\mu, \sigma^2)$ is the continuous
+distribution with PDF
+
+$$
+f_X(x) = \frac{1}{\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right).
+$$
+
+Its parameters are its moments directly: $\mathbb{E}[X] = \mu$ and
+$\operatorname{Var}(X) = \sigma^2$. The **standard normal** $\mathcal{N}(0, 1)$ has
+$\mu = 0, \sigma = 1$, and any Gaussian standardizes via $Z = (X - \mu)/\sigma$.
+
+The Gaussian dominates because of the central limit theorem (a later lesson): sums
+and averages of many independent contributions converge to it regardless of the
+pieces' own distributions. Sums of independent Gaussians are again Gaussian, with
+means and variances adding.
+
+## Check it on arrays
+
+```python
+import numpy as np
+from math import comb, factorial
+
+rng = np.random.default_rng(6)
+N = 1_000_000
+
+# Bernoulli(0.3)
+q = 0.3
+B = (rng.random(N) < q).astype(float)
+print(f"Bernoulli mean {B.mean():.3f} (q={q}), var {B.var():.3f} (q(1-q)={q*(1-q):.3f})")
+
+# Binomial(n=20, q=0.3)
+n = 20
+X = rng.binomial(n, q, size=N)
+print(f"Binomial mean {X.mean():.3f} (nq={n*q}), var {X.var():.3f} (nq(1-q)={n*q*(1-q):.3f})")
+# Check one PMF value
+k = 6
+print(f"P(X={k}) sim {np.mean(X == k):.4f}, exact {comb(n,k)*q**k*(1-q)**(n-k):.4f}")
+
+# Poisson(lambda=4): mean == variance
+lam = 4.0
+Pn = rng.poisson(lam, size=N)
+print(f"Poisson mean {Pn.mean():.3f}, var {Pn.var():.3f} (both {lam})")
+print(f"P(X=3) sim {np.mean(Pn == 3):.4f}, exact {lam**3*np.exp(-lam)/factorial(3):.4f}")
+
+# Gaussian(mu=1, sigma=2): standardize and check ~N(0,1)
+G = rng.normal(1.0, 2.0, size=N)
+Z = (G - 1.0) / 2.0
+print(f"standardized mean {Z.mean():.3f} (~0), std {Z.std():.3f} (~1)")
+```
+
+Every mean and variance lands on its formula, the binomial and Poisson PMF spot
+checks match, and standardizing the Gaussian produces a unit normal. The next
+lesson shows that three of these four share a single algebraic skeleton: the
+exponential family.

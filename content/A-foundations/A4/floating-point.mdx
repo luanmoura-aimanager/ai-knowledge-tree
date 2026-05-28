@@ -1,0 +1,107 @@
+---
+title: "Floating-point numbers and machine epsilon"
+pillar: A
+subId: A4
+lessonId: floating-point
+order: 1
+estimatedMinutes: 18
+goal: "Understand IEEE-754 floating point, machine epsilon, and where rounding error comes from."
+prerequisites: []
+---
+
+Every real number a computer manipulates is an approximation. Understanding *which*
+approximation, and how big the error is, is what separates code that quietly produces
+wrong answers from code that does not. Floating point follows a strict standard
+(IEEE-754) with an exactly characterized error floor: machine epsilon.
+
+## The representation
+
+A floating-point number stores three pieces: a sign $s \in \{0, 1\}$, an exponent
+$e$, and a fixed-precision **mantissa** $m$. The value is
+
+$$
+x = (-1)^s \cdot (1.m_1 m_2 \dots m_p)_2 \cdot 2^{e}.
+$$
+
+The leading 1 is implicit (a normalized binary number starts with 1), so a 24-bit
+mantissa actually stores 23 explicit bits. **IEEE-754 single precision (float32)**
+uses 8 bits of exponent and 23 of mantissa for a total of 32 bits; **double precision
+(float64)** uses 11 and 52 for 64 bits. There are also special encodings for $\pm 0$,
+$\pm \infty$, and **NaN** (not-a-number, the result of $0/0$ or $\infty - \infty$).
+
+## Representable numbers and gaps
+
+Representable floats are not evenly spaced on the real line: they are evenly spaced
+between consecutive powers of two and then double. Between $2^k$ and $2^{k+1}$, the
+spacing is $2^{k-p}$ where $p$ is the mantissa bit count. Near 1, the gap is tiny
+($\approx 10^{-16}$ for float64); near $10^{20}$, it is huge.
+
+## Machine epsilon
+
+**Machine epsilon** is the gap between 1 and the next representable float above it:
+
+$$
+\varepsilon_{\text{machine}} = 2^{-p}.
+$$
+
+For float64, $\varepsilon_{\text{machine}} \approx 2.22 \times 10^{-16}$; for float32,
+$\approx 1.19 \times 10^{-7}$. Any real $x$ that lies between two consecutive floats
+is rounded to one of them, with **relative error** bounded by
+
+$$
+\frac{|\text{fl}(x) - x|}{|x|} \le \frac{\varepsilon_{\text{machine}}}{2}.
+$$
+
+So floating point is accurate to about 16 decimal digits (double) or 7 (single),
+**relatively**, not absolutely. A number of magnitude $10^{20}$ has absolute
+uncertainty of order $10^4$ even in double precision.
+
+## Where error enters
+
+A single arithmetic operation in IEEE-754 returns the exact result rounded to the
+nearest representable float. Each `+`, `*`, `/` introduces relative error of size at
+most $\varepsilon_{\text{machine}}/2$. Algorithms with many operations can accumulate
+these errors; the next lesson on conditioning and stability formalizes how much.
+
+Two specific phenomena dominate practical problems:
+
+- **Overflow:** the result exceeds the largest representable float and becomes $\pm\infty$.
+  Computing $e^{1000}$ overflows in any double-precision system. The log-sum-exp trick
+  (later lesson) exists to dodge this in softmax.
+- **Underflow:** the result is smaller than the smallest normal float and rounds to
+  zero, losing all information. Multiplying many probabilities is the classic example,
+  which is why likelihoods are computed in log space.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Machine epsilon
+print("float64 eps:", np.finfo(np.float64).eps)        # ~2.22e-16
+print("float32 eps:", np.finfo(np.float32).eps)        # ~1.19e-07
+
+# 1 + eps/2 still rounds to 1 (it's below the spacing at 1)
+print("1 + eps/2 == 1:", 1.0 + np.finfo(float).eps / 2 == 1.0)
+# 1 + eps is the next representable number above 1
+print("1 + eps > 1:", 1.0 + np.finfo(float).eps > 1.0)
+
+# Spacing doubles with the exponent
+for k in [0, 10, 20, 30]:
+    x = 2.0**k
+    print(f"spacing at 2^{k}:", np.spacing(x))
+
+# Overflow and underflow in float32
+inf = np.exp(np.float32(100))                          # overflows
+zero = np.exp(np.float32(-100))                        # underflows
+print("exp(100) f32:", inf, "  exp(-100) f32:", zero)
+
+# Associativity fails in floating point: (a+b)+c != a+(b+c) in general
+a, b, c = 1e16, -1e16, 1.0
+print("(a+b)+c:", (a + b) + c, "  a+(b+c):", a + (b + c))
+```
+
+Machine epsilon defines the relative precision floor, the spacing doubles every power
+of two, overflow and underflow happen at predictable thresholds, and addition is not
+even associative. With this representation in hand, the next lesson asks: when does
+rounding error matter, and when does it explode?
