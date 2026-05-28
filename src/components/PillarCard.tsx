@@ -89,7 +89,7 @@ export function PillarCard({
             </span>
           </div>
           <div className="text-xs text-[var(--fg-mute)] mt-1 mb-2">
-            {s.cov}/{s.total} cobertos · {s.par} parciais · {s.hot} hot
+            {s.cov}/{s.total} covered · {s.par} partial · {s.hot} hot
           </div>
           <div className="statbar">
             <div className="seg cov" style={{ width: `${s.pctCov}%` }} />
