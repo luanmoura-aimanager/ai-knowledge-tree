@@ -922,7 +922,7 @@ export const PILLARS: Pillar[] = [
             status: "gap",
           },
           {
-            name: "Observabilidade (tracing, latência, LangSmith)",
+            name: "Observability (tracing, latency, LangSmith)",
             status: "gap",
           },
           { name: "Surfaces (Slack/Teams/Outlook integration)", status: "gap" },
@@ -940,7 +940,7 @@ export const PILLARS: Pillar[] = [
         name: "Advanced patterns",
         topics: [
           {
-            name: "Quando NÃO fine-tunar (prompting + RAG + long context)",
+            name: "When NOT to fine-tune (prompting + RAG + long context)",
             status: "gap",
           },
           {
@@ -959,7 +959,7 @@ export const PILLARS: Pillar[] = [
             hot: true,
           },
           {
-            name: "Custo & latência (caching, model routing, prompt compression)",
+            name: "Cost & latency (caching, model routing, prompt compression)",
             status: "gap",
             hot: true,
           },

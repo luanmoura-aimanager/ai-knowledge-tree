@@ -319,7 +319,7 @@ export function ConnectionsGraph() {
       >
         <svg ref={svgRef} className="conn-graph w-full h-full" />
         <div className="absolute bottom-3 left-3 text-xs text-[var(--fg-mute)] bg-[var(--bg)]/80 px-2 py-1 rounded backdrop-blur">
-          💡 arraste nós · scroll zoom · clique para detalhes
+          💡 drag nodes · scroll to zoom · click for details
         </div>
       </div>
 
