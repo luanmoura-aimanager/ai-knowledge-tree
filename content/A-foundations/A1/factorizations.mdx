@@ -98,7 +98,6 @@ substitution).
 
 ```python
 import numpy as np
-import scipy.linalg as la
 
 A = np.array([[4.0, 3.0, 2.0],
               [3.0, 6.0, 1.0],
@@ -106,25 +105,46 @@ A = np.array([[4.0, 3.0, 2.0],
 
 b = np.array([1.0, 2.0, 3.0])
 
-# LU (via scipy, which does PA = LU):
-P, L, U = la.lu(A)
-print("LU: P@A == L@U:", np.allclose(P @ A, L @ U))
+# Triangular solves (the cheap O(n^2) step every factorization reduces to):
+def forward_sub(L, b):       # L lower triangular
+    x = np.zeros_like(b)
+    for i in range(len(b)):
+        x[i] = (b[i] - L[i, :i] @ x[:i]) / L[i, i]
+    return x
 
-x_lu = la.solve(A, b)   # uses LU internally
+def back_sub(U, b):          # U upper triangular
+    x = np.zeros_like(b)
+    for i in reversed(range(len(b))):
+        x[i] = (b[i] - U[i, i + 1:] @ x[i + 1:]) / U[i, i]
+    return x
 
-# QR:
-Q, R = la.qr(A)
-x_qr = la.solve_triangular(R, Q.T @ b)
+# LU without pivoting (A is PD here, so no row swaps are needed):
+def lu(A):
+    n = A.shape[0]
+    L, U = np.eye(n), A.astype(float).copy()
+    for k in range(n):
+        for i in range(k + 1, n):
+            L[i, k] = U[i, k] / U[k, k]
+            U[i, k:] -= L[i, k] * U[k, k:]
+    return L, U
+
+L, U = lu(A)
+print("LU reconstructs A:", np.allclose(L @ U, A))
+x_lu = back_sub(U, forward_sub(L, b))      # solve Ly=b, then Ux=y
+
+# QR: A = QR, so Ax=b becomes Rx = Q^T b
+Q, R = np.linalg.qr(A)
+x_qr = back_sub(R, Q.T @ b)
 print("LU == QR solution:", np.allclose(x_lu, x_qr))
 
-# Cholesky:
-L_chol = la.cholesky(A, lower=True)
-y = la.solve_triangular(L_chol, b, lower=True)
-x_chol = la.solve_triangular(L_chol.T, y)
+# Cholesky: A = L L^T, solve Ly=b then L^T x=y
+L_chol = np.linalg.cholesky(A)             # lower triangular
+y = forward_sub(L_chol, b)
+x_chol = back_sub(L_chol.T, y)
 print("LU == Cholesky solution:", np.allclose(x_lu, x_chol))
 
-# Never invert: compare condition numbers
-print("cond(A):", np.linalg.cond(A))   # moderate -> solving is fine
+# Never invert: compare condition number
+print("cond(A):", np.linalg.cond(A))       # moderate -> solving is fine
 ```
 
 All three paths give the same solution; the Cholesky factorization halves the
