@@ -1,0 +1,112 @@
+---
+title: "Markov chains and stationary distributions"
+pillar: A
+subId: A2
+lessonId: markov-chains
+order: 17
+estimatedMinutes: 24
+goal: "Define a Markov chain by its transition matrix and find its stationary distribution."
+prerequisites: ["joint-distributions", "A1/eigenvalues"]
+---
+
+Many processes evolve in steps where the next state depends only on the current one,
+not the full history: a random walk, a shuffled card deck, a token sequence under a
+simple model. A **Markov chain** captures this, and its long-run behavior is read off
+from the eigenstructure of a single matrix, tying probability back to linear algebra.
+
+## The Markov property
+
+A sequence of random variables $X_0, X_1, X_2, \dots$ taking values in a finite state
+set is a **Markov chain** if the future depends on the past only through the present:
+
+$$
+P(X_{t+1} = j \mid X_t = i, X_{t-1}, \dots, X_0) = P(X_{t+1} = j \mid X_t = i).
+$$
+
+This **memorylessness** is the defining assumption. The one-step dynamics are
+collected in the **transition matrix** $P$ with entries $P_{ij} = P(X_{t+1} = j \mid X_t = i)$.
+Each row sums to 1 (from state $i$ the chain must go somewhere), making $P$ a
+**row-stochastic** matrix.
+
+## Distributions evolve by matrix multiplication
+
+Represent the distribution over states at time $t$ as a row vector $\pi^{(t)}$, with
+$\pi^{(t)}_i = P(X_t = i)$. One step forward uses the law of total probability:
+
+$$
+\pi^{(t+1)}_j = \sum_i P(X_t = i)\,P_{ij} = \sum_i \pi^{(t)}_i P_{ij},
+$$
+
+which is the vector-matrix product $\pi^{(t+1)} = \pi^{(t)} P$. After $n$ steps,
+
+$$
+\pi^{(n)} = \pi^{(0)} P^n.
+$$
+
+The $n$-step transition probabilities are the entries of $P^n$. Evolving the chain is
+repeatedly multiplying by $P$.
+
+## Stationary distribution
+
+A distribution $\pi$ is **stationary** if it is unchanged by a step:
+
+$$
+\pi P = \pi, \qquad \sum_i \pi_i = 1, \quad \pi_i \ge 0.
+$$
+
+The equation $\pi P = \pi$ says $\pi$ is a **left eigenvector of $P$ with eigenvalue
+1**. Every row-stochastic matrix has eigenvalue 1: the all-ones column vector
+$\mathbf{1}$ satisfies $P\mathbf{1} = \mathbf{1}$ (rows sum to 1), so 1 is an
+eigenvalue, and left and right eigenvalues coincide. All other eigenvalues have
+magnitude $\le 1$ (Gershgorin / Perron-Frobenius).
+
+## Convergence to stationarity
+
+If the chain is **irreducible** (every state reachable from every other) and
+**aperiodic** (no forced cycles), the Perron-Frobenius theorem guarantees a **unique**
+stationary distribution $\pi$, and the chain converges to it from any start:
+
+$$
+\pi^{(0)} P^n \xrightarrow{n \to \infty} \pi.
+$$
+
+The rate is governed by the second-largest eigenvalue magnitude $|\lambda_2|$: the
+distance to $\pi$ shrinks roughly like $|\lambda_2|^n$. The spectral gap $1 - |\lambda_2|$
+is the mixing speed. This is the engine behind MCMC sampling and PageRank, both of
+which construct a chain whose stationary distribution is the target.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# A 3-state weather chain (rows: from-state, cols: to-state)
+P = np.array([
+    [0.7, 0.2, 0.1],   # sunny ->
+    [0.3, 0.4, 0.3],   # cloudy ->
+    [0.2, 0.45, 0.35], # rainy ->
+])
+print("rows sum to 1:", np.allclose(P.sum(axis=1), 1.0))
+
+# Evolve a distribution; watch it converge
+pi = np.array([1.0, 0.0, 0.0])     # start certain it's sunny
+for n in [1, 5, 20, 100]:
+    print(f"n={n:>3}:", np.round(pi @ np.linalg.matrix_power(P, n), 5))
+
+# Stationary distribution = left eigenvector of P with eigenvalue 1
+vals, vecs = np.linalg.eig(P.T)        # left eigvecs of P = right eigvecs of P^T
+idx = np.argmin(np.abs(vals - 1.0))
+stat = np.real(vecs[:, idx])
+stat = stat / stat.sum()
+print("stationary (eigen):", np.round(stat, 5))
+print("check pi P == pi:", np.allclose(stat @ P, stat))
+
+# Second-largest |eigenvalue| controls mixing speed
+mags = np.sort(np.abs(vals))[::-1]
+print("|lambda_2| =", round(mags[1], 4), " spectral gap", round(1 - mags[1], 4))
+```
+
+The evolving distribution settles onto the stationary vector, which is exactly the
+left eigenvector of $P$ for eigenvalue 1, and the second eigenvalue magnitude
+reports how fast it got there. The final A2 lesson connects this curvature-of-the-
+log-likelihood idea to geometry: Fisher information.

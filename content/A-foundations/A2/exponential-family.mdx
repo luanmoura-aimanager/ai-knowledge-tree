@@ -1,0 +1,111 @@
+---
+title: "The exponential family and sufficient statistics"
+pillar: A
+subId: A2
+lessonId: exponential-family
+order: 8
+estimatedMinutes: 22
+goal: "Write distributions in exponential-family form and read off sufficient statistics and natural parameters."
+prerequisites: ["common-distributions"]
+---
+
+The Bernoulli, Poisson, Gaussian, and many others look unrelated until you write
+them in one common algebraic form. The **exponential family** is that form. Once a
+distribution is in it, the sufficient statistics, the mean, and the maximum-likelihood
+equations all fall out of the same template, which is why generalized linear models
+and much of classical statistics are built on it.
+
+## The canonical form
+
+A family of distributions is an **exponential family** if its PMF or PDF can be
+written as
+
+$$
+p(x \mid \theta) = h(x)\, \exp\!\big(\eta(\theta)^\top T(x) - A(\theta)\big),
+$$
+
+where:
+
+- $T(x)$ is the **sufficient statistic** (a vector function of the data),
+- $\eta(\theta)$ is the **natural parameter**,
+- $A(\theta)$ is the **log-partition function** (the normalizer),
+- $h(x)$ is the **base measure** (no parameter dependence).
+
+In **canonical form** the parameter is $\eta$ itself:
+$p(x \mid \eta) = h(x)\exp(\eta^\top T(x) - A(\eta))$. The whole parametric family is
+determined by the choice of $T$, $h$, and the resulting $A$.
+
+## Bernoulli in exponential form
+
+Start from $p(x \mid q) = q^x(1-q)^{1-x}$ and take the log inside an exponential:
+
+$$
+p(x \mid q) = \exp\!\big(x\log q + (1-x)\log(1-q)\big) = \exp\!\left(x\log\frac{q}{1-q} + \log(1-q)\right).
+$$
+
+Matching the template: $T(x) = x$, the natural parameter is the **log-odds**
+$\eta = \log\frac{q}{1-q}$, the base measure is $h(x) = 1$, and
+$A(\eta) = -\log(1-q) = \log(1 + e^\eta)$ after inverting $q = \sigma(\eta)$ with the
+logistic $\sigma$. The logistic link of classification is not a convenient guess: it
+is the exponential-family natural parameter of the Bernoulli.
+
+## The log-partition generates moments
+
+Differentiating $A$ with respect to the natural parameter produces the moments of
+the sufficient statistic. From $\int h(x)\exp(\eta^\top T(x) - A(\eta))\,dx = 1$,
+differentiate both sides with respect to $\eta$:
+
+$$
+\nabla_\eta A(\eta) = \mathbb{E}[T(X)], \qquad \nabla^2_\eta A(\eta) = \operatorname{Cov}(T(X)).
+$$
+
+*Sketch.* Differentiating the normalization identity and moving the derivative
+inside the integral brings down a factor $T(x) - \nabla_\eta A$; setting the result
+to zero gives the mean. A second derivative gives the covariance. The log-partition
+is a moment generator built into the structure, and because its Hessian is a
+covariance, $A$ is **convex** in $\eta$, which makes maximum-likelihood fitting a
+convex problem.
+
+## Sufficiency
+
+$T(x)$ is **sufficient** because the data enters the likelihood only through it: two
+datasets with the same $\sum_i T(x_i)$ produce the same likelihood and hence the same
+inference about $\eta$. For $n$ i.i.d. samples, the likelihood depends on the data
+only through $\sum_i T(x_i)$, so that sum (plus $n$) is all you need to store. This
+collapses an arbitrarily large dataset to a fixed-size summary without losing
+information about the parameter.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+N = 2_000_000
+
+# Bernoulli(q): verify A'(eta) = E[T(X)] = E[X] = q
+q = 0.3
+X = (rng.random(N) < q).astype(float)
+eta = np.log(q / (1 - q))                 # natural parameter (log-odds)
+A = np.log(1 + np.exp(eta))               # log-partition
+# A'(eta) = sigmoid(eta) should equal E[X]
+sigmoid = lambda z: 1 / (1 + np.exp(-z))
+print("A'(eta) =", round(sigmoid(eta), 4), "  E[X] =", round(X.mean(), 4))
+
+# A''(eta) = Var(T(X)) = q(1-q)
+print("A''(eta) =", round(sigmoid(eta) * (1 - sigmoid(eta)), 4),
+      "  Var(X) =", round(X.var(), 4))
+
+# Sufficiency: likelihood depends on data only through sum(T(x)) = sum(x)
+def loglik(eta, data):
+    return np.sum(eta * data - np.log(1 + np.exp(eta)))
+data_a = X[:1000]
+data_b = np.zeros(1000); data_b[:int(X[:1000].sum())] = 1.0   # same number of 1s
+print("same sum -> same loglik:",
+      np.isclose(loglik(0.4, data_a), loglik(0.4, data_b)))
+```
+
+The first and second derivatives of the log-partition reproduce the Bernoulli mean
+and variance, and two datasets with the same success count give identical
+likelihoods. The next lesson handles a different transformation question: what
+happens to a distribution when you pass the variable through a function.

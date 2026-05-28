@@ -1,0 +1,140 @@
+---
+title: "Dynamic programming"
+pillar: A
+subId: A5
+lessonId: dynamic-programming
+order: 8
+estimatedMinutes: 22
+goal: "Recognize optimal substructure and overlapping subproblems, and build DP solutions."
+prerequisites: ["divide-and-conquer"]
+---
+
+When divide-and-conquer leads to subproblems that *overlap*, naive recursion
+re-solves the same piece exponentially many times. **Dynamic programming** saves each
+subproblem's answer the first time it is computed and reuses it everywhere it
+appears. The result is often a polynomial-time algorithm where the recursive
+formulation alone is exponential.
+
+## When DP applies
+
+Dynamic programming works when the problem has two properties:
+
+1. **Optimal substructure.** The optimum of the original problem is constructed from
+   the optima of smaller subproblems.
+2. **Overlapping subproblems.** The same subproblems appear many times in the
+   recursive decomposition.
+
+If only property 1 holds (and subproblems are disjoint), divide-and-conquer suffices.
+If only property 2 holds, memoization helps but the algorithm need not give an
+optimum. Both together unlock DP.
+
+## The Fibonacci illustration
+
+The naive recursion $F(n) = F(n-1) + F(n-2)$ takes $\Theta(\phi^n)$ time because it
+re-computes $F(k)$ for every $k$ many times. The recursion tree is huge but contains
+only $n$ distinct subproblems. **Memoizing** them (saving each $F(k)$ the first time
+it is computed and returning the saved value on subsequent calls) collapses the
+runtime to $\Theta(n)$. Same algorithm, exponentially better.
+
+## Top-down vs bottom-up
+
+The same DP can be written two ways:
+
+- **Top-down (memoized recursion).** Write the recurrence directly; check a table at
+  the start of each call and store the result before returning. Natural and
+  declarative; the call stack costs are usually negligible.
+- **Bottom-up (tabulation).** Decide an order in which subproblems can be solved with
+  only already-solved smaller ones; fill a table iteratively. Avoids recursion and
+  usually has smaller constants.
+
+Both have the same asymptotic complexity. Top-down is easier to derive and modify;
+bottom-up is easier to reason about for space optimization and is what gets shipped.
+
+## A typical DP: longest common subsequence
+
+Given two strings $X = x_1 x_2 \dots x_m$ and $Y = y_1 y_2 \dots y_n$, the **longest
+common subsequence (LCS)** is the longest sequence that appears in both as a (not
+necessarily contiguous) subsequence. Let $L(i, j)$ be the LCS length of the prefixes
+$X_{1..i}$ and $Y_{1..j}$. The recurrence:
+
+$$
+L(i, j) = \begin{cases}
+0 & \text{if } i = 0 \text{ or } j = 0, \\
+L(i-1, j-1) + 1 & \text{if } x_i = y_j, \\
+\max\big(L(i-1, j),\ L(i, j-1)\big) & \text{otherwise.}
+\end{cases}
+$$
+
+**Optimal substructure:** the LCS of two prefixes is built from LCSs of one-shorter
+prefixes. **Overlapping subproblems:** $L(i-1, j-1)$ is reused in many cells. The
+table has $mn$ entries each computed in $O(1)$, so the runtime is $\Theta(mn)$. The
+**back-pointer** trick (recording at each cell which case was used) lets you
+reconstruct the actual subsequence, not just its length, in $O(m + n)$.
+
+## Knapsack, edit distance, and beyond
+
+The same template handles:
+
+- **0/1 knapsack.** $K(i, w)$ = best value using items $1..i$ with weight budget $w$.
+- **Edit distance.** $D(i, j)$ = minimum insertions, deletions, and substitutions to
+  turn $X_{1..i}$ into $Y_{1..j}$. The recurrence has the same shape as LCS.
+- **Shortest paths in a DAG.** Topological order + DP gives $\Theta(V + E)$.
+- **Matrix-chain order.** $M(i, j)$ = minimum scalar multiplications for the
+  product $A_i \cdots A_j$.
+
+A DP solution is "find the right table indexing, write the recurrence, prove the
+order in which cells can be filled".
+
+## Check it on arrays
+
+```python
+# Fibonacci: naive vs memoized
+import time, sys
+sys.setrecursionlimit(5_000)
+
+def fib_naive(n):
+    if n < 2: return n
+    return fib_naive(n - 1) + fib_naive(n - 2)
+
+def fib_memo(n, cache={}):
+    if n < 2: return n
+    if n in cache: return cache[n]
+    cache[n] = fib_memo(n - 1) + fib_memo(n - 2)
+    return cache[n]
+
+n = 30
+t = time.perf_counter(); fib_naive(n); t_naive = time.perf_counter() - t
+t = time.perf_counter(); fib_memo(n);  t_memo  = time.perf_counter() - t
+print(f"fib({n}) naive: {t_naive:.4f}s   memo: {t_memo*1e6:.1f} us  speedup ~ {t_naive/max(t_memo,1e-9):.0e}x")
+
+# LCS bottom-up tabulation
+def lcs(X, Y):
+    m, n = len(X), len(Y)
+    L = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if X[i-1] == Y[j-1]:
+                L[i][j] = L[i-1][j-1] + 1
+            else:
+                L[i][j] = max(L[i-1][j], L[i][j-1])
+    # Reconstruct subsequence from back-pointers
+    i, j, out = m, n, []
+    while i > 0 and j > 0:
+        if X[i-1] == Y[j-1]:
+            out.append(X[i-1]); i -= 1; j -= 1
+        elif L[i-1][j] >= L[i][j-1]:
+            i -= 1
+        else:
+            j -= 1
+    return L[m][n], "".join(reversed(out))
+
+length, seq = lcs("AGCAT", "GAC")
+print(f"LCS length={length}, sequence='{seq}'")     # 2, 'GA' or 'AC'
+length, seq = lcs("kitten", "sitting")
+print(f"LCS length={length}, sequence='{seq}'")     # 4, 'ittn'
+```
+
+The memoized Fibonacci is orders of magnitude faster than the exponential naive
+version, and the LCS table both gives the length and reconstructs the sequence. The
+next lesson examines when a *greedy* strategy, no table needed, can also reach an
+optimum.

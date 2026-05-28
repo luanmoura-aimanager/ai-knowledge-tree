@@ -1,0 +1,137 @@
+---
+title: "Joint, marginal, and conditional distributions"
+pillar: A
+subId: A2
+lessonId: joint-distributions
+order: 5
+estimatedMinutes: 22
+goal: "Work with joint distributions, marginalize, condition, and define independence."
+prerequisites: ["random-variables"]
+---
+
+Most interesting questions involve more than one quantity at once: a pixel and its
+neighbor, a feature and a label, today's price and tomorrow's. The **joint
+distribution** describes how two random variables vary together, and from it come
+the two operations at the heart of probabilistic modeling: marginalizing and
+conditioning.
+
+## Joint distribution
+
+For two discrete random variables $X, Y$, the **joint PMF** is
+
+$$
+p_{X,Y}(x, y) = P(X = x,\ Y = y),
+$$
+
+the probability that both take their stated values. It is nonnegative and sums to 1
+over all pairs. The continuous analogue is a **joint PDF** $f_{X,Y}(x, y)$ with
+$\iint f_{X,Y} = 1$, where probabilities come from integrating over a region.
+
+## Marginalization
+
+To recover the distribution of one variable alone, sum (or integrate) the joint over
+the other. The **marginal PMF** of $X$ is
+
+$$
+p_X(x) = \sum_y p_{X,Y}(x, y).
+$$
+
+*Why.* The event $\{X = x\}$ is the disjoint union over all $y$ of the events
+$\{X = x, Y = y\}$. Countable additivity turns that union into the sum above.
+Marginalizing is summing out the variables you do not care about.
+
+## Conditional distribution
+
+The **conditional PMF** of $Y$ given $X = x$ rescales the slice of the joint at
+$X = x$ so it sums to 1:
+
+$$
+p_{Y \mid X}(y \mid x) = \frac{p_{X,Y}(x, y)}{p_X(x)}, \qquad p_X(x) > 0.
+$$
+
+This is the definition $P(A \mid B) = P(A \cap B)/P(B)$ written for random variables.
+Conditioning answers "given that I have observed $X = x$, how is $Y$ distributed?"
+The denominator $p_X(x)$ is exactly the marginal, which is why it is the
+normalizing constant of the slice.
+
+Rearranged, the definition gives the **chain rule** for distributions:
+
+$$
+p_{X,Y}(x, y) = p_X(x)\, p_{Y \mid X}(y \mid x).
+$$
+
+A joint factors into a marginal times a conditional, the basic move behind every
+generative model.
+
+## Independence
+
+$X$ and $Y$ are **independent** if the joint factors into the product of marginals
+for all values:
+
+$$
+p_{X,Y}(x, y) = p_X(x)\, p_Y(y).
+$$
+
+Equivalently, $p_{Y \mid X}(y \mid x) = p_Y(y)$: knowing $X$ tells you nothing about
+$Y$. Independence is a strong assumption, and the factorization is what makes
+likelihoods of independent samples multiply.
+
+## Covariance
+
+The **covariance** measures the linear co-movement of two variables:
+
+$$
+\operatorname{Cov}(X, Y) = \mathbb{E}[(X - \mu_X)(Y - \mu_Y)] = \mathbb{E}[XY] - \mu_X \mu_Y.
+$$
+
+The second form follows by expanding and using linearity, exactly as in the
+single-variable variance formula. Positive covariance means they tend to move
+together; negative means opposite; and **independence implies zero covariance**
+(since then $\mathbb{E}[XY] = \mathbb{E}[X]\mathbb{E}[Y]$). The converse fails: zero
+covariance does not imply independence, because covariance only sees linear
+structure.
+
+The variance of a sum picks up a covariance term:
+
+$$
+\operatorname{Var}(X + Y) = \operatorname{Var}(X) + \operatorname{Var}(Y) + 2\operatorname{Cov}(X, Y).
+$$
+
+For independent variables the cross term vanishes and variances simply add.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(4)
+N = 500_000
+
+# Correlated pair via a shared component
+Z = rng.normal(size=N)
+X = Z + rng.normal(size=N) * 0.5
+Y = Z - rng.normal(size=N) * 0.5
+
+cov = np.mean((X - X.mean()) * (Y - Y.mean()))
+print("Cov(X, Y):", round(cov, 4), "  (positive: shared Z)")
+
+# Var(X + Y) = Var(X) + Var(Y) + 2 Cov(X, Y)
+lhs = (X + Y).var()
+rhs = X.var() + Y.var() + 2 * cov
+print("Var(X+Y):", round(lhs, 4), "  decomposition:", round(rhs, 4))
+
+# Independent pair: covariance ~ 0
+U = rng.normal(size=N)
+V = rng.normal(size=N)
+print("Cov(indep):", round(np.mean((U - U.mean()) * (V - V.mean())), 4))
+
+# Marginal by summing a joint table (discrete)
+joint = np.array([[0.1, 0.2], [0.3, 0.4]])   # P(X=i, Y=j)
+print("P(X) marginal:", joint.sum(axis=1))   # sum over Y
+print("P(Y|X=0):", joint[0] / joint[0].sum())
+```
+
+The covariance is positive for the shared-component pair, the variance-of-sum
+decomposition holds, the independent pair has near-zero covariance, and summing a
+joint table recovers the marginal. The next lesson turns the conditioning formula
+around into Bayes' rule.

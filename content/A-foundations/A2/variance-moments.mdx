@@ -1,0 +1,122 @@
+---
+title: "Variance, moments, and moment generating functions"
+pillar: A
+subId: A2
+lessonId: variance-moments
+order: 4
+estimatedMinutes: 22
+goal: "Define variance and higher moments, and use the MGF to recover them."
+prerequisites: ["expectation"]
+---
+
+The mean says where a distribution sits; it says nothing about how spread out it is.
+Two distributions with the same mean can be a tight spike or a broad smear.
+**Variance** measures that spread, and the **moment generating function** packages
+the mean, variance, and every higher moment into a single function.
+
+## Variance and standard deviation
+
+The **variance** of $X$ is the expected squared deviation from the mean
+$\mu = \mathbb{E}[X]$:
+
+$$
+\operatorname{Var}(X) = \mathbb{E}\!\left[(X - \mu)^2\right].
+$$
+
+Squaring makes deviations positive and penalizes large ones more. The
+**standard deviation** $\sigma = \sqrt{\operatorname{Var}(X)}$ returns to the
+original units.
+
+**Computational formula.** Expand the square and use linearity:
+
+$$
+\operatorname{Var}(X) = \mathbb{E}[X^2 - 2\mu X + \mu^2] = \mathbb{E}[X^2] - 2\mu\,\mathbb{E}[X] + \mu^2 = \mathbb{E}[X^2] - \mu^2.
+$$
+
+So variance is "the mean of the square minus the square of the mean". Both
+$\mathbb{E}[X^2]$ and $\mu$ come from LOTUS.
+
+**Scaling.** For constants $a, b$, since $aX + b$ has mean $a\mu + b$,
+$$
+\operatorname{Var}(aX + b) = \mathbb{E}[(aX + b - a\mu - b)^2] = a^2\,\mathbb{E}[(X-\mu)^2] = a^2 \operatorname{Var}(X).
+$$
+Shifting by $b$ does not change spread; scaling by $a$ scales the variance by $a^2$.
+
+## Moments
+
+The **$k$-th moment** of $X$ is $\mathbb{E}[X^k]$, and the **$k$-th central moment**
+is $\mathbb{E}[(X - \mu)^k]$. The first moment is the mean; the second central
+moment is the variance. The third and fourth central moments, suitably normalized,
+give **skewness** (asymmetry) and **kurtosis** (tail heaviness). The moments,
+taken together, often pin down the entire distribution.
+
+## The moment generating function
+
+The **moment generating function (MGF)** of $X$ is
+
+$$
+M_X(t) = \mathbb{E}\!\left[e^{tX}\right],
+$$
+
+defined for $t$ in a neighborhood of 0 where the expectation is finite. The name
+comes from the way it generates moments by differentiation. Expand the exponential
+as a power series and apply linearity term by term:
+
+$$
+M_X(t) = \mathbb{E}\!\left[\sum_{k=0}^\infty \frac{(tX)^k}{k!}\right] = \sum_{k=0}^\infty \frac{t^k}{k!}\,\mathbb{E}[X^k].
+$$
+
+The coefficient of $t^k/k!$ is the $k$-th moment. Differentiating $k$ times and
+setting $t = 0$ kills every other term:
+
+$$
+M_X^{(k)}(0) = \mathbb{E}[X^k].
+$$
+
+So $M_X'(0) = \mathbb{E}[X]$ and $M_X''(0) = \mathbb{E}[X^2]$, from which
+$\operatorname{Var}(X) = M_X''(0) - M_X'(0)^2$.
+
+## Two key uses
+
+**Uniqueness.** If two random variables have the same MGF on an interval around 0,
+they have the same distribution. The MGF is a fingerprint.
+
+**Sums of independent variables.** If $X$ and $Y$ are independent, then
+$$
+M_{X+Y}(t) = \mathbb{E}[e^{t(X+Y)}] = \mathbb{E}[e^{tX}]\,\mathbb{E}[e^{tY}] = M_X(t)\,M_Y(t),
+$$
+where the middle step uses independence to split the expectation of the product.
+Convolving distributions becomes multiplying their MGFs, the cleanest route to
+proving, for example, that a sum of independent Gaussians is Gaussian.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+N = 1_000_000
+
+# Exponential(rate=2): mean 1/2, variance 1/4, MGF M(t) = 2/(2 - t) for t < 2
+X = rng.exponential(scale=0.5, size=N)   # numpy uses scale = 1/rate
+print("mean:", X.mean(), "  exact 0.5")
+print("Var (E[X^2]-mu^2):", (X**2).mean() - X.mean()**2, "  exact 0.25")
+print("Var (direct):", X.var(), "  same")
+
+# MGF at t = 0.5 by sampling vs closed form 2/(2 - t)
+t = 0.5
+print("MGF(0.5) sampled:", np.mean(np.exp(t * X)), "  exact", 2 / (2 - t))
+
+# Moments from finite-difference derivatives of the empirical MGF
+def Mhat(t):
+    return np.mean(np.exp(t * X))
+h = 1e-3
+m1 = (Mhat(h) - Mhat(-h)) / (2 * h)               # ~ E[X]
+m2 = (Mhat(h) - 2 * Mhat(0) + Mhat(-h)) / h**2    # ~ E[X^2]
+print("M'(0) ~ E[X]:", m1)
+print("M''(0) ~ E[X^2]:", m2, "  variance:", m2 - m1**2)
+```
+
+The two variance formulas agree, the sampled MGF matches its closed form, and
+numerical derivatives of the MGF recover the first two moments. With spread defined
+for one variable, the next lesson handles several at once: joint distributions.

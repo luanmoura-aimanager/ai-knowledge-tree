@@ -1,0 +1,133 @@
+---
+title: "Random variables and distributions"
+pillar: A
+subId: A2
+lessonId: random-variables
+order: 2
+estimatedMinutes: 20
+goal: "Define random variables, their CDF, and the PMF/PDF, and tell discrete from continuous."
+prerequisites: ["probability-spaces"]
+---
+
+A probability space tells you which outcomes are possible and how likely each event
+is, but outcomes are often unwieldy objects (a card, a coin face, a point in space).
+A **random variable** attaches a number to each outcome, turning probability into
+something we can average, plot, and compute with.
+
+## Definition
+
+A **random variable** is a function $X: \Omega \to \mathbb{R}$ that assigns a real
+number to each outcome. For a die, $X(\omega) = \omega$ is the face value; for two
+coins, $X$ could count the number of heads.
+
+The probability of $X$ landing in a set $S \subseteq \mathbb{R}$ is the probability
+of the outcomes that map into $S$:
+
+$$
+P(X \in S) = P(\{\omega : X(\omega) \in S\}).
+$$
+
+The right-hand side is a probability of an event in the original space; the
+left-hand side is the notation we actually use. The distribution of $X$ is the
+collection of these probabilities over all $S$.
+
+## The cumulative distribution function
+
+The **cumulative distribution function (CDF)** of $X$ is
+
+$$
+F_X(x) = P(X \le x).
+$$
+
+It works for any random variable, discrete or continuous. Three properties follow
+directly from the probability axioms:
+
+1. **Monotone nondecreasing:** if $x_1 \le x_2$ then $\{X \le x_1\} \subseteq \{X \le x_2\}$,
+   so $F_X(x_1) \le F_X(x_2)$ by monotonicity of $P$.
+2. **Limits:** $F_X(x) \to 0$ as $x \to -\infty$ and $F_X(x) \to 1$ as $x \to +\infty$.
+3. **Right-continuous.**
+
+Any function with these properties is the CDF of some random variable.
+
+## Discrete random variables and the PMF
+
+$X$ is **discrete** if it takes values in a finite or countable set. Its
+distribution is captured by the **probability mass function (PMF)**
+
+$$
+p_X(x) = P(X = x), \qquad \sum_x p_X(x) = 1.
+$$
+
+The CDF is a sum of masses: $F_X(x) = \sum_{x_i \le x} p_X(x_i)$, a staircase that
+jumps by $p_X(x_i)$ at each value $x_i$.
+
+## Continuous random variables and the PDF
+
+$X$ is **continuous** if its CDF can be written as an integral
+
+$$
+F_X(x) = \int_{-\infty}^x f_X(t)\, dt,
+$$
+
+for some nonnegative **probability density function (PDF)** $f_X$. By the
+fundamental theorem of calculus, $f_X(x) = F_X'(x)$ where the derivative exists.
+
+A density is not a probability: $f_X(x)$ can exceed 1. Probabilities come from
+integrating it over an interval,
+
+$$
+P(a \le X \le b) = \int_a^b f_X(x)\, dx,
+$$
+
+and a single point has probability zero, $P(X = a) = 0$. The normalization is
+$\int_{-\infty}^\infty f_X(x)\, dx = 1$.
+
+## The density as a limit
+
+The interpretation of $f_X$ is a probability per unit length: for a small width
+$\varepsilon$,
+
+$$
+P\!\left(x \le X \le x + \varepsilon\right) = \int_x^{x+\varepsilon} f_X(t)\,dt \approx f_X(x)\,\varepsilon.
+$$
+
+So $f_X(x)$ measures how concentrated the probability is near $x$, just as mass
+density measures how concentrated matter is near a point.
+
+## Check it on arrays
+
+Sampling lets us reconstruct both the PMF (by counting) and the PDF (by a
+normalized histogram), and verify that the empirical CDF tracks the theoretical one.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+N = 200_000
+
+# Discrete: number of heads in 3 fair coin flips -> values 0..3
+flips = rng.integers(0, 2, size=(N, 3))
+X = flips.sum(axis=1)
+values, counts = np.unique(X, return_counts=True)
+pmf = counts / N
+# Exact PMF: C(3,k)/8
+from math import comb
+exact = np.array([comb(3, k) for k in values]) / 8
+for v, p, e in zip(values, pmf, exact):
+    print(f"P(X={v}) = {p:.4f}   exact {e:.4f}")
+print("PMF sums to:", pmf.sum())
+
+# Continuous: standard normal, compare histogram to the PDF
+Z = rng.normal(size=N)
+hist, edges = np.histogram(Z, bins=50, density=True)   # density=True -> integrates to 1
+centers = 0.5 * (edges[:-1] + edges[1:])
+pdf = np.exp(-centers**2 / 2) / np.sqrt(2 * np.pi)
+print("max |hist - pdf|:", np.max(np.abs(hist - pdf)))   # small
+
+# Empirical CDF at 0 should be ~0.5
+print("F_Z(0) empirical:", (Z <= 0).mean(), "  theoretical 0.5")
+```
+
+Counting recovers the binomial PMF, the normalized histogram matches the Gaussian
+density, and the empirical CDF lands on the theoretical value. The next lesson
+collapses a whole distribution into a single representative number: its expectation.

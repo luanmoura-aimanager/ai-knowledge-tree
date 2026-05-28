@@ -1,0 +1,126 @@
+---
+title: "Stochastic gradient descent"
+pillar: A
+subId: A3
+lessonId: sgd
+order: 6
+estimatedMinutes: 22
+goal: "Replace the full gradient with a stochastic estimate and understand the noise versus step-size tradeoff."
+prerequisites: ["gradient-descent"]
+---
+
+Machine-learning objectives are averages over millions of examples, and computing the
+full gradient every step is prohibitive. **Stochastic gradient descent** replaces it
+with the gradient of a small random batch: a noisy but unbiased and cheap estimate.
+The noise changes the convergence story, and managing it through the step-size
+schedule is the central practical skill.
+
+## The finite-sum objective
+
+Training minimizes an average loss over $n$ examples,
+
+$$
+f(x) = \frac{1}{n}\sum_{i=1}^n f_i(x),
+$$
+
+where $f_i$ is the loss on example $i$ and $x$ are the parameters. The full gradient
+$\nabla f(x) = \frac{1}{n}\sum_i \nabla f_i(x)$ costs a pass over all $n$ examples.
+
+## The stochastic update
+
+**SGD** samples an index $i_t$ (or a small minibatch) uniformly at random and steps
+along that single gradient:
+
+$$
+x_{t+1} = x_t - \eta_t\, \nabla f_{i_t}(x_t).
+$$
+
+The key property is **unbiasedness**: averaging over the random draw,
+
+$$
+\mathbb{E}_{i_t}[\nabla f_{i_t}(x_t)] = \frac{1}{n}\sum_{i=1}^n \nabla f_i(x_t) = \nabla f(x_t).
+$$
+
+The stochastic gradient points in the right direction on average, but any single step
+is corrupted by **variance** $\sigma^2 = \mathbb{E}\lVert \nabla f_{i_t}(x) - \nabla f(x)\rVert^2$.
+
+## The noise floor with a constant step size
+
+The variance changes convergence fundamentally. For $\mu$-strongly convex, $L$-smooth
+$f$ with a constant step size $\eta$, the expected suboptimality satisfies a recursion
+of the form
+
+$$
+\mathbb{E}[\Delta_{t+1}] \le (1 - \eta\mu)\,\mathbb{E}[\Delta_t] + \frac{\eta^2 L \sigma^2}{2}.
+$$
+
+The first term contracts as in deterministic GD; the second injects noise every step.
+At the fixed point, contraction balances injection and the iterates hover at a
+**noise floor**:
+
+$$
+\lim_{t \to \infty}\mathbb{E}[\Delta_t] \approx \frac{\eta L \sigma^2}{2\mu}.
+$$
+
+Constant-step SGD converges fast to a neighborhood of the optimum, then bounces around
+it. The floor height is proportional to $\eta$: a smaller step gives a lower floor but
+slower approach.
+
+## Decaying step sizes
+
+To reach the exact optimum, the step size must shrink so the noise term vanishes. The
+**Robbins-Monro** conditions are
+
+$$
+\sum_t \eta_t = \infty \quad (\text{steps large enough to travel any distance}), \qquad \sum_t \eta_t^2 < \infty \quad (\text{noise sums to finite}).
+$$
+
+A schedule like $\eta_t = \eta_0 / t$ satisfies both and gives $\mathbb{E}[\Delta_t] = O(1/t)$.
+In practice, step decay or cosine schedules implement the same idea: large steps early
+to move fast, small steps late to settle.
+
+## Why minibatches
+
+A minibatch of size $B$ averages $B$ independent gradient estimates, cutting the
+variance to $\sigma^2 / B$. This lowers the noise floor and lets a larger step size be
+used, while exploiting vectorized hardware. The minibatch size trades gradient quality
+against per-step cost.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Least squares as a finite sum: f_i(x) = 0.5 (a_i^T x - b_i)^2
+n, d = 2000, 10
+A = rng.normal(size=(n, d))
+x_true = rng.normal(size=d)
+b = A @ x_true + 0.1 * rng.normal(size=n)
+x_star = np.linalg.lstsq(A, b, rcond=None)[0]
+
+def full_loss(x):
+    return 0.5 * np.mean((A @ x - b)**2)
+
+def sgd(eta, batch=1, steps=20_000, decay=False):
+    x = np.zeros(d)
+    for t in range(steps):
+        idx = rng.integers(0, n, size=batch)
+        g = A[idx].T @ (A[idx] @ x - b[idx]) / batch
+        lr = eta / (1 + 0.001 * t) if decay else eta
+        x = x - lr * g
+    return full_loss(x) - full_loss(x_star)
+
+# Constant step: lower eta -> lower noise floor
+print("const eta=0.05, B=1 :", round(sgd(0.05), 6))
+print("const eta=0.01, B=1 :", round(sgd(0.01), 6))
+# Bigger batch lowers the floor at the same step size
+print("const eta=0.05, B=32:", round(sgd(0.05, batch=32), 6))
+# Decaying step reaches lower suboptimality
+print("decaying eta0=0.05  :", round(sgd(0.05, decay=True), 6))
+```
+
+A smaller constant step and a larger batch both lower the noise floor, and the
+decaying schedule drives suboptimality further down. The next lesson speeds up the
+deterministic part with momentum.

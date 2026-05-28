@@ -1,0 +1,114 @@
+---
+title: "Expectation and the law of the unconscious statistician"
+pillar: A
+subId: A2
+lessonId: expectation
+order: 3
+estimatedMinutes: 20
+goal: "Define expectation, prove linearity, and compute E[g(X)] without first finding the distribution of g(X)."
+prerequisites: ["random-variables"]
+---
+
+A distribution carries a lot of detail. Often the single most useful summary is its
+center of mass: the value the random variable takes on average over many trials.
+That is the **expectation**, and its single most useful property, linearity, holds
+with no independence assumptions at all.
+
+## Definition
+
+The **expectation** (or mean) of a random variable $X$ is a probability-weighted
+average of its values. For a discrete $X$ with PMF $p_X$,
+
+$$
+\mathbb{E}[X] = \sum_x x\, p_X(x),
+$$
+
+and for a continuous $X$ with PDF $f_X$,
+
+$$
+\mathbb{E}[X] = \int_{-\infty}^\infty x\, f_X(x)\, dx,
+$$
+
+whenever the sum or integral converges absolutely. The expectation is a single
+number, often written $\mu$. It is the balance point of the distribution: the place
+where the PMF or PDF would balance on a knife edge.
+
+## The law of the unconscious statistician
+
+To compute the expectation of $g(X)$ for some function $g$, one route is to find the
+distribution of the new random variable $Y = g(X)$, then average. The **law of the
+unconscious statistician (LOTUS)** says you can skip that step and weight $g(x)$ by
+the distribution of $X$ directly:
+
+$$
+\mathbb{E}[g(X)] = \sum_x g(x)\, p_X(x) \qquad \text{or} \qquad \int_{-\infty}^\infty g(x)\, f_X(x)\, dx.
+$$
+
+*Why it holds (discrete case).* Group the outcomes by the value $y$ that $g$ takes:
+$$
+\mathbb{E}[g(X)] = \sum_y y\, P(g(X) = y) = \sum_y y \sum_{x : g(x) = y} p_X(x) = \sum_y \sum_{x : g(x) = y} g(x)\, p_X(x) = \sum_x g(x)\, p_X(x).
+$$
+The inner step replaces $y$ by $g(x)$, valid because the sum only includes $x$ with
+$g(x) = y$. Summing over the groups recovers a sum over all $x$.
+
+## Linearity of expectation
+
+For any random variables $X, Y$ and constants $a, b$,
+
+$$
+\mathbb{E}[aX + bY] = a\,\mathbb{E}[X] + b\,\mathbb{E}[Y].
+$$
+
+*Derivation (discrete, joint PMF $p$).* By LOTUS applied to the function
+$g(x, y) = ax + by$,
+$$
+\mathbb{E}[aX + bY] = \sum_{x, y} (ax + by)\, p(x, y) = a\sum_{x,y} x\, p(x,y) + b\sum_{x,y} y\, p(x,y).
+$$
+The first double sum marginalizes out $y$ to give $\sum_x x\, p_X(x) = \mathbb{E}[X]$;
+the second gives $\mathbb{E}[Y]$. So the expectation of a sum is the sum of
+expectations, **with no independence assumption**. This is what makes linearity so
+powerful: it applies even to highly dependent variables.
+
+## A worked use of linearity
+
+How many heads in $n$ flips of a coin with $P(\text{head}) = q$? Let $X_i$ be the
+indicator that flip $i$ is heads, so $\mathbb{E}[X_i] = q$. The total is
+$X = \sum_{i=1}^n X_i$, and by linearity
+
+$$
+\mathbb{E}[X] = \sum_{i=1}^n \mathbb{E}[X_i] = nq,
+$$
+
+with no need to touch the binomial PMF. **Indicator random variables** plus
+linearity solve a large fraction of counting-expectation problems.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+N = 500_000
+
+# E[X] for a die
+X = rng.integers(1, 7, size=N)
+print("E[die]:", X.mean(), "  exact 3.5")
+
+# LOTUS: E[X^2] computed by weighting g(x)=x^2, no distribution of X^2 needed
+print("E[X^2]:", (X**2).mean(), "  exact", sum(x**2 for x in range(1, 7)) / 6)
+
+# Linearity without independence: Y = X, so X + Y = 2X are perfectly dependent
+Y = X
+print("E[X + Y]:", (X + Y).mean(), "  E[X]+E[Y]:", X.mean() + Y.mean())
+
+# Indicators + linearity: heads in n=10 flips, q=0.3
+q, n = 0.3, 10
+flips = (rng.random(size=(N, n)) < q)
+total = flips.sum(axis=1)
+print("E[heads]:", total.mean(), "  n*q:", n * q)
+```
+
+The die mean lands on 3.5, LOTUS gives the right second moment, linearity holds even
+for the perfectly dependent pair, and the indicator sum averages to $nq$. That
+second moment is the raw material for the next lesson, which measures spread:
+variance.

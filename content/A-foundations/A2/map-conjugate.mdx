@@ -1,0 +1,111 @@
+---
+title: "MAP estimation and conjugate priors"
+pillar: A
+subId: A2
+lessonId: map-conjugate
+order: 13
+estimatedMinutes: 22
+goal: "Add a prior, compute the posterior, and use conjugacy to keep it in closed form."
+prerequisites: ["bayes-rule", "mle"]
+---
+
+Maximum likelihood trusts the data alone. When data are scarce or you hold prior
+belief about a parameter, Bayesian inference combines both: it treats the parameter
+as random, places a prior on it, and updates to a posterior. **Conjugate priors**
+keep that update in closed form, and **MAP estimation** reads off its peak.
+
+## The posterior over parameters
+
+Treat the parameter $\theta$ as a random variable with prior density $p(\theta)$.
+Bayes' rule gives the **posterior** after observing data $\mathcal{D}$:
+
+$$
+p(\theta \mid \mathcal{D}) = \frac{p(\mathcal{D} \mid \theta)\, p(\theta)}{p(\mathcal{D})} \propto \underbrace{p(\mathcal{D} \mid \theta)}_{\text{likelihood}}\,\underbrace{p(\theta)}_{\text{prior}}.
+$$
+
+The evidence $p(\mathcal{D}) = \int p(\mathcal{D} \mid \theta)p(\theta)\,d\theta$ is a
+constant in $\theta$, so for finding the shape (and the peak) of the posterior it can
+be ignored: posterior $\propto$ likelihood $\times$ prior.
+
+## MAP estimation
+
+The **maximum a posteriori (MAP)** estimate is the posterior mode:
+
+$$
+\hat\theta_{\text{MAP}} = \arg\max_\theta\; \big[\log p(\mathcal{D} \mid \theta) + \log p(\theta)\big].
+$$
+
+It is maximum likelihood plus an additive prior term. With a Gaussian prior on
+weights, $\log p(\theta) = -\frac{1}{2\tau^2}\lVert\theta\rVert^2 + \text{const}$, and
+MAP becomes likelihood maximization with an **L2 (ridge) penalty**. A Laplace prior
+gives an **L1 penalty**. Regularization is a prior in disguise.
+
+As data accumulate, the likelihood term grows with $n$ while the prior term stays
+fixed, so the MAP estimate converges to the MLE: the prior washes out.
+
+## Conjugate priors
+
+A prior is **conjugate** to a likelihood if the posterior belongs to the same family
+as the prior. Then updating only changes the family's parameters, with no integration
+required.
+
+**Beta-Bernoulli.** For $n$ Bernoulli($q$) trials with $k$ successes, the likelihood
+is $q^k(1-q)^{n-k}$. The conjugate prior is the **Beta** distribution
+$p(q) \propto q^{\alpha-1}(1-q)^{\beta-1}$. Multiplying,
+
+$$
+p(q \mid \mathcal{D}) \propto q^{k}(1-q)^{n-k}\, q^{\alpha-1}(1-q)^{\beta-1} = q^{(\alpha + k) - 1}(1-q)^{(\beta + n - k) - 1},
+$$
+
+which is $\text{Beta}(\alpha + k,\ \beta + n - k)$. The update just adds successes to
+$\alpha$ and failures to $\beta$. The prior parameters act as **pseudo-counts**:
+prior belief stated as "as if I had already seen $\alpha$ successes and $\beta$
+failures".
+
+The posterior mean and mode are
+
+$$
+\mathbb{E}[q \mid \mathcal{D}] = \frac{\alpha + k}{\alpha + \beta + n}, \qquad \hat q_{\text{MAP}} = \frac{\alpha + k - 1}{\alpha + \beta + n - 2}.
+$$
+
+The MAP mode reduces to the MLE $k/n$ when $\alpha = \beta = 1$ (a flat prior).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(12)
+
+# True coin bias, small sample so the prior matters
+true_q = 0.7
+n = 20
+data = (rng.random(n) < true_q).astype(int)
+k = data.sum()
+print(f"observed {k} heads in {n} flips; MLE = {k/n:.3f}")
+
+# Beta(2,2) prior (mild belief near 0.5), conjugate update
+alpha0, beta0 = 2.0, 2.0
+alpha_post, beta_post = alpha0 + k, beta0 + (n - k)
+post_mean = alpha_post / (alpha_post + beta_post)
+post_mode = (alpha_post - 1) / (alpha_post + beta_post - 2)
+print(f"posterior Beta({alpha_post}, {beta_post})")
+print(f"posterior mean {post_mean:.3f}, MAP mode {post_mode:.3f}")
+
+# Verify conjugacy numerically: posterior ∝ likelihood * prior on a grid
+q = np.linspace(1e-3, 1 - 1e-3, 5000)
+dq = q[1] - q[0]
+prior = q**(alpha0 - 1) * (1 - q)**(beta0 - 1)
+like = q**k * (1 - q)**(n - k)
+post = prior * like
+post /= post.sum() * dq                          # normalize (Riemann sum)
+beta_pdf = q**(alpha_post - 1) * (1 - q)**(beta_post - 1)
+beta_pdf /= beta_pdf.sum() * dq
+print("max |grid posterior - Beta pdf|:", round(np.max(np.abs(post - beta_pdf)), 6))
+print("grid MAP:", round(q[np.argmax(post)], 3))
+```
+
+The conjugate update gives a Beta posterior whose density matches the
+likelihood-times-prior computed on a grid, and the MAP mode pulls the estimate toward
+the prior on this small sample. The next lesson shifts from estimating distributions
+to quantifying their information content, starting with entropy.

@@ -1,0 +1,109 @@
+---
+title: "Momentum and Nesterov acceleration"
+pillar: A
+subId: A3
+lessonId: momentum
+order: 7
+estimatedMinutes: 22
+goal: "Add momentum to gradient descent and see why acceleration improves the convergence rate."
+prerequisites: ["convergence-rates"]
+---
+
+Gradient descent on an ill-conditioned problem zig-zags: it bounces across the steep
+directions while crawling along the flat ones. **Momentum** averages successive
+gradients so the consistent flat-direction signal accumulates while the oscillating
+steep-direction noise cancels. Nesterov's variant tunes this into a provably faster
+rate.
+
+## Heavy-ball momentum
+
+**Momentum** (Polyak's heavy ball) maintains a velocity vector $v$ that accumulates
+past gradients with a decay $\beta \in [0, 1)$:
+
+$$
+v_{t+1} = \beta v_t + \nabla f(x_t), \qquad x_{t+1} = x_t - \eta\, v_{t+1}.
+$$
+
+The velocity is an exponentially weighted sum of gradients:
+$v_{t+1} = \sum_{k=0}^{t}\beta^{t-k}\nabla f(x_k)$. A heavy ball rolling downhill keeps
+moving in a consistent direction and is not deflected by every local wiggle, which is
+the physical picture $\beta$ controls.
+
+## Why it helps: the zig-zag cancels
+
+On a quadratic with a steep direction (curvature $L$) and a flat direction (curvature
+$\mu$), plain gradient descent overshoots the steep axis and reverses sign each step,
+producing oscillation, while inching along the flat axis. Momentum averages those
+sign-flipping steep-direction gradients toward zero, while the flat-direction
+gradients all point the same way and build up. The effective step grows along the
+direction that matters and shrinks along the direction that oscillates.
+
+## Nesterov accelerated gradient
+
+**Nesterov's** method evaluates the gradient at a *look-ahead* point, after the
+momentum step has been tentatively applied:
+
+$$
+v_{t+1} = \beta v_t + \nabla f(x_t - \eta\beta v_t), \qquad x_{t+1} = x_t - \eta\, v_{t+1}.
+$$
+
+Computing the gradient where momentum is about to land, rather than where it currently
+sits, lets the method correct an overshoot before committing to it. This look-ahead is
+what turns heuristic speedup into a provable one.
+
+## The accelerated rate
+
+For $\mu$-strongly convex, $L$-smooth $f$ with condition number $\kappa = L/\mu$,
+gradient descent needs $O(\kappa\log\frac{1}{\varepsilon})$ iterations. Nesterov's
+method, with $\beta = \frac{\sqrt\kappa - 1}{\sqrt\kappa + 1}$, achieves
+
+$$
+f(x_t) - f(x^\star) \le O\!\left(\Big(1 - \frac{1}{\sqrt\kappa}\Big)^t\right),
+$$
+
+needing only $O(\sqrt\kappa\log\frac{1}{\varepsilon})$ iterations. The dependence on
+the condition number drops from $\kappa$ to $\sqrt\kappa$, a large gain on
+ill-conditioned problems. This $\sqrt\kappa$ rate is **optimal** among methods that
+only use gradients: no first-order method can do better in the worst case.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Ill-conditioned quadratic: f(x) = 0.5 x^T A x, A = diag(mu, L)
+mu, L = 1.0, 100.0
+A = np.diag([mu, L])
+grad = lambda x: A @ x
+f = lambda x: 0.5 * x @ A @ x                    # f(x*) = 0
+eta = 1.0 / L
+kappa = L / mu
+
+def gd(steps):
+    x = np.array([1.0, 1.0]); gaps = []
+    for _ in range(steps):
+        gaps.append(f(x)); x = x - eta * grad(x)
+    return np.array(gaps)
+
+def nesterov(steps):
+    beta = (np.sqrt(kappa) - 1) / (np.sqrt(kappa) + 1)
+    x = np.array([1.0, 1.0]); v = np.zeros(2); gaps = []
+    for _ in range(steps):
+        gaps.append(f(x))
+        v = beta * v + grad(x - eta * beta * v)
+        x = x - eta * v
+    return np.array(gaps)
+
+g_gd, g_nag = gd(400), nesterov(400)
+# Iterations to reach gap < 1e-6
+def first_below(g, tol=1e-6):
+    idx = np.where(g < tol)[0]
+    return idx[0] if len(idx) else len(g)
+print("GD steps to 1e-6:      ", first_below(g_gd))
+print("Nesterov steps to 1e-6:", first_below(g_nag))
+print("sqrt(kappa) =", round(np.sqrt(kappa), 1), " kappa =", kappa)
+```
+
+Nesterov reaches the tolerance in far fewer steps than plain gradient descent, with
+the gap closing on the $\sqrt\kappa$ timescale rather than $\kappa$. The next lesson
+makes the step size adapt per coordinate, the idea behind Adam.

@@ -1,0 +1,127 @@
+---
+title: "Bayesian optimization"
+pillar: A
+subId: A3
+lessonId: bayesian-optimization
+order: 15
+estimatedMinutes: 24
+goal: "Optimize an expensive black-box function with a Gaussian-process surrogate and an acquisition function."
+prerequisites: ["A2/map-conjugate"]
+---
+
+Some objectives have no gradient and cost a fortune to evaluate: a hyperparameter
+setting that takes hours to train, a physical experiment, a chemical assay.
+**Bayesian optimization** spends computation to be sample-efficient. It fits a
+probabilistic model of the objective, then uses that model's uncertainty to choose
+the single most informative point to try next.
+
+## The setting
+
+Minimize (or maximize) $f(x)$ where each evaluation is expensive and no derivatives
+are available. The budget is a few dozen evaluations, not millions, so the goal is to
+find a good $x$ in as few queries as possible. Two ingredients make this work: a
+**surrogate model** that predicts $f$ with calibrated uncertainty, and an
+**acquisition function** that turns those predictions into the next query.
+
+## The Gaussian-process surrogate
+
+A **Gaussian process (GP)** models the unknown function as a distribution over
+functions, specified by a covariance **kernel** $k(x, x')$ that says how correlated
+the values at two inputs are. The common choice is the **RBF kernel**
+
+$$
+k(x, x') = \sigma_f^2 \exp\!\left(-\frac{\lVert x - x'\rVert^2}{2\ell^2}\right),
+$$
+
+which makes nearby inputs strongly correlated and distant ones independent, with
+length scale $\ell$. Given observations $(X, \mathbf{y})$, the GP posterior at a new
+point $x_\star$ is Gaussian with closed-form mean and variance:
+
+$$
+\mu(x_\star) = k_\star^\top (K + \sigma_n^2 I)^{-1}\mathbf{y}, \qquad
+s^2(x_\star) = k(x_\star, x_\star) - k_\star^\top (K + \sigma_n^2 I)^{-1} k_\star,
+$$
+
+where $K_{ij} = k(x_i, x_j)$, $(k_\star)_i = k(x_i, x_\star)$, and $\sigma_n^2$ is
+observation noise. The mean is the prediction; the variance grows away from observed
+points, encoding "I have not looked here yet". This is the conjugate Gaussian update
+of the MAP lesson, lifted to functions.
+
+## The acquisition function
+
+The acquisition function scores each candidate by how worthwhile it is to evaluate,
+balancing **exploitation** (low predicted mean) against **exploration** (high
+variance). **Expected improvement (EI)**, for minimizing with current best
+$f^\star = \min y_i$, is the expected amount by which a query at $x$ would beat the
+best so far:
+
+$$
+\text{EI}(x) = \mathbb{E}\big[\max(f^\star - f(x),\ 0)\big] = (f^\star - \mu)\,\Phi(z) + s\,\phi(z), \quad z = \frac{f^\star - \mu}{s},
+$$
+
+with $\Phi, \phi$ the standard normal CDF and PDF. EI is large where the mean is low
+(promising) or the variance is high (uncertain), and it is zero where the model is
+confident the value is worse than $f^\star$. The next query is $\arg\max_x \text{EI}(x)$.
+
+## The loop
+
+1. Fit the GP to all evaluations so far.
+2. Maximize the acquisition function to pick the next $x$.
+3. Evaluate the true (expensive) $f$ there, add the point, repeat.
+
+Each step uses cheap GP and acquisition computation to decide where to spend one
+expensive evaluation, which is why it dominates random or grid search for
+hyperparameter tuning.
+
+## Check it on arrays
+
+```python
+import numpy as np
+import math
+
+rng = np.random.default_rng(0)
+
+# Expensive black box (here cheap, for demonstration): minimize on [0, 10].
+f = lambda x: np.sin(x) + 0.3 * (x - 4)**2 / 4
+
+def rbf(a, b, ell=1.0, sf=1.0):
+    d2 = (a[:, None] - b[None, :])**2
+    return sf**2 * np.exp(-d2 / (2 * ell**2))
+
+_erf = np.vectorize(math.erf)
+normal_cdf = lambda z: 0.5 * (1 + _erf(np.asarray(z, float) / np.sqrt(2)))
+normal_pdf = lambda z: np.exp(-z**2 / 2) / np.sqrt(2 * np.pi)
+
+cand = np.linspace(0, 10, 400)              # candidate grid for the acquisition max
+X = np.array([1.0, 9.0])                    # two initial evaluations
+y = f(X)
+noise = 1e-2                                # nugget keeps the kernel matrix well-conditioned
+
+for step in range(12):
+    K = rbf(X, X) + noise * np.eye(len(X))
+    alpha = np.linalg.solve(K, y)           # solve, never form the inverse
+    ks = rbf(X, cand)
+    mu = ks.T @ alpha
+    var = np.maximum(rbf(cand, cand).diagonal() - np.sum(ks * np.linalg.solve(K, ks), axis=0), 1e-12)
+    s = np.sqrt(var)
+    f_best = y.min()
+    z = (f_best - mu) / s
+    ei = (f_best - mu) * normal_cdf(z) + s * normal_pdf(z)
+    idx = np.argmax(ei)
+    X = np.append(X, cand[idx])
+    y = np.append(y, f(cand[idx]))
+    cand = np.delete(cand, idx)             # do not re-query the same point
+
+best = X[np.argmin(y)]
+# True minimum by dense search for reference
+dense = np.linspace(0, 10, 100_000)
+print("BO best x:", round(best, 3), " f:", round(f(best), 4))
+print("true  best x:", round(dense[np.argmin(f(dense))], 3),
+      " f:", round(f(dense).min(), 4))
+print("evaluations used:", len(X))
+```
+
+Bayesian optimization locates the minimum to within grid resolution using only about
+a dozen evaluations, guided by expected improvement. This closes the A3 optimization
+track; the next subsection, A4, examines the finite-precision arithmetic these
+algorithms actually run in.

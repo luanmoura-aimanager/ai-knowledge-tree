@@ -1,0 +1,114 @@
+---
+title: "Gradient descent"
+pillar: A
+subId: A3
+lessonId: gradient-descent
+order: 4
+estimatedMinutes: 22
+goal: "Derive gradient descent from a local model and analyze its descent guarantee."
+prerequisites: ["optimization-landscape"]
+---
+
+The negative gradient is the steepest-descent direction; gradient descent simply
+takes repeated steps along it. It is the algorithm under nearly every model trained
+today. This lesson derives the update from a local quadratic model, explains the
+step-size tradeoff, and proves it makes progress on smooth functions.
+
+## The update
+
+**Gradient descent** generates iterates by
+
+$$
+x_{t+1} = x_t - \eta\, \nabla f(x_t),
+$$
+
+where $\eta > 0$ is the **step size** (learning rate). Each step moves opposite the
+gradient, downhill, by an amount scaled by $\eta$.
+
+## Derivation from a local model
+
+The update is the minimizer of a local model of $f$. Approximate $f$ near $x_t$ by
+its first-order Taylor expansion plus a quadratic **proximity penalty** that
+distrusts large steps:
+
+$$
+\hat f(x) = f(x_t) + \nabla f(x_t)^\top (x - x_t) + \frac{1}{2\eta}\lVert x - x_t\rVert^2.
+$$
+
+Setting $\nabla \hat f(x) = \nabla f(x_t) + \frac{1}{\eta}(x - x_t) = 0$ gives
+$x = x_t - \eta\,\nabla f(x_t)$, the gradient step. The step size $\eta$ is the
+inverse weight on the trust penalty: small $\eta$ trusts the linear model only
+nearby, large $\eta$ ventures further.
+
+## The descent lemma
+
+Progress is guaranteed when the gradient does not change too fast. $f$ is
+**$L$-smooth** if its gradient is $L$-Lipschitz,
+$\lVert \nabla f(x) - \nabla f(y)\rVert \le L\lVert x - y\rVert$, which for twice-
+differentiable $f$ means $\nabla^2 f \preceq L I$. Smoothness gives a quadratic upper
+bound:
+
+$$
+f(y) \le f(x) + \nabla f(x)^\top (y - x) + \frac{L}{2}\lVert y - x\rVert^2.
+$$
+
+**Descent lemma.** Take a gradient step $y = x - \eta\nabla f(x)$ and substitute:
+
+$$
+f(y) \le f(x) - \eta\lVert \nabla f(x)\rVert^2 + \frac{L\eta^2}{2}\lVert \nabla f(x)\rVert^2 = f(x) - \eta\left(1 - \frac{L\eta}{2}\right)\lVert \nabla f(x)\rVert^2.
+$$
+
+For any step size $0 < \eta < 2/L$ the bracket is positive, so $f(y) < f(x)$ whenever
+the gradient is nonzero: the objective strictly decreases. The largest guaranteed
+per-step decrease is at $\eta = 1/L$, giving
+$f(y) \le f(x) - \frac{1}{2L}\lVert\nabla f(x)\rVert^2$.
+
+## The step-size tradeoff
+
+The descent lemma makes the tradeoff concrete. Too small an $\eta$ wastes the
+allowed decrease and crawls. Too large ($\eta \ge 2/L$) breaks the guarantee: the
+quadratic penalty term dominates and the iterates can oscillate or diverge. On a
+quadratic with curvature $L$, the threshold $\eta = 2/L$ is exactly where the update
+starts to amplify the error instead of shrinking it.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Minimize f(x) = 0.5 x^T A x - b^T x, gradient A x - b, minimum at x* = A^{-1} b.
+A = np.array([[3.0, 1.0], [1.0, 2.0]])           # symmetric PD
+b = np.array([1.0, -1.0])
+f = lambda x: 0.5 * x @ A @ x - b @ x
+grad = lambda x: A @ x - b
+x_star = np.linalg.solve(A, b)
+
+L = np.linalg.eigvalsh(A).max()                  # smoothness = largest eigenvalue
+eta = 1.0 / L
+
+x = np.zeros(2)
+for t in range(60):
+    x = x - eta * grad(x)
+print("GD solution:", np.round(x, 6), " exact:", np.round(x_star, 6))
+
+# Monotone decrease at eta = 1/L
+x, prev = np.array([5.0, 5.0]), np.inf
+decreasing = True
+for t in range(50):
+    fx = f(x)
+    decreasing &= (fx <= prev + 1e-12)
+    prev = fx
+    x = x - eta * grad(x)
+print("monotone decrease at eta=1/L:", decreasing)
+
+# Divergence when eta > 2/L
+eta_big = 2.5 / L
+x = np.array([5.0, 5.0])
+for t in range(40):
+    x = x - eta_big * grad(x)
+print("eta>2/L diverges:", not np.all(np.isfinite(x)) or np.linalg.norm(x) > 1e6)
+```
+
+Gradient descent at $\eta = 1/L$ converges to the exact minimizer with a monotone
+decrease, and pushing past $2/L$ diverges, matching the descent lemma. The next
+lesson quantifies how fast convergence is, using smoothness and strong convexity.

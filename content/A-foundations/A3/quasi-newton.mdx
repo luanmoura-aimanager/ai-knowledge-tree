@@ -1,0 +1,117 @@
+---
+title: "Quasi-Newton methods (BFGS, L-BFGS)"
+pillar: A
+subId: A3
+lessonId: quasi-newton
+order: 13
+estimatedMinutes: 22
+goal: "Approximate the Hessian from gradient differences with the BFGS update and its limited-memory form."
+prerequisites: ["newton-method"]
+---
+
+Newton's method is fast but pays $O(n^3)$ per step to invert the Hessian, and often
+the Hessian is unavailable anyway. **Quasi-Newton** methods build an approximation to
+the inverse Hessian from nothing but the gradients already computed, recovering most
+of Newton's speed at gradient-descent cost. BFGS and its limited-memory form L-BFGS
+are the workhorses of classical smooth optimization.
+
+## The secant condition
+
+The idea is to infer curvature from how the gradient changes. Over one step define
+
+$$
+s_t = x_{t+1} - x_t, \qquad y_t = \nabla f(x_{t+1}) - \nabla f(x_t).
+$$
+
+For a quadratic with Hessian $H$, the gradient change is exactly $y_t = H s_t$. A
+quasi-Newton method requires its Hessian approximation $B_{t+1}$ to reproduce this
+observed relationship, the **secant condition**:
+
+$$
+B_{t+1}\, s_t = y_t.
+$$
+
+This is the multidimensional analogue of estimating a second derivative from two first
+derivatives. One equation underdetermines the $n \times n$ matrix, so the method adds
+a requirement that $B_{t+1}$ stay close to $B_t$.
+
+## The BFGS update
+
+**BFGS** updates the inverse Hessian approximation $H_t \approx [\nabla^2 f]^{-1}$
+directly, so each step needs only a matrix-vector product, not a solve. With
+$\rho_t = 1/(y_t^\top s_t)$:
+
+$$
+H_{t+1} = (I - \rho_t s_t y_t^\top)\, H_t\, (I - \rho_t y_t s_t^\top) + \rho_t s_t s_t^\top.
+$$
+
+This is a rank-two correction to $H_t$ chosen to satisfy the secant condition while
+keeping $H_{t+1}$ symmetric. As long as the **curvature condition** $y_t^\top s_t > 0$
+holds (guaranteed by a proper line search), the update preserves positive
+definiteness, so the search direction $-H_t \nabla f(x_t)$ is always a descent
+direction. The step is
+
+$$
+x_{t+1} = x_t - \alpha_t\, H_t\, \nabla f(x_t),
+$$
+
+with $\alpha_t$ from a line search. BFGS converges **superlinearly**: faster than any
+linear rate, approaching Newton, without ever forming a Hessian.
+
+## L-BFGS: limited memory
+
+Storing the dense $n \times n$ matrix $H_t$ is $O(n^2)$, still too much for large $n$.
+**L-BFGS** never forms $H_t$. It keeps only the last $m$ pairs $(s_k, y_k)$ (typically
+$m = 5$ to $20$) and computes the product $H_t \nabla f(x_t)$ on the fly with the
+**two-loop recursion**: one backward pass over the stored pairs applying the
+$(I - \rho s y^\top)$ factors, a scaling by an estimate of the Hessian, then one
+forward pass. Cost and memory drop to $O(mn)$, linear in the dimension. L-BFGS is the
+default for medium-scale smooth problems and large-batch training where the gradients
+are clean enough to trust.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Minimize f(x) = 0.5 x^T A x - b^T x with BFGS (inverse-Hessian form).
+rng = np.random.default_rng(0)
+n = 20
+Q = np.linalg.qr(rng.normal(size=(n, n)))[0]
+A = Q @ np.diag(np.linspace(1.0, 50.0, n)) @ Q.T   # SPD, condition number 50
+b = rng.normal(size=n)
+x_star = np.linalg.solve(A, b)
+
+f = lambda x: 0.5 * x @ A @ x - b @ x
+grad = lambda x: A @ x - b
+
+def line_search(x, p):                              # backtracking (Armijo)
+    a, g = 1.0, grad(x)
+    while f(x + a * p) > f(x) + 1e-4 * a * (g @ p):
+        a *= 0.5
+    return a
+
+x = np.zeros(n)
+H = np.eye(n)                                       # initial inverse-Hessian guess
+g = grad(x)
+for t in range(40):
+    p = -H @ g
+    alpha = line_search(x, p)
+    s = alpha * p
+    x_new = x + s
+    g_new = grad(x_new)
+    y = g_new - g
+    rho = 1.0 / (y @ s)
+    if y @ s > 1e-12:                               # curvature condition
+        I = np.eye(n)
+        H = (I - rho * np.outer(s, y)) @ H @ (I - rho * np.outer(y, s)) + rho * np.outer(s, s)
+    x, g = x_new, g_new
+
+print("BFGS error:", f"{np.linalg.norm(x - x_star):.2e}")
+print("gradient norm:", f"{np.linalg.norm(g):.2e}")
+```
+
+BFGS reaches the minimizer of an ill-conditioned ($\kappa = 50$) quadratic in a few
+dozen steps using only gradients, with the inverse-Hessian estimate built from the
+secant pairs. The next lesson handles objectives that are not smooth, with proximal
+methods.

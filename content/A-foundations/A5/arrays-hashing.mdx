@@ -1,0 +1,137 @@
+---
+title: "Dynamic arrays and hash maps"
+pillar: A
+subId: A5
+lessonId: arrays-hashing
+order: 2
+estimatedMinutes: 20
+goal: "Understand amortized O(1) append and average O(1) hashing, along with their failure modes."
+prerequisites: ["complexity-analysis"]
+---
+
+The two data structures behind nearly every program are the **dynamic array**
+(Python's `list`, C++'s `vector`) and the **hash map** (`dict`, `unordered_map`).
+Both promise constant-time operations under realistic assumptions; both have failure
+modes when those assumptions break. Understanding the internals is what lets you
+recognize the failure modes when they happen.
+
+## Dynamic arrays
+
+A dynamic array stores elements in a contiguous block of memory. The basic operations
+are:
+
+- **Indexed access** `a[i]`: $O(1)$, a single pointer arithmetic.
+- **Append** `a.append(x)`: amortized $O(1)$ via doubling (previous lesson).
+- **Insert/delete at position $i$**: $O(n)$, every later element must shift.
+
+Contiguity is the win and the cost. Cache prefetchers love sequential access of an
+array; the CPU pipelines hundreds of elements ahead. The penalty for inserting in the
+middle is the same contiguity: there is no empty slot to slide into without moving
+everyone after it.
+
+## Hash maps
+
+A **hash map** stores key-value pairs and answers "what is the value for this key?"
+in average $O(1)$. The keys can be anything hashable (strings, tuples, custom
+objects). The structure has three pieces:
+
+1. A **hash function** $h: \text{keys} \to \mathbb{Z}$ that maps every key to an
+   integer.
+2. An array of $m$ **buckets**, indexed by $h(\text{key}) \bmod m$.
+3. A **collision-resolution** strategy when two keys land in the same bucket.
+
+To insert or look up a key, compute $h(\text{key}) \bmod m$ and search within that
+bucket. With a good hash function, keys spread roughly uniformly over buckets, and
+each bucket holds $O(1)$ items on average.
+
+## Collisions
+
+Collisions are unavoidable: $n$ keys into $m$ buckets means some bucket holds at least
+$\lceil n/m \rceil$ items. Two standard remedies:
+
+- **Chaining.** Each bucket is a linked list (or small array) of the items that hash
+  there. Insertion appends to the list; lookup scans it.
+- **Open addressing.** Each bucket holds at most one item; on collision, probe a
+  deterministic sequence of alternative slots ($h+1, h+2, \dots$ for linear probing).
+
+In both cases, the average lookup time stays $O(1)$ as long as the **load factor**
+$\alpha = n/m$ stays bounded (say below 0.75). The implementation **resizes** the
+backing array (doubling $m$ and rehashing all keys) when $\alpha$ exceeds a threshold,
+keeping the amortized cost per operation $O(1)$.
+
+## When it goes wrong
+
+Hash maps degrade to $O(n)$ per operation when:
+
+- **The hash function clusters.** All keys hash to the same bucket, giving one giant
+  list. The pathological case is an adversary choosing keys to collide, the basis of
+  HashDoS attacks. Python's `hash()` randomizes its seed each interpreter start
+  precisely to defeat this.
+- **The load factor is too high.** Slow lookups even with a good hash, because
+  buckets fill up.
+
+The custom-hash trap: if you override `__hash__` on an object, a careless
+implementation (always returning 0, or ignoring fields used in equality) destroys
+$O(1)$ lookup. The invariant is that equal objects must hash to the same value.
+
+## Check it on arrays
+
+```python
+# Hash map from scratch with chaining.
+class HashMap:
+    def __init__(self, capacity=8):
+        self.capacity = capacity
+        self.size = 0
+        self.buckets = [[] for _ in range(capacity)]
+
+    def _bucket(self, key):
+        return self.buckets[hash(key) % self.capacity]
+
+    def get(self, key, default=None):
+        for k, v in self._bucket(key):
+            if k == key: return v
+        return default
+
+    def set(self, key, value):
+        b = self._bucket(key)
+        for i, (k, _) in enumerate(b):
+            if k == key: b[i] = (key, value); return
+        b.append((key, value))
+        self.size += 1
+        if self.size > self.capacity * 0.75:        # load factor threshold
+            self._rehash()
+
+    def _rehash(self):
+        old = [(k, v) for b in self.buckets for k, v in b]
+        self.capacity *= 2
+        self.buckets = [[] for _ in range(self.capacity)]
+        self.size = 0
+        for k, v in old: self.set(k, v)
+
+# Insert lots of items, check distribution and lookups
+h = HashMap()
+for i in range(2000):
+    h.set(f"key-{i}", i * i)
+print("size:", h.size, "  capacity:", h.capacity)
+print("lookup key-1234:", h.get("key-1234"))
+bucket_sizes = [len(b) for b in h.buckets]
+print(f"avg bucket: {sum(bucket_sizes)/len(bucket_sizes):.2f}, "
+      f"max bucket: {max(bucket_sizes)}")
+
+# Demonstrate degradation: every key collides via a bad hash.
+class BadKey:
+    def __init__(self, n): self.n = n
+    def __hash__(self): return 0                    # always collide!
+    def __eq__(self, other): return self.n == other.n
+
+bad = HashMap()
+for i in range(500): bad.set(BadKey(i), i)
+loads = [len(b) for b in bad.buckets]
+print(f"bad hash: one bucket has {max(loads)} entries, others have {min(loads)}")
+print("lookup is now O(n) instead of O(1)")
+```
+
+The chained hash map keeps buckets small on average, the load-factor threshold
+triggers resizing, and the deliberately bad hash collapses every key into one bucket,
+showing how a poor hash destroys the constant-time guarantee. The next lesson covers
+the linear structures: linked lists, stacks, and queues.

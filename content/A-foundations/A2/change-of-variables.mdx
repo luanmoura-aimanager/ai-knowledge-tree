@@ -1,0 +1,111 @@
+---
+title: "Transformations of random variables"
+pillar: A
+subId: A2
+lessonId: change-of-variables
+order: 9
+estimatedMinutes: 22
+goal: "Push a distribution through a function with the change-of-variables formula."
+prerequisites: ["common-distributions"]
+---
+
+You often know the distribution of $X$ but need the distribution of $Y = g(X)$:
+sampling a uniform and turning it into a Gaussian, or pushing a latent variable
+through a neural network in a normalizing flow. The **change-of-variables formula**
+tells you exactly how a density transforms, and the determinant from linear algebra
+reappears as the local volume-stretching factor.
+
+## The CDF route (always works)
+
+The safe, general method is to compute the CDF of $Y$ and differentiate. For an
+increasing $g$,
+
+$$
+F_Y(y) = P(Y \le y) = P(g(X) \le y) = P(X \le g^{-1}(y)) = F_X(g^{-1}(y)).
+$$
+
+Differentiating with the chain rule gives the density. This route handles
+non-monotone $g$ too, by splitting into monotone pieces.
+
+## The change-of-variables formula (1D)
+
+For a differentiable, strictly monotone $g$ with inverse $x = g^{-1}(y)$,
+differentiating $F_Y(y) = F_X(g^{-1}(y))$:
+
+$$
+f_Y(y) = f_X\!\big(g^{-1}(y)\big)\,\left|\frac{d}{dy}g^{-1}(y)\right|.
+$$
+
+The absolute value covers decreasing $g$ (where $F_Y(y) = 1 - F_X(g^{-1}(y))$, and
+the derivative is negative). The factor $|dg^{-1}/dy|$ corrects for how $g$
+stretches or compresses the axis: where $g$ spreads probability over a wider range,
+the density thins out.
+
+A useful restatement uses $dy/dx = g'(x)$:
+
+$$
+f_Y(y) = \frac{f_X(x)}{|g'(x)|}\bigg|_{x = g^{-1}(y)}.
+$$
+
+Probability mass is conserved, $f_Y(y)\,|dy| = f_X(x)\,|dx|$; only its density per
+unit length changes.
+
+## The multivariate formula
+
+For an invertible differentiable map $\mathbf{y} = g(\mathbf{x})$ on
+$\mathbb{R}^n$, the single derivative becomes the **Jacobian determinant**:
+
+$$
+f_Y(\mathbf{y}) = f_X\!\big(g^{-1}(\mathbf{y})\big)\,\left|\det J_{g^{-1}}(\mathbf{y})\right|,
+$$
+
+where $J_{g^{-1}}$ is the Jacobian matrix of the inverse map. The determinant is the
+local volume-scaling factor of the transformation (its meaning from linear algebra),
+now applied pointwise to a nonlinear map. This is the identity normalizing flows
+exploit: stack invertible maps with cheap log-determinants to build a flexible
+density whose normalization stays tractable.
+
+## Worked example: inverse-CDF sampling
+
+If $U \sim \text{Uniform}(0,1)$ and $F$ is a target CDF, then $X = F^{-1}(U)$ has CDF
+$F$. Check it:
+
+$$
+P(X \le x) = P(F^{-1}(U) \le x) = P(U \le F(x)) = F(x),
+$$
+
+using that $F$ is increasing and $U$ is uniform on $[0,1]$ (so $P(U \le u) = u$).
+This is how a single uniform random source generates samples from any distribution
+with an invertible CDF, for example the exponential via $X = -\frac{1}{\lambda}\log(1-U)$.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(8)
+N = 1_000_000
+
+# Inverse-CDF sampling for Exponential(rate=lambda): X = -ln(1-U)/lambda
+lam = 1.5
+U = rng.random(N)
+X = -np.log(1 - U) / lam
+print("inverse-CDF exp mean:", round(X.mean(), 4), "  exact 1/lambda =", round(1/lam, 4))
+print("numpy exp mean:      ", round(rng.exponential(1/lam, N).mean(), 4))
+
+# Change of variables: Y = X^2 for X ~ N(0,1); density check via histogram
+Xn = rng.normal(size=N)
+Y = Xn**2                                   # chi-square with 1 dof
+hist, edges = np.histogram(Y, bins=200, range=(0.01, 5), density=True)
+centers = 0.5 * (edges[:-1] + edges[1:])
+# f_Y(y) = f_X(sqrt y)/|g'(x)| summed over the two roots +/-sqrt(y):
+#        = 2 * phi(sqrt y) * (1/(2 sqrt y)) = phi(sqrt y)/sqrt y
+phi = lambda x: np.exp(-x**2/2)/np.sqrt(2*np.pi)
+f_theory = phi(np.sqrt(centers)) / np.sqrt(centers)
+print("max |hist - theory|:", round(np.max(np.abs(hist - f_theory)), 4))
+```
+
+Inverse-CDF sampling reproduces the exponential mean, and the analytic density of
+$X^2$ (with the Jacobian factor and both roots accounted for) matches its histogram.
+The next lesson steps back from exact distributions to bounds that hold for all of
+them: the basic probability inequalities.

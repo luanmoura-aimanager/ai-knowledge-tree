@@ -1,0 +1,137 @@
+---
+title: "Fisher information and information geometry"
+pillar: A
+subId: A2
+lessonId: information-geometry
+order: 18
+estimatedMinutes: 24
+goal: "Define the Fisher information, see it as the curvature of the log-likelihood, and meet the natural gradient."
+prerequisites: ["mle", "kl-cross-entropy"]
+---
+
+A parameter space is not flat: moving the mean of a sharp Gaussian by 0.1 changes the
+distribution far more than the same move on a broad one. **Fisher information**
+measures this local sensitivity, and treating it as a metric turns the parameter
+space into a curved geometry where the **natural gradient** replaces the ordinary one.
+This is the foundation of efficient estimation and second-order optimization of
+probabilistic models.
+
+## The score and its mean
+
+Recall the **score**, the gradient of the log-likelihood of a single observation:
+
+$$
+s(\theta) = \nabla_\theta \log p(x \mid \theta).
+$$
+
+Under mild regularity, the score has **zero mean** at the true parameter:
+
+$$
+\mathbb{E}_{x \sim p(\cdot \mid \theta)}[s(\theta)] = \int p(x \mid \theta)\,\frac{\nabla_\theta p(x \mid \theta)}{p(x \mid \theta)}\,dx = \nabla_\theta \int p(x \mid \theta)\,dx = \nabla_\theta 1 = 0.
+$$
+
+The densities cancel, the integral is the constant 1, and its gradient is zero.
+
+## Fisher information
+
+The **Fisher information** is the covariance of the score (equivalently, since the
+score has zero mean, its second moment):
+
+$$
+\mathcal{I}(\theta) = \mathbb{E}\!\left[s(\theta)\, s(\theta)^\top\right] = \operatorname{Cov}(s(\theta)).
+$$
+
+A second identity rewrites it as the expected negative curvature of the
+log-likelihood:
+
+$$
+\mathcal{I}(\theta) = -\,\mathbb{E}\!\left[\nabla^2_\theta \log p(x \mid \theta)\right].
+$$
+
+*Sketch.* Differentiate the zero-mean score identity
+$\int p\,\nabla\log p\,dx = 0$ once more in $\theta$. The product rule produces two
+terms: $\int (\nabla p)(\nabla \log p)^\top$ and $\int p\,\nabla^2 \log p$. The first
+equals $\mathbb{E}[s s^\top]$ (using $\nabla p = p\,\nabla\log p$), the second is
+$\mathbb{E}[\nabla^2 \log p]$, and their sum is zero. Rearranging gives the two
+forms. High Fisher information means the log-likelihood is sharply peaked, so the
+parameter is easy to pin down.
+
+## The Cramer-Rao bound
+
+Fisher information sets the best possible precision of any unbiased estimator
+$\hat\theta$:
+
+$$
+\operatorname{Var}(\hat\theta) \ge \mathcal{I}(\theta)^{-1}.
+$$
+
+No unbiased estimator beats the inverse Fisher information. The MLE achieves this
+bound asymptotically, which is the precise sense in which maximum likelihood is
+**efficient**.
+
+## KL divergence and the Fisher metric
+
+Fisher information is the local curvature of the KL divergence between nearby
+distributions. A second-order Taylor expansion of $D_{\mathrm{KL}}\big(p_\theta \,\|\, p_{\theta + \delta}\big)$
+in the small step $\delta$ gives
+
+$$
+D_{\mathrm{KL}}\big(p_\theta \,\|\, p_{\theta + \delta}\big) \approx \tfrac{1}{2}\,\delta^\top \mathcal{I}(\theta)\,\delta,
+$$
+
+with the zeroth and first-order terms vanishing (KL is zero and minimized at
+$\delta = 0$). So $\mathcal{I}(\theta)$ is the metric tensor that measures distance
+between distributions in parameter space, the central object of **information
+geometry**.
+
+## The natural gradient
+
+Ordinary gradient descent steps in the direction of steepest descent measured in
+Euclidean parameter distance, which is arbitrary: it depends on how the model happens
+to be parameterized. The **natural gradient** measures steepest descent in KL
+distance instead, preconditioning by the inverse Fisher matrix:
+
+$$
+\tilde\nabla_\theta \mathcal{L} = \mathcal{I}(\theta)^{-1}\,\nabla_\theta \mathcal{L}.
+$$
+
+Because KL distance is parameterization-invariant, so is the natural-gradient
+direction. It is the probabilistic cousin of Newton's method (Fisher information in
+place of the Hessian) and underlies natural-gradient and K-FAC optimizers.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(17)
+
+# Gaussian with known variance 1, unknown mean theta.
+# log p(x|theta) = -0.5 (x-theta)^2 + const; score = (x - theta); I(theta) = 1.
+theta_true = 2.0
+N = 2_000_000
+x = rng.normal(theta_true, 1.0, N)
+
+score = x - theta_true
+print("E[score] ~ 0:", round(score.mean(), 4))
+print("Fisher I = Var(score):", round(score.var(), 4), " exact 1.0")
+
+# Curvature form: -E[d^2/dtheta^2 log p] = -E[-1] = 1
+print("Fisher (curvature form): 1.0")
+
+# Cramer-Rao: MLE (sample mean) variance vs 1/(N*I)
+trials = 4000
+mle = rng.normal(theta_true, 1.0, size=(trials, 50)).mean(axis=1)
+print("Var(MLE) over n=50:", round(mle.var(), 5), " CR bound 1/(n*I) =", round(1/50, 5))
+
+# KL between N(theta,1) and N(theta+d,1) is d^2/2 = 0.5 * d * I * d, with I=1
+d = 0.1
+kl_exact = d**2 / 2
+print("KL(N(0,1)||N(d,1)):", round(kl_exact, 6), " ~ 0.5 d I d:", round(0.5 * d * 1.0 * d, 6))
+```
+
+The score averages to zero, its variance recovers the Fisher information of 1, the
+MLE variance sits at the Cramer-Rao bound, and the KL between nearby Gaussians equals
+the Fisher quadratic form. This closes the A2 probability and information-theory
+track; the optimization pillar (A3) builds on these gradients and curvatures to
+actually minimize losses.
