@@ -210,7 +210,8 @@ material, plus infra-flavored D7 topics, have no natural code surface. Mark them
   in `globals.css` via `@theme inline` and `:root`.
 - **Status glyphs**: `✓` covered/studied, `◐` partial/in-progress, `○` gap, `★` hot.
 - **Pillar IDs** are single letters `A–J`; subsection IDs are `<letter><n>`, uppercased.
-- **Portuguese** for UI strings, English for code identifiers and topic names.
+- **English** for all strings (UI chrome, content, code identifiers, topic
+  names). The site is written in English end-to-end.
 
 ## Common tasks
 

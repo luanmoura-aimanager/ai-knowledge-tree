@@ -53,12 +53,12 @@ export function FilterBar() {
   }, [filter, query]);
 
   const filters: { id: Filter; label: string }[] = [
-    { id: "all", label: "Todos" },
-    { id: "covered", label: "✓ Cobertos" },
-    { id: "partial", label: "◐ Parciais" },
+    { id: "all", label: "All" },
+    { id: "covered", label: "✓ Covered" },
+    { id: "partial", label: "◐ Partial" },
     { id: "gap", label: "○ Gaps" },
     { id: "hot", label: "★ Hot" },
-    { id: "hot-gap", label: "🎯 Hot Gaps" },
+    { id: "hot-gap", label: "🎯 Hot gaps" },
   ];
 
   const setAllCollapsed = (collapsed: boolean) => {
@@ -74,7 +74,7 @@ export function FilterBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔍 Buscar tópico (ex: diffusion, kalman, RAG)..."
+          placeholder="🔍 Search topic (e.g. diffusion, kalman, RAG)..."
           className="flex-1 min-w-[200px] bg-[var(--card)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--accent)]"
         />
         <div className="flex gap-1.5 flex-wrap">
@@ -90,10 +90,10 @@ export function FilterBar() {
         </div>
         <div className="flex gap-1.5 ml-auto">
           <button className="btn" onClick={() => setAllCollapsed(false)}>
-            ▾ Expandir tudo
+            ▾ Expand all
           </button>
           <button className="btn" onClick={() => setAllCollapsed(true)}>
-            ▸ Recolher tudo
+            ▸ Collapse all
           </button>
         </div>
       </div>

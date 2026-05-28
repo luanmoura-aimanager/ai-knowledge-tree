@@ -25,9 +25,9 @@ export default async function PillarOverviewPage({
     <div className="max-w-[1100px] mx-auto px-6 py-10">
       <div className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-1">
         <Link href="/" className="no-underline hover:text-[var(--fg)]">
-          Mapa
+          Map
         </Link>{" "}
-        / Pilar {pillar.letter}
+        / Pillar {pillar.letter}
       </div>
       <h1
         className="text-3xl font-bold tracking-tight mb-2"
@@ -62,17 +62,17 @@ export default async function PillarOverviewPage({
               <div className="text-xs text-[var(--fg-mute)]">
                 {total > 0 ? (
                   <>
-                    {total} lições ·{" "}
+                    {total} lessons ·{" "}
                     {available ? (
                       <span className="text-[var(--good)]">
-                        {done} disponíveis
+                        {done} available
                       </span>
                     ) : (
-                      <span>em breve</span>
+                      <span>coming soon</span>
                     )}
                   </>
                 ) : (
-                  <span>currículo em breve</span>
+                  <span>curriculum coming soon</span>
                 )}
               </div>
             </Link>

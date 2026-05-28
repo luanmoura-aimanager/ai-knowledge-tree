@@ -857,7 +857,7 @@ export const PILLARS: Pillar[] = [
     name: "AI Engineering",
     shortName: "AI Engineering",
     tagline:
-      "RAG, agents, MCP, production, Cloud AI: roadmap do AI Eng Journey",
+      "RAG, agents, MCP, production, Cloud AI: the AI Eng Journey roadmap",
     color: "#c0caf5",
     subs: [
       {
@@ -871,7 +871,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "ReAct loop manual", status: "gap" },
           {
-            name: "LangChain (@tool, create_react_agent, memória)",
+            name: "LangChain (@tool, create_react_agent, memory)",
             status: "gap",
           },
           {
@@ -885,7 +885,7 @@ export const PILLARS: Pillar[] = [
         name: "Pensamento de sistemas",
         topics: [
           {
-            name: "MCP: protocolo, servidores, integrações",
+            name: "MCP: protocol, servers, integrations",
             status: "gap",
             hot: true,
           },
@@ -895,11 +895,11 @@ export const PILLARS: Pillar[] = [
             hot: true,
           },
           {
-            name: "Evaluation: LLM-as-judge, datasets, regressão",
+            name: "Evaluation: LLM-as-judge, datasets, regression",
             status: "gap",
           },
           {
-            name: "RAG de produção (chunking, hybrid search, rerank)",
+            name: "Production RAG (chunking, hybrid search, rerank)",
             status: "gap",
           },
           { name: "Data Lake × Warehouse × Lakehouse", status: "gap" },
@@ -907,14 +907,14 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J3",
-        name: "Production grade & integração enterprise",
+        name: "Production grade & enterprise integration",
         topics: [
           {
             name: "API design (FastAPI, streaming, async, versioning)",
             status: "gap",
           },
           {
-            name: "Camada de governança (auth, rate limiting, cost attribution)",
+            name: "Governance layer (auth, rate limiting, cost attribution)",
             status: "gap",
           },
           {
@@ -937,14 +937,14 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J4",
-        name: "Padrões avançados",
+        name: "Advanced patterns",
         topics: [
           {
             name: "Quando NÃO fine-tunar (prompting + RAG + long context)",
             status: "gap",
           },
           {
-            name: "LoRA / QLoRA (sessão única, não-caixa-preta)",
+            name: "LoRA / QLoRA (single session, not a black box)",
             status: "gap",
             hot: true,
           },
@@ -970,7 +970,7 @@ export const PILLARS: Pillar[] = [
         name: "Data platform para IA",
         topics: [
           { name: "dbt em profundidade", status: "gap" },
-          { name: "Orquestração (Dagster ou Airflow)", status: "gap" },
+          { name: "Orchestration (Dagster or Airflow)", status: "gap" },
           { name: "Data contracts", status: "gap" },
           {
             name: "Vector infra em escala (pgvector × managed)",
@@ -991,7 +991,7 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J6",
-        name: "Cloud AI & integração enterprise",
+        name: "Cloud AI & enterprise integration",
         topics: [
           {
             name: "AWS Bedrock end-to-end (KB, Agents, Guardrails)",
@@ -1003,7 +1003,7 @@ export const PILLARS: Pillar[] = [
             status: "gap",
           },
           {
-            name: "Identidade & segurança (IAM, VPC, SSO, OAuth)",
+            name: "Identity & security (IAM, VPC, SSO, OAuth)",
             status: "gap",
           },
           { name: "API gateway, service mesh, multi-tenancy", status: "gap" },
@@ -1242,9 +1242,14 @@ export const CONNECTIONS: Connection[] = [
 
   // ---- J. AI Engineering internal flow ----
   { from: "J1", to: "J2", label: "Fundamentos → sistemas", kind: "uses" },
-  { from: "J2", to: "J3", label: "Sistemas → produção", kind: "uses" },
-  { from: "J3", to: "J4", label: "Produção → padrões avançados", kind: "uses" },
-  { from: "J3", to: "J5", label: "Produção → data platform", kind: "uses" },
+  { from: "J2", to: "J3", label: "Systems → production", kind: "uses" },
+  {
+    from: "J3",
+    to: "J4",
+    label: "Production → advanced patterns",
+    kind: "uses",
+  },
+  { from: "J3", to: "J5", label: "Production → data platform", kind: "uses" },
   { from: "J5", to: "J6", label: "Data platform → Cloud AI", kind: "uses" },
   { from: "J6", to: "J7", label: "Cloud → arquiteto", kind: "uses" },
 ];
@@ -1258,37 +1263,37 @@ export const CONNECTIONS: Connection[] = [
 export const PATHS: Path[] = [
   {
     name: "🎓 LLM Researcher",
-    desc: "Espinha clássica de LLMs: math → DL → Transformers → alignment.",
+    desc: "Classic LLM spine: math → DL → Transformers → alignment.",
     pillars: ["A2", "A3", "D1", "D3", "E3", "E4", "E8", "H6"],
     color: "var(--pe)",
   },
   {
     name: "🛠️ AI Engineer (applied)",
-    desc: "O roadmap do AI Eng Journey: RAG → MCP → produção → cloud.",
+    desc: "The AI Eng Journey roadmap: RAG → MCP → production → cloud.",
     pillars: ["E6", "J1", "J2", "J3", "J4", "J5", "J6", "J7"],
     color: "var(--pj)",
   },
   {
     name: "📈 Causal & Experimental DS",
-    desc: "Estatística rigorosa + causal inference para decisão de produto.",
+    desc: "Rigorous statistics + causal inference for product decisions.",
     pillars: ["A2", "B1", "B2", "B4", "B5", "G5"],
     color: "var(--pb)",
   },
   {
     name: "🏭 ML Platform / MLOps",
-    desc: "Dados, treino distribuído, serving e monitoring em escala.",
+    desc: "Data, distributed training, serving, and monitoring at scale.",
     pillars: ["A5", "D7", "E5", "I1", "I2", "I3", "I4"],
     color: "var(--pi)",
   },
   {
     name: "🔬 Frontier Researcher",
-    desc: "Tópicos ★ 2023–2025: SSMs, diffusion, SAEs, R1-style RL, MCP.",
+    desc: "★ topics 2023–2025: SSMs, diffusion, SAEs, R1-style RL, MCP.",
     pillars: ["D3", "D4", "D7", "E4", "E6", "E8", "H6", "J2"],
     color: "var(--pf)",
   },
   {
     name: "👁️ Computer Vision",
-    desc: "Da CNN ao SAM/NeRF, com cruzamento para SSL e multimodal.",
+    desc: "From CNNs to SAM/NeRF, with crossings to SSL and multimodal.",
     pillars: ["D2", "D5", "E7"],
     color: "var(--pd)",
   },

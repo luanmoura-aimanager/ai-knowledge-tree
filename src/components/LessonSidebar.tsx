@@ -32,18 +32,18 @@ export function LessonSidebar({
     const st = progress[lessonId];
     if (st === "studied")
       return (
-        <span className="text-[var(--good)]" title="estudado">
+        <span className="text-[var(--good)]" title="studied">
           ✓
         </span>
       );
     if (st === "in-progress")
       return (
-        <span className="text-[var(--partial)]" title="em progresso">
+        <span className="text-[var(--partial)]" title="in progress">
           ◐
         </span>
       );
     return (
-      <span className="text-[var(--fg-mute)] text-xs" title="não estudado">
+      <span className="text-[var(--fg-mute)] text-xs" title="not studied">
         ○
       </span>
     );
@@ -104,7 +104,7 @@ export function LessonSidebar({
           })}
           {lessons.length === 0 && (
             <p className="text-sm text-[var(--fg-mute)] px-2.5">
-              Currículo em breve.
+              Curriculum coming soon.
             </p>
           )}
         </nav>
@@ -117,7 +117,7 @@ export function LessonSidebar({
             ← {pillar.name}
           </Link>
           <Link href="/" className="hover:text-[var(--fg)] no-underline">
-            ← Mapa
+            ← Map
           </Link>
         </div>
       </div>

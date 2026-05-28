@@ -80,7 +80,7 @@ export default async function LessonPage({
         >
           {sub.id} · {sub.name}
         </Link>{" "}
-        · lição {lesson.order}
+        · lesson {lesson.order}
       </div>
       <h1 className="text-3xl font-bold tracking-tight mb-3">
         {fm?.title ?? lesson.title}
@@ -97,7 +97,7 @@ export default async function LessonPage({
         {fm?.estimatedMinutes ? <span>⏱ {fm.estimatedMinutes} min</span> : null}
         {prereqs.length > 0 && (
           <span className="flex items-center gap-1.5 flex-wrap">
-            Pré-requisitos:
+            Prerequisites:
             {prereqs.map((t) => (
               <PrereqLink key={t} token={t} />
             ))}
@@ -113,7 +113,7 @@ export default async function LessonPage({
         <MdxContent source={loaded.body} />
       ) : (
         <div className="card p-6 text-[var(--fg-dim)]">
-          Esta lição ainda não foi escrita. Objetivo planejado: {lesson.goal}
+          This lesson has not been written yet. Planned goal: {lesson.goal}
         </div>
       )}
 
@@ -123,7 +123,7 @@ export default async function LessonPage({
             href={`/pillar/${pillar.letter}/${prev.subId}/${prev.id}`}
             className="card p-4 no-underline flex-1 max-w-[48%]"
           >
-            <div className="text-xs text-[var(--fg-mute)]">← Anterior</div>
+            <div className="text-xs text-[var(--fg-mute)]">← Previous</div>
             <div className="text-sm font-semibold text-[var(--fg)]">
               {prev.title}
             </div>
@@ -136,7 +136,7 @@ export default async function LessonPage({
             href={`/pillar/${pillar.letter}/${next.subId}/${next.id}`}
             className="card p-4 no-underline flex-1 max-w-[48%] text-right"
           >
-            <div className="text-xs text-[var(--fg-mute)]">Próximo →</div>
+            <div className="text-xs text-[var(--fg-mute)]">Next →</div>
             <div className="text-sm font-semibold text-[var(--fg)]">
               {next.title}
             </div>
