@@ -1,4 +1,4 @@
--- AI Knowledge Tree — database schema (Neon Postgres).
+-- AI Knowledge Tree: database schema (Neon Postgres).
 -- Run once against your Neon database:  psql "$DATABASE_URL" -f schema.sql
 --
 -- Auth.js (@auth/pg-adapter) tables + a per-user progress table.
