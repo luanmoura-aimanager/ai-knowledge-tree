@@ -1,0 +1,110 @@
+---
+title: "Linear maps and matrices"
+pillar: A
+subId: A1
+lessonId: linear-maps-matrices
+order: 3
+estimatedMinutes: 20
+goal: "Show every linear map between finite-dimensional spaces is a matrix once bases are fixed, and that composition is matrix multiplication."
+prerequisites: ["basis-dimension"]
+---
+
+Numbers are not the only things we multiply by scalars and add together; maps
+between vector spaces can behave the same way. When they do, a single rectangular
+array of numbers captures everything about them.
+
+## What a linear map is
+
+A map $T: V \to W$ is **linear** if it respects the two vector-space operations:
+
+$$
+T(u + v) = T(u) + T(v), \qquad T(\alpha v) = \alpha\, T(v),
+$$
+
+for all $u, v \in V$ and $\alpha \in \mathbb{R}$. The two conditions collapse into
+one: $T(\alpha u + \beta v) = \alpha T(u) + \beta T(v)$. A linear map sends linear
+combinations to linear combinations, with the same coefficients.
+
+Immediate consequences: $T(0) = 0$ (set $\alpha = 0$), and $T(-v) = -T(v)$.
+
+## Every linear map is a matrix
+
+Fix bases $\mathcal{B} = \{e_1, \dots, e_n\}$ of $V$ and
+$\mathcal{C} = \{f_1, \dots, f_m\}$ of $W$. By linearity, knowing $T$ on the
+basis is enough to know $T$ everywhere: any $v = \sum_j x_j e_j$ gives
+$T(v) = \sum_j x_j T(e_j)$.
+
+Each $T(e_j)$ is a vector in $W$, so it expands in $\mathcal{C}$:
+$T(e_j) = \sum_i a_{ij} f_i$. Collect the coefficients into the $m \times n$
+matrix $A = [a_{ij}]$. Then for any $v$ with coordinate vector $x \in \mathbb{R}^n$,
+the coordinate vector of $T(v)$ in $\mathcal{C}$ is $Ax$:
+
+$$
+[T(v)]_{\mathcal{C}} = A\,[v]_{\mathcal{B}}.
+$$
+
+**The $j$-th column of $A$ is the coordinate vector of $T(e_j)$.**
+
+This is the complete story: a linear map is a matrix, and the matrix depends on
+the choice of bases. Switch bases and the matrix changes, but it represents the
+same map.
+
+## Composition is matrix multiplication
+
+If $T: U \to V$ has matrix $A$ (in bases $\mathcal{B}, \mathcal{C}$) and
+$S: V \to W$ has matrix $B$ (in bases $\mathcal{C}, \mathcal{D}$), then the
+composition $S \circ T: U \to W$ has matrix $BA$.
+
+*Proof.* For any $u$ with coordinate vector $x$:
+$(S \circ T)(u) = S(T(u))$. The coordinate vector of $T(u)$ is $Ax$, and then
+$S$ sends it to $B(Ax) = (BA)x$. So the composite acts as $BA$ on coordinate
+vectors. $\qquad\blacksquare$
+
+Matrix multiplication is not a formula chosen for convenience; it is the *only*
+rule for associating a matrix to a composition of linear maps.
+
+## The kernel and image
+
+Two subspaces are attached to every linear map:
+
+- **Kernel** (null space): $\ker T = \{v \in V : T(v) = 0\}$. It is a subspace of
+  $V$ (if $T(u) = T(v) = 0$, then $T(u+v) = 0$ and $T(\alpha u) = 0$).
+- **Image** (column space): $\operatorname{im} T = \{T(v) : v \in V\}$. It is a
+  subspace of $W$.
+
+These are the null space and column space of the matrix $A$ in the chosen bases.
+The kernel measures how much $T$ collapses, and the image measures how much of $W$
+it can reach: two quantifications the rank–nullity theorem connects in the next
+lesson.
+
+## Check it on arrays
+
+The claim is that $T(e_j)$ lands in the $j$-th column of the matrix, and that
+applying $T$ to a vector is matrix-vector multiplication.
+
+```python
+import numpy as np
+
+# Define T: R^3 -> R^2 by its action on the standard basis:
+#   T(e1) = [1, 2], T(e2) = [0, -1], T(e3) = [3, 1]
+A = np.array([[1.0, 0.0, 3.0],
+              [2.0,-1.0, 1.0]])
+
+# v = 2*e1 - e2 + 4*e3
+v = np.array([2.0, -1.0, 4.0])
+Tv = A @ v
+print("T(v):", Tv)   # [1*2+0*(-1)+3*4, 2*2+(-1)*(-1)+1*4] = [14, 9]
+print("manual:", 2*A[:,0] - A[:,1] + 4*A[:,2])  # same
+
+# Composition: define S: R^2 -> R^2
+B = np.array([[0.0, 1.0],
+              [-1.0, 2.0]])
+
+# (S o T)(v) = B @ (A @ v) = (B @ A) @ v
+print("B@A@v:", B @ A @ v)
+print("B@(A@v):", B @ (A @ v))  # identical
+```
+
+Both routes give the same result, confirming that composition equals matrix
+multiplication. The next lesson asks: given the matrix of $T$, how much of the
+input does $T$ annihilate, and how much of the output does it fill?

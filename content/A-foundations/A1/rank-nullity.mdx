@@ -1,0 +1,117 @@
+---
+title: "Rank, nullity, and the four fundamental subspaces"
+pillar: A
+subId: A1
+lessonId: rank-nullity
+order: 4
+estimatedMinutes: 24
+goal: "Prove the rank–nullity theorem and use the four fundamental subspaces to decide when Ax=b is solvable and how many solutions there are."
+prerequisites: ["linear-maps-matrices"]
+---
+
+The matrix $A$ of a linear map $T: \mathbb{R}^n \to \mathbb{R}^m$ carves out four
+subspaces: two inside the domain, two inside the codomain. Their dimensions are
+linked by a single equation, and that equation tells you everything about the
+solvability of $Ax = b$.
+
+## The four fundamental subspaces
+
+For an $m \times n$ matrix $A$:
+
+| Subspace | Space | Definition |
+|---|---|---|
+| Column space $\operatorname{col}(A)$ | $\mathbb{R}^m$ | $\{Ax : x \in \mathbb{R}^n\}$ |
+| Null space $\operatorname{null}(A)$ | $\mathbb{R}^n$ | $\{x : Ax = 0\}$ |
+| Row space $\operatorname{row}(A)$ | $\mathbb{R}^n$ | $\operatorname{col}(A^\top)$ |
+| Left null space | $\mathbb{R}^m$ | $\{y : A^\top y = 0\}$ |
+
+The column space is where $Ax$ can land; the null space is what $A$ collapses
+to zero. The **rank** is $r = \dim\operatorname{col}(A)$, the number of linearly
+independent columns (equivalently, independent rows: row rank equals column rank,
+a nontrivial fact). The **nullity** is $\dim\operatorname{null}(A)$.
+
+## Rank–nullity theorem
+
+**Theorem.** For any $A \in \mathbb{R}^{m \times n}$,
+
+$$
+\operatorname{rank}(A) + \operatorname{nullity}(A) = n.
+$$
+
+*Proof.* Let $r = \operatorname{rank}(A)$ and $k = \operatorname{nullity}(A)$;
+pick a basis $\{z_1, \dots, z_k\}$ for $\operatorname{null}(A)$. Extend it to a
+basis of $\mathbb{R}^n$ by adding $\{w_1, \dots, w_r\}$.
+
+**Step 1: $\{Aw_1, \dots, Aw_r\}$ spans $\operatorname{col}(A)$.** Any $Ax$ with
+$x = \sum c_i z_i + \sum d_j w_j$ satisfies $Ax = \sum d_j Aw_j$ (the $z_i$ are
+annihilated). So every column-space vector is a combination of the $Aw_j$.
+
+**Step 2: $\{Aw_1, \dots, Aw_r\}$ is independent.** Suppose
+$\sum d_j Aw_j = 0$, i.e. $A(\sum d_j w_j) = 0$. Then $v = \sum d_j w_j \in
+\operatorname{null}(A)$, so $v = \sum c_i z_i$ for some $c_i$. But
+$\{z_1, \dots, z_k, w_1, \dots, w_r\}$ is a basis of $\mathbb{R}^n$, so all
+coefficients are zero. Hence all $d_j = 0$.
+
+Steps 1 and 2 together say $\{Aw_1, \dots, Aw_r\}$ is a basis of
+$\operatorname{col}(A)$, confirming $\dim\operatorname{col}(A) = r$. The
+original basis of $\mathbb{R}^n$ had $k + r = n$ elements.
+$\qquad\blacksquare$
+
+## Solvability and solution structure
+
+The system $Ax = b$ is consistent if and only if $b \in \operatorname{col}(A)$.
+
+When it is consistent, the solution set is a **coset** of the null space: pick any
+particular solution $x_p$ (i.e. $Ax_p = b$), then every solution has the form
+
+$$
+x = x_p + z, \qquad z \in \operatorname{null}(A).
+$$
+
+*Proof.* If $Ax = b$ and $Ax_p = b$, then $A(x - x_p) = 0$, so $x - x_p \in
+\operatorname{null}(A)$. Conversely, $A(x_p + z) = b + 0 = b$ for any
+$z \in \operatorname{null}(A)$. $\qquad\blacksquare$
+
+In particular: if $\operatorname{nullity}(A) = 0$ (the null space is just $\{0\}$),
+the solution is unique when it exists. If nullity is positive, there are infinitely
+many.
+
+## Orthogonality of the four spaces
+
+Row space and null space are orthogonal complements in $\mathbb{R}^n$: every row-
+space vector is orthogonal to every null-space vector. The cleanest route to this
+is: if $Ax = 0$ and $y$ is any row of $A$, then $y \cdot x = 0$ by definition.
+So the null space is perpendicular to every row, hence to the entire row space.
+By dimension count (row space has dimension $r$, null space has dimension $n - r$,
+and they are orthogonal), they are orthogonal complements. The same argument gives
+col space $\perp$ left null space in $\mathbb{R}^m$.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+A = np.array([
+    [1.0, 2.0, 3.0],
+    [2.0, 4.0, 6.0],   # row 2 = 2 * row 1
+    [0.0, 1.0, 1.0],
+], dtype=float)
+
+r = np.linalg.matrix_rank(A)
+n = A.shape[1]
+print(f"rank={r}, nullity={n - r}, rank+nullity={n}")  # 2, 1, 3
+
+# Null space via SVD (last right singular vectors for near-zero singular values):
+_, s, Vt = np.linalg.svd(A)
+print("singular values:", np.round(s, 6))  # one near zero
+null_vec = Vt[-1]   # approximate null vector
+print("A @ null_vec:", np.round(A @ null_vec, 10))   # ~zero
+
+# Verify row space ⊥ null space:
+# Row 0 should be orthogonal to null_vec
+print("row0 . null_vec:", np.round(A[0] @ null_vec, 10))  # ~0
+```
+
+The near-zero singular value flags the one-dimensional null space; the null
+vector is numerically orthogonal to every row. The next lesson builds a ruler for
+measuring the length of vectors sitting in these spaces.

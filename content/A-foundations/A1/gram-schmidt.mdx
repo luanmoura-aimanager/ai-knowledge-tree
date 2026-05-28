@@ -1,0 +1,133 @@
+---
+title: "Orthonormal bases & Gram–Schmidt"
+pillar: A
+subId: A1
+lessonId: gram-schmidt
+order: 7
+estimatedMinutes: 22
+goal: "Construct an orthonormal basis by Gram–Schmidt, prove orthogonal matrices are isometries, and connect the result to the QR factorization."
+prerequisites: ["inner-products", "basis-dimension"]
+---
+
+Working in an orthonormal basis turns inner products into dot products, projections
+into trivial formulas, and matrix inversions into transposes. Gram–Schmidt is the
+algorithm that manufactures one from any basis.
+
+## Orthonormal sets
+
+A set of vectors $\{q_1, \dots, q_k\}$ is **orthonormal** if
+
+$$
+\langle q_i, q_j\rangle = \delta_{ij} = \begin{cases} 1 & i = j \\ 0 & i \neq j \end{cases}.
+$$
+
+Every orthonormal set is automatically linearly independent: if
+$\sum c_i q_i = 0$, take the inner product with $q_j$:
+$c_j = \langle \sum c_i q_i, q_j\rangle = 0$. So an orthonormal set of $n$
+vectors in $\mathbb{R}^n$ is a basis, called an **orthonormal basis**.
+
+In an orthonormal basis, coordinates are inner products: if
+$v = \sum_i x_i q_i$, then $x_j = \langle v, q_j\rangle$. No linear system to
+solve: the coordinate in each direction is just the projection onto that direction.
+
+## Projection onto a subspace
+
+Given a subspace $W \subseteq V$ with orthonormal basis $\{q_1, \dots, q_k\}$,
+the **orthogonal projection** of $v$ onto $W$ is
+
+$$
+\operatorname{proj}_W v = \sum_{i=1}^k \langle v, q_i\rangle\, q_i.
+$$
+
+The residual $v - \operatorname{proj}_W v$ is orthogonal to every $q_i$ (check:
+$\langle v - \operatorname{proj}_W v, q_j\rangle = \langle v, q_j\rangle - \langle v, q_j\rangle = 0$),
+hence orthogonal to all of $W$.
+
+## The Gram–Schmidt algorithm
+
+Given a basis $\{v_1, \dots, v_n\}$, produce an orthonormal basis
+$\{q_1, \dots, q_n\}$ spanning the same space by the following procedure:
+
+**Step $k$ (for $k = 1, 2, \dots, n$):**
+
+1. Subtract from $v_k$ its projection onto the previously built orthonormal
+   vectors:
+   $$
+   \tilde{q}_k = v_k - \sum_{i=1}^{k-1} \langle v_k, q_i\rangle\, q_i.
+   $$
+2. Normalize: $q_k = \tilde{q}_k / \lVert \tilde{q}_k\rVert$.
+
+The residual $\tilde{q}_k$ is nonzero because $v_k$ is independent of
+$\{v_1, \dots, v_{k-1}\}$, so it cannot lie entirely in their span.
+
+After $n$ steps, $\{q_1, \dots, q_n\}$ is orthonormal and
+$\operatorname{span}(q_1, \dots, q_k) = \operatorname{span}(v_1, \dots, v_k)$ for
+every $k$.
+
+## Connection to QR
+
+Writing out the Gram–Schmidt process in matrix form: each $v_j$ is a combination
+of $q_1, \dots, q_j$ with coefficients $r_{ij} = \langle v_j, q_i\rangle$ (for
+$i < j$) and $r_{jj} = \lVert \tilde{q}_j\rVert$. Stack into matrices:
+
+$$
+A = Q R,
+$$
+
+where $A = [v_1 \mid \cdots \mid v_n]$, $Q = [q_1 \mid \cdots \mid q_n]$, and
+$R$ is upper-triangular with positive diagonal. This is the **QR factorization**.
+
+## Orthogonal matrices as isometries
+
+A square matrix $Q$ with $Q^\top Q = I$ is called **orthogonal**. Its columns are
+orthonormal. Three equivalent facts:
+
+1. $Q^\top = Q^{-1}$: the inverse is free (just transpose).
+2. $Q$ preserves inner products: $\langle Qu, Qv\rangle = (Qu)^\top(Qv) = u^\top Q^\top Q v = u^\top v$.
+3. $Q$ preserves lengths: $\lVert Qu\rVert = \lVert u\rVert$.
+
+Preserving lengths means $Q$ is an **isometry**: it rotates or reflects, but
+never stretches or compresses. This is the reason orthogonal matrices appear in
+the SVD, where we want to separate pure stretching (diagonal $\Sigma$) from pure
+rotation ($U, V^\top$).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+def gram_schmidt(A):
+    """Orthonormalize columns of A via Gram-Schmidt."""
+    Q = np.zeros_like(A, dtype=float)
+    for j in range(A.shape[1]):
+        q = A[:, j].astype(float)
+        for i in range(j):
+            q -= np.dot(q, Q[:, i]) * Q[:, i]
+        Q[:, j] = q / np.linalg.norm(q)
+    return Q
+
+A = np.array([
+    [1.0, 1.0, 0.0],
+    [1.0, 0.0, 1.0],
+    [0.0, 1.0, 1.0],
+])
+
+Q = gram_schmidt(A)
+
+# Check orthonormality: Q^T Q should be I
+print("Q^T Q:\n", np.round(Q.T @ Q, 10))
+
+# Check same span: each column of A in span of columns of Q
+# (the change-of-basis matrix R should be upper triangular)
+R = Q.T @ A
+print("R (upper triangular):\n", np.round(R, 10))
+
+# Isometry: lengths preserved
+v = np.array([1.0, 2.0, 3.0])
+print("||v|| =", np.linalg.norm(v))
+print("||Qv|| =", np.linalg.norm(Q @ v))   # same
+```
+
+The $Q^\top Q$ block comes out as the identity (up to float error), and $R$ is
+upper triangular. The orthonormal basis in hand, the next lesson turns to
+determinants, which measure how a linear map stretches or collapses volume.

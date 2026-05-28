@@ -1,0 +1,149 @@
+---
+title: "Least squares & the Moore–Penrose pseudo-inverse"
+pillar: A
+subId: A1
+lessonId: least-squares
+order: 15
+estimatedMinutes: 24
+goal: "Derive the normal equations from the residual, interpret the solution as a projection, and build the pseudo-inverse from the SVD."
+prerequisites: ["svd", "factorizations"]
+---
+
+Most real systems are overdetermined: more equations than unknowns, and no exact
+solution exists. The least-squares criterion picks the $x$ that makes $Ax$ as
+close to $b$ as possible, and the geometry is a projection.
+
+## The least-squares problem
+
+Given $A \in \mathbb{R}^{m \times n}$ with $m > n$ and $b \in \mathbb{R}^m$, find
+
+$$
+\hat{x} = \arg\min_{x \in \mathbb{R}^n} \lVert Ax - b\rVert_2^2.
+$$
+
+The objective $\lVert Ax - b\rVert^2$ is a quadratic in $x$ (it opens up:
+$A^\top A$ is PSD). Its minimum is where the gradient is zero.
+
+## Derivation via the gradient
+
+Expand:
+
+$$
+\lVert Ax - b\rVert^2 = x^\top A^\top A x - 2b^\top Ax + b^\top b.
+$$
+
+Taking the gradient with respect to $x$ and setting it to zero:
+
+$$
+\nabla_x \lVert Ax - b\rVert^2 = 2A^\top A x - 2A^\top b = 0,
+$$
+
+giving the **normal equations:**
+
+$$
+A^\top A\, \hat{x} = A^\top b.
+$$
+
+If $A$ has full column rank ($n$), $A^\top A$ is invertible, and the unique
+solution is $\hat{x} = (A^\top A)^{-1} A^\top b$.
+
+## Geometric interpretation
+
+$A\hat{x}$ is the **projection of $b$ onto $\operatorname{col}(A)$**: it is the
+point in the column space closest to $b$. The residual $r = b - A\hat{x}$ is
+orthogonal to every column of $A$:
+
+$$
+A^\top(b - A\hat{x}) = A^\top b - A^\top A\hat{x} = 0,
+$$
+
+which is exactly the normal equations rewritten. The projection matrix onto
+$\operatorname{col}(A)$ is
+
+$$
+P = A(A^\top A)^{-1}A^\top, \qquad P^2 = P, \quad P^\top = P.
+$$
+
+Any symmetric idempotent matrix is a projection; these two properties
+characterize projections completely.
+
+## Numerical route: QR is preferable
+
+Forming $A^\top A$ squares the condition number: $\kappa(A^\top A) = \kappa(A)^2$.
+The QR route avoids this. Write $A = QR$ (thin QR, $Q \in \mathbb{R}^{m \times n}$,
+$R \in \mathbb{R}^{n \times n}$ upper triangular). The normal equations become
+
+$$
+R^\top Q^\top Q R\hat{x} = R^\top Q^\top b \implies R\hat{x} = Q^\top b,
+$$
+
+a triangular system solved by backward substitution.
+
+## The Moore–Penrose pseudo-inverse
+
+When $A$ does not have full column rank, the normal equations have infinitely many
+solutions. The **minimum-norm** solution (smallest $\lVert x\rVert_2$ among all
+minimizers of $\lVert Ax - b\rVert_2$) is given by the **Moore–Penrose pseudo-inverse**
+$A^+$:
+
+$$
+\hat{x} = A^+ b.
+$$
+
+**Construction from SVD.** Let $A = U\Sigma V^\top$ with rank $r$. Define
+
+$$
+A^+ = V\Sigma^+ U^\top,
+$$
+
+where $\Sigma^+$ replaces each nonzero singular value $\sigma_i$ by $1/\sigma_i$
+and leaves zeros alone.
+
+**Properties:**
+- If $A$ has full column rank: $A^+ = (A^\top A)^{-1}A^\top$ (the standard formula).
+- If $A$ has full row rank: $A^+ = A^\top(AA^\top)^{-1}$ (a right inverse).
+- $A A^+ A = A$, $A^+ A A^+ = A^+$, and both $A A^+$ and $A^+ A$ are symmetric.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+
+m, n = 50, 5
+A = rng.normal(size=(m, n))
+b = rng.normal(size=m)
+
+# Normal equations (full column rank here)
+ATA = A.T @ A
+ATb = A.T @ b
+x_normal = np.linalg.solve(ATA, ATb)
+
+# QR route (numerically preferable)
+Q, R = np.linalg.qr(A)
+x_qr = np.linalg.solve(R, Q.T @ b)
+
+# Built-in lstsq (uses SVD internally)
+x_lstsq, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+
+print("normal eq residual:", np.linalg.norm(A @ x_normal - b))
+print("QR residual:", np.linalg.norm(A @ x_qr - b))
+print("lstsq residual:", np.linalg.norm(A @ x_lstsq - b))   # same
+print("solutions agree:", np.allclose(x_qr, x_lstsq, atol=1e-10))
+
+# Pseudo-inverse via SVD: also handles rank-deficient A
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+A_plus = Vt.T @ np.diag(1.0 / s) @ U.T
+x_pinv = A_plus @ b
+print("pinv agrees with lstsq:", np.allclose(x_pinv, x_lstsq, atol=1e-10))
+
+# Residual is orthogonal to col(A):
+r = b - A @ x_lstsq
+print("A^T r (should be ~0):", np.round(A.T @ r, 8))
+```
+
+All four routes agree on the solution; the residual is orthogonal to every column
+of $A$. With overdetermined systems handled, the next lesson builds the calculus
+for differentiating expressions involving matrices, the prerequisite for
+understanding backpropagation.

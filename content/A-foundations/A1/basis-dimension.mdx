@@ -1,0 +1,128 @@
+---
+title: "Span, independence, basis, dimension"
+pillar: A
+subId: A1
+lessonId: basis-dimension
+order: 2
+estimatedMinutes: 22
+goal: "Build span and linear independence into the notion of a basis, prove that dimension is well defined, and read off coordinates in any basis."
+prerequisites: ["vector-spaces"]
+---
+
+A subspace is defined by closure under linear combination, but that tells you
+nothing about *how many* vectors you need to generate it, or whether some of
+them are redundant. This lesson makes those questions precise.
+
+## Span
+
+The **span** of a set of vectors $\{v_1, \dots, v_k\} \subseteq V$ is the set of
+all linear combinations:
+
+$$
+\operatorname{span}(v_1, \dots, v_k)
+= \left\{ c_1 v_1 + \cdots + c_k v_k : c_i \in \mathbb{R} \right\}.
+$$
+
+Span is always a subspace (closure is built in by definition), and it is the
+*smallest* subspace containing every $v_i$. "Smallest" means: any subspace that
+contains all $v_i$ must contain their span.
+
+## Linear independence
+
+A list $v_1, \dots, v_k$ is **linearly independent** if the only solution to
+
+$$
+c_1 v_1 + \cdots + c_k v_k = 0
+$$
+
+is $c_1 = \cdots = c_k = 0$. Otherwise the list is **linearly dependent**, and at
+least one vector in it can be written as a combination of the others (subtract the
+nonzero-coefficient term from both sides).
+
+The condition captures redundancy: a dependent list contains at least one vector
+that contributes nothing to the span, because it already lives in the span of its
+neighbors.
+
+## Basis and coordinates
+
+A **basis** of $V$ is a list that is both spanning and independent. The two
+conditions together are precisely what is needed to give every element of $V$
+a unique representation.
+
+**Theorem.** If $\{e_1, \dots, e_n\}$ is a basis of $V$, then every $v \in V$
+can be written as $v = x_1 e_1 + \cdots + x_n e_n$ for a *unique* tuple
+$(x_1, \dots, x_n) \in \mathbb{R}^n$.
+
+*Proof.* Spanning gives existence. Suppose there are two representations:
+
+$$
+v = x_1 e_1 + \cdots + x_n e_n = y_1 e_1 + \cdots + y_n e_n.
+$$
+
+Subtracting: $(x_1 - y_1)e_1 + \cdots + (x_n - y_n)e_n = 0$. Independence forces
+each coefficient to be zero, so $x_i = y_i$ for all $i$. $\qquad\blacksquare$
+
+The unique tuple $(x_1, \dots, x_n)$ is the **coordinate vector** of $v$ in the
+given basis. Coordinates turn abstract vector-space arguments into concrete
+$\mathbb{R}^n$ computations.
+
+## Dimension is well defined
+
+Different bases of the same space might have different sizes, in principle. The
+exchange lemma shows they cannot.
+
+**Exchange lemma.** If $\{u_1, \dots, u_m\}$ spans $V$ and $\{w_1, \dots, w_k\}$
+is linearly independent in $V$, then $k \le m$.
+
+*Proof sketch.* Each $w_i$ can be written in terms of the $u_j$. Start with the
+spanning set and swap in $w_1$: since it is a nontrivial combination of the
+$u_j$, at least one $u_j$ is redundant once $w_1$ is present; remove it. The
+resulting set still spans $V$. Repeat for $w_2, \dots, w_k$: each swap removes
+one $u_j$ and the spanning property is preserved. We can only do this while $u_j$
+are available, so $k \le m$. $\qquad\blacksquare$
+
+**Corollary.** All bases of $V$ have the same number of elements.
+
+*Proof.* If $B_1$ has $m$ elements and $B_2$ has $k$: applying the lemma with
+$B_1$ spanning and $B_2$ independent gives $k \le m$; then swap roles to get
+$m \le k$. So $m = k$. $\qquad\blacksquare$
+
+The common size is the **dimension** $\dim V$. For $\mathbb{R}^n$ it is $n$; for
+degree-$\le d$ polynomials it is $d+1$.
+
+## Checking bases numerically
+
+A finite set of vectors in $\mathbb{R}^n$ forms a basis for its span when the
+matrix whose columns are those vectors has full column rank. Gaussian elimination
+(or the SVD) reveals rank, and hence whether independence holds.
+
+```python
+import numpy as np
+
+# Candidate basis for R^3
+B = np.column_stack([
+    [1.0, 0.0, 2.0],   # b1
+    [0.0, 1.0,-1.0],   # b2
+    [2.0, 1.0, 3.0],   # b3 = 2*b1 + b2 -> dependent!
+])
+
+rank = np.linalg.matrix_rank(B)
+print("rank:", rank)   # 2, not 3 -> columns are dependent
+
+# A genuinely independent set:
+B2 = np.column_stack([
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 1.0],
+])
+print("rank:", np.linalg.matrix_rank(B2))  # 3 -> basis for R^3
+
+# Coordinates of v in the B2 basis (trivial here, but general route: solve Bx=v):
+v = np.array([3.0, -1.0, 5.0])
+x = np.linalg.solve(B2, v)
+print("coordinates:", x)  # [3, -1, 5]
+```
+
+The rank check catches the dependent column; solving the system recovers
+coordinates. With the space and its dimension pinned down, the next lesson asks
+what happens to dimension when a linear map connects two spaces.
