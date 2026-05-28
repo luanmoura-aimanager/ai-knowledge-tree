@@ -143,11 +143,17 @@ def kernel_svm(K, y, C=1.0, lr=1e-3, steps=20000):
     return alpha
 
 alpha = kernel_svm(K, y, C=10.0)
-b = np.mean(y - (alpha * y) @ K)
-preds = np.sign((alpha * y) @ K + b)
+# Recover the bias from MARGIN support vectors only (0 < alpha < C). For these
+# y_i (sum_j alpha_j y_j K_ij + b) = 1, so b = y_i - sum_j alpha_j y_j K_ij.
+C = 10.0
+margin_sv = (alpha > 1e-4) & (alpha < C - 1e-4)
+scores = (alpha * y) @ K
+b = np.mean(y[margin_sv] - scores[margin_sv]) if margin_sv.any() else 0.0
+preds = np.sign(scores + b)
 acc = np.mean(preds == y)
 print(f"kernel-SVM accuracy on circles: {acc:.3f}")
-print(f"support vectors: {int(np.sum(alpha > 1e-4))} / {len(y)}")
+print(f"support vectors: {int(np.sum(alpha > 1e-4))} / {len(y)} "
+      f"(margin SVs used to set bias: {int(margin_sv.sum())})")
 ```
 
 The polynomial-kernel identity matches the explicit feature map, the RBF Gram

@@ -107,12 +107,17 @@ for k in [1, 3, 5, 11, 51]:
     acc = np.mean(y_pred == yte)
     print(f"k={k:>3}: test accuracy={acc:.3f}")
 
-# Distance matters: shuffle the scales of features and watch accuracy collapse
-X_bad = Xte.copy(); X_bad[:, 1] *= 100             # one feature dominates distance
-acc_bad = np.mean(knn_predict(X_bad, Xtr * np.array([1, 100]), ytr, k=5) == yte)
+# Distance matters: add a noisy feature with a huge scale and watch the
+# informative features get drowned out (no train/query mismatch, just
+# a feature whose magnitude dominates the L2 distance).
+noise_tr = 100.0 * rng.normal(size=(len(Xtr), 1))
+noise_te = 100.0 * rng.normal(size=(len(Xte), 1))
+Xtr_noisy = np.column_stack([Xtr, noise_tr])
+Xte_noisy = np.column_stack([Xte, noise_te])
+acc_bad = np.mean(knn_predict(Xte_noisy, Xtr_noisy, ytr, k=5) == yte)
 acc_ok  = np.mean(knn_predict(Xte, Xtr, ytr, k=5) == yte)
-print(f"\nunscaled features:  acc={acc_bad:.3f}  (one feature dominates)")
-print(f"scaled features:    acc={acc_ok:.3f}")
+print(f"\nwith a noisy feature on scale 100: acc={acc_bad:.3f}  (drowns out signal)")
+print(f"informative features only:         acc={acc_ok:.3f}")
 
 # Regression k-NN: average instead of vote
 y_reg = X[:, 0] + 0.3 * rng.normal(size=len(X))
@@ -127,6 +132,6 @@ print(f"k-NN regression test RMSE: {rmse:.3f}")
 ```
 
 The U-shape in $k$ is visible: $k = 1$ overfits, large $k$ underfits, with the
-sweet spot in between. Unscaled features destroy accuracy, confirming the
-scaling caveat. The next lesson explains why all of this gets worse as the
-dimension grows.
+sweet spot in between. Adding one high-magnitude noise feature drowns out the
+informative ones, confirming the scaling caveat. The next lesson explains why
+all of this gets worse as the dimension grows.

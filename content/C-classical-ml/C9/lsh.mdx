@@ -126,7 +126,7 @@ def signatures_match(sig_a, sig_b):
 
 # Single table, vary k (signature length)
 def recall_for_k(k_bits, table_count):
-    recall_total = 0; count = 0
+    recall_total = 0.0; frac_total = 0.0; count = 0
     for query in queries:
         true_top10 = np.argsort(-X @ query)[:10]      # by cosine similarity
         # OR over `table_count` tables
@@ -138,12 +138,13 @@ def recall_for_k(k_bits, table_count):
             # Match if signature agrees on ALL bits
             same = (H == hq).all(axis=1)
             candidate_mask |= same
+        frac_total += candidate_mask.sum() / n         # average over EVERY query
         if candidate_mask.sum() < 10: continue
         cand_idx = np.where(candidate_mask)[0]
         ann_top10 = cand_idx[np.argsort(-(X[cand_idx] @ query))[:10]]
         recall_total += len(set(ann_top10) & set(true_top10)) / 10
         count += 1
-    return recall_total / max(count, 1), candidate_mask.sum() / n
+    return recall_total / max(count, 1), frac_total / len(queries)
 
 print(f"{'k_bits':>8}  {'L tables':>8}  {'recall@10':>10}  {'cand. fraction':>15}")
 for k_bits in [4, 8, 12]:

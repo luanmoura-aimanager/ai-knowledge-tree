@@ -117,31 +117,48 @@ def knn_predict_proba(X_train, y_train, X_query, k=15):
     nn = np.argsort(d, axis=1)[:, :k]
     return y_train[nn].mean(axis=1)
 
-# 5-fold OOF
-K = 5
-folds = np.array_split(rng.permutation(n), K)
-phi = np.zeros((n, 2))
-for i, fold in enumerate(folds):
-    train_idx = np.setdiff1d(np.arange(n), fold)
-    beta = fit_logistic(X[train_idx], y[train_idx])
-    phi[fold, 0] = logistic_predict_proba(beta, X[fold])
-    phi[fold, 1] = knn_predict_proba(X[train_idx], y[train_idx], X[fold], k=15)
+# Hold out a final test set the meta-learner never sees, so the comparison
+# is honest. Use 5-fold OOF on the training data: build phi_tr for fitting
+# the meta-learner, and AVERAGE per-fold test predictions to build phi_te
+# (so train and test base predictions have the same distribution).
+test_idx = rng.permutation(n)[: n // 5]
+train_idx = np.setdiff1d(np.arange(n), test_idx)
+X_tr, y_tr = X[train_idx], y[train_idx]
+X_te, y_te = X[test_idx], y[test_idx]
 
-# Train a simple meta-learner: logistic regression on (phi, y)
-beta_meta = fit_logistic(phi, y)
+K = 5
+folds = np.array_split(rng.permutation(len(X_tr)), K)
+phi_tr = np.zeros((len(X_tr), 2))
+phi_te_acc = np.zeros((len(X_te), 2))
+for fold in folds:
+    inner_train = np.setdiff1d(np.arange(len(X_tr)), fold)
+    beta = fit_logistic(X_tr[inner_train], y_tr[inner_train])
+    phi_tr[fold, 0] = logistic_predict_proba(beta, X_tr[fold])
+    phi_tr[fold, 1] = knn_predict_proba(X_tr[inner_train], y_tr[inner_train],
+                                        X_tr[fold], k=15)
+    # Per-fold test-set predictions; average across folds at the end.
+    phi_te_acc[:, 0] += logistic_predict_proba(beta, X_te)
+    phi_te_acc[:, 1] += knn_predict_proba(X_tr[inner_train], y_tr[inner_train],
+                                          X_te, k=15)
+phi_te = phi_te_acc / K
+
+# Train the meta-learner on OOF predictions
+beta_meta = fit_logistic(phi_tr, y_tr)
 print(f"meta-learner coefficients: intercept={beta_meta[0]:.3f}, "
       f"w_logistic={beta_meta[1]:.3f}, w_knn={beta_meta[2]:.3f}")
 
-# Evaluate: held-out fold accuracy from OOF
-oof_pred = logistic_predict_proba(beta_meta, phi)
-acc_stack = np.mean((oof_pred > 0.5) == y)
-acc_logistic_alone = np.mean((phi[:, 0] > 0.5) == y)
-acc_knn_alone = np.mean((phi[:, 1] > 0.5) == y)
-print(f"OOF accuracy: logistic alone = {acc_logistic_alone:.3f}, "
+# Evaluate every method on the same held-out test set
+stack_pred = logistic_predict_proba(beta_meta, phi_te)
+acc_stack = np.mean((stack_pred > 0.5) == y_te)
+acc_logistic_alone = np.mean((phi_te[:, 0] > 0.5) == y_te)
+acc_knn_alone = np.mean((phi_te[:, 1] > 0.5) == y_te)
+print(f"held-out test accuracy: logistic alone = {acc_logistic_alone:.3f}, "
       f"k-NN alone = {acc_knn_alone:.3f}, stacked = {acc_stack:.3f}")
 ```
 
-The stacked predictor matches or beats the better single base learner; the
-meta-coefficients tell you how the meta-learner weights each base model. The
-next lesson covers cheap alternatives to true stacking: snapshot ensembles
-and voting.
+The meta-coefficients show how the meta-learner weights each base model.
+On this small two-learner toy with k-NN already dominating, stacking does
+not clearly beat the best single learner: the win from stacking comes from
+heterogeneity and from problems where no single model is best across the
+data, not from any two random base learners. The next lesson covers cheap
+alternatives to true stacking: snapshot ensembles and voting.

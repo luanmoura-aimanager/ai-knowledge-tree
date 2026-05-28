@@ -108,9 +108,11 @@ def exact_knn(X, q, k=10):
     d = np.sqrt(((X - q)**2).sum(axis=1))
     return np.argsort(d)[:k]
 
-# Time exact search as the database grows
+# Time exact search as the database grows. Capped at 10^5 to fit comfortably
+# in a Pyodide WebAssembly heap; the linear-in-n trend is already visible at
+# this scale and lets you extrapolate to billions.
 print(f"{'n':>10}  {'time/query (ms)':>15}")
-for n in [10**3, 10**4, 10**5, 10**6]:
+for n in [10**3, 10**4, 10**5]:
     X = rng.normal(size=(n, d)).astype(np.float32)
     q = rng.normal(size=d).astype(np.float32)
     t = time.perf_counter()

@@ -140,36 +140,59 @@ bias_bag = np.mean((bagged_preds.mean(axis=0) - f_true)**2)
 var_bag = np.mean(bagged_preds.var(axis=0))
 print(f"bagged deep polynomial: bias^2 = {bias_bag:.3f}, variance = {var_bag:.3f}  (variance ↓, bias same)")
 
-# Boosting (sequential additive fits): use shallow learners
-def stagewise_fit(x, y, n_rounds=20, eta=0.5, degree=1):
-    F = np.zeros_like(y)
-    rounds = []
-    for _ in range(n_rounds):
-        resid = y - F
-        coefs = fit_poly(x, resid, degree=degree)
-        F = F + eta * predict_poly(coefs, x)
-        rounds.append((eta, coefs))
-    return rounds
+# Boosting must use a weak learner whose model class genuinely expands when
+# combined. Stumps (one-split piecewise constants) work; a sum of degree-1
+# polynomials is still degree 1, so polynomial boosting cannot reduce bias.
+def fit_stump(x, y):
+    order = np.argsort(x); xs, ys = x[order], y[order]
+    cum = np.cumsum(ys); n = len(ys); total = cum[-1]
+    best = (None, None, None, np.inf)
+    for k in range(1, n):
+        thr = (xs[k - 1] + xs[k]) / 2
+        sum_l, sum_r = cum[k - 1], total - cum[k - 1]
+        mean_l, mean_r = sum_l / k, sum_r / (n - k)
+        sse = np.sum((ys[:k] - mean_l)**2) + np.sum((ys[k:] - mean_r)**2)
+        if sse < best[3]: best = (thr, mean_l, mean_r, sse)
+    return best[:3]
 
-def stagewise_predict(rounds, x):
+def predict_stumps(stumps, x):
     F = np.zeros_like(x)
-    for eta, coefs in rounds:
-        F = F + eta * predict_poly(coefs, x)
+    for eta, (thr, ml, mr) in stumps:
+        F = F + eta * np.where(x < thr, ml, mr)
     return F
+
+def stagewise_fit_stumps(x, y, n_rounds=40, eta=0.3):
+    F = np.zeros_like(y); stumps = []
+    for _ in range(n_rounds):
+        thr, ml, mr = fit_stump(x, y - F)
+        stumps.append((eta, (thr, ml, mr)))
+        F = F + eta * np.where(x < thr, ml, mr)
+    return stumps
 
 boost_preds = []
 for t in range(200):
     x, y = make_data(rng=np.random.default_rng(1000 + t))
-    rounds = stagewise_fit(x, y, n_rounds=20, eta=0.3, degree=1)
-    boost_preds.append(stagewise_predict(rounds, x_test))
+    stumps = stagewise_fit_stumps(x, y, n_rounds=40, eta=0.3)
+    boost_preds.append(predict_stumps(stumps, x_test))
 boost_preds = np.array(boost_preds)
 
 bias_boost = np.mean((boost_preds.mean(axis=0) - f_true)**2)
 var_boost = np.mean(boost_preds.var(axis=0))
-print(f"boosted linear regressors: bias^2 = {bias_boost:.3f}, variance = {var_boost:.3f}  (bias ↓ vs single linear)")
+
+# Bias of a single weak learner (one stump): much higher, so we can show the drop.
+single_stump_preds = []
+for t in range(200):
+    x, y = make_data(rng=np.random.default_rng(1000 + t))
+    thr, ml, mr = fit_stump(x, y)
+    single_stump_preds.append(np.where(x_test < thr, ml, mr))
+single_stump_preds = np.array(single_stump_preds)
+bias_single_stump = np.mean((single_stump_preds.mean(axis=0) - f_true)**2)
+
+print(f"single stump:    bias^2 = {bias_single_stump:.3f}")
+print(f"boosted stumps:  bias^2 = {bias_boost:.3f}, variance = {var_boost:.3f}  (bias ↓ vs single stump)")
 ```
 
 Bagging the deep polynomial cuts variance while leaving bias roughly
-unchanged; boosting many linear learners reduces bias relative to a single
-linear fit. The next lesson combines multiple learners explicitly via
-stacking.
+unchanged; boosting stumps drops the bias far below a single stump because
+each round refits the residual with a fresh split. The next lesson
+combines multiple learners explicitly via stacking.

@@ -163,15 +163,16 @@ acc_te = np.mean((pred_te > 0.5) == yte)
 print(f"random-forest test acc: {acc_te:.3f}")
 
 # OOB error: for each training point, average predictions from trees that did not see it
-oob_pred = np.full(len(ytr), np.nan)
 counts = np.zeros(len(ytr))
 votes = np.zeros(len(ytr))
 for tree, oob in zip(trees, oob_idx):
     for i in oob:
         votes[i] += predict(tree, Xtr[i]); counts[i] += 1
-oob_pred = np.where(counts > 0, votes / np.maximum(counts, 1), 0.5)
-oob_acc = np.mean((oob_pred > 0.5) == ytr[counts > 0])
-print(f"OOB accuracy:        {oob_acc:.3f}")
+mask = counts > 0
+oob_pred = votes[mask] / counts[mask]
+oob_acc = np.mean((oob_pred > 0.5) == ytr[mask])
+print(f"OOB accuracy:        {oob_acc:.3f}  "
+      f"(over {int(mask.sum())}/{len(ytr)} examples with >=1 OOB tree)")
 
 # Single tree vs forest
 single = build(Xtr, ytr, m=d, rng=rng, max_depth=8)

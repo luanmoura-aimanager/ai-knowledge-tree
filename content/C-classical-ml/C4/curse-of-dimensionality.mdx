@@ -82,11 +82,15 @@ import numpy as np
 
 rng = np.random.default_rng(0)
 
-# Pairwise distance ratio across increasing dimensions
+# Pairwise distance ratio across increasing dimensions.
+# Compute via ||x - y||^2 = ||x||^2 + ||y||^2 - 2 x^T y to avoid materializing
+# the n x n x d broadcast (which would OOM at large d).
 print(f"{'d':>5}  {'min':>8}  {'max':>8}  {'max/min':>8}  {'std/mean':>8}")
-for d in [1, 2, 10, 100, 1000, 10000]:
+for d in [1, 2, 10, 100, 1000, 5000]:
     X = rng.random(size=(200, d))
-    d2 = np.sum((X[:, None] - X[None, :])**2, axis=2)
+    sq = (X * X).sum(axis=1)
+    d2 = sq[:, None] + sq[None, :] - 2 * X @ X.T
+    d2 = np.maximum(d2, 0.0)                          # clip tiny negatives
     d2_off = d2[~np.eye(len(X), dtype=bool)]
     dist = np.sqrt(d2_off)
     print(f"{d:>5}  {dist.min():>8.3f}  {dist.max():>8.3f}  "

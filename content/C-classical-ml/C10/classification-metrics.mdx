@@ -149,7 +149,7 @@ def metrics_at_threshold(y_true, scores, thr):
     prec = tp / max(tp + fp, 1)
     rec = tp / max(tp + fn, 1)
     f1 = 2 * prec * rec / max(prec + rec, 1e-9)
-    return prec, rec, f1, tp + tn / max(n, 1)
+    return prec, rec, f1, (tp + tn) / max(n, 1)
 
 for thr in [0.0, 0.5, 1.0, 1.5]:
     prec, rec, f1, _ = metrics_at_threshold(y, scores, thr)

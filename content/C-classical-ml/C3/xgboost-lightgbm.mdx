@@ -27,16 +27,19 @@ $$
 \ell(y_i, F_{t-1}(x_i) + f) \approx \ell(y_i, F_{t-1}(x_i)) + g_i f + \tfrac{1}{2} h_i f^2.
 $$
 
-The optimal constant increment in a leaf with set of examples $S$ is
+XGBoost adds an $L_2$ regularizer on leaf weights, so the per-leaf objective
+is $\sum_{i \in S}(g_i f + \tfrac{1}{2}h_i f^2) + \tfrac{1}{2}\lambda f^2$.
+Setting the derivative in $f$ to zero gives the regularized Newton step:
 
 $$
-f^\star = -\frac{\sum_{i \in S} g_i}{\sum_{i \in S} h_i},
+f^\star = -\frac{\sum_{i \in S} g_i}{\sum_{i \in S} h_i + \lambda},
 $$
 
-the **Newton step**. XGBoost computes leaf weights this way, which for
-squared loss recovers the residual mean (since $h_i = 1$), and for log-loss
-adjusts the step by the local curvature. Second-order information makes
-training converge in fewer rounds.
+with the unregularized $f^\star = -G/H$ as the $\lambda = 0$ special case. For
+squared loss $h_i = 1$ and $\lambda = 0$ recover the residual mean; for
+log-loss the local curvature $h_i = p_i(1 - p_i)$ adjusts the step, and the
+$+\lambda$ shrinks leaf weights of small or noisy leaves. Second-order
+information makes training converge in fewer rounds.
 
 ## Regularized split criterion
 
@@ -166,21 +169,18 @@ def predict(tree, X_bins):
 idx_tr = rng.choice(n, size=1100, replace=False)
 idx_te = np.setdiff1d(np.arange(n), idx_tr)
 
-# Newton boosting for log-loss. We compute gradient + hessian on the *training*
-# rows only (a held-out test fold), but pass the full X_bins so the fitted tree
-# can predict on test rows too. Test-row gradients enter the tree as zeros, so
-# they do not steer splits.
-g_full = np.zeros(n); h_full = np.full(n, 1e-3)
+# Newton boosting for log-loss. Build each tree on TRAINING rows only (so
+# splits and leaf weights are unpolluted by test data), then apply it to the
+# full X_bins to extend F to both train and test rows.
 F = np.zeros(n)
 eta = 0.1
 trees = []
+X_bins_tr = X_bins[idx_tr]
 for t in range(60):
-    p_t = 1 / (1 + np.exp(-F))
-    g_tr = p_t[idx_tr] - y[idx_tr]
-    h_tr = p_t[idx_tr] * (1 - p_t[idx_tr]) + 1e-3
-    g_full[:] = 0.0; g_full[idx_tr] = g_tr
-    h_full[:] = 1e-3; h_full[idx_tr] = h_tr
-    tree = fit_tree_hist(X_bins, g_full, h_full, max_depth=3, lam=1.0)
+    p_t = 1 / (1 + np.exp(-F[idx_tr]))
+    g_tr = p_t - y[idx_tr]
+    h_tr = p_t * (1 - p_t) + 1e-3
+    tree = fit_tree_hist(X_bins_tr, g_tr, h_tr, max_depth=3, lam=1.0)
     F = F + eta * predict(tree, X_bins)
     trees.append(tree)
 

@@ -136,8 +136,10 @@ s_train, y_train = make_data(n_train, rng)
 s_val, y_val = make_data(n_val, rng)
 s_test, y_test = make_data(n_test, rng)
 
-# Build a miscalibrated "classifier" that produces over-confident scores by squaring
-def miscalibrate(s): return s**3 / 8 * np.sign(s)
+# Build a miscalibrated "classifier" that amplifies the true score: a steeper
+# monotone distortion makes sigmoid(miscal(s)) sit much closer to 0 / 1 than
+# the true probabilities, so the classifier is overconfident at the extremes.
+def miscalibrate(s): return 3.0 * s
 mis_train = miscalibrate(s_train)
 mis_val = miscalibrate(s_val)
 mis_test = miscalibrate(s_test)
@@ -201,6 +203,8 @@ print(f"{'Platt':>15}  {brier(y_test, p_platt_test):.4f}")
 print(f"{'Isotonic':>15}  {brier(y_test, p_iso_test):.4f}")
 ```
 
-Both calibration methods improve Brier score over the raw uncalibrated
-probabilities. The next lesson covers how to construct the held-out sets
-properly: cross-validation strategies.
+Platt scaling improves Brier substantially over the raw uncalibrated
+probabilities; isotonic on this small validation set overfits and ends up
+worse, illustrating the body's caveat about isotonic needing more
+calibration data. The next lesson covers how to construct the held-out
+sets properly: cross-validation strategies.
