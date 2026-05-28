@@ -16,8 +16,8 @@ export async function Header() {
           🌳 AI Knowledge Tree
         </Link>
         <nav className="flex gap-1 text-sm items-center">
-          <NavLink href="/">Dashboard</NavLink>
-          <NavLink href="/connections">Connections</NavLink>
+          <NavLink href="/">Painel</NavLink>
+          <NavLink href="/connections">Conexões</NavLink>
           {dbEnabled() && <AuthControl session={session} />}
         </nav>
       </div>
