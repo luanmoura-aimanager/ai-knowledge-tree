@@ -1,0 +1,124 @@
+---
+title: "Determinants and volume"
+pillar: A
+subId: A1
+lessonId: determinants
+order: 8
+estimatedMinutes: 20
+goal: "Define the determinant as a signed volume scaling, derive its key properties, and tie det=0 to singularity."
+prerequisites: ["linear-maps-matrices"]
+---
+
+A linear map distorts space: it might expand, contract, or collapse it. The
+**determinant** is the number that measures that distortion. It is a single scalar
+that encodes whether a matrix is invertible and by how much it scales volumes.
+
+## Definition via volume
+
+For a square matrix $A \in \mathbb{R}^{n \times n}$, the determinant $\det A$
+(also written $|A|$) is the signed volume of the parallelepiped spanned by the
+column vectors of $A$, relative to the unit cube's volume of $1$.
+
+Two properties characterize the determinant completely (up to normalization):
+
+1. **Multilinearity in each column.** Scaling one column by $c$ scales the
+   determinant by $c$. Splitting a column into a sum of two columns splits
+   the determinant into a sum of two determinants.
+2. **Alternating.** Swapping any two columns changes the sign of the
+   determinant.
+
+The normalization $\det I = 1$ (the identity does not distort volume) pins it
+down. From these three requirements, one can derive the cofactor-expansion formula
+and every other property.
+
+## Key properties
+
+**Product rule:**
+$$
+\det(AB) = \det(A)\,\det(B).
+$$
+
+*Derivation.* Both sides depend multilinearly on the columns of $A$ and $B$.
+The cleanest proof uses the fact that any matrix is a product of elementary
+matrices (row operations), whose determinants multiply; here we state it as the
+fundamental multiplicativity law.
+
+**Transpose:**
+$$
+\det(A^\top) = \det(A).
+$$
+
+So everything that holds for columns holds for rows: swapping rows changes sign,
+scaling a row scales the determinant, and a zero row gives $\det = 0$.
+
+**Triangular matrices:** $\det A = a_{11} a_{22} \cdots a_{nn}$ (the product of
+diagonal entries). Follows from multilinearity and alternating: off-diagonal
+entries in a triangular matrix contribute zero.
+
+**Block diagonal:** $\det\begin{pmatrix} A & 0 \\ 0 & B \end{pmatrix} = \det(A)\det(B)$.
+
+## Determinant = 0 means singular
+
+$\det A = 0$ if and only if the columns of $A$ are linearly dependent, i.e. the
+map $x \mapsto Ax$ collapses $\mathbb{R}^n$ into a lower-dimensional subspace.
+The collapsed image has zero $n$-dimensional volume, so the determinant (a volume
+scale factor) is zero. A matrix with nonzero determinant is **invertible** (or
+*nonsingular*), and
+
+$$
+\det(A^{-1}) = \frac{1}{\det(A)}.
+$$
+
+## Computing the determinant
+
+For $2 \times 2$:
+$$
+\det\begin{pmatrix} a & b \\ c & d \end{pmatrix} = ad - bc.
+$$
+
+For $n \times n$, the cofactor expansion along column $j$ gives a recursion:
+$$
+\det A = \sum_{i=1}^n (-1)^{i+j}\, a_{ij}\, M_{ij},
+$$
+where $M_{ij}$ is the determinant of the $(n-1)\times(n-1)$ matrix obtained by
+deleting row $i$ and column $j$. This is $O(n!)$ naively, but the LU
+factorization computes the determinant in $O(n^3)$ as the product of the LU
+diagonal entries (with sign from the row-swap parity).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+A = np.array([[2.0, 1.0, 0.0],
+              [1.0, 3.0, 1.0],
+              [0.0, 1.0, 2.0]])
+
+d = np.linalg.det(A)
+print(f"det(A) = {d:.6f}")   # should be 2*5-1*2 = 8 (cofactor along row 1)
+
+# Product rule: det(AB) = det(A)*det(B)
+B = np.array([[1.0, 2.0, 0.0],
+              [0.0, 1.0, 3.0],
+              [2.0, 0.0, 1.0]])
+print(f"det(A)*det(B) = {d * np.linalg.det(B):.6f}")
+print(f"det(A@B)      = {np.linalg.det(A @ B):.6f}")   # same
+
+# Singular matrix: det = 0
+C = np.array([[1.0, 2.0, 3.0],
+              [2.0, 4.0, 6.0],
+              [1.0, 0.0, 1.0]])
+print(f"det(C) = {np.linalg.det(C):.2e}")   # ~0 (row 2 = 2*row 1)
+
+# Triangular: det = product of diagonal
+T = np.array([[3.0, 1.0, 5.0],
+              [0.0, 2.0, 7.0],
+              [0.0, 0.0, 4.0]])
+print(f"det(T) = {np.linalg.det(T):.4f}")  # 3*2*4 = 24
+print(f"diagonal product = {3*2*4}")
+```
+
+The product rule holds to floating-point precision; the singular matrix gives a
+determinant near zero; the triangular matrix matches its diagonal product. With
+the determinant linking to singularity, the next lesson asks: which vectors does
+$A$ only scale, without rotating?

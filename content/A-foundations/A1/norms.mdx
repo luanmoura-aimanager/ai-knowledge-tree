@@ -1,0 +1,117 @@
+---
+title: "Norms and the geometry of distance"
+pillar: A
+subId: A1
+lessonId: norms
+order: 5
+estimatedMinutes: 18
+goal: "Define norms via their three axioms, meet the p-norms, and connect L1 and L2 to sparsity and Euclidean length."
+prerequisites: ["vector-spaces"]
+---
+
+A vector space has no built-in notion of length. A **norm** adds one. The choice
+of norm shapes which solutions we prefer in an optimization problem: L2 favors
+small overall magnitude, L1 favors sparsity, and each choice comes with its own
+geometry.
+
+## The three axioms
+
+A **norm** on a vector space $V$ is a function $\lVert \cdot \rVert: V \to \mathbb{R}$ satisfying:
+
+1. **Positivity:** $\lVert v\rVert \ge 0$, with $\lVert v\rVert = 0$ only when $v = 0$.
+2. **Absolute homogeneity:** $\lVert \alpha v\rVert = |\alpha|\,\lVert v\rVert$ for all
+   $\alpha \in \mathbb{R}$.
+3. **Triangle inequality:** $\lVert u + v\rVert \le \lVert u\rVert + \lVert v\rVert$.
+
+Axiom 1 says the only zero-length vector is the origin. Axiom 2 says scaling a
+vector scales its length proportionally. Axiom 3 is the geometric fact that the
+direct path is never longer than a detour.
+
+## The p-norms
+
+For $v \in \mathbb{R}^n$ and $p \ge 1$, the **$\ell^p$ norm** is
+
+$$
+\lVert v\rVert_p = \left(\sum_{i=1}^n |v_i|^p\right)^{1/p}.
+$$
+
+The three cases that appear constantly in machine learning:
+
+**$\ell^2$ (Euclidean norm, $p=2$):**
+$\lVert v\rVert_2 = \sqrt{v_1^2 + \cdots + v_n^2}$.
+This is the familiar length of an arrow in space. Its unit ball $\{v : \lVert v\rVert_2 \le 1\}$
+is the round sphere. Minimizing $\lVert v\rVert_2$ penalizes all coordinates
+uniformly and typically produces many small, nonzero entries.
+
+**$\ell^1$ (Manhattan norm, $p=1$):**
+$\lVert v\rVert_1 = |v_1| + \cdots + |v_n|$.
+The unit ball is a diamond (hyperoctahedron). Minimizing $\lVert v\rVert_1$ in an
+optimization problem tends to push most coordinates to exactly zero: the corners
+of the diamond are where the constraint boundary meets objective-level sets, and
+corners have many zero coordinates. This is the geometric root of the sparsity
+effect in LASSO.
+
+**$\ell^\infty$ (max norm, $p \to \infty$):**
+$\lVert v\rVert_\infty = \max_i |v_i|$.
+The unit ball is a hypercube. It penalizes the single largest entry.
+
+All $\ell^p$ norms for $p \ge 1$ are genuine norms. The hard part is the triangle
+inequality (Minkowski's inequality); the proof uses Holder's inequality, which the
+inner-products lesson derives in the $p=2$ case.
+
+## Equivalence of norms
+
+On a finite-dimensional space all norms are **equivalent**: for any two norms
+$\lVert \cdot \rVert_a$ and $\lVert \cdot \rVert_b$, there exist constants
+$c, C > 0$ such that
+
+$$
+c\,\lVert v\rVert_a \;\le\; \lVert v\rVert_b \;\le\; C\,\lVert v\rVert_a.
+$$
+
+For $\mathbb{R}^n$ the explicit constants between $\ell^1$, $\ell^2$, $\ell^\infty$
+are:
+
+$$
+\lVert v\rVert_\infty \;\le\; \lVert v\rVert_2 \;\le\; \lVert v\rVert_1 \;\le\; \sqrt{n}\,\lVert v\rVert_2 \;\le\; n\,\lVert v\rVert_\infty.
+$$
+
+Equivalence means that convergence and continuity are norm-independent in finite
+dimensions; the choice of norm matters for *optimization* (it shapes solutions)
+but not for *analysis* (it does not change which sequences converge).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+v = np.array([3.0, -4.0, 0.0, 1.0])
+
+l1 = np.linalg.norm(v, ord=1)
+l2 = np.linalg.norm(v, ord=2)
+linf = np.linalg.norm(v, ord=np.inf)
+
+print(f"L1 = {l1:.4f}")     # 8.0
+print(f"L2 = {l2:.4f}")     # 5.0990...
+print(f"Linf = {linf:.4f}") # 4.0
+
+# Verify the inequalities: linf <= l2 <= l1 <= sqrt(n)*l2
+n = len(v)
+print(f"linf <= l2: {linf <= l2 + 1e-12}")            # True
+print(f"l2 <= l1: {l2 <= l1 + 1e-12}")                # True
+print(f"l1 <= sqrt(n)*l2: {l1 <= np.sqrt(n)*l2 + 1e-12}")  # True
+
+# Sparsity intuition: L1-minimizing solution of min ||x||_1 s.t. x in an affine set
+# is often sparse. Quick demo with a random underdetermined system:
+rng = np.random.default_rng(42)
+A = rng.normal(size=(3, 8))   # 3 equations, 8 unknowns -> many solutions
+b = rng.normal(size=3)
+
+# L2-minimum norm solution via pseudo-inverse:
+x_l2 = np.linalg.lstsq(A, b, rcond=None)[0]
+print(f"L2 solution nonzeros: {np.sum(np.abs(x_l2) > 1e-8)}")  # likely 3 (full)
+```
+
+The L2 solution typically uses all available coordinates; a proper L1 solve
+(requires a QP or LASSO solver not shown here) would produce a sparse vector.
+With a norm in hand, the inner-products lesson adds the angle between two vectors.

@@ -1,0 +1,128 @@
+---
+title: "Low-rank approximation (Eckart–Young) & PCA"
+pillar: A
+subId: A1
+lessonId: low-rank-pca
+order: 13
+estimatedMinutes: 24
+goal: "Prove the truncated SVD is the best low-rank approximation, and identify PCA as the SVD of the centered data matrix."
+prerequisites: ["svd"]
+---
+
+Storing a full $m \times n$ matrix costs $mn$ numbers. Often the matrix is
+*approximately* low-rank: most of the information lives in a few directions.
+The Eckart–Young theorem says the truncated SVD is the optimal compression, and
+PCA applies this directly to data.
+
+## Low-rank approximation
+
+The **rank-$k$ truncated SVD** of $A = U\Sigma V^\top$ is
+
+$$
+A_k = \sum_{i=1}^k \sigma_i u_i v_i^\top,
+$$
+
+using only the $k$ largest singular values and their associated vectors.
+$A_k$ is a rank-$k$ matrix (a sum of $k$ rank-1 outer products).
+
+**Eckart–Young theorem.** Among all rank-$k$ matrices $B$,
+
+$$
+\lVert A - A_k\rVert_F \;\le\; \lVert A - B\rVert_F,
+$$
+
+and the same holds with the spectral norm (largest singular value). The truncated
+SVD is the closest rank-$k$ matrix to $A$ in both the Frobenius and spectral
+norms.
+
+*Proof sketch (Frobenius norm).* Write the Frobenius norm using singular values:
+$\lVert A\rVert_F^2 = \sum_i \sigma_i^2$. The approximation error is
+
+$$
+\lVert A - A_k\rVert_F^2 = \sum_{i=k+1}^r \sigma_i^2.
+$$
+
+For any rank-$k$ matrix $B$, $B$ has a null space of dimension $\ge n - k$, so
+there exists a nonzero $w$ in $\operatorname{span}(v_1, \dots, v_{k+1}) \cap \ker B$
+(the intersection of a $(k+1)$-dimensional space with the $(n-k)$-dimensional
+null space of $B$; by dimension count this is at least 1-dimensional). Then
+
+$$
+\lVert A - B\rVert_F^2 \ge \lVert (A - B)w/\lVert w\rVert\rVert^2 = \lVert Aw\rVert^2 \ge \sigma_{k+1}^2,
+$$
+
+where the last inequality uses the fact that $w$ is in the span of the first
+$k+1$ right singular vectors and $\lVert Av_{k+1}\rVert = \sigma_{k+1}$. A more
+careful argument shows the lower bound is $\sum_{i>k}\sigma_i^2$, matching the
+error of $A_k$. $\qquad\blacksquare$
+
+## Energy captured
+
+The **fraction of variance explained** by $A_k$ is
+
+$$
+\frac{\sum_{i=1}^k \sigma_i^2}{\sum_{i=1}^r \sigma_i^2}.
+$$
+
+Plotting this as a function of $k$ gives the **scree plot**: the knee where adding
+more components yields diminishing returns is the natural choice of rank.
+
+## PCA as truncated SVD
+
+Given a data matrix $X \in \mathbb{R}^{n \times d}$ (rows = samples, columns =
+features), **principal component analysis (PCA)** proceeds:
+
+1. **Center:** subtract the column means, obtaining $\tilde{X}$ with mean zero.
+2. **Compute SVD:** $\tilde{X} = U\Sigma V^\top$.
+3. **Project onto $k$ components:** the score matrix is $Z = \tilde{X} V_k$, where
+   $V_k$ is the first $k$ columns of $V$.
+
+The $i$-th column of $V$ (the $i$-th **right singular vector**) is the $i$-th
+**principal direction**: the direction of maximum remaining variance after
+removing the previous $i-1$ directions. The corresponding singular value
+$\sigma_i$ encodes how much variance lies along it ($\sigma_i^2/n$ is the
+variance in that direction).
+
+The covariance matrix is $\frac{1}{n}\tilde{X}^\top\tilde{X} = \frac{1}{n}V\Sigma^2 V^\top$,
+so the principal directions are the eigenvectors of the sample covariance and the
+principal variances are its eigenvalues.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(42)
+
+# Synthetic data: 200 samples, 10 features, low-rank signal
+d, n, k_true = 10, 200, 3
+V_true = np.linalg.qr(rng.normal(size=(d, k_true)))[0]   # 3 orthonormal directions
+scores = rng.normal(scale=[5, 3, 1], size=(n, k_true))    # varying variance
+X = scores @ V_true.T + 0.2 * rng.normal(size=(n, d))    # signal + noise
+
+# Center
+X_c = X - X.mean(axis=0)
+
+# SVD
+U, s, Vt = np.linalg.svd(X_c, full_matrices=False)
+
+# Scree: fraction of variance explained
+total = (s**2).sum()
+explained = np.cumsum(s**2) / total
+print("cumulative variance explained (k=1,2,3,4):", np.round(explained[:4], 3))
+
+# Rank-k approximation
+k = 3
+X_approx = U[:, :k] * s[:k] @ Vt[:k, :]
+print(f"rank-{k} Frobenius error / total norm:", np.linalg.norm(X_c - X_approx, 'fro') / np.linalg.norm(X_c, 'fro'))
+
+# PCA scores: project onto first k principal directions
+Z = X_c @ Vt[:k].T    # (n, k) scores
+print("variance of first component:", np.var(Z[:, 0], ddof=1))
+print("expected (s[0]^2 / (n-1)):", s[0]**2 / (n - 1))
+```
+
+The first three components capture most of the variance; the rank-3 approximation
+has low relative error; and the PCA score variance matches the expected formula.
+With the best low-rank approximation understood, the next lesson looks at the
+factorizations that solve linear systems efficiently without forming inverses.

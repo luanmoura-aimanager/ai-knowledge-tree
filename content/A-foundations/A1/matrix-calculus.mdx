@@ -1,0 +1,148 @@
+---
+title: "Matrix calculus & the chain rule"
+pillar: A
+subId: A1
+lessonId: matrix-calculus
+order: 16
+estimatedMinutes: 26
+goal: "Fix a layout convention, derive the gradients of the linear, quadratic, and affine forms, and compose them into a matrix-level chain rule."
+prerequisites: ["linear-maps-matrices"]
+---
+
+Neural networks are compositions of differentiable maps. Computing their gradients
+by hand requires differentiating expressions that involve matrices, not just
+scalars. The key is to fix a layout convention once, then derive the gradient of
+each building block systematically.
+
+## Layout convention: numerator layout
+
+When a scalar $f$ depends on a vector $x \in \mathbb{R}^n$, the gradient
+$\nabla_x f$ is a column vector of partial derivatives:
+
+$$
+\nabla_x f = \frac{\partial f}{\partial x} = \begin{pmatrix}\partial f/\partial x_1 \\ \vdots \\ \partial f/\partial x_n\end{pmatrix} \in \mathbb{R}^n.
+$$
+
+When a vector $y \in \mathbb{R}^m$ depends on $x \in \mathbb{R}^n$, the
+**Jacobian** is the $m \times n$ matrix
+
+$$
+J = \frac{\partial y}{\partial x}, \qquad J_{ij} = \frac{\partial y_i}{\partial x_j}.
+$$
+
+Row $i$ of $J$ is the gradient of $y_i$ with respect to $x$ (transposed). This
+**numerator layout** (also called "denominator layout" in some texts; conventions
+differ) makes the chain rule stack Jacobians in the natural left-to-right
+multiplication order: $\frac{\partial z}{\partial x} = \frac{\partial z}{\partial y}\frac{\partial y}{\partial x}$.
+
+## Gradient of the linear form
+
+Let $f(x) = a^\top x = a_1 x_1 + \cdots + a_n x_n$.
+
+$$
+\frac{\partial f}{\partial x_j} = a_j \implies \nabla_x(a^\top x) = a.
+$$
+
+## Gradient of the quadratic form
+
+Let $f(x) = x^\top A x$ with $A$ symmetric. Write index-by-index:
+
+$$
+f = \sum_{i,j} a_{ij} x_i x_j.
+$$
+
+The partial derivative with respect to $x_k$:
+
+$$
+\frac{\partial f}{\partial x_k} = \sum_j a_{kj} x_j + \sum_i a_{ik} x_i = (Ax)_k + (A^\top x)_k = 2(Ax)_k,
+$$
+
+where the last step uses $A = A^\top$. So
+
+$$
+\nabla_x(x^\top A x) = 2Ax.
+$$
+
+## Jacobian of the affine map
+
+Let $y = Ax + b$ with $A \in \mathbb{R}^{m \times n}$, $b \in \mathbb{R}^m$.
+
+$$
+y_i = \sum_j a_{ij} x_j + b_i \implies \frac{\partial y_i}{\partial x_j} = a_{ij}.
+$$
+
+So the Jacobian is $\frac{\partial y}{\partial x} = A$.
+
+The intuition is direct: differentiating an affine map with respect to its input
+recovers its linear part.
+
+## Chain rule for matrix expressions
+
+If $z = h(y)$ and $y = g(x)$, the chain rule gives
+
+$$
+\frac{\partial z}{\partial x} = \frac{\partial z}{\partial y} \cdot \frac{\partial y}{\partial x}.
+$$
+
+For a scalar loss $L = \ell(y)$ and $y = Ax + b$:
+
+$$
+\nabla_x L = \left(\frac{\partial y}{\partial x}\right)^\top \nabla_y L = A^\top \nabla_y L.
+$$
+
+The transpose appears because the gradient is a column vector: the chain rule
+produces a Jacobian transpose times the upstream gradient.
+
+## Backprop as repeated chain rule
+
+For a two-layer network $z = W_2 \sigma(W_1 x)$ with loss $L(z)$:
+
+**Forward pass:** $h = W_1 x$, $a = \sigma(h)$ (elementwise), $z = W_2 a$, then $L(z)$.
+
+**Backward pass:**
+
+- $\delta_z = \nabla_z L$ (upstream gradient, given).
+- $\delta_a = W_2^\top \delta_z$ (chain rule through linear layer).
+- $\delta_h = \delta_a \odot \sigma'(h)$ (chain rule through elementwise nonlinearity;
+  $\odot$ is elementwise multiplication).
+- $\nabla_{W_1} L = \delta_h x^\top$ (outer product: gradient of linear layer w.r.t. weights).
+
+Each step is a Jacobian transpose times the upstream gradient. Chaining them
+across all layers produces backpropagation.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Verify gradients with finite differences
+def finite_diff(f, x, eps=1e-5):
+    grad = np.zeros_like(x)
+    for i in range(len(x)):
+        x_plus = x.copy(); x_plus[i] += eps
+        x_minus = x.copy(); x_minus[i] -= eps
+        grad[i] = (f(x_plus) - f(x_minus)) / (2 * eps)
+    return grad
+
+x = np.array([1.0, 2.0, 3.0])
+A = np.array([[2.0, 1.0, 0.0],
+              [1.0, 3.0, 1.0],
+              [0.0, 1.0, 4.0]])  # symmetric
+
+# Quadratic form: f(x) = x^T A x, grad = 2Ax
+f_quad = lambda x: x @ A @ x
+grad_analytic = 2 * A @ x
+grad_fd = finite_diff(f_quad, x)
+print("quadratic form gradient error:", np.max(np.abs(grad_analytic - grad_fd)))  # ~1e-9
+
+# Affine map composed with squared L2: L = ||Ax - b||^2, grad = 2 A^T (Ax - b)
+b = np.array([1.0, 0.0, -1.0])
+f_ls = lambda x: np.sum((A @ x - b)**2)
+grad_ls_analytic = 2 * A.T @ (A @ x - b)
+grad_ls_fd = finite_diff(f_ls, x)
+print("least-squares gradient error:", np.max(np.abs(grad_ls_analytic - grad_ls_fd)))  # ~1e-9
+```
+
+Finite differences confirm the analytic gradients to near-float precision.
+The final lesson generalizes this calculus to higher-order arrays (tensors) and
+the Einstein summation notation that batch computations in deep learning rely on.

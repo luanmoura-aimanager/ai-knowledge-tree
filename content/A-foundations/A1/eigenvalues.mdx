@@ -1,0 +1,117 @@
+---
+title: "Eigenvalues & eigenvectors"
+pillar: A
+subId: A1
+lessonId: eigenvalues
+order: 9
+estimatedMinutes: 22
+goal: "Define eigenpairs, find them through the characteristic polynomial, and interpret them as invariant scaling directions."
+prerequisites: ["determinants"]
+---
+
+Most vectors, when multiplied by a matrix, change direction. An **eigenvector**
+is a direction that a matrix leaves alone, only stretching or flipping it. Finding
+these invariant directions reveals the intrinsic geometry of the transformation.
+
+## Definition
+
+A nonzero vector $v \in \mathbb{R}^n$ is an **eigenvector** of $A \in \mathbb{R}^{n \times n}$
+with **eigenvalue** $\lambda \in \mathbb{R}$ (or $\mathbb{C}$) if
+
+$$
+Av = \lambda v.
+$$
+
+The vector $v$ is mapped to a scalar multiple of itself: it stays on its own line.
+The scalar $\lambda$ may be positive (same direction), negative (flipped),
+zero (collapsed), or complex.
+
+The pair $(\lambda, v)$ is called an **eigenpair**. Eigenvectors are not unique:
+any nonzero multiple $cv$ of an eigenvector is again an eigenvector for the same
+$\lambda$ (since $A(cv) = c(Av) = c\lambda v = \lambda(cv)$). The
+**eigenspace** $E_\lambda = \ker(A - \lambda I)$ is the set of all eigenvectors
+for $\lambda$, together with $0$.
+
+## Finding eigenvalues: the characteristic polynomial
+
+Rewrite $Av = \lambda v$ as $(A - \lambda I)v = 0$. A nonzero solution exists if
+and only if $A - \lambda I$ is singular, which by the previous lesson means
+
+$$
+\det(A - \lambda I) = 0.
+$$
+
+Expanding the determinant in the variable $\lambda$ yields the **characteristic
+polynomial** $p(\lambda) = \det(A - \lambda I)$, a polynomial of degree $n$ in
+$\lambda$. Its roots are the eigenvalues. By the fundamental theorem of algebra,
+counting complex roots with multiplicity, there are exactly $n$ roots.
+
+## Two useful facts
+
+**Trace and determinant.**
+$$
+\sum_{i=1}^n \lambda_i = \operatorname{tr}(A), \qquad \prod_{i=1}^n \lambda_i = \det(A).
+$$
+
+The trace is the sum of diagonal entries. These follow from expanding
+$p(\lambda) = \det(A - \lambda I)$ and comparing coefficients at the leading and
+constant terms.
+
+**Eigenvalues of triangular matrices.** If $A$ is upper (or lower) triangular,
+$A - \lambda I$ is also triangular, and its determinant is the product of
+diagonal entries $a_{ii} - \lambda$. So the eigenvalues are exactly the diagonal
+entries.
+
+## Algebraic vs. geometric multiplicity
+
+The **algebraic multiplicity** of $\lambda$ is its multiplicity as a root of the
+characteristic polynomial. The **geometric multiplicity** is $\dim E_\lambda$.
+Geometric multiplicity is always $\le$ algebraic multiplicity. When they are
+equal for every eigenvalue, the matrix is called **diagonalizable** (the next
+lesson proves this rigorously).
+
+## Complex eigenvalues for real matrices
+
+A real matrix can have complex eigenvalues, always in conjugate pairs
+$\lambda, \bar\lambda$. For a $2\times 2$ rotation matrix
+
+$$
+R_\theta = \begin{pmatrix}\cos\theta & -\sin\theta \\ \sin\theta & \cos\theta\end{pmatrix}
+$$
+
+the characteristic polynomial is $\lambda^2 - 2\cos\theta\,\lambda + 1 = 0$,
+whose roots are $e^{\pm i\theta}$: pure rotation has no real invariant direction.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+A = np.array([[4.0, 1.0],
+              [2.0, 3.0]])
+
+eigenvalues, eigenvectors = np.linalg.eig(A)
+print("eigenvalues:", eigenvalues)       # [5, 2]
+print("eigenvectors (columns):\n", eigenvectors)
+
+# Verify: A @ v == lambda * v for each pair
+for i, lam in enumerate(eigenvalues):
+    v = eigenvectors[:, i]
+    print(f"A@v - lam*v = {np.round(A @ v - lam * v, 10)}")  # ~zero
+
+# Trace and det from eigenvalues
+print("trace(A):", np.trace(A), "= sum of eigenvalues:", eigenvalues.sum())
+print("det(A):", np.linalg.det(A), "= product of eigenvalues:", eigenvalues.prod())
+
+# Triangular matrix: eigenvalues are the diagonal entries
+T = np.array([[3.0, 5.0, 1.0],
+              [0.0, 7.0, 2.0],
+              [0.0, 0.0,-1.0]])
+lams = np.linalg.eig(T)[0]
+print("triangular eigenvalues:", np.sort(lams)[::-1], "diagonal:", [3, 7, -1])
+```
+
+The residuals $Av - \lambda v$ are near zero; trace and determinant match the
+eigenvalue sums and products. When a symmetric matrix enters the picture, its
+eigenvalues are always real and its eigenvectors always orthogonal: the spectral
+theorem, the subject of the next lesson.

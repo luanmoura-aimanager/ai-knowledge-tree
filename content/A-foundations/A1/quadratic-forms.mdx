@@ -1,0 +1,127 @@
+---
+title: "Quadratic forms & positive definiteness"
+pillar: A
+subId: A1
+lessonId: quadratic-forms
+order: 11
+estimatedMinutes: 18
+goal: "Read a quadratic form through the spectrum of its matrix, and use eigenvalue signs to test positive (semi)definiteness."
+prerequisites: ["spectral-theorem"]
+---
+
+Loss surfaces, covariance matrices, and curvature in optimization all wear the
+same algebraic dress: a **quadratic form**. Reading the signs of the eigenvalues
+tells you whether the bowl opens up everywhere, flattens out, or has saddle
+directions.
+
+## Definition
+
+A **quadratic form** in $x \in \mathbb{R}^n$ is a scalar function
+
+$$
+q(x) = x^\top A x = \sum_{i,j} a_{ij} x_i x_j,
+$$
+
+where $A \in \mathbb{R}^{n \times n}$. Without loss of generality, $A$ can always
+be taken symmetric: $x^\top A x = x^\top \frac{A + A^\top}{2} x$, so replace $A$
+by its symmetrization. The cross-term $a_{ij} x_i x_j + a_{ji} x_j x_i =
+(a_{ij} + a_{ji}) x_i x_j$ shows that only the symmetric part matters.
+
+For $n = 2$:
+
+$$
+q(x) = a_{11}x_1^2 + 2a_{12}x_1 x_2 + a_{22}x_2^2.
+$$
+
+The level sets $q(x) = c$ are ellipses (when the form is definite) or hyperbolas
+(when it is indefinite).
+
+## Definiteness
+
+A symmetric matrix $A$ is called:
+
+| Term | Condition | Eigenvalues |
+|---|---|---|
+| **Positive definite (PD)** | $x^\top A x > 0$ for all $x \neq 0$ | All $\lambda_i > 0$ |
+| **Positive semidefinite (PSD)** | $x^\top A x \ge 0$ for all $x$ | All $\lambda_i \ge 0$ |
+| **Negative definite (ND)** | $x^\top A x < 0$ for all $x \neq 0$ | All $\lambda_i < 0$ |
+| **Indefinite** | Both signs occur | Mixed signs |
+
+**Proof that eigenvalue signs determine definiteness.**
+By the spectral theorem $A = Q\Lambda Q^\top$. Substitute $x = Qy$ (bijective
+since $Q$ is invertible):
+
+$$
+x^\top A x = y^\top Q^\top A Q y = y^\top \Lambda y = \sum_i \lambda_i y_i^2.
+$$
+
+If all $\lambda_i > 0$, the sum is positive whenever $y \neq 0$, i.e. whenever
+$x \neq 0$. If some $\lambda_i < 0$, choose $y = e_i$ (so $x = Qe_i = q_i$) to
+get $q(q_i) = \lambda_i < 0$. The sign pattern of the eigenvalues is exactly the
+definiteness. $\qquad\blacksquare$
+
+## Covariance matrices are PSD
+
+If $X \in \mathbb{R}^{n \times d}$ is a data matrix (rows are observations), the
+sample covariance $\Sigma = \frac{1}{n} X^\top X$ (after centering) satisfies
+
+$$
+v^\top \Sigma v = \frac{1}{n} v^\top X^\top X v = \frac{1}{n} \lVert Xv\rVert^2 \ge 0,
+$$
+
+so $\Sigma$ is PSD. Its eigenvalues are the squared singular values of
+$\frac{1}{\sqrt{n}} X$, and they are nonnegative.
+
+## Sylvester's criterion (practical test)
+
+For a symmetric $A$, positive definiteness is equivalent to all **leading
+principal minors** being positive. The $k$-th leading principal minor is the
+determinant of the top-left $k \times k$ block of $A$:
+
+$$
+\Delta_k = \det A_{1:k,\, 1:k} > 0 \quad \text{for } k = 1, \dots, n.
+$$
+
+This gives an $O(n^3)$ test (compute $n$ determinants, each $O(k^3)$, amortized
+via Cholesky: if Cholesky succeeds, the matrix is PD).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# PD matrix: A = Q diag(3,1) Q^T, eigenvalues 3 and 1
+theta = np.pi / 6
+Q = np.array([[np.cos(theta), -np.sin(theta)],
+              [np.sin(theta),  np.cos(theta)]])
+A = Q @ np.diag([3.0, 1.0]) @ Q.T
+
+# Visualize q(x) on a grid and confirm q > 0 everywhere
+x1, x2 = np.meshgrid(np.linspace(-1, 1, 40), np.linspace(-1, 1, 40))
+X = np.stack([x1.ravel(), x2.ravel()])
+q_vals = np.einsum("ij,jk,ik->i", X.T, A, X.T)   # batched x^T A x
+print("min quadratic form value:", q_vals.min())    # > 0 (PD)
+
+# Indefinite matrix: eigenvalues 3 and -1
+A_indef = Q @ np.diag([3.0, -1.0]) @ Q.T
+q_indef = np.einsum("ij,jk,ik->i", X.T, A_indef, X.T)
+print("indefinite: min =", q_indef.min(), "max =", q_indef.max())  # neg and pos
+
+# Cholesky as PD test
+try:
+    np.linalg.cholesky(A)
+    print("A is PD: Cholesky succeeded")
+except np.linalg.LinAlgError:
+    print("not PD")
+
+try:
+    np.linalg.cholesky(A_indef)
+    print("A_indef is PD")
+except np.linalg.LinAlgError:
+    print("A_indef is not PD: Cholesky failed")
+```
+
+The PD matrix's quadratic form stays positive; the indefinite one has both signs.
+Cholesky succeeds only for PD. The spectral decomposition of a rectangular matrix,
+where the same geometry extends to non-square transforms, is the SVD of the next
+lesson.

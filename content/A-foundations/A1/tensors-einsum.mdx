@@ -1,0 +1,119 @@
+---
+title: "Tensors & einsum"
+pillar: A
+subId: A1
+lessonId: tensors-einsum
+order: 17
+estimatedMinutes: 20
+goal: "Generalize to higher-order tensors with index notation and the Einstein summation convention behind einsum."
+prerequisites: ["matrix-calculus"]
+---
+
+A matrix is an array indexed by two indices; a weight tensor in a neural network
+might have four. Index notation lets you write any contraction (dot product,
+matrix multiply, batch outer product, attention scores) in a single, unambiguous
+expression, and `numpy.einsum` evaluates it directly.
+
+## What a tensor is
+
+A **tensor** of order $k$ over $\mathbb{R}$ is a multidimensional array indexed
+by $k$ integers. Order-0 is a scalar, order-1 a vector, order-2 a matrix. An
+order-3 tensor $T \in \mathbb{R}^{d_1 \times d_2 \times d_3}$ has entry $T_{ijk}$
+for $1 \le i \le d_1$, $1 \le j \le d_2$, $1 \le k \le d_3$.
+
+Tensors are not just "multidimensional arrays": they transform in a specific way
+under a change of basis. For the purposes of machine learning, the transformation
+law matters mainly when reasoning about equivariance; in computation, the array
+viewpoint suffices.
+
+## The Einstein summation convention
+
+In the **Einstein convention**, a repeated index appearing once "up" and once
+"down" (or in practice: in two factor arrays) is summed over its full range:
+
+$$
+c_i = \sum_j a_{ij} b_j \quad\longrightarrow\quad c_i = a_{ij} b_j.
+$$
+
+The summation sign is dropped; the repeated $j$ implies it. This makes long
+expressions readable:
+
+| Operation | Conventional | Einstein / einsum |
+|---|---|---|
+| Dot product | $\sum_i u_i v_i$ | $u_i v_i$ → scalar |
+| Matrix–vector | $\sum_j A_{ij} x_j$ | $A_{ij} x_j$ → $c_i$ |
+| Matrix multiply | $\sum_k A_{ik} B_{kj}$ | $A_{ik} B_{kj}$ → $C_{ij}$ |
+| Trace | $\sum_i A_{ii}$ | $A_{ii}$ → scalar |
+| Outer product | $u_i v_j$ (no sum) | $u_i v_j$ → $C_{ij}$ |
+| Batch matmul | $\sum_k A_{bik} B_{bkj}$ | `bij,bjk->bik` |
+
+## Numpy's einsum
+
+`np.einsum(subscript, *arrays)` reads a string like `'ij,jk->ik'` and executes
+the corresponding index expression:
+
+- Letters before `->` label the indices in each input array.
+- Letters after `->` label the indices of the output.
+- Letters that appear in inputs but not in the output are summed over.
+
+The notation is unambiguous: there is no convention about row-major vs. column-
+major, no hidden transpose. The subscript string *is* the computation.
+
+## Broadcasting vs. contraction
+
+Indices that appear in only one input array appear in the output: they are
+**free** (broadcast). Indices shared between two inputs that do not appear in
+the output are **contracted** (summed). For example:
+
+- `'i,j->ij'`: outer product ($u_i v_j$, no contraction).
+- `'i,i->'`: dot product ($u_i v_i$, contracts $i$, output is scalar).
+- `'ij,ij->ij'`: elementwise product (no contraction, both indices free).
+- `'ij,ij->'`: Frobenius inner product (contracts both, scalar output).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+u = np.array([1.0, 2.0, 3.0])
+v = np.array([4.0, 5.0, 6.0])
+A = np.arange(1.0, 7.0).reshape(2, 3)
+B = np.arange(1.0, 7.0).reshape(3, 2)
+
+# Dot product
+print("dot:", np.einsum("i,i->", u, v), "==", u @ v)  # 32
+
+# Outer product
+C = np.einsum("i,j->ij", u, v)
+print("outer shape:", C.shape, "== ", np.outer(u, v).shape)
+
+# Matrix multiply
+D = np.einsum("ij,jk->ik", A, B)
+print("matmul:\n", D, "\n", A @ B)   # identical
+
+# Trace
+M = np.array([[1.0, 2.0], [3.0, 4.0]])
+print("trace:", np.einsum("ii->", M), "==", np.trace(M))  # 5
+
+# Batch matrix multiply: (batch, m, k) x (batch, k, n) -> (batch, m, n)
+batch = 4
+X = np.random.default_rng(0).normal(size=(batch, 3, 5))
+Y = np.random.default_rng(1).normal(size=(batch, 5, 2))
+Z = np.einsum("bik,bkj->bij", X, Y)
+Z_ref = np.stack([X[b] @ Y[b] for b in range(batch)])
+print("batch matmul error:", np.max(np.abs(Z - Z_ref)))  # ~0
+
+# Gradient of a bilinear form x^T A y w.r.t. x: result is Ay
+x = np.array([1.0, 2.0])
+y = np.array([3.0, 4.0])
+A2 = np.array([[1.0, 2.0], [3.0, 4.0]])
+# f = x_i A_ij y_j; df/dx_k = A_kj y_j
+grad_x = np.einsum("kj,j->k", A2, y)   # same as A @ y
+print("bilinear grad:", grad_x, "==", A2 @ y)
+```
+
+Every operation resolves to the same result as its explicit loop or built-in
+equivalent. Index notation makes the computation visible and the gradient derivation
+mechanical: just differentiate the subscript expression index by index. This
+closes the A1 curriculum on linear algebra; the next subsections build probability
+and calculus on top of these foundations.
