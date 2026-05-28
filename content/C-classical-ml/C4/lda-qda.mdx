@@ -1,0 +1,163 @@
+---
+title: "Linear and quadratic discriminant analysis"
+pillar: C
+subId: C4
+lessonId: lda-qda
+order: 4
+estimatedMinutes: 18
+goal: "Model classes as Gaussians (shared or per-class covariance) and derive linear vs quadratic decision boundaries."
+prerequisites: ["naive-bayes", "A2/common-distributions"]
+---
+
+Naive Bayes assumes feature independence given the class. **LDA** and **QDA**
+drop that assumption: each class gets a full multivariate Gaussian, including
+covariances between features. The shape of the decision boundary falls out of
+whether the classes share covariance or not.
+
+## The setup
+
+Assume each class has a multivariate Gaussian class-conditional:
+
+$$
+\Pr(x \mid y = c) = \mathcal{N}(x \mid \mu_c,\ \Sigma_c).
+$$
+
+With class priors $\pi_c$, the Bayes-optimal classifier picks
+$\arg\max_c \pi_c\, \Pr(x \mid y = c)$. Taking the log, the **discriminant
+function** for class $c$ is
+
+$$
+\delta_c(x) = -\tfrac{1}{2}\log|\Sigma_c| - \tfrac{1}{2}(x - \mu_c)^\top \Sigma_c^{-1}(x - \mu_c) + \log \pi_c.
+$$
+
+The classifier picks $\arg\max_c \delta_c(x)$.
+
+## QDA: per-class covariance
+
+If each class has its own covariance $\Sigma_c$, the quadratic term in
+$\delta_c$ does not cancel across classes, so the decision boundary
+$\delta_a(x) = \delta_b(x)$ is **quadratic in $x$**. This is **Quadratic
+Discriminant Analysis (QDA)**.
+
+QDA has $O(d^2)$ parameters per class plus the prior, totaling roughly
+$C \cdot d^2$ parameters. With small training sets per class, the covariance
+estimates become unstable and the boundaries follow the noise.
+
+## LDA: shared covariance
+
+If all classes share the same $\Sigma$, the quadratic term cancels in pairwise
+comparisons. The discriminant becomes
+
+$$
+\delta_c(x) = x^\top \Sigma^{-1} \mu_c - \tfrac{1}{2}\mu_c^\top \Sigma^{-1}\mu_c + \log \pi_c,
+$$
+
+which is **linear in $x$**. The decision boundaries are hyperplanes; this is
+**Linear Discriminant Analysis (LDA)**.
+
+LDA has only $O(C d + d^2)$ parameters and is more stable than QDA in
+small-sample regimes. It is the right starting point and what
+`sklearn.discriminant_analysis.LinearDiscriminantAnalysis` runs by default.
+
+## Regularized variants
+
+When $\Sigma$ is ill-conditioned (small $n$, large $d$, or collinear
+features):
+
+- **Shrinkage LDA**: $\Sigma \leftarrow (1 - \alpha)\hat\Sigma + \alpha\,\tfrac{\operatorname{tr}\hat\Sigma}{d}I$.
+  Cross-validate $\alpha$. Especially useful in high-dimensional settings
+  like text and genomics.
+- **Diagonal LDA**: zero out off-diagonals of $\Sigma$. Equivalent to
+  Gaussian Naive Bayes with shared variance per feature.
+
+## LDA vs logistic regression
+
+Both produce linear decision boundaries. They differ in what they assume and
+optimize:
+
+- **LDA** assumes Gaussian class-conditionals with shared covariance, fits by
+  plug-in MLE on those Gaussians.
+- **Logistic regression** assumes only that the log-odds are linear in $x$,
+  fits by maximizing the conditional likelihood $\Pr(y \mid x)$.
+
+When the LDA assumption is approximately correct, LDA tends to be more
+data-efficient. When it is grossly wrong (non-Gaussian features), logistic
+regression is more robust. Logistic also handles $y \mid x$ directly without
+needing to model $\Pr(x)$, which is appealing when $x$ is high-dimensional
+and unmodelable.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Three classes with different covariances (QDA-favorable)
+n_per = 200
+mu = [np.array([2.0, 0.0]), np.array([-2.0, 0.0]), np.array([0.0, 2.0])]
+cov = [np.array([[1.0, 0.0], [0.0, 0.5]]),
+       np.array([[0.5, 0.0], [0.0, 1.0]]),
+       np.array([[1.0, 0.7], [0.7, 1.0]])]
+
+X, y = [], []
+for c, (m, S) in enumerate(zip(mu, cov)):
+    L = np.linalg.cholesky(S)
+    Xc = rng.normal(size=(n_per, 2)) @ L.T + m
+    X.append(Xc); y.extend([c] * n_per)
+X = np.vstack(X); y = np.array(y)
+
+idx = rng.permutation(len(y)); tr, te = idx[:400], idx[400:]
+Xtr, ytr = X[tr], y[tr]; Xte, yte = X[te], y[te]
+
+def fit_lda(X, y):
+    classes = np.unique(y); d = X.shape[1]
+    Sigma = np.zeros((d, d))
+    means = {}; priors = {}
+    for c in classes:
+        Xc = X[y == c]
+        mu_c = Xc.mean(axis=0)
+        means[c] = mu_c; priors[c] = len(Xc) / len(X)
+        Sigma += (Xc - mu_c).T @ (Xc - mu_c)
+    Sigma /= len(X) - len(classes)
+    return means, Sigma, priors
+
+def fit_qda(X, y):
+    classes = np.unique(y)
+    params = {}
+    for c in classes:
+        Xc = X[y == c]
+        mu_c = Xc.mean(axis=0); Sigma_c = np.cov(Xc.T) + 1e-4 * np.eye(Xc.shape[1])
+        params[c] = (mu_c, Sigma_c, len(Xc) / len(X))
+    return params
+
+def predict_lda(X, means, Sigma, priors):
+    inv = np.linalg.inv(Sigma); classes = list(means.keys())
+    scores = []
+    for c in classes:
+        mu = means[c]
+        s = X @ inv @ mu - 0.5 * mu @ inv @ mu + np.log(priors[c])
+        scores.append(s)
+    return np.array(classes)[np.argmax(scores, axis=0)]
+
+def predict_qda(X, params):
+    classes = list(params.keys()); scores = []
+    for c, (mu, Sigma, pi) in params.items():
+        inv = np.linalg.inv(Sigma)
+        sign, logdet = np.linalg.slogdet(Sigma)
+        diff = X - mu
+        s = -0.5 * logdet - 0.5 * np.sum(diff @ inv * diff, axis=1) + np.log(pi)
+        scores.append(s)
+    return np.array(classes)[np.argmax(scores, axis=0)]
+
+means, Sigma, priors = fit_lda(Xtr, ytr)
+qda = fit_qda(Xtr, ytr)
+
+print(f"LDA test acc: {np.mean(predict_lda(Xte, means, Sigma, priors) == yte):.3f}")
+print(f"QDA test acc: {np.mean(predict_qda(Xte, qda) == yte):.3f}")
+print("QDA wins when classes have different covariances; LDA wins when shared.")
+```
+
+QDA usually edges out LDA here because the three Gaussians have genuinely
+different covariances. The next lesson reuses the LDA setup as a
+dimensionality-reduction method, the supervised twin of PCA.

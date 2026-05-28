@@ -1,0 +1,137 @@
+---
+title: "k-nearest neighbors"
+pillar: C
+subId: C4
+lessonId: knn
+order: 1
+estimatedMinutes: 16
+goal: "Predict by majority vote (classification) or average (regression) over the k closest points, and choose k by cross-validation."
+prerequisites: []
+---
+
+The simplest learning rule: to predict for a new point, find the $k$ closest
+training examples and reuse their labels. **k-nearest neighbors (k-NN)** has
+no training step (it stores the data) and almost no inductive bias beyond
+"nearby points have similar labels". It is a useful baseline, a sanity check,
+and a stepping stone to the curse-of-dimensionality lesson that follows.
+
+## The algorithm
+
+To predict for a query $x_\star$:
+
+1. Compute distances $d(x_\star, x_i)$ to every training point.
+2. Pick the $k$ nearest neighbors.
+3. For classification: predict the majority class among the neighbors. For
+   regression: predict their mean (or median for robustness).
+
+There is no model to fit. Inference walks the entire training set, costing
+$O(n d)$ per query (which is what the C9 lessons on approximate nearest
+neighbor address).
+
+## Choosing $k$
+
+$k$ is the regularization knob:
+
+- $k = 1$: zero training error but enormous variance. Each prediction is
+  determined by a single point, so noise dominates.
+- $k$ large: low variance (averaging stabilizes the prediction) but high
+  bias (averaging across distant points blurs the structure). $k = n$
+  predicts the global mean / majority everywhere.
+
+Pick $k$ by cross-validation. Common practice for classification: odd $k$
+to avoid ties; values in the range $\sqrt{n}$ to $n/10$ are typical
+starting points.
+
+## Distance choices
+
+- **Euclidean** ($L_2$): default for continuous features, after scaling.
+- **Manhattan** ($L_1$): more robust to outliers.
+- **Cosine**: for high-dimensional sparse representations (text, embeddings).
+- **Hamming**: for binary or categorical features.
+
+Whatever metric, features must be **scaled** before computing distances. A
+feature in dollars and one in millimeters will let the dollar feature
+dominate every distance computation if both are raw.
+
+## Weighted k-NN
+
+Instead of all $k$ neighbors voting equally, weight each by $1/d$ or by a
+kernel of distance. Closer neighbors get more say. Smooths the predictor and
+makes $k$ less sensitive.
+
+## What k-NN does badly
+
+- **High dimensions**: distances concentrate (next lesson), so every point is
+  about as far as every other and the "nearest" neighbor barely means
+  anything.
+- **Slow inference**: $O(nd)$ per query; production systems use KD-trees,
+  ball trees, or ANN indices (C9).
+- **Memory hungry**: the model is the training set.
+- **No probabilities by default**: vote fractions are uncalibrated.
+
+## Strengths
+
+- Trivial to implement and reason about.
+- No assumptions on the target's shape, smoothness, or distribution.
+- Locally adapts: complex decision boundaries cost no extra fitting effort.
+- Good baseline for tabular problems on small to medium $n$.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Binary classification: two Gaussian blobs
+n_per = 150
+X_pos = rng.normal(loc=[1.5, 0.5], scale=0.7, size=(n_per, 2))
+X_neg = rng.normal(loc=[-1.0, -0.5], scale=0.7, size=(n_per, 2))
+X = np.vstack([X_pos, X_neg])
+y = np.array([1] * n_per + [0] * n_per)
+
+idx = rng.permutation(len(y))
+tr, te = idx[:200], idx[200:]
+Xtr, ytr = X[tr], y[tr]
+Xte, yte = X[te], y[te]
+
+def knn_predict(Xq, Xtr, ytr, k=5):
+    d = np.sqrt(((Xq[:, None, :] - Xtr[None, :, :])**2).sum(axis=2))
+    nn = np.argsort(d, axis=1)[:, :k]                  # k nearest indices per query
+    votes = ytr[nn]
+    # Majority vote (binary)
+    return (votes.sum(axis=1) > k / 2).astype(int)
+
+for k in [1, 3, 5, 11, 51]:
+    y_pred = knn_predict(Xte, Xtr, ytr, k=k)
+    acc = np.mean(y_pred == yte)
+    print(f"k={k:>3}: test accuracy={acc:.3f}")
+
+# Distance matters: add a noisy feature with a huge scale and watch the
+# informative features get drowned out (no train/query mismatch, just
+# a feature whose magnitude dominates the L2 distance).
+noise_tr = 100.0 * rng.normal(size=(len(Xtr), 1))
+noise_te = 100.0 * rng.normal(size=(len(Xte), 1))
+Xtr_noisy = np.column_stack([Xtr, noise_tr])
+Xte_noisy = np.column_stack([Xte, noise_te])
+acc_bad = np.mean(knn_predict(Xte_noisy, Xtr_noisy, ytr, k=5) == yte)
+acc_ok  = np.mean(knn_predict(Xte, Xtr, ytr, k=5) == yte)
+print(f"\nwith a noisy feature on scale 100: acc={acc_bad:.3f}  (drowns out signal)")
+print(f"informative features only:         acc={acc_ok:.3f}")
+
+# Regression k-NN: average instead of vote
+y_reg = X[:, 0] + 0.3 * rng.normal(size=len(X))
+def knn_regress(Xq, Xtr, y_reg_tr, k=5):
+    d = np.sqrt(((Xq[:, None, :] - Xtr[None, :, :])**2).sum(axis=2))
+    nn = np.argsort(d, axis=1)[:, :k]
+    return y_reg_tr[nn].mean(axis=1)
+
+y_reg_tr = y_reg[tr]; y_reg_te = y_reg[te]
+rmse = np.sqrt(np.mean((knn_regress(Xte, Xtr, y_reg_tr, k=10) - y_reg_te)**2))
+print(f"k-NN regression test RMSE: {rmse:.3f}")
+```
+
+The U-shape in $k$ is visible: $k = 1$ overfits, large $k$ underfits, with the
+sweet spot in between. Adding one high-magnitude noise feature drowns out the
+informative ones, confirming the scaling caveat. The next lesson explains why
+all of this gets worse as the dimension grows.

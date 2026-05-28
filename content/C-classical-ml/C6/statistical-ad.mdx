@@ -1,0 +1,145 @@
+---
+title: "Statistical anomaly detection"
+pillar: C
+subId: C6
+lessonId: statistical-ad
+order: 1
+estimatedMinutes: 16
+goal: "Flag points beyond IQR, ESD, or CUSUM thresholds, the simplest and most defensible AD baselines."
+prerequisites: ["A2/inequalities"]
+---
+
+The simplest anomaly detectors are statistical thresholds: flag any point
+that sits far from where the distribution says it should. **IQR** and **ESD**
+test single observations against a fitted distribution; **CUSUM** detects
+when a *sequence* of observations starts drifting. These methods have one
+huge advantage over more complex AD: they come with calibrated false-alarm
+rates.
+
+## Tukey's IQR rule
+
+Compute the interquartile range $\text{IQR} = Q_3 - Q_1$. Flag any point
+outside the **fences**
+
+$$
+[Q_1 - 1.5\,\text{IQR},\ Q_3 + 1.5\,\text{IQR}].
+$$
+
+For a normal distribution this catches roughly 0.7% of points (a 99.3%
+confidence interval). The constant 1.5 is conventional; 3 is sometimes used
+to flag only extreme outliers. The rule is **nonparametric**: it does not
+assume Gaussianity, just that the bulk of the data is well-summarized by its
+quartiles.
+
+## Z-score and modified Z-score
+
+For roughly normal data:
+
+$$
+z_i = \frac{x_i - \bar x}{s}, \qquad \text{flag if } |z_i| > 3.
+$$
+
+The fraction of normally-distributed points beyond 3 standard deviations is
+~0.27%, giving a controlled false-alarm rate. The catch: $\bar x$ and $s$ are
+themselves contaminated by the outliers you want to find, so a few large
+outliers can mask each other (**masking effect**).
+
+**Modified Z-score** uses median and MAD (median absolute deviation), which
+are robust to outliers:
+
+$$
+z_i^{\text{mod}} = \frac{0.6745\,(x_i - \text{median}(x))}{\text{MAD}(x)}.
+$$
+
+The 0.6745 makes the modified Z-score consistent with the standard
+$\mathcal{N}(0, 1)$ for normal data. Threshold at $|z^{\text{mod}}| > 3.5$.
+
+## Generalized ESD (Rosner's test)
+
+Iterative procedure that explicitly tests for up to $k$ outliers in a normal
+sample:
+
+1. Compute the most extreme residual $R_i = \max_i |x_i - \bar x|/s$ on the
+   current data.
+2. Compare $R_i$ to a critical value $\lambda_i$ from the Student-t
+   distribution.
+3. If $R_i > \lambda_i$, remove the point and repeat. Otherwise stop.
+
+ESD handles masking better than a single Z-score by removing detected
+outliers and recomputing the mean/std at each round.
+
+## CUSUM for change detection
+
+For a sequence of observations, **CUSUM** (cumulative sum) tracks how far
+the running sum has drifted from the baseline. Define
+
+$$
+S_t^+ = \max(0,\ S_{t-1}^+ + (x_t - \mu) - k), \qquad S_t^- = \min(0,\ S_{t-1}^- + (x_t - \mu) + k),
+$$
+
+with target mean $\mu$ and slack $k$. Raise an alarm when $|S_t^\pm|$
+exceeds a threshold $h$. Calibrated for given $(k, h)$, CUSUM has a known
+average run length between false alarms, making it useful for quality
+control and time-series monitoring.
+
+## When statistical AD is the right tool
+
+- **One-dimensional or low-dimensional** continuous data.
+- **Need calibrated false-alarm rates** (regulated industries, safety
+  monitoring).
+- **As a fast baseline** before reaching for complicated AD.
+
+## Limits
+
+- One-dimensional methods can miss **multivariate** anomalies (a point with
+  every feature individually normal but jointly impossible). Multivariate
+  extensions (Mahalanobis distance to fitted Gaussian) work for low $d$;
+  beyond that, the next lessons cover scalable methods.
+- Assume the bulk distribution is stationary. Drift over time breaks the
+  threshold.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Mostly normal with a few outliers
+x = np.concatenate([rng.normal(loc=0, scale=1, size=200),
+                    np.array([6.0, -7.0, 8.0])])           # 3 outliers
+true_outlier_idx = np.array([200, 201, 202])
+
+# IQR rule
+q1, q3 = np.percentile(x, [25, 75])
+iqr = q3 - q1
+mask_iqr = (x < q1 - 1.5 * iqr) | (x > q3 + 1.5 * iqr)
+print(f"IQR rule: flagged {mask_iqr.sum()} (true outliers in flagged: {mask_iqr[true_outlier_idx].sum()})")
+
+# Z-score (sensitive to masking)
+z = (x - x.mean()) / x.std()
+mask_z = np.abs(z) > 3
+print(f"Z-score: flagged {mask_z.sum()} (true in flagged: {mask_z[true_outlier_idx].sum()})")
+
+# Modified Z-score (robust)
+med = np.median(x)
+mad = np.median(np.abs(x - med))
+z_mod = 0.6745 * (x - med) / mad
+mask_modz = np.abs(z_mod) > 3.5
+print(f"Modified Z: flagged {mask_modz.sum()} (true in flagged: {mask_modz[true_outlier_idx].sum()})")
+
+# CUSUM on a sequence with a level shift in the middle
+n = 200
+seq = np.concatenate([rng.normal(0, 1, n), rng.normal(0.5, 1, n)])  # mean shifts at t=200
+mu, k_slack, h = 0.0, 0.3, 5.0
+S_plus = np.zeros(len(seq))
+for t in range(1, len(seq)):
+    S_plus[t] = max(0, S_plus[t-1] + (seq[t] - mu) - k_slack)
+alarm = np.argmax(S_plus > h) if np.any(S_plus > h) else None
+print(f"\nCUSUM alarm at t={alarm} (true shift at t=200)")
+```
+
+The IQR and modified Z-score correctly find the planted outliers; the plain
+Z-score is partially masked by the outliers themselves; CUSUM detects the
+level shift in the synthetic sequence. The next lesson generalizes to high
+dimensions with Isolation Forest.

@@ -1,0 +1,185 @@
+---
+title: "Bagging and random forests"
+pillar: C
+subId: C3
+lessonId: bagging-rf
+order: 4
+estimatedMinutes: 20
+goal: "Average bootstrap replicas to reduce variance, and decorrelate trees with random feature subsets."
+prerequisites: ["tree-pruning", "C1/bias-variance"]
+---
+
+Trees are high-variance learners: small data changes produce very different
+trees. **Bagging** (bootstrap aggregating) averages many trees fit on
+bootstrap resamples of the data, slashing the variance without adding bias.
+**Random forests** push the idea further by also randomizing which features
+each split can use, which decorrelates the trees and lowers variance even
+more.
+
+## Variance reduction from averaging
+
+Let $\hat f_b(x)$ be the prediction of the $b$-th tree, trained on a different
+bootstrap sample of the data. The bagged predictor averages them:
+
+$$
+\hat f_{\text{bag}}(x) = \frac{1}{B}\sum_{b=1}^B \hat f_b(x).
+$$
+
+If the individual predictors are i.i.d. with variance $\sigma^2$, the
+average has variance $\sigma^2 / B$. The catch: bootstrap-trained trees are
+**not** independent (they share most of the same training data), so the
+variance of the average is
+
+$$
+\rho\,\sigma^2 + \frac{1 - \rho}{B}\,\sigma^2,
+$$
+
+where $\rho$ is the average correlation between trees. As $B \to \infty$, the
+variance floors at $\rho\sigma^2$. **Reducing $\rho$** is what random forests
+add on top of bagging.
+
+## The random-forest twist
+
+At each split, instead of picking the best feature among all $d$ features,
+pick the best among a random subset of $m$ features. Typical choices:
+$m = \sqrt d$ for classification, $m = d/3$ for regression. The randomness
+ensures that no single dominant feature appears in every tree, so trees see
+different subsets of structure and end up less correlated.
+
+The cost is per-tree quality: a tree restricted to subset $m$ usually beats
+its larger-$m$ counterpart in training loss. The forest still wins because
+the ensemble variance reduction more than compensates.
+
+## Out-of-bag (OOB) estimation
+
+A bootstrap sample contains roughly 63% unique training examples (since
+$1 - (1 - 1/n)^n \to 1 - 1/e \approx 0.632$). The remaining 37% are
+**out-of-bag** for that tree. Predicting an OOB example with only the trees
+that did not see it gives a free held-out estimate of test error, without a
+separate validation set.
+
+For a random forest, the OOB error tracks held-out test error closely. It is
+the practical replacement for cross-validation on small datasets.
+
+## Hyperparameters
+
+The standard knobs:
+
+- **Number of trees** $B$. Effectively a noise control: more trees never hurt
+  accuracy and modestly help calibration; pick $B$ as large as compute allows.
+- **`max_features`** $m$. Smaller $m$ means lower correlation and lower
+  variance, but each tree fits worse.
+- **`max_depth` / `min_samples_leaf`**. Less critical than in single trees,
+  but useful for compute control.
+
+Defaults usually work; the most useful tunable is $m$.
+
+## Strengths and limits
+
+**Strengths:**
+
+- Excellent out-of-the-box accuracy on tabular data.
+- OOB error replaces cross-validation.
+- Handles mixed types and missing values gracefully.
+- Robust to irrelevant features and outliers.
+
+**Limits:**
+
+- Less accurate than gradient boosting on most tabular benchmarks.
+- Predictions are bounded by the training-target range (extrapolation is
+  weak).
+- Many trees means slower inference and bigger model files.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n, d = 400, 6
+X = rng.normal(size=(n, d))
+y = ((X[:, 0] + X[:, 1] > 0) ^ (X[:, 2] > 0)).astype(int)
+flip = rng.random(n) < 0.10
+y = np.where(flip, 1 - y, y)
+
+def gini(labels):
+    if len(labels) == 0: return 0.0
+    p = np.bincount(labels, minlength=2) / len(labels)
+    return 1 - np.sum(p**2)
+
+class Node:
+    def __init__(self): self.leaf = None; self.feature = self.threshold = self.left = self.right = None
+
+def split(X, y, m, rng):
+    n, d = X.shape
+    feats = rng.choice(d, size=min(m, d), replace=False)
+    best = (None, None, -1)
+    parent = gini(y)
+    for j in feats:
+        for t in np.unique(X[:, j]):
+            mm = X[:, j] <= t
+            if mm.sum() == 0 or (~mm).sum() == 0: continue
+            gain = parent - (mm.sum()/n)*gini(y[mm]) - ((~mm).sum()/n)*gini(y[~mm])
+            if gain > best[2]: best = (j, t, gain)
+    return best
+
+def build(X, y, m, rng, max_depth=8):
+    node = Node()
+    if max_depth == 0 or len(y) < 2 or gini(y) == 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    j, t, gain = split(X, y, m, rng)
+    if j is None or gain <= 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    mm = X[:, j] <= t
+    node.feature, node.threshold = j, t
+    node.left = build(X[mm], y[mm], m, rng, max_depth - 1)
+    node.right = build(X[~mm], y[~mm], m, rng, max_depth - 1)
+    return node
+
+def predict(node, x):
+    while node.leaf is None:
+        node = node.left if x[node.feature] <= node.threshold else node.right
+    return node.leaf
+
+# Random forest
+idx_te = rng.choice(n, size=100, replace=False)
+idx_tr = np.setdiff1d(np.arange(n), idx_te)
+Xtr, ytr = X[idx_tr], y[idx_tr]
+Xte, yte = X[idx_te], y[idx_te]
+
+def random_forest(Xtr, ytr, B=50, m=2, rng=rng):
+    trees, oob_idx = [], []
+    n_tr = len(ytr)
+    for _ in range(B):
+        sample = rng.integers(0, n_tr, n_tr)
+        trees.append(build(Xtr[sample], ytr[sample], m=m, rng=rng))
+        oob_idx.append(np.setdiff1d(np.arange(n_tr), sample))
+    return trees, oob_idx
+
+trees, oob_idx = random_forest(Xtr, ytr, B=50, m=2, rng=rng)
+pred_te = np.mean([[predict(t, x) for x in Xte] for t in trees], axis=0)
+acc_te = np.mean((pred_te > 0.5) == yte)
+print(f"random-forest test acc: {acc_te:.3f}")
+
+# OOB error: for each training point, average predictions from trees that did not see it
+counts = np.zeros(len(ytr))
+votes = np.zeros(len(ytr))
+for tree, oob in zip(trees, oob_idx):
+    for i in oob:
+        votes[i] += predict(tree, Xtr[i]); counts[i] += 1
+mask = counts > 0
+oob_pred = votes[mask] / counts[mask]
+oob_acc = np.mean((oob_pred > 0.5) == ytr[mask])
+print(f"OOB accuracy:        {oob_acc:.3f}  "
+      f"(over {int(mask.sum())}/{len(ytr)} examples with >=1 OOB tree)")
+
+# Single tree vs forest
+single = build(Xtr, ytr, m=d, rng=rng, max_depth=8)
+single_acc = np.mean([predict(single, x) for x in Xte] == yte)
+print(f"single tree test acc: {single_acc:.3f}  (forest reduces variance over this)")
+```
+
+The random forest beats the single tree on the noisy test set, and the OOB
+accuracy tracks the held-out test accuracy. The next lesson opens the black
+box: how to read feature importance from a forest.

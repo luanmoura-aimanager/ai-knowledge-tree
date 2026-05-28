@@ -1,0 +1,131 @@
+---
+title: "Autoencoder-based anomaly detection"
+pillar: C
+subId: C6
+lessonId: autoencoder-ad
+order: 4
+estimatedMinutes: 14
+goal: "Train a reconstruction model on normal data and flag points whose reconstruction error exceeds a threshold."
+prerequisites: ["A1/low-rank-pca"]
+---
+
+The simplest neural anomaly detector: train an **autoencoder** to compress
+and reconstruct normal data, then score test points by reconstruction error.
+Normal points reconstruct well (the model has seen their structure); anomalies
+do not (the model has no template for them). The idea works with any
+reconstruction model, including linear PCA.
+
+## The setup
+
+An autoencoder is a pair of networks: an **encoder** $f_\phi: \mathcal{X} \to \mathbb{R}^k$
+maps inputs to a low-dimensional code, and a **decoder** $g_\theta: \mathbb{R}^k \to \mathcal{X}$
+maps the code back. Training minimizes reconstruction loss on a dataset of
+normal examples:
+
+$$
+\min_{\theta, \phi}\; \sum_i \lVert x_i - g_\theta(f_\phi(x_i))\rVert^2.
+$$
+
+The bottleneck dimension $k$ forces the network to throw away information,
+keeping only the structure most useful for reconstruction. For normal data,
+that structure is enough; for anomalies, it is not, so they reconstruct
+poorly.
+
+**Anomaly score:** $s(x) = \lVert x - g_\theta(f_\phi(x))\rVert^2$.
+Threshold on a held-out validation set of normal examples; choose the
+quantile that matches your target false-alarm rate.
+
+## Linear AE = PCA
+
+When encoder and decoder are linear and the loss is squared error, the
+autoencoder reduces to PCA: the optimal $f$ and $g$ project onto the top-$k$
+principal directions. Reconstruction error becomes the residual in the
+complement of the principal subspace, which is exactly what Hotelling's
+T^2 statistic measures.
+
+For purely linear structure, PCA is the right tool: it has a closed-form
+solution, no hyperparameters beyond $k$, and no risk of overfitting in the
+nonlinear sense. The autoencoder framing matters when the normal data lives
+on a curved manifold.
+
+## Variants
+
+- **Sparse autoencoder**: add an L1 penalty on the code so each example
+  activates only a few latent units.
+- **Denoising autoencoder**: train to reconstruct from a corrupted input,
+  which forces the network to learn the data manifold (not just memorize).
+  Robust to noise.
+- **Variational autoencoder**: turns the bottleneck into a probabilistic
+  latent variable. The reconstruction probability under the posterior is the
+  anomaly score; arguably more principled than raw reconstruction error.
+- **Adversarial autoencoder (AnoGAN family)**: train a generator and
+  discriminator; anomalies are points that the generator cannot reproduce
+  even with optimization.
+
+## Strengths
+
+- **Scales** to large datasets and high dimensions.
+- **Handles structured inputs** (images, sequences) when the encoder/decoder
+  are CNNs/transformers.
+- **No labels of anomalies needed** at training time, only normal data.
+
+## Limits
+
+- **Threshold calibration** is hard without a small labeled anomaly set; the
+  reconstruction-error distribution on normal data depends on architecture
+  and training.
+- **Subtle anomalies** can reconstruct well if their high-level features look
+  normal (this is why VAE / generative-model AD is sometimes better than
+  raw reconstruction).
+- **Distribution shift** in normal data over time degrades the threshold.
+
+## Check it on arrays
+
+A linear autoencoder = PCA. The reconstruction error from the top-$k$ PCs
+gives a clean implementation of the idea.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Normal data: lives near a 1D line in 4D
+n_normal = 400
+t = rng.normal(size=n_normal)
+X_normal = np.column_stack([t, 2 * t, -t, 0.5 * t]) + 0.1 * rng.normal(size=(n_normal, 4))
+
+# Anomalies: off the line
+X_anom = rng.normal(scale=2.0, size=(40, 4))
+X = np.vstack([X_normal, X_anom])
+labels = np.concatenate([np.zeros(n_normal), np.ones(40)])
+
+# Linear AE = top-k PCA
+X_mean = X_normal.mean(axis=0)
+Xc = X_normal - X_mean
+U, S, Vt = np.linalg.svd(Xc, full_matrices=False)
+k = 1                                                # bottleneck dimension
+V_k = Vt[:k]                                         # top-k directions
+
+def reconstruct(X, V_k, X_mean):
+    Xc = X - X_mean
+    code = Xc @ V_k.T                                # encode
+    return code @ V_k + X_mean                       # decode
+
+recon = reconstruct(X, V_k, X_mean)
+scores = np.linalg.norm(X - recon, axis=1)**2
+
+print(f"mean recon. error on normal:    {scores[labels == 0].mean():.3f}")
+print(f"mean recon. error on anomalies: {scores[labels == 1].mean():.3f}")
+
+# Threshold at 99th percentile of normal scores
+thr = np.quantile(scores[labels == 0], 0.99)
+flagged = scores > thr
+print(f"threshold (99th percentile of normal): {thr:.3f}")
+print(f"anomalies flagged: {int(flagged[labels == 1].sum())} / 40")
+print(f"normal points falsely flagged: {int(flagged[labels == 0].sum())} / {n_normal}")
+```
+
+The linear autoencoder (= PCA) reconstructs the 1D normal manifold cleanly;
+off-manifold anomalies have much larger reconstruction errors. This closes
+the C6 anomaly-detection track; the next subsection turns from outlier
+detection to combining many models: ensembles.

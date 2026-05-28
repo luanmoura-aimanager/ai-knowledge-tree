@@ -1,0 +1,123 @@
+---
+title: "LASSO and L1 regularization"
+pillar: C
+subId: C1
+lessonId: lasso
+order: 5
+estimatedMinutes: 20
+goal: "Solve the LASSO with proximal gradient (soft-thresholding) and explain why L1 produces sparse coefficients."
+prerequisites: ["ridge-regression", "A3/proximal-methods"]
+---
+
+Ridge shrinks coefficients but rarely sets them to zero. The **LASSO** replaces
+the L2 penalty with L1 and produces *sparse* solutions: most coefficients are
+exactly zero. The trick is that the L1 ball has corners, and the loss landscape
+prefers them; the algorithmic counterpart is soft-thresholding.
+
+## The objective
+
+$$
+\hat\beta_\lambda = \arg\min_\beta\; \frac{1}{2n}\lVert \mathbf{y} - X\beta\rVert^2 + \lambda\,\lVert \beta \rVert_1.
+$$
+
+The L1 penalty $\lVert \beta\rVert_1 = \sum_j |\beta_j|$ is convex but not
+differentiable at zero. There is no closed-form solution in general; the
+objective is solved iteratively.
+
+## Why L1 produces sparsity
+
+Picture the level sets of the squared-error loss as ellipses around
+$\hat\beta_{\text{OLS}}$, and the constraint region as the L1 ball (a diamond
+in 2D, with corners on the axes). The constrained minimum is where the
+smallest ellipse touches the diamond.
+
+The L2 ball is round, so contact is generic, in the interior of a face; ridge
+shrinks but does not zero. The L1 ball has corners on the axes; the ellipse
+touches a corner with high probability, and at a corner some coordinates are
+*exactly* zero. The corners of L1 are where sparsity is born.
+
+## Proximal gradient (ISTA)
+
+The L1 part has a closed-form proximal operator: **soft-thresholding**. For a
+single coordinate,
+
+$$
+\operatorname{prox}_{\eta\lambda |\cdot|}(v) = \operatorname{sign}(v)\,\max(|v| - \eta\lambda,\ 0),
+$$
+
+which shrinks $v$ toward zero by $\eta\lambda$ and snaps to exactly zero
+anything smaller than the threshold. The proximal-methods lesson derives this.
+
+Proximal gradient descent (ISTA) alternates a gradient step on the smooth part
+with a prox step:
+
+$$
+\beta^{(k+1)} = \operatorname{prox}_{\eta\lambda\lVert\cdot\rVert_1}\!\left(\beta^{(k)} - \frac{\eta}{n}\,X^\top(X\beta^{(k)} - \mathbf{y})\right).
+$$
+
+The step size $\eta \le n / \sigma_{\max}^2(X)$ ensures convergence. Each
+iteration is $O(nd)$. Coordinates whose gradient is too small to overcome
+$\lambda$ are zeroed out and stay zero, giving sparse iterates.
+
+## The Bayesian reading
+
+Ridge was MAP under a Gaussian prior. The LASSO is MAP under a **Laplace prior**
+$p(\beta_j) \propto \exp(-|\beta_j| / b)$. The Laplace distribution is peaked at
+zero (which is why MAP prefers exact zeros), where the Gaussian is rounded.
+Same algorithmic principle, different prior, different geometry.
+
+## When LASSO wins, and where it fails
+
+- **Sparse truth.** If the true model uses only a small subset of features,
+  LASSO recovers their support under incoherence conditions.
+- **Correlated features.** When two columns are highly correlated, LASSO picks
+  one arbitrarily and zeroes the other; elastic net (next lesson) addresses
+  this.
+- **Grouped features.** LASSO selects within groups arbitrarily; the group
+  LASSO penalizes group norms instead.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d, k = 150, 200, 8                              # n < d, k true nonzeros
+A = rng.normal(size=(n, d)) / np.sqrt(n)
+beta_true = np.zeros(d)
+beta_true[rng.choice(d, k, replace=False)] = rng.normal(size=k) * 3
+y = A @ beta_true + 0.01 * rng.normal(size=n)
+
+def soft_threshold(v, t):
+    return np.sign(v) * np.maximum(np.abs(v) - t, 0.0)
+
+def lasso(A, y, lam, steps=2000):
+    n = A.shape[0]
+    L = np.linalg.eigvalsh(A.T @ A / n).max()
+    eta = 1.0 / L
+    beta = np.zeros(A.shape[1])
+    for _ in range(steps):
+        grad = A.T @ (A @ beta - y) / n
+        beta = soft_threshold(beta - eta * grad, eta * lam)
+    return beta
+
+beta_hat = lasso(A, y, lam=0.1)
+
+nz_recovered = int(np.sum(np.abs(beta_hat) > 1e-2))
+print(f"recovered nonzeros: {nz_recovered}  true: {k}")
+support_true = beta_true != 0
+support_hat = np.abs(beta_hat) > 1e-2
+print(f"support match: {np.array_equal(support_hat, support_true)}")
+print(f"reconstruction error: {np.linalg.norm(beta_hat - beta_true):.4f}")
+
+# Sweep lambda: more shrinkage -> fewer nonzeros
+for lam in [0.05, 0.1, 0.2, 0.5]:
+    b = lasso(A, y, lam, steps=1500)
+    nz = int(np.sum(np.abs(b) > 1e-2))
+    print(f"lambda={lam:.2f}: nonzeros={nz}  ||b - b*||={np.linalg.norm(b - beta_true):.3f}")
+```
+
+LASSO recovers the true sparse support exactly at moderate $\lambda$; sweeping
+$\lambda$ traces a path from dense (small $\lambda$) to all-zero (large
+$\lambda$). The next lesson combines L1 and L2 to fix LASSO's
+correlated-feature behavior.

@@ -1,0 +1,150 @@
+---
+title: "Matrix factorization (SVD, ALS)"
+pillar: C
+subId: C8
+lessonId: matrix-factorization
+order: 2
+estimatedMinutes: 18
+goal: "Factor the rating matrix into low-rank user and item embeddings, fit with ALS or SGD."
+prerequisites: ["A1/low-rank-pca"]
+---
+
+Neighborhood CF works on observed ratings, item by item. **Matrix
+factorization** models the rating matrix as a product of two low-rank
+factors, $R \approx U V^\top$, where each user and item gets a $k$-
+dimensional latent vector. The factor model generalizes across sparse
+entries, dramatically improves accuracy, and is the foundation of every
+modern recommendation system.
+
+## The model
+
+User $u$ has embedding $\mathbf{u}_u \in \mathbb{R}^k$, item $i$ has
+embedding $\mathbf{v}_i \in \mathbb{R}^k$. The predicted rating is the dot
+product:
+
+$$
+\hat R_{ui} = \mathbf{u}_u^\top \mathbf{v}_i.
+$$
+
+The dot product captures matched preferences: if user and item embeddings
+align in the same direction in the latent space, the predicted rating is
+high.
+
+For most production systems, add per-user and per-item bias terms (plus a
+global mean) to absorb constant offsets:
+
+$$
+\hat R_{ui} = \mu + b_u + b_i + \mathbf{u}_u^\top \mathbf{v}_i.
+$$
+
+## Loss with regularization
+
+Train on observed ratings only. Minimize
+
+$$
+L = \sum_{(u, i) \in \Omega}(R_{ui} - \hat R_{ui})^2 + \lambda\left(\sum_u \lVert\mathbf{u}_u\rVert^2 + \sum_i \lVert\mathbf{v}_i\rVert^2\right),
+$$
+
+where $\Omega$ is the set of observed entries. The L2 penalty is essential
+to prevent embeddings from blowing up on sparse data.
+
+## Alternating least squares (ALS)
+
+The loss is non-convex jointly in $U$ and $V$, but **convex if either is
+fixed**. Alternate:
+
+**Fix $V$, solve for $U$.** Each $\mathbf{u}_u$ is independent and has a
+closed-form ridge solution over the items user $u$ rated:
+
+$$
+\mathbf{u}_u = \left(\sum_{i \in I_u}\mathbf{v}_i \mathbf{v}_i^\top + \lambda I\right)^{-1}\sum_{i \in I_u} R_{ui} \mathbf{v}_i.
+$$
+
+**Fix $U$, solve for $V$** symmetrically. Iterate until convergence.
+
+Each ALS step decreases the loss, so the algorithm converges to a local
+minimum. The closed-form per-user update makes ALS embarrassingly parallel
+(each user solved independently), which is what makes it scale.
+
+## Stochastic gradient descent (SGD)
+
+Alternative: iterate over rated $(u, i)$ pairs, computing the gradient and
+updating both $\mathbf{u}_u$ and $\mathbf{v}_i$:
+
+$$
+\mathbf{u}_u \leftarrow \mathbf{u}_u + \eta\,(e_{ui} \mathbf{v}_i - \lambda \mathbf{u}_u), \quad \mathbf{v}_i \leftarrow \mathbf{v}_i + \eta\,(e_{ui} \mathbf{u}_u - \lambda \mathbf{v}_i),
+$$
+
+with $e_{ui} = R_{ui} - \hat R_{ui}$. SGD is simpler but harder to
+parallelize and sensitive to learning-rate schedules. ALS dominates in
+production for explicit-feedback MF.
+
+## Connection to the SVD
+
+When the rating matrix is **fully observed** and there is no regularization,
+the optimal rank-$k$ factorization is the truncated SVD (the Eckart-Young
+theorem). MF generalizes this to sparse matrices and adds regularization.
+The "SVD" in the Netflix-prize literature is actually MF with SGD, not the
+classical algebraic SVD.
+
+## Why it works on sparse data
+
+Each user's $\mathbf{u}_u$ is fit from their ratings, but it lives in a
+shared $k$-dimensional space, so ratings on one item indirectly inform
+ratings on every other item. Pooling structure across users and items
+gives MF its dramatic improvement over neighborhood CF in sparse regimes.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Synthetic low-rank rating matrix + noise + sparsity
+n_u, n_i, k_true = 80, 50, 4
+U_true = rng.normal(size=(n_u, k_true))
+V_true = rng.normal(size=(n_i, k_true))
+R_full = U_true @ V_true.T + 0.1 * rng.normal(size=(n_u, n_i))
+
+# Sparsify: observe ~20% of entries
+mask = rng.random((n_u, n_i)) < 0.2
+R_obs = R_full * mask
+
+def als(R, mask, k=4, lam=0.1, n_iter=20):
+    n_u, n_i = R.shape
+    U = rng.normal(scale=0.1, size=(n_u, k))
+    V = rng.normal(scale=0.1, size=(n_i, k))
+    for _ in range(n_iter):
+        # Update U: per-user ridge over rated items
+        for u in range(n_u):
+            rated = np.where(mask[u])[0]
+            if len(rated) == 0: continue
+            Vr = V[rated]
+            A = Vr.T @ Vr + lam * np.eye(k)
+            b = Vr.T @ R[u, rated]
+            U[u] = np.linalg.solve(A, b)
+        # Update V symmetrically
+        for i in range(n_i):
+            rated = np.where(mask[:, i])[0]
+            if len(rated) == 0: continue
+            Ur = U[rated]
+            A = Ur.T @ Ur + lam * np.eye(k)
+            b = Ur.T @ R[rated, i]
+            V[i] = np.linalg.solve(A, b)
+    return U, V
+
+U_hat, V_hat = als(R_obs, mask, k=4, lam=0.1, n_iter=30)
+
+# Reconstruction quality on observed and missing cells
+R_hat = U_hat @ V_hat.T
+err_obs = np.sqrt(np.mean((R_hat[mask] - R_full[mask])**2))
+err_mis = np.sqrt(np.mean((R_hat[~mask] - R_full[~mask])**2))
+print(f"observed RMSE: {err_obs:.3f}")
+print(f"held-out RMSE: {err_mis:.3f}")
+print(f"true ratings range: [{R_full.min():.2f}, {R_full.max():.2f}]")
+```
+
+ALS recovers the true low-rank structure from a 20% sample, with held-out
+RMSE close to the noise level. The next lesson handles the harder
+implicit-feedback case where there are no ratings, only clicks.

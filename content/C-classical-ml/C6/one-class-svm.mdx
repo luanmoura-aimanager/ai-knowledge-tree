@@ -1,0 +1,135 @@
+---
+title: "One-class SVM"
+pillar: C
+subId: C6
+lessonId: one-class-svm
+order: 3
+estimatedMinutes: 14
+goal: "Carve out a small region containing most of the data with a kernel SVM, and use the boundary as a novelty detector."
+prerequisites: ["C2/kernel-trick"]
+---
+
+The two-class SVM finds the hyperplane separating two labeled classes. The
+**one-class SVM** treats anomaly detection as a degenerate classification:
+all the training data is "normal", and the algorithm finds the smallest
+region in feature space that contains the bulk of it. Anything outside is
+flagged as anomalous.
+
+## Two equivalent formulations
+
+Two algorithms are commonly called "one-class SVM" and they are equivalent
+under a change of kernel:
+
+**Schölkopf's $\nu$-SVM.** Find a hyperplane in kernel feature space that
+separates the data from the origin with maximum margin. Equivalently, solve
+
+$$
+\min_{w, \rho, \xi}\; \tfrac{1}{2}\lVert w\rVert^2 - \rho + \frac{1}{\nu n}\sum_i \xi_i \quad \text{s.t.}\quad w^\top \phi(x_i) \ge \rho - \xi_i,\ \xi_i \ge 0.
+$$
+
+The hyperparameter $\nu \in (0, 1]$ is both an upper bound on the fraction of
+training points outside the boundary (i.e. flagged) and a lower bound on the
+fraction of support vectors.
+
+**Tax & Duin's SVDD (Support Vector Data Description).** Find the smallest
+ball in feature space containing the data:
+
+$$
+\min_{c, R, \xi}\; R^2 + \frac{1}{\nu n}\sum_i \xi_i \quad \text{s.t.}\quad \lVert\phi(x_i) - c\rVert^2 \le R^2 + \xi_i,\ \xi_i \ge 0.
+$$
+
+With the RBF kernel, the two are equivalent: every point in feature space
+has the same norm $k(x, x) = 1$, so the smallest enclosing ball and the
+hyperplane farthest from the origin are the same boundary.
+
+## The decision function
+
+After training, score a query point by
+
+$$
+f(x) = w^\top \phi(x) - \rho = \sum_{i \in SV}\alpha_i\, k(x_i, x) - \rho.
+$$
+
+Flag $x$ as anomalous if $f(x) < 0$, normal if $f(x) > 0$. The magnitude of
+$f$ is a continuous score, useful for ranking.
+
+## Hyperparameters
+
+- **$\nu$**: the fraction of allowed outliers. Set to your expected
+  anomaly rate. Smaller $\nu$ = stricter boundary (fewer flags), larger
+  $\nu$ = looser.
+- **RBF $\gamma$**: bandwidth. Small $\gamma$ produces wide, smooth
+  boundaries (under-fits the normal region); large $\gamma$ produces tight
+  boundaries (over-fits, flags everything). Cross-validate against expected
+  anomaly rate or held-out anomalies if available.
+
+## Strengths
+
+- **Kernel flexibility**: any positive-definite kernel works, so the
+  boundary can be arbitrarily nonlinear.
+- **Sparse representation**: only support vectors matter at test time.
+- **Provable bound on training-error rate** via $\nu$.
+
+## Limits
+
+- **Cost**: training a kernel SVM is $O(n^2)$ memory and worse in time.
+  Impractical above ~10^5 samples.
+- **High dimensions**: like all distance-based methods, suffers from the
+  curse.
+- **Hyperparameter sensitivity**: $\gamma$ and $\nu$ both need
+  cross-validation, and the boundary is sensitive to both.
+
+For large datasets, Isolation Forest (previous lesson) or deep AD methods
+(next lesson) are usually faster.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Normal cluster + ring of anomalies far away
+n_normal = 200
+X_normal = rng.normal(scale=0.7, size=(n_normal, 2))
+theta = np.linspace(0, 2 * np.pi, 30, endpoint=False)
+X_anom = 4 * np.column_stack([np.cos(theta), np.sin(theta)]) + 0.1 * rng.normal(size=(30, 2))
+
+# One-class SVM via projected gradient on the dual:
+# max -0.5 alpha^T K alpha + sum(alpha)   s.t. 0 <= alpha <= 1/(nu n),  sum(alpha) = 1
+def rbf(X1, X2, gamma):
+    d2 = np.sum(X1**2, 1)[:, None] + np.sum(X2**2, 1) - 2 * X1 @ X2.T
+    return np.exp(-gamma * d2)
+
+def one_class_svm(X, nu=0.1, gamma=0.5, steps=5000, lr=1e-3):
+    n = len(X)
+    K = rbf(X, X, gamma)
+    alpha = np.full(n, 1 / n)                            # init to feasible
+    cap = 1.0 / (nu * n)
+    for _ in range(steps):
+        grad = np.ones(n) - K @ alpha
+        alpha = np.clip(alpha + lr * grad, 0, cap)
+        alpha /= alpha.sum()                              # project onto sum = 1
+        alpha = np.clip(alpha, 0, cap)
+    # rho recovered from support vectors at the boundary (0 < alpha < cap)
+    boundary = (alpha > 1e-4) & (alpha < cap - 1e-4)
+    rho = np.median((K @ alpha)[boundary]) if boundary.any() else np.median(K @ alpha)
+    return alpha, rho, gamma
+
+alpha, rho, gamma = one_class_svm(X_normal, nu=0.05, gamma=0.5)
+
+def score(X_query, X_train, alpha, rho, gamma):
+    return rbf(X_query, X_train, gamma) @ alpha - rho
+
+scores_normal = score(X_normal, X_normal, alpha, rho, gamma)
+scores_anom = score(X_anom, X_normal, alpha, rho, gamma)
+print(f"mean score on normal:    {scores_normal.mean():.3f}  (>= 0 = normal)")
+print(f"mean score on anomalies: {scores_anom.mean():.3f}")
+print(f"fraction of anomalies flagged: {(scores_anom < 0).mean():.2f}")
+print(f"fraction of normal points flagged: {(scores_normal < 0).mean():.2f}  (nu = 0.05 budget)")
+```
+
+The one-class SVM keeps normal points on the positive side of the boundary
+and flags most of the ring anomalies; the false-positive rate on normal
+points sits near the $\nu$ budget. The next lesson uses neural-network
+reconstruction error as the AD signal.

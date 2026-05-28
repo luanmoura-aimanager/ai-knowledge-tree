@@ -1,0 +1,164 @@
+---
+title: "Two-tower and neural collaborative filtering"
+pillar: C
+subId: C8
+lessonId: two-tower
+order: 5
+estimatedMinutes: 16
+goal: "Embed users and items with neural nets and score with a dot product, the basis of modern retrieval."
+prerequisites: ["matrix-factorization"]
+---
+
+Matrix factorization gives each user and item one fixed embedding from the
+interaction matrix alone. **Two-tower models** generalize MF by computing
+the embeddings with **neural networks** that consume features (user
+demographics, item content, context). The dot-product scoring rule survives,
+which is what lets two-tower models scale to billion-item catalogs through
+approximate nearest-neighbor retrieval.
+
+## The architecture
+
+Two independent **towers** (encoders), one for users and one for items, each
+producing a $k$-dimensional embedding:
+
+$$
+\mathbf{u}_u = f_\phi(\text{user features}), \qquad \mathbf{v}_i = g_\theta(\text{item features}).
+$$
+
+The score is the dot product (or cosine):
+
+$$
+s(u, i) = \mathbf{u}_u^\top \mathbf{v}_i.
+$$
+
+Two key design choices flow from this:
+
+- **Independence at scoring time.** The user tower depends only on user
+  features, the item tower only on item features. The interaction happens
+  only through the dot product at the end. This means item embeddings can
+  be **precomputed** and indexed; at serving time, only the user embedding
+  is computed online, and retrieval is a dot-product search.
+- **Cold-start fix.** Because the towers consume *features*, a brand-new
+  item with no interactions can still get an embedding from its content
+  features. MF cannot do this without retraining.
+
+## Training
+
+Pose retrieval as a classification problem: for each observed (user, item)
+positive pair, sample $K$ random items as in-batch negatives and minimize
+softmax cross-entropy:
+
+$$
+L = -\log \frac{\exp(\mathbf{u}_u^\top \mathbf{v}_{i^+})}{\sum_{j \in \text{batch}}\exp(\mathbf{u}_u^\top \mathbf{v}_j)}.
+$$
+
+In-batch negatives are nearly free (the items already in the batch). Each
+batch has many positives, each providing implicit negatives via the other
+items. Practitioners add explicit **hard negatives** (items that look like
+positives but are not) to focus learning on confusable cases.
+
+## Approximate nearest neighbor at serving time
+
+Two-tower models meet ANN at retrieval:
+
+1. **Offline**: encode every item to $\mathbf{v}_i$, build an HNSW or IVF
+   index over $\{\mathbf{v}_i\}$.
+2. **Online**: encode the user to $\mathbf{u}_u$, ANN-search the item index
+   for top-$N$ matches.
+
+This is why dot-product (or cosine) is non-negotiable: ANN indices over
+arbitrary score functions do not exist at production scale, but for
+dot-product they do. The C9 lessons cover the index structures.
+
+## Why "two-tower" and not "one big network"
+
+A cross-feature model (concatenate user and item, pass through one network)
+would be more expressive but cannot precompute item embeddings: every
+(user, item) pair needs a forward pass at serving time. For a catalog of
+millions of items per query, this is too slow.
+
+Two-tower is the design that gives you neural expressiveness in the towers
+*and* sub-linear retrieval via ANN at serving time. It is the dominant
+architecture for industrial-scale recommendation **retrieval** (the first
+stage that narrows millions of items to thousands; a downstream **ranker**
+then scores the survivors with richer cross-features).
+
+## Extensions
+
+- **Multi-task** towers train on multiple objectives (click, dwell, like)
+  simultaneously, sharing the user and item representations.
+- **Sequence models in the user tower** (next lesson) consume the user's
+  recent history rather than static features.
+- **Calibration heads** map dot-product scores to probabilities for
+  downstream ranking.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Synthetic data: user features -> latent preference; item features -> latent properties
+n_users, n_items, d_feat, k = 200, 100, 8, 4
+U_feat = rng.normal(size=(n_users, d_feat))
+I_feat = rng.normal(size=(n_items, d_feat))
+
+# True interaction = dot product of low-dimensional projections (linear two-tower)
+W_user_true = rng.normal(size=(d_feat, k))
+W_item_true = rng.normal(size=(d_feat, k))
+U_emb_true = U_feat @ W_user_true
+I_emb_true = I_feat @ W_item_true
+scores_true = U_emb_true @ I_emb_true.T
+# Positive interactions: top-3 items per user
+positives = np.argsort(-scores_true, axis=1)[:, :3]
+
+def two_tower_train(U_feat, I_feat, positives, k=4, lr=0.1, epochs=200, n_neg=8):
+    W_u = rng.normal(scale=0.1, size=(U_feat.shape[1], k))
+    W_i = rng.normal(scale=0.1, size=(I_feat.shape[1], k))
+    n_u, n_i = U_feat.shape[0], I_feat.shape[0]
+    for _ in range(epochs):
+        # Sample random user-positive-negatives triplets
+        u = rng.integers(0, n_u)
+        i_pos = int(positives[u, rng.integers(0, positives.shape[1])])
+        i_negs = rng.integers(0, n_i, size=n_neg)
+        u_emb = U_feat[u] @ W_u
+        v_pos = I_feat[i_pos] @ W_i
+        v_negs = I_feat[i_negs] @ W_i                   # (n_neg, k)
+        # Softmax over (pos, negs)
+        logits = np.array([u_emb @ v_pos] + list(v_negs @ u_emb))
+        logits -= logits.max()
+        p = np.exp(logits); p /= p.sum()
+        # Softmax CE gradient: delta = p - one_hot(target)
+        target = np.zeros_like(p); target[0] = 1
+        delta = p - target                              # (1 + n_neg,)
+        v_all = np.vstack([v_pos[None, :], v_negs])     # (1+n_neg, k)
+        # Gradient wrt W_u: U_feat[u] outer (sum_j delta_j * v_j)
+        grad_Wu = np.outer(U_feat[u], delta @ v_all)
+        # Gradient wrt W_i: sum_j delta_j * I_feat[item_j] outer u_emb
+        items = [i_pos] + list(i_negs)
+        grad_Wi = np.zeros_like(W_i)
+        for j, item in enumerate(items):
+            grad_Wi += np.outer(I_feat[item], delta[j] * u_emb)
+        W_u -= lr * grad_Wu / (n_neg + 1)
+        W_i -= lr * grad_Wi / (n_neg + 1)
+    return W_u, W_i
+
+W_u_hat, W_i_hat = two_tower_train(U_feat, I_feat, positives, k=4, epochs=2000)
+
+U_emb = U_feat @ W_u_hat
+I_emb = I_feat @ W_i_hat
+scores_hat = U_emb @ I_emb.T
+
+# Recall@10: how often are the true positives in the top-10 predicted?
+top10 = np.argsort(-scores_hat, axis=1)[:, :10]
+recall = []
+for u in range(n_users):
+    hits = len(set(positives[u]).intersection(top10[u]))
+    recall.append(hits / 3)
+print(f"recall@10 over users: mean={np.mean(recall):.3f}, std={np.std(recall):.3f}")
+```
+
+The learned two-tower model recovers most true positives in the top-10. The
+next lesson takes the user tower further by consuming sequences instead of
+static features.

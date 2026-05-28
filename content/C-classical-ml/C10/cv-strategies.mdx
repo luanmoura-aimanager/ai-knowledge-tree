@@ -1,0 +1,164 @@
+---
+title: "Cross-validation strategies"
+pillar: C
+subId: C10
+lessonId: cv-strategies
+order: 4
+estimatedMinutes: 14
+goal: "Pick k-fold, stratified, group, or time-series CV based on what the test distribution actually looks like."
+prerequisites: []
+---
+
+Cross-validation estimates test performance by reusing the same data for
+training and evaluation in disjoint folds. The right CV strategy matches
+the **test distribution**: the data the model will see in production.
+Mismatched CV produces over-optimistic numbers and disappointing
+deployments.
+
+## Plain k-fold
+
+Split the data into $k$ equal-sized folds. For each fold $i$: train on the
+other $k - 1$ folds, evaluate on fold $i$. The CV score is the mean across
+folds.
+
+- **Pros**: Uses all data for both training and evaluation. Variance of
+  the estimate is lower than a single train/test split.
+- **Cons**: Assumes folds are i.i.d. Wrong for imbalanced classes (each
+  fold may have a different positive rate), time-ordered data, or grouped
+  data.
+- **Default $k$**: 5 or 10. Smaller $k$ = larger training sets per fold
+  (less bias) and noisier estimates (fewer folds to average). Larger $k$
+  = stable estimates but expensive.
+
+## Stratified k-fold
+
+For classification with imbalanced classes, sample folds so that each
+fold has roughly the same class distribution as the full dataset. Same
+algorithm, constrained sampling.
+
+Use stratified k-fold by default for any classification problem; the cost
+is zero and the variance reduction is real.
+
+## Group k-fold
+
+When examples cluster into **groups** (multiple records per patient,
+multiple snapshots per user, repeated measurements per device), random
+k-fold leaks: a patient appears in both train and test, and the model
+learns patient-specific shortcuts that do not generalize.
+
+**Group k-fold** keeps all of a group's records in the same fold. The
+test fold is genuinely "new groups". Use it whenever the production task
+involves predicting on a new patient/user/device.
+
+## Time-series CV
+
+Random shuffling **does not work** for temporal data. A future event in
+the training set can leak into past predictions. Two correct strategies:
+
+- **Walk-forward CV (rolling)**: split the data chronologically into
+  $k$ folds. Train on fold 1, test on fold 2. Train on folds 1+2, test
+  on fold 3. Etc. The training set grows monotonically; each test fold
+  is in the future.
+- **Sliding window**: train on a fixed-size window, test on the next
+  window. Useful when older data is no longer representative.
+
+Always do time-series CV when predicting future events. Doing standard
+k-fold on time-series gives wildly optimistic numbers because of leakage.
+
+## Nested CV
+
+If you do hyperparameter selection with CV and then evaluate with the
+*same* CV, you overfit on the validation folds. **Nested CV** has an
+outer loop for performance estimation and an inner loop for
+hyperparameter selection:
+
+- Outer: $k$-fold over the data.
+- For each outer fold, inner CV on the outer-training set picks
+  hyperparameters; refit on the outer training set with those hypers;
+  evaluate on the outer test fold.
+
+Computationally expensive but the only honest way to estimate
+generalization with hyperparameter tuning.
+
+## Leave-one-out (LOO)
+
+$k = n$. Train on $n - 1$, test on the remaining 1, repeat. High
+variance, low bias. Expensive (one full training per data point).
+
+LOO has theoretical appeal for very small datasets but is rarely
+used in practice; 5-fold or 10-fold is usually enough.
+
+## Cross-validation under shift
+
+If train and test come from different distributions (concept drift,
+covariate shift), CV measures the wrong thing. Standard remedies:
+
+- **Stratify by domain**: ensure each fold has a representative mix.
+- **Cluster-based CV**: cluster the data and hold out whole clusters at
+  a time. Approximates "new mode" generalization.
+- **Adversarial validation**: train a classifier to distinguish train
+  from test; if it succeeds, you have shift and need to adjust.
+
+CV cannot fix distribution shift. It can only honestly estimate
+performance under the assumption that your CV setup mimics production.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Synthetic dataset with groups (multiple samples per "patient")
+n_patients = 100
+samples_per_patient = 10
+n = n_patients * samples_per_patient
+group = np.repeat(np.arange(n_patients), samples_per_patient)
+y_patient = rng.normal(size=n_patients)
+y = y_patient[group] + 0.1 * rng.normal(size=n)         # patient-specific signal
+X = np.column_stack([y_patient[group], rng.normal(size=n)])
+
+# Linear regression: train coefficient on X
+def fit_lr(X, y):
+    return np.linalg.lstsq(X, y, rcond=None)[0]
+
+def mse(y, y_hat): return np.mean((y - y_hat)**2)
+
+# Random k-fold: optimistic because patient feature is in both train and test
+random_fold = np.array_split(rng.permutation(n), 5)
+random_scores = []
+for i in range(5):
+    test = random_fold[i]
+    train = np.setdiff1d(np.arange(n), test)
+    beta = fit_lr(X[train], y[train])
+    random_scores.append(mse(y[test], X[test] @ beta))
+print(f"random k-fold MSE:  {np.mean(random_scores):.4f}  (each fold has same patients as train)")
+
+# Group k-fold: hold out entire patients
+groups_per_fold = np.array_split(rng.permutation(n_patients), 5)
+group_scores = []
+for i in range(5):
+    test_pat = groups_per_fold[i]
+    test = np.where(np.isin(group, test_pat))[0]
+    train = np.setdiff1d(np.arange(n), test)
+    beta = fit_lr(X[train], y[train])
+    group_scores.append(mse(y[test], X[test] @ beta))
+print(f"group k-fold MSE:   {np.mean(group_scores):.4f}  (test patients are new)")
+
+# Time-series walk-forward: train on past, test on future
+n_test_folds = 4
+fold_size = n // (n_test_folds + 1)
+ts_scores = []
+for i in range(n_test_folds):
+    end = (i + 2) * fold_size                            # train: 0..(i+1)*fold_size; test: (i+1)*fold_size..(i+2)*fold_size
+    train = np.arange(0, (i + 1) * fold_size)
+    test = np.arange((i + 1) * fold_size, end)
+    beta = fit_lr(X[train], y[train])
+    ts_scores.append(mse(y[test], X[test] @ beta))
+print(f"walk-forward MSE:    {np.mean(ts_scores):.4f}  (each test is future)")
+```
+
+The random k-fold reports a low MSE that overestimates real generalization
+because patient-specific signal leaks; group k-fold gives the honest
+number for "new patient" generalization. The next lesson picks the
+hyperparameters using these CV scores.
