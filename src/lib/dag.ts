@@ -428,7 +428,8 @@ export const PILLARS: Pillar[] = [
     slug: "E-nlp-llms",
     name: "NLP & Language Models",
     shortName: "NLP & LLMs",
-    tagline: "Tokenization, LLMs, alignment, agents: espinha do AI ML Theory",
+    tagline:
+      "Tokenization, LLMs, alignment, agents: the backbone of AI ML Theory",
     color: "#bb9af7",
     subs: [
       {
@@ -862,9 +863,12 @@ export const PILLARS: Pillar[] = [
     subs: [
       {
         id: "J1",
-        name: "Fundamentos (RAG, tool_use, agentes)",
+        name: "Fundamentals (RAG, tool_use, agents)",
         topics: [
-          { name: "RAG do zero (pypdf, ChromaDB, embeddings)", status: "gap" },
+          {
+            name: "RAG from scratch (pypdf, ChromaDB, embeddings)",
+            status: "gap",
+          },
           {
             name: "Native tool_use (Claude API, schema injection)",
             status: "gap",
@@ -882,7 +886,7 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J2",
-        name: "Pensamento de sistemas",
+        name: "Systems thinking",
         topics: [
           {
             name: "MCP: protocol, servers, integrations",
@@ -890,7 +894,7 @@ export const PILLARS: Pillar[] = [
             hot: true,
           },
           {
-            name: "Desenhar um servidor MCP (granularidade, versionamento)",
+            name: "Design an MCP server (granularity, versioning)",
             status: "gap",
             hot: true,
           },
@@ -967,13 +971,13 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J5",
-        name: "Data platform para IA",
+        name: "Data platform for AI",
         topics: [
-          { name: "dbt em profundidade", status: "gap" },
+          { name: "dbt in depth", status: "gap" },
           { name: "Orchestration (Dagster or Airflow)", status: "gap" },
           { name: "Data contracts", status: "gap" },
           {
-            name: "Vector infra em escala (pgvector × managed)",
+            name: "Vector infra at scale (pgvector × managed)",
             status: "gap",
             hot: true,
           },
@@ -983,7 +987,7 @@ export const PILLARS: Pillar[] = [
             hot: true,
           },
           {
-            name: "Event-driven & streaming para IA (Kafka, CDC)",
+            name: "Event-driven & streaming for AI (Kafka, CDC)",
             status: "gap",
           },
           { name: "Feature stores & embedding stores (Feast)", status: "gap" },
@@ -1008,7 +1012,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "API gateway, service mesh, multi-tenancy", status: "gap" },
           {
-            name: "Cost & FinOps para IA (caching tiers, reserved capacity)",
+            name: "Cost & FinOps for AI (caching tiers, reserved capacity)",
             status: "gap",
             hot: true,
           },
@@ -1016,17 +1020,17 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "J7",
-        name: "Skills de arquiteto",
+        name: "Architect skills",
         topics: [
-          { name: "AI governance (LGPD/GDPR para sistemas IA)", status: "gap" },
+          { name: "AI governance (LGPD/GDPR for AI systems)", status: "gap" },
           {
-            name: "Red teaming, prompt injection em escala",
+            name: "Red teaming, prompt injection at scale",
             status: "gap",
             hot: true,
           },
           { name: "Reference architectures, ADRs, C4 diagrams", status: "gap" },
           {
-            name: "System design para IA (architect-interview style)",
+            name: "System design for AI (architect-interview style)",
             status: "gap",
           },
           { name: "Capacity / cost modeling", status: "gap" },
@@ -1251,7 +1255,7 @@ export const CONNECTIONS: Connection[] = [
   },
   { from: "J3", to: "J5", label: "Production → data platform", kind: "uses" },
   { from: "J5", to: "J6", label: "Data platform → Cloud AI", kind: "uses" },
-  { from: "J6", to: "J7", label: "Cloud → arquiteto", kind: "uses" },
+  { from: "J6", to: "J7", label: "Cloud → architect", kind: "uses" },
 ];
 
 // -------------------------------------------------------------------------
