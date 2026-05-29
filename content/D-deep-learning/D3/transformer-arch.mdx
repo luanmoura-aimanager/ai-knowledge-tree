@@ -1,0 +1,217 @@
+---
+title: "The Transformer"
+pillar: D
+subId: D3
+lessonId: transformer-arch
+order: 6
+estimatedMinutes: 20
+goal: "Assemble multi-head self-attention, position-wise FFNs, residuals, and LayerNorm into the encoder-decoder Transformer."
+prerequisites: ["self-attention", "D1/normalization"]
+---
+
+Self-attention is a single operation; the **Transformer** is the
+architecture that turns it into a full sequence model. Each block
+alternates self-attention with a position-wise feed-forward network,
+wraps both in residual connections and LayerNorm, and stacks $L$ of
+these blocks. The encoder-decoder variant adds cross-attention for
+seq2seq tasks. Every modern LLM, vision Transformer, and multimodal
+model is a variation of this template.
+
+## The encoder block
+
+For a sequence $X \in \mathbb{R}^{N \times d}$, one encoder block
+computes:
+
+$$
+X' = X + \text{MultiHeadAttention}(\text{LN}(X))
+$$
+
+$$
+X'' = X' + \text{FFN}(\text{LN}(X'))
+$$
+
+with **pre-norm** placement (LayerNorm before each sublayer), which is
+the modern default. Original Transformer used post-norm (LayerNorm
+after); pre-norm is more stable for deep stacks.
+
+Two sublayers:
+
+- **Multi-head self-attention** (previous lesson) mixes information
+  across positions.
+- **Position-wise FFN** processes each position independently with a
+  two-layer MLP:
+  $$
+  \text{FFN}(x) = W_2\, \sigma(W_1 x + b_1) + b_2,
+  $$
+  with hidden dimension $d_{\text{ff}}$, typically $4d$. The activation
+  $\sigma$ is GELU (or SwiGLU in modern LLMs).
+
+The residual connections let gradients flow directly through the depth
+of the stack; LayerNorm keeps the activation scale stable.
+
+## Why "attention mixes, FFN processes"
+
+A common reading of the Transformer block:
+
+- Attention is the only operation that **mixes information between
+  positions**. Without it, the network is a stack of independent
+  per-token MLPs.
+- The FFN processes each position **independently** but with a much
+  larger hidden dimension than the attention. It is where most of the
+  parameters live (about 2/3 of a Transformer's parameters are in
+  FFNs).
+
+Attention + FFN is the minimal architecture that has both global
+mixing and per-token processing.
+
+## The encoder-decoder Transformer
+
+For seq2seq tasks (translation, summarization), the architecture has
+two stacks:
+
+**Encoder** ($L$ blocks): each block is self-attention + FFN as above,
+applied to the source sequence.
+
+**Decoder** ($L$ blocks): each block has three sublayers:
+
+1. **Masked self-attention** over the target sequence (causal mask
+   prevents the decoder from seeing future tokens).
+2. **Cross-attention**: queries come from the decoder, keys and values
+   come from the encoder. The decoder reads the encoder's
+   representation.
+3. **FFN**.
+
+Each sublayer is wrapped in a residual connection and LayerNorm. The
+decoder's final output is projected through a linear layer to vocabulary
+logits and softmaxed to predict the next token.
+
+## Decoder-only Transformers (GPT-style)
+
+For autoregressive language modeling, no encoder is needed: the model
+takes a prefix and predicts the next token. The architecture is just the
+**decoder stack** without cross-attention:
+
+$$
+\text{Block}: x \mapsto x + \text{Attention}(\text{LN}(x)) \mapsto x + \text{FFN}(\text{LN}(x)),
+$$
+
+with a causal mask in attention. GPT, LLaMA, Claude, Gemini: all
+decoder-only.
+
+Training: feed the model a sequence, predict every next token in
+parallel using teacher forcing. Loss is the cross-entropy averaged
+across positions. Inference: generate one token at a time, append it to
+the prefix, repeat.
+
+## Encoder-only Transformers (BERT-style)
+
+For tasks where the model only needs to read (classification, named
+entity recognition, span extraction), use just the encoder stack with no
+causal mask. BERT, RoBERTa, DeBERTa: encoder-only.
+
+Training: masked language modeling (mask 15% of tokens, predict them
+from the surrounding bidirectional context). Inference: take a final
+hidden state for the [CLS] token or for span positions, feed into a
+task-specific head.
+
+## Hyperparameter dimensions
+
+A modern decoder-only Transformer has:
+
+- **Number of layers** $L$ (depth): 6 (small), 32 (medium), 80+ (large).
+- **Model dimension** $d$ (hidden size): 512, 1024, 2048, 4096, 8192.
+- **Number of heads** $H$: $d / 64$ typically, so 8, 16, 32, 64.
+- **FFN expansion**: 4× or 8/3× (the latter for SwiGLU).
+- **Vocabulary size** $V$: 30K-200K for subword tokenizers.
+
+Total parameters scale roughly as $L \cdot d^2 \cdot 12$ (the leading
+constant comes from 4 projections in attention + 2 in FFN at expansion
+4, ignoring biases and norms).
+
+## The training-inference asymmetry
+
+- **Training** is parallel over positions: predict all next tokens
+  simultaneously with teacher forcing. GPU-friendly.
+- **Inference** is sequential: each token depends on all previous, so
+  generation is one-token-at-a-time. **KV caching** stores attention
+  keys and values across steps to avoid recomputing them.
+
+Each generated token costs one forward pass. Long-context generation is
+dominated by the per-step compute, which is mostly attention against the
+KV cache. This is what motivates the linear-attention and SSM
+alternatives later.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def softmax(z, axis):
+    z = z - z.max(axis=axis, keepdims=True)
+    e = np.exp(z); return e / e.sum(axis=axis, keepdims=True)
+
+def gelu(x):
+    return 0.5 * x * (1 + np.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * x**3)))
+
+def layer_norm(x, eps=1e-5):
+    mu = x.mean(axis=-1, keepdims=True)
+    var = x.var(axis=-1, keepdims=True)
+    return (x - mu) / np.sqrt(var + eps)
+
+def multihead_attention(X, Wq, Wk, Wv, Wo, H, causal=True):
+    N, d = X.shape
+    d_k = d // H
+    Q = X @ Wq; K = X @ Wk; V = X @ Wv
+    # split into heads
+    Q = Q.reshape(N, H, d_k).transpose(1, 0, 2)        # (H, N, d_k)
+    K = K.reshape(N, H, d_k).transpose(1, 0, 2)
+    V = V.reshape(N, H, d_k).transpose(1, 0, 2)
+    scores = Q @ K.transpose(0, 2, 1) / np.sqrt(d_k)    # (H, N, N)
+    if causal:
+        mask = np.triu(np.ones((N, N)), k=1).astype(bool)
+        scores = np.where(mask, -np.inf, scores)
+    A = softmax(scores, axis=-1)
+    out = A @ V                                        # (H, N, d_k)
+    out = out.transpose(1, 0, 2).reshape(N, H * d_k)
+    return out @ Wo
+
+def ffn(x, W1, W2, b1, b2):
+    return gelu(x @ W1 + b1) @ W2 + b2
+
+def transformer_block(X, Wq, Wk, Wv, Wo, W1, W2, b1, b2, H):
+    X = X + multihead_attention(layer_norm(X), Wq, Wk, Wv, Wo, H)
+    X = X + ffn(layer_norm(X), W1, W2, b1, b2)
+    return X
+
+# Tiny decoder-only Transformer
+N, d, H, d_ff = 8, 16, 4, 64
+X = rng.normal(size=(N, d))
+
+# Initialize parameters
+Wq = rng.normal(scale=0.1, size=(d, d))
+Wk = rng.normal(scale=0.1, size=(d, d))
+Wv = rng.normal(scale=0.1, size=(d, d))
+Wo = rng.normal(scale=0.1, size=(d, d))
+W1 = rng.normal(scale=0.1, size=(d, d_ff))
+W2 = rng.normal(scale=0.1, size=(d_ff, d))
+b1 = np.zeros(d_ff); b2 = np.zeros(d)
+
+# Stack 4 blocks
+for _ in range(4):
+    X = transformer_block(X, Wq, Wk, Wv, Wo, W1, W2, b1, b2, H)
+print(f"output shape after 4 blocks: {X.shape}")
+print(f"output norm per position: {[round(np.linalg.norm(X[i]), 2) for i in range(N)]}")
+
+# Parameter count for this tiny model
+n_params = sum(p.size for p in [Wq, Wk, Wv, Wo, W1, W2, b1, b2])
+total_per_block = n_params
+print(f"parameters per block: {total_per_block:,}  "
+      f"(FFN: {W1.size + W2.size + b1.size + b2.size:,}, attention: {Wq.size * 4:,})")
+```
+
+The 4-block Transformer processes an 8-token sequence; FFN parameters
+already dominate attention parameters at this small scale, and the
+ratio only grows in real models. The next lesson covers how positional
+information is injected into the otherwise position-blind self-attention.

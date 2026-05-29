@@ -1,0 +1,133 @@
+---
+title: "Universal approximation"
+pillar: D
+subId: D1
+lessonId: universal-approximation
+order: 4
+estimatedMinutes: 16
+goal: "State and use Cybenko / Hornik's theorem: one hidden layer with enough units can approximate any continuous function on a compact set."
+prerequisites: ["mlp-forward"]
+---
+
+A natural question: how expressive is the MLP function class? The answer
+is the **universal approximation theorem**: a single hidden layer with
+enough units can approximate any continuous function on a compact set,
+to any accuracy. The theorem says expressiveness is not a bottleneck;
+depth, width, and optimization are.
+
+## The statement
+
+**Theorem (Cybenko 1989, Hornik 1991).** Let $\sigma: \mathbb{R} \to \mathbb{R}$
+be a nonconstant, bounded, monotone-increasing continuous function (or,
+in modern variants, any nonpolynomial continuous function, including
+ReLU). For any continuous $f: K \to \mathbb{R}$ on a compact
+$K \subset \mathbb{R}^n$ and any $\varepsilon > 0$, there exist integers
+$M$, weights $w_i \in \mathbb{R}^n$, biases $b_i \in \mathbb{R}$, and
+output coefficients $c_i \in \mathbb{R}$ such that
+
+$$
+\sup_{x \in K} \left| f(x) - \sum_{i=1}^M c_i\, \sigma(w_i^\top x + b_i) \right| < \varepsilon.
+$$
+
+A single hidden layer (width $M$, possibly very large) approximates any
+continuous function on a compact set. ReLU MLPs satisfy a corresponding
+theorem (Leshno et al. 1993): the only nonlinearities for which universal
+approximation fails are polynomials.
+
+## Why this matters less than it sounds
+
+The theorem says **expressiveness is not the bottleneck**. It does *not*
+say:
+
+- That training will find the right weights. Optimization is a separate
+  problem (the next lessons).
+- How big $M$ needs to be. For some functions, $M$ grows exponentially
+  with input dimension or accuracy.
+- That a single hidden layer is the right architecture. **Depth** lets
+  the same total parameter budget represent some functions
+  **exponentially more efficiently** than width can.
+
+So in practice, the choice between a wide shallow network and a deep
+narrow one matters enormously, even though both are universal.
+
+## Why a sketch makes the result believable
+
+A working intuition for one-dimensional inputs: with sigmoid-like
+$\sigma$ and a pair of units $(w_1, b_1), (w_2, b_2)$, you can build a
+**bump function** with controllable width and height. Stacking many
+bumps along the input axis approximates any continuous function by
+piecewise-constant blocks that look like its integral.
+
+For multi-dimensional inputs, the construction generalizes: each unit's
+$w_i^\top x + b_i$ defines a hyperplane, and combinations of opposite-sign
+units carve out half-space differences that approximate cells.
+
+The argument is not constructive in any useful sense at high
+dimension, but it makes "infinite hidden units can fit any function"
+believable from first principles.
+
+## Depth vs width
+
+Modern deep learning is empirically about **depth**, not width. Two
+results explain why:
+
+- **Constructive depth advantage.** For functions like compositions of
+  many simple primitives (parity, multi-step decisions), a shallow
+  network needs exponentially many units while a deep one needs
+  polynomially many.
+- **Optimization friendliness.** Deep networks with residual connections
+  train more easily than equivalently-sized wide shallow networks, even
+  when both have the same parameter count.
+
+Neither is a corollary of the universal approximation theorem. The
+theorem says "deep is not necessary in principle"; experiments show "deep
+is hugely useful in practice".
+
+## Beyond MLPs
+
+Universal approximation theorems exist for:
+
+- **CNNs** (with enough channels and depth).
+- **Transformers** (with enough heads and depth).
+- **GNNs** (with caveats about distinguishing isomorphic graphs:
+  Weisfeiler-Leman tests).
+
+In every case, the theorem is comforting but does not predict practical
+performance. Architecture matters because of inductive bias,
+optimization, and sample efficiency, not because the universal-approximation
+class is too small.
+
+## Check it on arrays
+
+A pictorial check: build a wide one-hidden-layer ReLU network with random
+weights, fit only the output coefficients, and watch it approximate a
+nontrivial target.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Target: sin(2 pi x)
+x_train = np.linspace(0, 1, 200)
+y_train = np.sin(2 * np.pi * x_train)
+
+def features(x, M, rng):
+    # Random hidden layer: x -> ReLU(w * x + b)
+    w = rng.normal(scale=5.0, size=M)
+    b = rng.uniform(-2, 2, size=M)
+    return np.maximum(0.0, np.outer(x, w) + b)
+
+for M in [5, 20, 100, 500]:
+    Phi = features(x_train, M, rng)
+    # Fit output coefficients by least squares
+    c, *_ = np.linalg.lstsq(Phi, y_train, rcond=None)
+    y_hat = Phi @ c
+    rmse = np.sqrt(np.mean((y_hat - y_train)**2))
+    print(f"M = {M:>4}: RMSE = {rmse:.4f}")
+```
+
+The fit improves monotonically as the hidden width grows; with enough
+units, a single hidden layer reproduces the sinusoid to machine-precision
+RMSE. The next lesson picks the right $\sigma$ for the inner nonlinearity:
+ReLU and its modern variants.

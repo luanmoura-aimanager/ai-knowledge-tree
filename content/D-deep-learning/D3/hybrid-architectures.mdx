@@ -1,0 +1,147 @@
+---
+title: "Hybrid architectures"
+pillar: D
+subId: D3
+lessonId: hybrid-architectures
+order: 10
+estimatedMinutes: 14
+goal: "Combine attention and recurrence (RWKV, Hyena, Jamba, Griffin) to keep Transformer quality at lower context cost."
+prerequisites: ["state-space-models", "linear-attention"]
+codeExempt: true
+---
+
+Pure attention is quadratic but precise; pure recurrence (SSM, linear
+attention) is linear but loses some quality on local lookup. The
+pragmatic answer is to combine them. **Hybrid architectures** interleave
+attention and recurrent blocks so the model gets attention's exactness
+where it helps most and recurrence's efficiency where it suffices. As of
+2024, hybrids are state-of-the-art for long-context language modeling.
+
+## The motivation
+
+Tasks like "find the named entity from three pages ago and reuse it" are
+attention's natural home: a content-based lookup against arbitrary
+positions. Tasks like "compose the next token from the local context" are
+where SSMs and linear attention excel: cheap, sequential, hardware-friendly.
+
+A long-context language model needs both. Hybrid architectures use:
+
+- **Attention** for occasional global content-based mixing.
+- **SSM or linear attention** for everything else (local processing,
+  bulk sequence mixing).
+
+The savings are large: most layers being O(N) and only a few being
+O(N²) puts the overall cost solidly sub-quadratic.
+
+## RWKV
+
+Bo Peng et al. (2023). A pure linear-attention architecture with
+**no quadratic attention at all**, but trained to behave like a
+Transformer.
+
+Recipe:
+
+- Replace QKV softmax attention with a parametric recurrent kernel
+  that combines token and channel mixing.
+- Channel-wise time decay parameters give the recurrent kernel a
+  data-independent "forgetting" behavior.
+- Trained to match Transformer language modeling on standard
+  benchmarks.
+
+RWKV runs at constant time per token (RNN-style inference) and trains
+in parallel (kernel as convolution). Earlier versions trailed pure
+Transformers; RWKV-5/6 closed the gap.
+
+Less attention to global structure than Mamba, but very fast.
+
+## Hyena
+
+Poli et al. (2023). Replace attention with **long convolutions** that
+have learned implicit kernels:
+
+- A kernel network produces a per-position multiplicative scaling.
+- The result is convolved with the input via FFT for O(N log N) cost.
+- Gated and interleaved with MLPs.
+
+Hyena was an early signal that pure-attention was not the only viable
+sequence mixer. Variants (Hyena Hierarchy, MultiHyena) are used in some
+production architectures.
+
+## Jamba
+
+AI21 Labs (2024). Mixture of attention and Mamba blocks in a single
+backbone:
+
+- Mostly Mamba blocks for cheap sequence mixing.
+- Every $K$-th block (e.g. one in every 8) is a standard Transformer
+  attention block, giving the model exact attention checkpoints.
+- Mixture-of-experts FFN sublayers for high effective parameter count
+  at lower inference cost.
+
+Jamba-1.5 supports 256K context window with throughput far exceeding
+pure-attention models of similar quality.
+
+## Griffin and RecurrentGemma
+
+DeepMind (2024). The Griffin architecture mixes a **recurrent block**
+(a gated linear recurrence) and a **local attention block** with
+windowed attention:
+
+- Most blocks are recurrent.
+- A few are local-attention only (no global attention).
+- No quadratic global attention at any layer.
+
+Griffin matches Llama-style Transformer quality at 7B-14B parameters
+while running much faster on long contexts.
+
+**RecurrentGemma** (Google, 2024) is a production-ready Griffin variant
+released as part of the Gemma family.
+
+## When hybrids win
+
+For long-context inference workloads:
+
+- **Recurrent components**: constant per-token cost (no growing KV
+  cache), low memory.
+- **Attention components**: where exact lookup is needed.
+
+The combination often achieves 10x+ throughput at long context vs pure
+attention, with comparable or better quality.
+
+For short contexts (typical sub-2K-token inputs), pure attention is
+fine; hybrids don't help much.
+
+## The bigger picture
+
+The Transformer's dominance from 2017-2022 was largely an absence of
+serious competitors. From 2023 onwards, the landscape diversified:
+
+- **Pure attention**: still the highest quality at short contexts.
+- **SSMs (Mamba family)**: competitive on long context, hardware-friendly.
+- **Linear attention (RWKV, others)**: simple, fast.
+- **Hybrids (Jamba, Griffin)**: practical defaults for long-context.
+
+The winning architecture for any given task as of 2024 is more
+likely to be a hybrid than a pure Transformer. The pure Transformer
+remains the default starting point and the most-studied baseline, but
+it is no longer the only game in town.
+
+## What about training cost
+
+Most of the hybrid architectures train comparably to pure attention
+when adjusted for parameter count. The savings come at **inference
+time**, especially for long-context inference:
+
+- Pure attention: O(N) per token (against KV cache).
+- Hybrid: O(constant) per token for recurrent layers, O(local window)
+  for local attention layers.
+
+For applications like long-document summarization, RAG-with-retrieval,
+or code generation with large context, hybrids dominate.
+
+## This closes the D3 sequence-modeling track
+
+Pillar D's sequence track ran from word embeddings through RNNs and
+LSTMs to the Transformer, then beyond it to SSMs and hybrid
+architectures. The next subsection (D4) covers a different problem
+entirely: generating *new* data, not predicting from existing data.

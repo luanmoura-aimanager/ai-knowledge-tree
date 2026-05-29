@@ -1,0 +1,132 @@
+---
+title: "Masked language modeling"
+pillar: D
+subId: D5
+lessonId: mlm
+order: 4
+estimatedMinutes: 14
+goal: "Pretrain BERT-style encoders by masking tokens and predicting them from bidirectional context."
+prerequisites: ["D3/transformer-arch"]
+codeExempt: true
+---
+
+**Masked language modeling** (MLM) is the SSL pretraining objective
+behind BERT and most encoder-only Transformers. The recipe: corrupt the
+input by masking some tokens, train the model to predict them from
+bidirectional context. Simple, scalable, and the most-used pretraining
+objective in NLP after autoregressive language modeling.
+
+## The MLM task
+
+Devlin et al. (2019), BERT.
+
+Given a token sequence $t_1, t_2, \dots, t_N$:
+
+1. Randomly select 15% of token positions.
+2. For each selected position $i$:
+   - 80% of the time, replace $t_i$ with a special **[MASK]** token.
+   - 10% of the time, replace with a random vocabulary token.
+   - 10% of the time, leave $t_i$ unchanged.
+3. Feed the corrupted sequence into a bidirectional Transformer encoder.
+4. Predict the original $t_i$ at each masked position via cross-entropy.
+
+The 80/10/10 split balances two pressures:
+
+- Pure [MASK] (100%) would teach the model only to predict [MASK]
+  tokens, since at inference there are no masks.
+- Mixing in unchanged and random tokens forces the model to compute
+  meaningful representations at *every* position, not just at masked
+  positions.
+
+## Why bidirectional context
+
+The masked token can use information from both the left and right
+context. An autoregressive language model only sees the left context.
+For tasks like classification, named entity recognition, and
+question-answering (where the model can read the whole input before
+predicting), bidirectional context is strictly more informative.
+
+The tradeoff: BERT-style models cannot generate text efficiently; they
+need a separate decoder for that. GPT-style autoregressive models are
+worse at understanding but excellent at generating.
+
+Modern decoder-only LLMs (GPT, LLaMA) have replaced BERT for most tasks
+through prompting; but BERT-style encoders are still the default for
+classification, retrieval embeddings, and span extraction.
+
+## BERT-family models
+
+- **BERT** (Devlin et al., 2019): the original. ~110M-340M parameters.
+  Trained on BookCorpus and English Wikipedia.
+- **RoBERTa** (Liu et al., 2019): same architecture, better training
+  (more data, more steps, no next-sentence-prediction).
+- **DeBERTa** (He et al., 2021): disentangled position and content
+  embeddings, plus enhanced mask decoder.
+- **mBERT, XLM-R**: multilingual variants.
+- **DistilBERT, TinyBERT**: smaller distilled versions for deployment.
+
+## Beyond MLM: span / replaced-token / next-token
+
+Several BERT successors modified the objective:
+
+- **SpanBERT**: mask contiguous spans of tokens, predict the whole
+  span. Better for span-based tasks.
+- **ELECTRA** (Clark et al., 2020): use a small generator network to
+  produce plausible replacement tokens, then train the main model to
+  classify each token as "original" or "replaced". More training-
+  efficient than MLM.
+- **T5** (Raffel et al., 2020): encoder-decoder; the encoder sees the
+  input with spans masked, the decoder generates the masked content.
+  Reframes every NLP task as text-to-text.
+
+ELECTRA and T5 both demonstrate that the MLM template is one point in a
+larger space of denoising-autoencoding objectives.
+
+## Tokenization
+
+BERT uses **WordPiece** subword tokenization, splitting words into
+common pieces ("playing" → "play" + "##ing"). Subword tokenization
+handles out-of-vocabulary words and reduces vocabulary size to ~30K.
+Modern LLMs use **Byte-Pair Encoding (BPE)** or **SentencePiece**.
+
+The tokenizer is fixed before pretraining and shared across all
+downstream uses.
+
+## Downstream usage
+
+After MLM pretraining, BERT is fine-tuned per task:
+
+- **Classification**: feed the [CLS] token's final hidden state into
+  a linear classifier.
+- **Token classification** (NER, POS): per-token linear head.
+- **Span extraction** (QA): per-token start/end position heads.
+- **Sentence-pair tasks** (NLI, similarity): feed two sentences
+  separated by [SEP]; use [CLS] features.
+
+Each task adds a small task-specific head; the BERT body is fine-tuned
+with a small learning rate.
+
+## Why MLM dominated NLP (and then didn't)
+
+2018-2022: BERT-style MLM was the dominant NLP pretraining recipe.
+Nearly every paper started with "we fine-tune BERT-base on...".
+
+2022-present: prompting large autoregressive LLMs (GPT-3, GPT-4,
+Claude) replaced BERT for many tasks. The same model, prompted
+differently, handles classification, span extraction, NER, translation,
+etc. Fine-tuning a separate small model per task is being replaced by
+prompting one big LLM.
+
+BERT-style models remain dominant where the model output is an
+**embedding** (retrieval, search) and where small, fast inference is
+needed (mobile, edge). They also live on inside multimodal systems as
+text encoders for CLIP-like models.
+
+## The bigger picture
+
+MLM is one instance of the **denoising autoencoder** family from D4:
+corrupt the input, predict the original. BERT's specific recipe
+(mask 15%, bidirectional encoder) is one design point.
+
+The next lesson applies the same recipe to images: masked image
+modeling.

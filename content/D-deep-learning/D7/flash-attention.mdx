@@ -1,0 +1,159 @@
+---
+title: "FlashAttention"
+pillar: D
+subId: D7
+lessonId: flash-attention
+order: 6
+estimatedMinutes: 14
+goal: "Tile attention into SRAM-fitting blocks, recompute softmax statistics, and avoid materializing the n x n attention matrix."
+prerequisites: ["D3/self-attention"]
+codeExempt: true
+---
+
+Standard attention computes $\operatorname{softmax}(QK^\top/\sqrt{d})V$
+by materializing the full $N \times N$ attention matrix in slow GPU
+memory. **FlashAttention** computes the exact same result with
+$O(N)$ memory by tiling the computation into chunks that fit in fast
+on-chip memory. The speedup is 2-4x; the memory savings unlock
+contexts that wouldn't otherwise fit. It is now the default in every
+production Transformer training pipeline.
+
+## The memory hierarchy
+
+GPU memory is layered:
+
+- **HBM (high-bandwidth memory)**: 40-80 GB on a modern GPU, ~3 TB/s
+  bandwidth. Slow.
+- **SRAM (on-chip cache)**: ~50 MB per streaming multiprocessor, ~30
+  TB/s bandwidth. Fast but tiny.
+
+Standard attention's bottleneck is **HBM bandwidth**: reading and
+writing $N \times N$ attention scores at every step dominates the
+runtime, not the compute.
+
+FLOP-wise, attention's matmul is fast; the data movement is the
+issue.
+
+## The FlashAttention algorithm
+
+Dao et al. (2022). Two innovations:
+
+**1. Tiling**: split the computation into blocks small enough to fit
+in SRAM. Compute each block fully before moving to the next.
+
+**2. Online softmax**: compute softmax incrementally as new blocks
+arrive, without ever holding the full $N \times N$ matrix.
+
+The naive softmax needs the full row to compute the normalizing
+constant. But softmax has a useful property:
+
+$$
+\operatorname{softmax}([z; z']) = \operatorname{softmax}([z - m\, \mathbf{1}; z' - m\, \mathbf{1}])
+$$
+
+with $m = \max([z; z'])$. So you can stream through blocks, keep
+running max and running sum, and combine them correctly across blocks.
+
+The full algorithm:
+
+1. Split $Q$, $K$, $V$ into row blocks $Q_i$ and column blocks
+   $K_j$, $V_j$.
+2. For each row block $Q_i$:
+   - Load into SRAM.
+   - For each column block $j$ (left to right):
+     - Load $K_j$, $V_j$ into SRAM.
+     - Compute $S_{ij} = Q_i K_j^\top$ in SRAM.
+     - Update running max and running sum.
+     - Update partial output $O_i$ in SRAM.
+   - Write final $O_i$ back to HBM.
+
+The full $N \times N$ matrix is never materialized; only a few blocks
+at a time exist in SRAM. HBM traffic drops from $O(N^2)$ to $O(N^2/B)$
+where $B$ is block size, but more importantly memory drops from
+$O(N^2)$ to $O(N)$.
+
+## Why it's faster
+
+For typical sequence lengths and block sizes, FlashAttention does
+**fewer** HBM reads/writes than standard attention. The compute is the
+same (or slightly more due to recomputation in the backward pass), but
+compute was never the bottleneck.
+
+Concrete: 2-4x faster than the standard implementation, with the
+ratio growing as sequence length grows.
+
+## Backward pass
+
+The backward pass needs the same statistics. Either store them from
+the forward pass (cheap: $O(N)$ instead of $O(N^2)$) or recompute
+them. FlashAttention's backward also tiles over blocks, computing
+gradients block-by-block.
+
+A small overhead: the backward pass redoes ~10% extra FLOPs compared
+to a naive implementation that stored everything. Saved memory is
+worth it.
+
+## FlashAttention-2 and -3
+
+Refinements that further increase throughput:
+
+- **FA-2** (Dao, 2023): better parallelism across thread blocks, swap
+  of inner and outer loops to use more SMs effectively. ~2x speedup
+  over FA-1.
+- **FA-3** (Shah et al., 2024): NVIDIA Hopper-specific instructions
+  (asynchronous TMA, FP8 support), another 1.5-2x on H100.
+
+Each generation is a re-implementation for the dominant hardware
+generation, illustrating the IO-aware-kernel discipline.
+
+## Variants
+
+- **PagedAttention** (vLLM): paginate the KV cache to handle variable-
+  length sequences efficiently in serving. Different problem (inference),
+  related discipline.
+- **Sparse FlashAttention**: extend to sliding-window and other sparse
+  attention patterns.
+- **Causal masking efficiency**: cleaner handling of the lower-
+  triangular mask in autoregressive decoding.
+
+## How to use it
+
+Modern frameworks integrate FlashAttention transparently:
+
+```python-static
+# PyTorch 2.x: scaled_dot_product_attention auto-dispatches to FlashAttention
+y = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=True)
+```
+
+The framework picks the right backend (FlashAttention, memory-efficient
+attention, naive) based on shapes, hardware, and dtype.
+
+For custom kernels, the `flash-attn` Python package provides direct
+access to the implementations.
+
+## Why it matters beyond speed
+
+FlashAttention shifted attention from being **memory-bound** to being
+**compute-bound** in practice. This:
+
+- Made long contexts (32K+ tokens) practical for training.
+- Made larger batches feasible.
+- Reduced the relative cost of attention in the Transformer block,
+  shifting more focus to FFN optimization.
+
+It is one of the most impactful systems contributions to modern deep
+learning, on par with mixed precision and FSDP for changing what is
+possible to train.
+
+## The bigger lesson
+
+FlashAttention is **the same algorithm**, just implemented to be kind
+to the memory hierarchy. The general principle: **memory bandwidth,
+not FLOPs, is often the bottleneck on modern hardware**. Any
+algorithm that operates on large intermediate tensors should consider
+tiling, fusion, and recomputation to reduce data movement.
+
+This thinking permeates modern kernel writing: KV cache management,
+mixture-of-experts routing, attention variants. The next lesson
+covers the broader infrastructure that wraps all of these: training
+clusters and orchestration.

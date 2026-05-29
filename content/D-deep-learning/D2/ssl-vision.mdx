@@ -1,0 +1,131 @@
+---
+title: "Self-supervised vision (DINO, MAE)"
+pillar: D
+subId: D2
+lessonId: ssl-vision
+order: 8
+estimatedMinutes: 14
+goal: "Pretrain vision backbones without labels via student-teacher distillation (DINO) and masked image modeling (MAE)."
+prerequisites: ["vit"]
+codeExempt: true
+---
+
+Labeled image datasets are expensive; unlabeled images are essentially
+free. **Self-supervised pretraining** turns this asymmetry into model
+quality: pretrain a vision Transformer on hundreds of millions of
+unlabeled images, then fine-tune on a small labeled set. Two methods
+dominate: **DINO** (student-teacher distillation, no labels needed) and
+**MAE** (masked image modeling, BERT for pixels). The D5 SSL track
+covers the general theory; this lesson is the vision-specific story.
+
+## Why SSL for vision
+
+Supervised ImageNet pretraining was the standard for years. Its limits:
+
+- 1.3M images is a small dataset by foundation-model standards.
+- Many real-world tasks have a domain gap from ImageNet.
+- ImageNet labels are noisy (~10% errors at the class level).
+
+Self-supervised pretraining on much larger unlabeled corpora (LAION,
+internal image dumps) consistently beats supervised pretraining on
+downstream transfer, while needing no labels at all.
+
+## DINO
+
+Caron et al. (2021), Facebook AI Research.
+
+**Setup**: two networks, the **student** $g_\theta$ and the **teacher**
+$g_\xi$, both vision Transformers. They receive different augmented
+crops of the same image and must produce similar features. The teacher's
+parameters are an **exponential moving average** of the student's; this
+prevents collapse without negative pairs.
+
+Loss: cross-entropy between the student's and teacher's softmaxed
+features, where each feature vector is interpreted as a probability
+distribution. **Centering** of the teacher's features (subtracting a
+running mean) and **temperature sharpening** keep the representations
+informative.
+
+DINO produces remarkable emergent properties:
+
+- The pretrained **[CLS] token attention** highlights the object of
+  interest, even though the model was never told what the object is.
+- **k-NN classification** on DINO features matches supervised
+  ImageNet classification at 78% accuracy without any labels.
+- Linear probes on top of frozen DINO features approach supervised
+  fine-tuning accuracy.
+
+**DINOv2** (2023) scaled this to a curated 142M-image dataset and
+produced general-purpose visual features used as backbones for
+classification, segmentation, depth, and 3D tasks. Closest vision has
+to a general-purpose feature extractor.
+
+## MAE (Masked Autoencoders)
+
+He et al. (2022). The image analogue of BERT's masked language modeling.
+
+**Setup**: mask 75% of the image patches at random. An **asymmetric
+encoder-decoder** ViT:
+
+- The **encoder** sees only the unmasked 25% of patches (much cheaper
+  than processing all patches).
+- The **decoder** (small, ~8 layers) receives the encoder's output plus
+  learned mask tokens at masked positions and predicts the original
+  pixel values.
+
+Loss: mean squared error on pixel values of the masked patches.
+
+Why it works:
+
+- The 75% mask rate forces the model to learn high-level semantic
+  features (low-level texture is not enough to fill in 75% of an
+  image).
+- The asymmetric encoder is efficient: it processes a quarter of the
+  patches in the forward pass, making 1.6B-parameter MAEs trainable
+  with modest compute.
+
+After pretraining, throw away the decoder and use the encoder as a
+backbone. Fine-tuning matches or beats DINO and supervised
+pretraining on classification and detection.
+
+## SimCLR / MoCo / iBOT (background)
+
+Other SSL methods used in vision before DINO and MAE:
+
+- **SimCLR** (2020): contrastive learning with augmented pairs (similar
+  views close, others apart). Needs huge batches and many negatives.
+- **MoCo** (2020): contrastive with a memory bank of negatives; works
+  at smaller batches.
+- **BYOL** (2020): student-teacher without negatives, similar to DINO.
+- **iBOT** (2022): combines DINO-style distillation with masked-image
+  prediction for the best of both.
+
+The C5 D5 SSL lesson covers the family broadly; here the focus is on
+the practical vision-specific recipe.
+
+## Practical recipe
+
+For a typical vision project:
+
+1. **Start with DINOv2 or MAE pretrained on a large corpus**. Freeze
+   the backbone, train a small task head. Excellent for fast
+   experimentation.
+2. **Fine-tune the whole backbone** for your task when you have enough
+   data and compute. Improves performance.
+3. **Train SSL from scratch on your domain** only if the domain is far
+   from natural images (medical, satellite, microscopy) and you have
+   millions of images.
+
+For most teams, option 1 is what works. DINOv2 weights, MAE weights,
+and CLIP image-encoder weights are all reasonable starting points.
+
+## The big picture
+
+Modern vision moved from "supervised ImageNet pretraining" to
+"self-supervised pretraining on much larger unlabeled corpora", with
+fine-tuning on smaller labeled task datasets. SSL methods are now the
+default upstream training; supervised fine-tuning is downstream.
+
+The next (and final) D2 lesson moves to a completely different vision
+application: 3D scene reconstruction from images, via NeRF and Gaussian
+Splatting.

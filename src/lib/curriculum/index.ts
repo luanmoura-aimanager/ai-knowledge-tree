@@ -1,6 +1,7 @@
 import type { Lesson, LessonWithSub } from "@/lib/types";
 import { A_CURRICULUM } from "./A";
 import { C_CURRICULUM } from "./C";
+import { D_CURRICULUM } from "./D";
 
 /**
  * Lesson curriculum registry: subsection id → ordered Lesson[]. Each pillar's
@@ -10,6 +11,7 @@ import { C_CURRICULUM } from "./C";
 const CURRICULA: Record<string, Lesson[]> = {
   ...A_CURRICULUM,
   ...C_CURRICULUM,
+  ...D_CURRICULUM,
 };
 
 /** Ordered lessons for a subsection (empty if none authored/planned yet). */

@@ -1,0 +1,170 @@
+---
+title: "Recurrent networks"
+pillar: D
+subId: D3
+lessonId: rnn
+order: 2
+estimatedMinutes: 18
+goal: "Define a vanilla RNN, unroll it through time, and see why long-range dependencies vanish or explode in the gradients."
+prerequisites: ["D1/backprop"]
+---
+
+A feed-forward network has no notion of time. To process sequences,
+**recurrent neural networks** (RNNs) carry a hidden state from one
+timestep to the next, so the prediction at time $t$ depends on every
+input from time 1 to $t$. The vanilla RNN is conceptually clean but
+trains poorly on long sequences; the next lesson's gated variants fix
+this.
+
+## The RNN cell
+
+At each timestep $t$, the RNN consumes input $x_t \in \mathbb{R}^{d_{\text{in}}}$
+and the previous hidden state $h_{t-1} \in \mathbb{R}^{d_h}$, and
+produces a new hidden state and an output:
+
+$$
+h_t = \tanh(W_x x_t + W_h h_{t-1} + b), \qquad y_t = W_y h_t + c.
+$$
+
+The same parameters $W_x, W_h, W_y, b, c$ are used at every timestep.
+This **weight sharing** across time is what makes the network handle
+sequences of arbitrary length with a fixed parameter count.
+
+## Unrolling through time
+
+To train, "unroll" the recurrence into a $T$-layer feed-forward network
+where layer $t$ has the same weights as every other layer:
+
+$$
+h_1 = \tanh(W_x x_1 + W_h h_0 + b), \quad h_2 = \tanh(W_x x_2 + W_h h_1 + b), \quad \dots
+$$
+
+Compute the loss $\mathcal{L}$ as a function of all $y_t$ (or just $y_T$,
+depending on the task), then backprop through the entire unrolled
+graph. This is **backpropagation through time (BPTT)**.
+
+The gradients with respect to a single weight matrix $W_h$ sum
+contributions from every timestep:
+
+$$
+\frac{\partial \mathcal{L}}{\partial W_h} = \sum_{t=1}^T \frac{\partial \mathcal{L}}{\partial h_t}\,\frac{\partial h_t}{\partial W_h}.
+$$
+
+## Vanishing and exploding gradients
+
+The bad news. The gradient at an early timestep $t$ is a product of $T - t$
+recurrence Jacobians:
+
+$$
+\frac{\partial h_T}{\partial h_t} = \prod_{k=t}^{T-1} \frac{\partial h_{k+1}}{\partial h_k}.
+$$
+
+Each factor is the Jacobian of one tanh step: $\operatorname{diag}(1 - \tanh^2)\cdot W_h$.
+The product is well-behaved only if its eigenvalues stay near 1; in
+practice they do not:
+
+- **Vanishing**: if the spectral radius is below 1, the product shrinks
+  exponentially. Gradients from far in the past die before reaching
+  current weights. The network cannot learn long-range dependencies.
+- **Exploding**: if the spectral radius is above 1, the product grows
+  exponentially. Single gradient updates become huge, training NaNs.
+
+Both regimes are easy to enter. Vanilla RNNs in practice learn
+dependencies of length 10-20; longer ranges require the gated variants
+of the next lesson.
+
+## Gradient clipping
+
+A practical bandage for exploding gradients: cap the global gradient
+norm:
+
+$$
+g \leftarrow g \cdot \min\!\left(1, \frac{c}{\lVert g\rVert}\right).
+$$
+
+Standard in RNN training (and still useful in Transformers). Clipping
+does not fix vanishing gradients; for that, the architecture itself must
+change.
+
+## When RNNs are still used
+
+The dominant sequence architecture for years (2014-2018), then largely
+replaced by Transformers and state space models. Still useful when:
+
+- **Memory matters**: an RNN processes sequences of arbitrary length
+  with constant memory per step.
+- **Streaming**: producing output as input arrives, without buffering.
+- **Very long context where attention is infeasible**: SSMs (D3 lesson)
+  are also good here.
+- **Small models** for edge / mobile inference.
+
+For language modeling at scale, Transformers and SSM hybrids dominate.
+For control / RL with sequential state, RNN-style updates are still
+common.
+
+## Variants beyond LSTM/GRU
+
+- **Bidirectional RNN**: stack a forward-time RNN and a backward-time
+  RNN; concatenate the hidden states. Standard for encoders that can
+  see the whole input (text classification, sequence labeling).
+- **Stacked RNN**: multiple RNN layers on top of each other, each
+  consuming the previous layer's outputs as inputs. Like deep MLP
+  stacking, gives a more expressive function class.
+
+The next lesson tackles the vanishing-gradient problem head-on with
+LSTM and GRU gates.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def rnn_forward(X, Wx, Wh, b):
+    """X: (T, d_in). Returns (T, d_h) hidden state sequence."""
+    T = len(X); d_h = Wh.shape[0]
+    H = np.zeros((T, d_h))
+    h = np.zeros(d_h)
+    for t in range(T):
+        h = np.tanh(Wx @ X[t] + Wh @ h + b)
+        H[t] = h
+    return H
+
+T, d_in, d_h = 30, 5, 8
+X = rng.normal(size=(T, d_in))
+Wx = rng.normal(scale=0.3, size=(d_h, d_in))
+Wh = rng.normal(scale=0.3, size=(d_h, d_h))
+b = np.zeros(d_h)
+
+H = rnn_forward(X, Wx, Wh, b)
+print(f"hidden state shape: {H.shape}")
+print(f"hidden state norm over time: {[round(np.linalg.norm(H[t]), 2) for t in range(0, T, 5)]}")
+
+# Demonstrate vanishing gradient: compute |dh_T / dh_t| as t decreases
+def jacobian_product_norm(Wh, H, target):
+    """Product of one-step Jacobians from t to T-1."""
+    J = np.eye(Wh.shape[0])
+    for k in range(target, len(H) - 1):
+        D = np.diag(1 - H[k]**2)
+        J = (Wh.T @ D) @ J
+    return np.linalg.norm(J)
+
+# Use a Wh with spectral radius < 1 (typical for stable training): vanishing
+Wh_small = 0.5 * rng.normal(size=(d_h, d_h))
+H_small = rnn_forward(X, Wx, Wh_small, b)
+norms_small = [jacobian_product_norm(Wh_small, H_small, t) for t in range(T - 1, -1, -5)]
+print(f"\nvanishing: ||dh_T/dh_t|| from late to early steps: "
+      f"{[round(n, 3) for n in norms_small]}")
+
+# Use a Wh with spectral radius > 1: exploding
+Wh_big = 1.5 * rng.normal(size=(d_h, d_h))
+H_big = rnn_forward(X, Wx, Wh_big, b)
+norms_big = [jacobian_product_norm(Wh_big, H_big, t) for t in range(T - 1, -1, -5)]
+print(f"exploding: ||dh_T/dh_t|| from late to early steps: "
+      f"{[round(n, 1) for n in norms_big]}")
+```
+
+The Jacobian product shrinks geometrically with small weights and grows
+geometrically with large weights, visible across just 30 timesteps. The
+next lesson fixes the problem at the architectural level: LSTM and GRU.

@@ -1,0 +1,182 @@
+---
+title: "Positional encodings"
+pillar: D
+subId: D3
+lessonId: positional-encoding
+order: 7
+estimatedMinutes: 14
+goal: "Compare sinusoidal, learned, ALiBi, and RoPE positional encodings, and see why position must be injected into self-attention."
+prerequisites: ["transformer-arch"]
+---
+
+Self-attention is **permutation-equivariant**: shuffle the tokens and
+the output rows shuffle the same way. Without position information,
+the Transformer cannot tell "the cat sat on the mat" from "the mat sat
+on the cat". **Positional encodings** inject position into the
+representation. Four flavors dominate: sinusoidal (the original),
+learned, ALiBi, and RoPE. Modern LLMs all use one of the latter two.
+
+## Why position matters
+
+Multi-head self-attention is computed via $\operatorname{softmax}(QK^\top)V$,
+which depends only on the *set* of tokens, not their order. A
+Transformer with no positional information cannot distinguish word
+orderings, which destroys language modeling.
+
+Three places to add position information:
+
+- **Absolute positions** added to token embeddings before the first
+  layer.
+- **Relative positions** injected into attention scores at every layer.
+- **Rotational positions** applied to queries and keys before computing
+  attention.
+
+Each approach has a different generalization profile to sequence
+lengths longer than training.
+
+## Sinusoidal positional encoding
+
+The original Transformer: a fixed function of position, no parameters.
+
+$$
+\text{PE}(p, 2i) = \sin\!\left(\frac{p}{10000^{2i/d}}\right), \qquad \text{PE}(p, 2i + 1) = \cos\!\left(\frac{p}{10000^{2i/d}}\right).
+$$
+
+Each dimension of the encoding is a sinusoid at a different frequency.
+Added to the token embedding before the first Transformer block.
+
+Properties:
+
+- Different positions get different vectors.
+- $\text{PE}(p + k)$ can be expressed as a linear function of
+  $\text{PE}(p)$ for any fixed $k$, so relative positions are
+  representable.
+- Generalizes (in principle) to positions longer than training, since
+  the function is defined for any $p$.
+
+In practice, vanilla sinusoidal does not extrapolate well: the model
+overfits to seen positions and generalization to unseen lengths is poor.
+
+## Learned positional embeddings
+
+Used in BERT, original GPT, ViT. A learnable vector per position:
+
+$$
+\text{PE}(p) = E_p, \qquad E \in \mathbb{R}^{N_{\max} \times d}.
+$$
+
+Simple, slightly more flexible than sinusoidal at trained positions, but
+fixed maximum length and zero generalization past it.
+
+## ALiBi (Attention with Linear Biases)
+
+Press et al. (2022). Add a position-dependent **bias** directly to the
+attention scores:
+
+$$
+\text{score}(i, j) = Q_i^\top K_j / \sqrt{d_k} - m\, |i - j|,
+$$
+
+with $m$ a per-head slope (different across heads). Tokens at distance
+$|i - j|$ get penalized by $m \cdot |i - j|$, so closer tokens get more
+attention than far ones.
+
+No learned parameters, no embeddings to add. Generalizes to longer
+sequences than training because the bias is purely a function of
+distance.
+
+## RoPE (Rotary Position Embedding)
+
+Su et al. (2021). The standard in LLaMA, GPT-4-class models.
+
+Apply a position-dependent **rotation** to the query and key vectors
+before the attention dot product. For pairs of dimensions $(2i, 2i+1)$:
+
+$$
+\begin{pmatrix} q'_{2i} \\ q'_{2i+1} \end{pmatrix} = \begin{pmatrix} \cos(p\theta_i) & -\sin(p\theta_i) \\ \sin(p\theta_i) & \cos(p\theta_i) \end{pmatrix} \begin{pmatrix} q_{2i} \\ q_{2i+1} \end{pmatrix},
+$$
+
+with $\theta_i = 10000^{-2i/d}$ matching the sinusoidal frequencies.
+
+The crucial property: the attention dot product becomes
+$q'^\top k' = q^\top R(p_k - p_q)\, k$, a function only of the
+**relative** position $p_k - p_q$. RoPE is relative positional
+encoding implemented via rotations.
+
+Properties:
+
+- No added parameters (no learned embedding table).
+- Naturally encodes relative position.
+- Generalizes modestly to longer contexts; with **NTK scaling** or
+  **YaRN** extensions, can be retrofitted to 2-4x training length.
+
+RoPE is the de facto default for new LLM architectures. Combined with
+its scaling extensions, it has displaced both sinusoidal and learned
+absolute embeddings.
+
+## Practical recipe
+
+- **BERT-style encoders** for fixed-length text: learned positional
+  embeddings are fine.
+- **ViT**: learned 1D or learned 2D positional embeddings.
+- **Decoder-only LLMs with potential context extension**: RoPE plus
+  one of its scaling extensions (YaRN, NTK).
+- **Long-context experimentation or position generalization is
+  critical**: ALiBi.
+
+The choice rarely affects accuracy by more than 1-2% at the same
+context length, but greatly affects how well the model generalizes to
+longer contexts than it saw at training.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Sinusoidal positional encoding
+def sinusoidal(N, d):
+    pe = np.zeros((N, d))
+    pos = np.arange(N)[:, None]
+    div = np.exp(np.arange(0, d, 2) * -(np.log(10000.0) / d))
+    pe[:, 0::2] = np.sin(pos * div)
+    pe[:, 1::2] = np.cos(pos * div)
+    return pe
+
+PE = sinusoidal(N=32, d=8)
+print(f"sinusoidal PE shape: {PE.shape}")
+print(f"PE(0): {PE[0].round(2)}")
+print(f"PE(1): {PE[1].round(2)}  (close to PE(0) by linear shift)")
+
+# RoPE: apply position-dependent rotation
+def rope(x, position):
+    d = x.shape[-1]
+    theta = 10000.0 ** (-np.arange(0, d, 2) * 2.0 / d)
+    cos = np.cos(position * theta)
+    sin = np.sin(position * theta)
+    x_even = x[..., 0::2]; x_odd = x[..., 1::2]
+    out = np.empty_like(x)
+    out[..., 0::2] = x_even * cos - x_odd * sin
+    out[..., 1::2] = x_even * sin + x_odd * cos
+    return out
+
+# RoPE preserves rotational invariance: dot product depends only on relative position
+rng = np.random.default_rng(0)
+q = rng.normal(size=8); k = rng.normal(size=8)
+
+for pq, pk in [(0, 0), (0, 5), (3, 8), (10, 15)]:
+    q_rot = rope(q, pq); k_rot = rope(k, pk)
+    print(f"pos_q={pq}, pos_k={pk}, relative={pk-pq}: q_rot . k_rot = {q_rot @ k_rot:.4f}")
+
+# ALiBi bias for a small attention matrix
+def alibi_bias(N, slope):
+    distances = np.abs(np.arange(N)[:, None] - np.arange(N)[None, :])
+    return -slope * distances
+
+bias = alibi_bias(N=5, slope=0.5)
+print(f"\nALiBi bias matrix (slope=0.5):")
+print(bias.round(2))
+```
+
+The RoPE dot product depends on (pk - pq), not absolute positions; the
+ALiBi bias matrix is a function of distance only. The next lesson
+introduces an alternative to attention entirely: state space models.

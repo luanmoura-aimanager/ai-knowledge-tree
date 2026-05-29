@@ -1,0 +1,135 @@
+---
+title: "Multi-layer perceptron"
+pillar: D
+subId: D1
+lessonId: mlp-forward
+order: 1
+estimatedMinutes: 18
+goal: "Stack affine maps and nonlinearities into an MLP, and trace one forward pass through its parameters."
+prerequisites: ["A1/matrix-calculus"]
+---
+
+A **multi-layer perceptron** (MLP) alternates two operations, an affine
+map and a pointwise nonlinearity, $L$ times. Each affine map is a linear
+algebra problem; each nonlinearity is a scalar function. The composition
+turns the linear-classifier story from pillar C into a function class
+that can fit any continuous target. This lesson sets up the forward pass
+so the next lesson can derive backprop on it.
+
+## The single layer
+
+A linear layer with input $x \in \mathbb{R}^d$ and output $h \in \mathbb{R}^k$
+applies an **affine map** plus a **nonlinearity**:
+
+$$
+h = \sigma(W x + b), \qquad W \in \mathbb{R}^{k \times d},\ \ b \in \mathbb{R}^k.
+$$
+
+The matrix $W$ rotates and scales; the bias $b$ shifts; the elementwise
+$\sigma$ bends. Without $\sigma$ the layer is just a linear map, and the
+whole network would collapse to one large linear map regardless of depth.
+The nonlinearity is what makes stacking useful.
+
+## Stacking layers
+
+An $L$-layer MLP composes $L$ such blocks:
+
+$$
+h^{(0)} = x, \qquad h^{(\ell)} = \sigma\!\left(W^{(\ell)} h^{(\ell-1)} + b^{(\ell)}\right), \qquad \hat y = h^{(L)}.
+$$
+
+The **width** of layer $\ell$ is the number of rows of $W^{(\ell)}$; the
+**depth** is $L$. The final activation is task-specific: identity for
+regression, softmax for classification.
+
+The parameter count is $\sum_\ell (d_\ell \cdot d_{\ell-1} + d_\ell)$:
+matrices dominate, biases are a small surcharge.
+
+## Batched forward pass
+
+In practice $N$ examples flow through at once. Stack inputs into
+$X \in \mathbb{R}^{N \times d}$ and rewrite:
+
+$$
+H^{(\ell)} = \sigma\!\left(H^{(\ell-1)} W^{(\ell)\top} + b^{(\ell)\top}\right).
+$$
+
+The bias broadcasts across the batch axis. Modern frameworks store weights
+in `(in, out)` order and apply `X @ W + b`, which is the same operation
+written with the transpose absorbed. Either convention is fine; pick one
+and stick with it.
+
+## Output activations
+
+For **regression** the output is the raw $h^{(L)}$ (identity activation),
+trained with squared error.
+
+For **binary classification** the output is a single logit; apply sigmoid
+at prediction time and train with binary cross-entropy on the logit
+directly.
+
+For **multi-class classification** with $K$ classes, the output is a
+length-$K$ logit vector; apply softmax at prediction time and train with
+cross-entropy. Skip the explicit softmax in training and use the fused
+log-softmax + NLL form from the log-sum-exp lesson.
+
+## What the forward pass costs
+
+For a batch of $N$ examples and a layer mapping $d_\ell \to d_{\ell+1}$,
+the cost is $O(N\, d_\ell\, d_{\ell+1})$ multiply-adds. The total forward
+cost scales linearly in batch size and quadratically (roughly) in width.
+Depth multiplies cost by a constant; the doubling of layers does not
+square the cost.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def init_layer(in_dim, out_dim, rng):
+    # Simple Gaussian init; the initialization lesson refines this.
+    W = rng.normal(scale=0.1, size=(in_dim, out_dim))
+    b = np.zeros(out_dim)
+    return W, b
+
+def relu(x): return np.maximum(0.0, x)
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+# 4-layer MLP for 3-class classification on 8-dim inputs
+N, d_in, d_hid, K = 16, 8, 32, 3
+X = rng.normal(size=(N, d_in))
+
+W1, b1 = init_layer(d_in,  d_hid, rng)
+W2, b2 = init_layer(d_hid, d_hid, rng)
+W3, b3 = init_layer(d_hid, d_hid, rng)
+W4, b4 = init_layer(d_hid, K,     rng)
+
+# Forward pass
+h1 = relu(X  @ W1 + b1)
+h2 = relu(h1 @ W2 + b2)
+h3 = relu(h2 @ W3 + b3)
+logits = h3 @ W4 + b4
+probs = softmax(logits)
+
+print(f"shapes: X {X.shape}, h1 {h1.shape}, logits {logits.shape}, probs {probs.shape}")
+print(f"row sums of probs (should be 1): {probs.sum(axis=1)[:3]}")
+print(f"argmax classes for the first 5 rows: {probs.argmax(axis=1)[:5]}")
+
+# Parameter count
+n_params = sum(p.size for p in [W1, b1, W2, b2, W3, b3, W4, b4])
+print(f"total parameters: {n_params}")
+
+# Forward cost (multiply-adds) for one batch
+flops = N * (d_in * d_hid + d_hid * d_hid * 2 + d_hid * K)
+print(f"~{flops:,} multiply-adds for one forward pass")
+```
+
+The shapes flow consistently through the layers, the softmax rows sum to
+one, and the parameter count matches the matrix-plus-bias formula. The
+next lesson computes derivatives of this same forward pass: backpropagation.

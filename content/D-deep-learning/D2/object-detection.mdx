@@ -1,0 +1,147 @@
+---
+title: "Object detection"
+pillar: D
+subId: D2
+lessonId: object-detection
+order: 5
+estimatedMinutes: 18
+goal: "Move from R-CNN's two-stage proposal-and-classify to YOLO's single-shot grid and DETR's set-prediction Transformer."
+prerequisites: ["cnn-architectures"]
+codeExempt: true
+---
+
+Classification asks "what is in the image?" **Object detection** asks
+"what, and where, and how many?" The output is a set of bounding boxes,
+each labeled with a class. Three architectural families have dominated
+in succession: two-stage proposal networks (R-CNN), one-stage grid
+predictors (YOLO/SSD), and end-to-end set predictors (DETR).
+
+## The detection task
+
+Given an image, output a set $\{(\text{class}_i, \text{box}_i)\}_{i=1}^N$
+where each box is $(x, y, w, h)$ or $(x_1, y_1, x_2, y_2)$. The number
+$N$ varies per image. Standard benchmarks: COCO (80 classes, ~120K
+images), Open Images, LVIS (long-tail vocabulary).
+
+Evaluation is by **mean average precision (mAP)** computed over
+intersection-over-union (IoU) thresholds: a detection counts as correct
+if its predicted box overlaps a ground-truth box by at least an IoU
+threshold (typically 0.5 or averaged over 0.5-0.95).
+
+## R-CNN family (two-stage)
+
+The original deep-learning detector. Three steps:
+
+1. **Region proposal**: generate ~2000 candidate regions per image with
+   a class-agnostic method (selective search in original R-CNN; a
+   learned **Region Proposal Network (RPN)** in Faster R-CNN).
+2. **Feature extraction**: run each proposal through a CNN to get a
+   feature vector.
+3. **Classification and refinement**: per-proposal classifier plus a
+   bounding-box regressor.
+
+**Faster R-CNN** (2015) made this end-to-end by sharing the backbone
+between the RPN and the head, training both jointly. State-of-the-art
+accuracy for years and still common when speed is not the priority.
+
+Cost: two-stage means slow. ~5-10 frames per second on a GPU.
+
+## YOLO family (one-stage)
+
+Redmon's **YOLO (You Only Look Once)** treats detection as a single
+regression problem:
+
+- Divide the image into a coarse $S \times S$ grid (e.g. 13x13).
+- Each grid cell predicts a small number of **anchor boxes**, each with
+  its own class probabilities, objectness score, and bounding-box
+  offsets.
+- One forward pass produces all predictions.
+
+YOLOv1 (2016) sacrificed accuracy for speed; YOLOv3/v4/v5/v8 have
+caught up. Modern YOLOs are competitive with two-stage detectors and
+run at 30-100+ FPS, making them the default for real-time applications
+(autonomous driving, video, robotics).
+
+**Anchor boxes**: predefined box shapes (e.g. tall-thin, wide-flat,
+square) that the network's offset regressions are relative to.
+Anchor-free YOLOs (YOLOv8+) drop them in favor of direct corner
+regression, simplifying the head.
+
+## SSD and RetinaNet
+
+**SSD (Single Shot Detector)**: similar one-stage idea but with multi-
+scale feature maps, so different layers predict objects at different
+sizes.
+
+**RetinaNet**: introduced **focal loss** to address class imbalance
+(most of the $S \times S \times A$ predicted boxes have no object). The
+focal loss downweights easy examples so the network focuses on the few
+hard ones:
+
+$$
+\text{FL}(p_t) = -(1 - p_t)^\gamma \log p_t.
+$$
+
+Standard for one-stage detection.
+
+## DETR (Detection Transformer)
+
+Carion et al. (2020) reframed detection as **set prediction with a
+Transformer**:
+
+1. A CNN backbone extracts features.
+2. A Transformer encoder mixes features globally.
+3. A Transformer decoder takes $N$ learned **object queries** and
+   produces $N$ class+box predictions in parallel.
+4. **Bipartite matching loss**: at training time, the Hungarian
+   algorithm matches predicted boxes to ground-truth boxes one-to-one,
+   then computes a per-pair classification + box-regression loss.
+
+The crucial innovation: **no anchors, no non-maximum suppression**, no
+hand-tuned post-processing. Detection becomes end-to-end neural
+inference.
+
+The original DETR was slow to train (needed long schedules) but
+inspired faster variants:
+
+- **Deformable DETR**: sparse attention, much faster.
+- **DINO** (the detector, not the SSL method): improved query design.
+- **RT-DETR**, **YOLO-NAS**: real-time end-to-end detectors.
+
+DETR-family detectors now match or beat YOLOs at the high end.
+
+## Non-maximum suppression (NMS)
+
+Two-stage and most one-stage detectors output multiple overlapping
+predictions for each true object. **NMS** post-processes the output:
+
+1. Sort predictions by confidence.
+2. Keep the highest-confidence one; remove every other prediction with
+   IoU > 0.5 to it.
+3. Repeat until all predictions are processed.
+
+DETR sidesteps NMS through bipartite matching at training time, but
+most production pipelines still include some form of NMS for safety.
+
+## Common pitfalls
+
+- **Small objects**: standard architectures struggle with tiny boxes.
+  Multi-scale feature pyramids (FPN) and high-resolution inputs help.
+- **Overlapping objects**: NMS can suppress legitimate close
+  detections. Soft-NMS and learned NMS variants help.
+- **Class imbalance**: a few common classes dominate gradients.
+  Focal loss is the standard fix.
+- **Long-tail vocabulary**: rare classes get few training examples.
+  Federated heads, balanced sampling, and large-scale pretraining help.
+
+## When to use each
+
+- **Two-stage** (Faster R-CNN, Cascade R-CNN): highest accuracy on
+  small datasets, slower.
+- **One-stage anchor-based** (YOLO, SSD, RetinaNet): real-time,
+  moderate accuracy.
+- **One-stage end-to-end** (DETR family): cleanest, increasingly fast,
+  no NMS.
+
+For new projects in 2024+, an RT-DETR or YOLOv8 is the sensible default.
+The next lesson tackles pixel-level prediction: segmentation.

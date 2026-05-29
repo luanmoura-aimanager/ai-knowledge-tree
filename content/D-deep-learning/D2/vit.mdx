@@ -1,0 +1,157 @@
+---
+title: "Vision Transformers"
+pillar: D
+subId: D2
+lessonId: vit
+order: 4
+estimatedMinutes: 18
+goal: "Tokenize an image into patches and apply a standard Transformer encoder; understand the ViT inductive-bias tradeoffs."
+prerequisites: ["cnn-architectures", "D3/transformer-arch"]
+---
+
+The Vision Transformer (ViT) discarded the convolution prior entirely:
+chop the image into patches, treat each patch as a token, and feed the
+sequence into a standard Transformer encoder. With enough data, ViT
+matches or beats CNNs at every scale. Its rise is the story of a more
+general architecture beating a hand-engineered one given enough compute.
+
+## The patchify embedding
+
+A $224 \times 224 \times 3$ image is split into non-overlapping
+$P \times P$ patches (typically $P = 16$, giving $14 \times 14 = 196$
+patches). Each patch is **flattened to a vector** of length $P^2 \cdot 3 = 768$
+and then linearly projected to the model dimension $d$. This is
+equivalent to a single convolution with a $P \times P$ kernel, stride
+$P$, and $d$ output channels.
+
+The result is a sequence of $N = (H/P)(W/P)$ token embeddings
+$X \in \mathbb{R}^{N \times d}$.
+
+## Positional embedding and class token
+
+Two extras before the Transformer:
+
+- **Position embedding** $E^{\text{pos}} \in \mathbb{R}^{N \times d}$
+  added to each token: learned 1D embeddings (the original ViT)
+  or 2D-aware variants.
+- **[CLS] token**: a learned $d$-dimensional vector prepended to the
+  sequence. After the Transformer, this token's output is used as the
+  image representation for classification.
+
+The full input is $[x_{\text{cls}};\ X_{\text{patch}}] + E^{\text{pos}}$,
+a sequence of $N + 1$ tokens.
+
+## The Transformer encoder
+
+The architecture is unchanged from the D3 Transformer lesson:
+
+```
+for each layer:
+  x = x + Attention(LayerNorm(x))
+  x = x + MLP(LayerNorm(x))
+```
+
+Multi-head self-attention mixes information across all patch tokens
+(global mixing every layer); the MLP processes each token independently.
+The number of layers (12, 24, or 32 for Base, Large, Huge) and the model
+dimension are the main scaling knobs.
+
+## The data-hungry caveat
+
+ViT's lack of vision-specific inductive bias means it needs **more data**
+to reach the same accuracy as a CNN. The original ViT paper showed:
+
+- Trained on ImageNet-1k (1.3M images): ViT slightly worse than ResNet.
+- Trained on ImageNet-21k (14M images): ViT matches ResNet.
+- Trained on JFT-300M (300M images): ViT decisively beats ResNet.
+
+The crossover point is roughly tens of millions of images. For smaller
+datasets, transfer learning from a large-scale pretrained ViT works
+fine. Training a ViT from scratch on ImageNet-1k underperforms a ResNet.
+
+This dependence on data is the headline tradeoff: ViTs are weaker
+inductive learners but stronger scale learners.
+
+## Variants and improvements
+
+- **DeiT**: trains ViT efficiently on ImageNet-1k with stronger data
+  augmentation and a distillation token.
+- **Swin Transformer**: replaces global self-attention with shifted local
+  windows. Recovers some of the locality / hierarchy of CNNs, scales to
+  high resolutions, and is the dominant architecture for detection and
+  segmentation backbones.
+- **PVT**, **CvT**, hybrid CNN+ViT designs.
+- **ConvNeXt** (previous lesson): the counter-revolution that showed a
+  pure CNN can also match ViT with modern training.
+
+The lesson is that the architectural distinction CNN-vs-Transformer
+matters less than people thought; what matters is matching the
+architecture, training recipe, and data scale.
+
+## Compute scaling
+
+Self-attention is $O(N^2 d)$ in the number of tokens $N$. For an image,
+$N = (H/P)^2$ scales quadratically with resolution. Doubling resolution
+quadruples tokens and 16x's attention cost. This is the reason for
+**Swin's windowed attention** (linear in resolution) and for the
+proliferation of **linear-attention** Transformer variants for vision
+(C9-style methods, etc.).
+
+For classification (small inputs, single image label), the cost is
+manageable. For dense prediction (segmentation, detection on
+high-resolution images), specialized architectures dominate.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Patchify a (32, 32, 3) image with 8x8 patches
+H, W, C = 32, 32, 3
+P = 8
+image = rng.normal(size=(H, W, C))
+
+# Method 1: explicit loop over patches
+def patchify_loop(img, P):
+    H, W, C = img.shape
+    patches = []
+    for i in range(0, H, P):
+        for j in range(0, W, P):
+            patches.append(img[i:i+P, j:j+P, :].flatten())
+    return np.array(patches)                          # (N, P*P*C)
+
+patches = patchify_loop(image, P)
+N = patches.shape[0]
+print(f"image {image.shape} -> {N} patches of dim {patches.shape[1]}")
+
+# Linear projection to model dim d (just the patchify-and-project step of ViT)
+d = 64
+W_proj = rng.normal(scale=0.1, size=(P * P * C, d))
+tokens = patches @ W_proj                              # (N, d)
+
+# Add learned [CLS] token + learned positional embeddings
+cls = rng.normal(scale=0.1, size=(1, d))
+pos_emb = rng.normal(scale=0.1, size=(N + 1, d))
+x = np.vstack([cls, tokens]) + pos_emb
+
+print(f"input to Transformer encoder: shape {x.shape}, ([CLS] + {N} patch tokens)")
+
+# Self-attention has O(N^2) cost in tokens
+n_tokens = x.shape[0]
+attn_flops = n_tokens * n_tokens * d
+mlp_flops = n_tokens * d * d * 4                      # standard 4x MLP expansion
+print(f"per-layer cost: attention ~ {attn_flops:,} FLOPs, MLP ~ {mlp_flops:,} FLOPs")
+
+# Class-token recovery: after a Transformer pass (we mock it as the input),
+# the first token is fed into the classifier head.
+classifier_head = rng.normal(scale=0.1, size=(d, 10))
+cls_out = x[0:1]                                       # final [CLS] embedding
+logits = cls_out @ classifier_head
+print(f"logits shape: {logits.shape}  (1 class probability vector per image)")
+```
+
+The patchify embedding turns the image into a 16-token sequence (plus
+[CLS]) that any Transformer encoder can consume. The next lesson moves
+on from classification to localization: object detection.

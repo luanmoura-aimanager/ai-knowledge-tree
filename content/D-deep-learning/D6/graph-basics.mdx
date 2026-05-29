@@ -1,0 +1,157 @@
+---
+title: "Graphs for learning"
+pillar: D
+subId: D6
+lessonId: graph-basics
+order: 1
+estimatedMinutes: 14
+goal: "Represent a graph by its adjacency and feature matrices, and state the node, edge, and graph-level learning tasks."
+prerequisites: ["A5/graph-traversal"]
+---
+
+Many domains have data that is naturally a **graph**: social networks,
+molecules, knowledge bases, road networks, code, scenes. **Graph neural
+networks (GNNs)** are deep learning models specialized to these
+structures. This lesson sets up the basics: how to encode a graph for a
+neural network, and what the standard learning tasks look like.
+
+## What a graph is
+
+A graph $G = (V, E)$ has:
+
+- A set of **nodes** (or vertices) $V$ with $|V| = N$.
+- A set of **edges** $E \subseteq V \times V$, possibly directed or
+  weighted.
+
+In learning, nodes and edges carry **features**:
+
+- $X \in \mathbb{R}^{N \times d}$: node feature matrix, one row per
+  node, $d$-dim features.
+- $E_{ij} \in \mathbb{R}^{d_e}$: per-edge features (sometimes).
+
+## Representing the graph
+
+Three standard representations:
+
+- **Adjacency matrix** $A \in \{0, 1\}^{N \times N}$: $A_{ij} = 1$ if
+  $(i, j) \in E$. Dense; $O(N^2)$ memory. Used for dense graphs and
+  spectral methods.
+- **Edge list**: list of $(i, j)$ tuples. $O(|E|)$ memory. Used for
+  sparse graphs.
+- **Adjacency list**: dictionary mapping each node to its list of
+  neighbors. $O(|E|)$ memory; cheap neighborhood lookup. Used by GNN
+  libraries.
+
+PyTorch Geometric, DGL, and other GNN libraries use sparse
+representations internally.
+
+## The three learning tasks
+
+GNNs solve three task families:
+
+- **Node-level**: classify or regress on individual nodes.
+  Examples: paper classification in a citation network, fraud
+  detection on a transaction graph.
+- **Edge-level**: predict edges (link prediction) or score edge
+  attributes. Examples: predict friendships in a social network,
+  predict drug-drug interactions.
+- **Graph-level**: predict a single property of the whole graph.
+  Examples: molecule toxicity, scene classification.
+
+The same backbone architecture handles all three; only the readout
+head differs. For graph-level prediction, **graph pooling** (mean, max,
+sum, or learned attention pool over nodes) collapses the per-node
+features into one vector.
+
+## Why standard MLPs and CNNs are not enough
+
+MLPs need fixed-size inputs; graphs have variable node counts.
+CNNs assume a regular grid; graphs have irregular neighborhoods of
+varying sizes.
+
+Two needs that distinguish GNNs:
+
+- **Permutation invariance**: relabeling the nodes should not change
+  predictions. The architecture must be invariant (for graph-level) or
+  equivariant (for node-level) to node ordering.
+- **Local processing on neighborhoods**: each node's representation
+  should depend on its neighbors' features, not on global position.
+
+The next lesson formalizes both with the message-passing framework.
+
+## The Weisfeiler-Leman test
+
+A theoretical anchor: the **1-WL test** is a classical algorithm for
+distinguishing non-isomorphic graphs by iteratively refining node
+labels based on neighborhood multisets. Most standard GNNs (GCN, GAT,
+GraphSAGE) are at most as powerful as 1-WL: graphs that 1-WL cannot
+distinguish, these GNNs cannot either.
+
+This is the GNN equivalent of saying "MLPs can approximate any
+continuous function in principle, but the architecture limits what
+they can practically learn". More powerful architectures (Graph
+Transformers, higher-order GNNs) lift this ceiling at the cost of
+compute.
+
+## Datasets and benchmarks
+
+- **Citation networks**: Cora, Citeseer, Pubmed. Node classification.
+- **Molecules**: QM9, MoleculeNet, OGB. Property prediction.
+- **Social networks**: Reddit, Flickr. Node classification.
+- **Knowledge graphs**: WordNet, Freebase. Link prediction.
+- **OGB (Open Graph Benchmark)**: standardized large-scale benchmarks.
+
+Modern GNN papers usually report on OGB; earlier ones reported on
+Cora/Citeseer.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Small graph: 6 nodes, edges forming two triangles connected by one edge
+edges = [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3), (2, 3)]
+N = 6
+edges += [(j, i) for (i, j) in edges]                     # undirected
+
+# Adjacency matrix
+A = np.zeros((N, N))
+for i, j in edges: A[i, j] = 1
+print(f"adjacency matrix:")
+print(A.astype(int))
+print(f"node degrees: {A.sum(axis=1).astype(int)}")
+
+# Node features: random 4-dim vectors
+d = 4
+X = rng.normal(size=(N, d))
+
+# A simple "local average" features: average features of neighbors
+def neighbor_mean(A, X):
+    deg = A.sum(axis=1)[:, None] + 1e-8
+    return A @ X / deg
+
+X_smoothed = neighbor_mean(A, X)
+print(f"\nfirst node original features: {X[0].round(2)}")
+print(f"first node neighbor-averaged: {X_smoothed[0].round(2)}")
+
+# Three task heads conceptually:
+# Node task: per-node linear classifier head
+W_node = rng.normal(size=(d, 3))                          # 3-way classification
+node_logits = X_smoothed @ W_node
+print(f"node-level logits shape: {node_logits.shape}")
+
+# Edge task: dot product of endpoint embeddings as a score
+def edge_score(X, i, j): return float(X[i] @ X[j])
+print(f"edge score (0, 1): {edge_score(X_smoothed, 0, 1):.2f}")
+
+# Graph task: mean-pool node features then classify
+graph_emb = X_smoothed.mean(axis=0)
+W_graph = rng.normal(size=(d, 2))
+print(f"graph-level logits: {(graph_emb @ W_graph).round(2)}")
+```
+
+The three task heads consume the same node embeddings differently. The
+next lesson formalizes how those node embeddings are produced through
+the message-passing framework.

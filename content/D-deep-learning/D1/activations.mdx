@@ -1,0 +1,153 @@
+---
+title: "ReLU, GELU, Swish"
+pillar: D
+subId: D1
+lessonId: activations
+order: 5
+estimatedMinutes: 16
+goal: "Compare common nonlinearities and explain when each one is preferred, including the dead-ReLU failure mode."
+prerequisites: ["mlp-forward"]
+---
+
+The choice of nonlinearity inside a network looks small but has outsized
+effects on training. **ReLU** dominated for a decade because of its
+gradient behavior; **GELU** and **Swish** are smooth variants that show
+small but consistent wins in Transformers. The dead-ReLU failure mode
+explains why the family exists at all.
+
+## ReLU
+
+$$
+\operatorname{ReLU}(z) = \max(0, z).
+$$
+
+Gradient: $1$ if $z > 0$, $0$ if $z < 0$, undefined at $z = 0$ (use 0 or
+1 by convention; it does not matter in practice).
+
+Why it dominated:
+
+- **Cheap.** One `max` per element.
+- **Non-saturating for positive inputs.** Unlike sigmoid or tanh,
+  gradients do not vanish for large positive activations.
+- **Sparse activations.** About half of units are zero on average,
+  which can be a form of implicit regularization.
+
+## Dead ReLU
+
+A ReLU unit with a negative pre-activation for *every* training example
+has zero gradient and no path to escape. The unit is **dead** and
+contributes nothing to the network from that point on.
+
+Causes:
+
+- Bad initialization (the next lesson fixes this).
+- Learning rate too large during a noisy gradient step that drove the
+  bias deeply negative.
+
+Empirically, well-initialized ReLU networks have a small fraction of
+dead units that does not grow over training. Pathological cases (e.g.
+extreme learning rates) can kill 50%+ of the units.
+
+## Leaky ReLU and PReLU
+
+**Leaky ReLU** never zeros the gradient:
+
+$$
+\operatorname{LeakyReLU}(z) = \max(0.01\, z,\ z).
+$$
+
+A small leak (typically 0.01) lets dead units slowly come back. **PReLU**
+treats the leak slope as a learnable parameter. Both work but rarely beat
+plain ReLU enough to justify the extra complexity.
+
+## ELU and SELU
+
+**ELU** uses a smooth negative branch:
+
+$$
+\operatorname{ELU}(z) = \begin{cases} z & z \ge 0 \\ \alpha(e^z - 1) & z < 0 \end{cases}.
+$$
+
+**SELU** combines ELU with a carefully chosen scale to give
+**self-normalizing** behavior: under the right initialization, layer
+activations stay roughly mean-zero and variance-one without explicit
+normalization layers. Pretty in theory; less popular in practice because
+modern architectures use explicit normalization (next lesson).
+
+## GELU
+
+The activation that powers most Transformers:
+
+$$
+\operatorname{GELU}(z) = z \cdot \Phi(z),
+$$
+
+where $\Phi$ is the standard normal CDF. Intuition: a stochastic gate
+that drops the input with probability $1 - \Phi(z)$. Smooth, monotone-ish,
+and approximately $z$ for large positive $z$. The exact form uses the
+erf function; a common tanh-based approximation is
+
+$$
+\operatorname{GELU}(z) \approx 0.5\, z\, \left(1 + \tanh\!\left(\sqrt{2/\pi}\,(z + 0.044715\, z^3)\right)\right).
+$$
+
+GELU consistently outperforms ReLU in Transformer feed-forward layers,
+typically by 0.1-0.5 perplexity points in language modeling. The reason
+is debated; the smooth gating around zero seems to matter.
+
+## Swish (SiLU)
+
+$$
+\operatorname{Swish}(z) = z \cdot \sigma(z),
+$$
+
+with $\sigma$ the logistic sigmoid. Closely related to GELU
+(visually almost identical for $|z| < 3$). Discovered by neural
+architecture search, justified by ablations rather than theory. Modern
+papers refer to it as **SiLU** (sigmoid linear unit).
+
+## Practical recipe
+
+- **CNNs**: ReLU is fine; switch to Swish/GELU if you have a tuning
+  budget and care about the last few percentage points.
+- **Transformers**: GELU is the default. Switching to Swish is rarely
+  meaningful; switching to ReLU loses noticeable performance.
+- **Anywhere with normalization layers and residual connections**: the
+  activation choice matters less.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+z = np.linspace(-4, 4, 100)
+
+def relu(z):  return np.maximum(0, z)
+def gelu(z):  return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * z**3)))
+def swish(z): return z / (1 + np.exp(-z))
+def elu(z, alpha=1.0): return np.where(z >= 0, z, alpha * (np.exp(z) - 1))
+
+# Compare derivatives at zero: this is what matters for "smooth around zero"
+def num_deriv(f, z, eps=1e-5): return (f(z + eps) - f(z - eps)) / (2 * eps)
+print(f"derivative at z=0:")
+print(f"  ReLU:  {num_deriv(relu, 0.0):.4f}  (subdifferential; 0/1 convention)")
+print(f"  GELU:  {num_deriv(gelu, 0.0):.4f}")
+print(f"  Swish: {num_deriv(swish, 0.0):.4f}")
+print(f"  ELU:   {num_deriv(elu, 0.0):.4f}")
+
+# Demonstrate dead ReLU: with bad initialization, a fraction of units have
+# all-negative pre-activations and produce zero gradient forever.
+rng = np.random.default_rng(0)
+N, d, hidden = 500, 20, 256
+X = rng.normal(size=(N, d))
+W_bad = rng.normal(scale=2.0, loc=-1.0, size=(d, hidden))   # biased negative
+preact = X @ W_bad
+dead_units = ((preact <= 0).all(axis=0)).sum()
+print(f"\ndead ReLU units (with deliberately bad init): {dead_units} / {hidden}")
+```
+
+ReLU's "derivative at zero" is 0 by the subdifferential convention; GELU
+and Swish are smooth at zero. The bad-initialization demo shows how a
+substantial fraction of units can land in the dead region from a single
+poor initialization. The next lesson fixes this systematically with
+Xavier and He initialization.

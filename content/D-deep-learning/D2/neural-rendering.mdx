@@ -1,0 +1,153 @@
+---
+title: "NeRF and Gaussian Splatting"
+pillar: D
+subId: D2
+lessonId: neural-rendering
+order: 9
+estimatedMinutes: 18
+goal: "Represent a 3D scene as a learned radiance field or a set of anisotropic Gaussians, and render novel views."
+prerequisites: ["D1/mlp-forward"]
+---
+
+Given a handful of photographs of a scene from different viewpoints, can
+a model reconstruct the underlying 3D geometry and let you render the
+scene from new viewpoints? Two methods made this practical:
+**NeRF** (2020) trains a neural network to represent the scene as a
+continuous radiance field; **Gaussian Splatting** (2023) replaces the
+network with millions of 3D Gaussians and achieves real-time rendering
+with higher quality.
+
+## The novel-view synthesis task
+
+Inputs: $N$ posed images (each with its camera intrinsics and
+extrinsics). Output: a representation that lets you render the scene
+from any new camera pose. The representation is the model.
+
+Quality metrics: PSNR, SSIM, LPIPS computed on held-out test views.
+
+## NeRF: neural radiance fields
+
+Mildenhall et al. (2020): represent a scene with a small MLP that maps a
+3D position and viewing direction to a color and density:
+
+$$
+F_\theta: (\mathbf{x}, \mathbf{d}) \mapsto (\mathbf{c}, \sigma).
+$$
+
+Here $\mathbf{x} \in \mathbb{R}^3$ is a 3D point, $\mathbf{d} \in S^2$ is
+a unit viewing direction, $\mathbf{c} \in [0, 1]^3$ is RGB color, and
+$\sigma \in \mathbb{R}_{\ge 0}$ is volumetric density.
+
+**Volume rendering**: to render the color of a pixel along its ray, sample
+points along the ray, query the MLP at each, and integrate:
+
+$$
+C = \int_0^\infty T(t)\, \sigma(t)\, c(t)\, dt, \qquad T(t) = \exp\!\left(-\int_0^t \sigma(s)\, ds\right).
+$$
+
+In practice this is discretized: sample $N$ points along the ray,
+compute densities and colors, and use a weighted alpha-composite.
+
+**Training**: render every pixel of every training image, compare to the
+true pixel color, backprop through the volume rendering. The MLP's
+parameters are the scene representation. After training, render new
+views by simply running the same volume integration along new rays.
+
+## Positional encoding (NeRF version)
+
+A vanilla MLP cannot represent high-frequency detail. NeRF prepends a
+**Fourier feature** positional encoding to the input:
+
+$$
+\gamma(\mathbf{x}) = (\sin(2^0 \pi \mathbf{x}), \cos(2^0 \pi \mathbf{x}), \dots, \sin(2^L \pi \mathbf{x}), \cos(2^L \pi \mathbf{x})).
+$$
+
+Without this, NeRF produces a blurry blob; with it, the same network
+captures fine geometric detail. The same encoding underlies many
+implicit neural representations.
+
+## NeRF's limitations and successors
+
+Vanilla NeRF:
+
+- **Slow training**: hours to days per scene.
+- **Slow rendering**: minutes per frame on a GPU.
+- **No editability**: the scene is a black-box MLP.
+
+Successors:
+
+- **Instant NGP** (NVIDIA, 2022): hash-grid encoding instead of pure
+  MLP. Trains in seconds, renders at interactive frame rates.
+- **Mip-NeRF**, **Mip-NeRF 360**: handle anti-aliasing and unbounded
+  scenes.
+- **NeRF in the Wild**: handles photo collections with varying lighting.
+- **Dynamic NeRFs**: 4D extensions for moving scenes.
+
+## Gaussian Splatting
+
+Kerbl et al. (2023) replaced the MLP entirely with a **discrete set of
+3D Gaussians**:
+
+$$
+G_i(\mathbf{x}) = \exp\!\left(-\tfrac{1}{2}(\mathbf{x} - \boldsymbol\mu_i)^\top \boldsymbol\Sigma_i^{-1} (\mathbf{x} - \boldsymbol\mu_i)\right).
+$$
+
+Each Gaussian has a center $\boldsymbol\mu_i$, anisotropic covariance
+$\boldsymbol\Sigma_i$ (parameterized by quaternion + scale for
+differentiability), color $\mathbf{c}_i$ (modeled with spherical
+harmonics for view-dependent appearance), and opacity $\alpha_i$.
+
+**Rendering**: project each 3D Gaussian to the image plane (a 2D
+Gaussian), composite back-to-front with alpha blending.
+
+**Training**: gradient descent on the same photometric loss as NeRF,
+plus **densification** (split and clone Gaussians where reconstruction
+error is high) and **pruning** (remove low-opacity Gaussians).
+
+The whole pipeline is differentiable end-to-end and uses no neural
+network. A typical scene has 1-5 million Gaussians.
+
+Quality is comparable to or better than NeRF, training is 1-10 minutes,
+rendering is real-time (100+ FPS on a single GPU). Used in production
+for 3D capture and rendering pipelines.
+
+## Why Gaussian Splatting won (for now)
+
+- **No MLP queries during rendering**: every pixel is a sum of cheap 2D
+  Gaussian rasterizations. Real-time inference.
+- **No volumetric integration**: the explicit geometry skips the costly
+  ray marching.
+- **Easier to edit**: each Gaussian has a position, scale, and color
+  you can manipulate directly.
+- **Better quality** on most benchmarks.
+
+NeRFs are still preferred when you need:
+
+- A continuous representation (e.g. for downstream physics simulation).
+- A compact model (a single MLP vs millions of Gaussians).
+- Editability through latent codes (some NeRF variants).
+
+## The broader story
+
+NeRF and Gaussian Splatting are **differentiable rendering** methods:
+the rendering operation has analytic gradients with respect to scene
+parameters, so gradient descent can recover the scene from images.
+
+This pattern is broader than 3D reconstruction: differentiable
+rendering is used in inverse graphics (recover materials, lighting,
+geometry from images), robotics simulation, and even physics-informed
+training of vision models. Pillar D's other tracks (generative models,
+GNNs) intersect with this idea via diffusion-based 3D generators and
+mesh-based GNN methods.
+
+## What's next in 3D vision
+
+- **4D Gaussian Splatting** for dynamic scenes.
+- **Generative 3D**: combine NeRF/Gaussian Splatting with diffusion to
+  go from text to 3D scenes.
+- **3D foundation models** that generalize across scenes without
+  per-scene retraining (LRM, TripoSR).
+
+This closes the D2 computer-vision track. The next subsection moves to
+sequence modeling, the foundation that powers language models and
+beyond.

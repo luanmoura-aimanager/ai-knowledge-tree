@@ -1,0 +1,149 @@
+---
+title: "Linear and sub-quadratic attention"
+pillar: D
+subId: D3
+lessonId: linear-attention
+order: 9
+estimatedMinutes: 14
+goal: "Approximate softmax attention in linear time via kernel feature maps (Linformer, Performer) and IO-aware kernels (FlashAttention)."
+prerequisites: ["transformer-arch"]
+codeExempt: true
+---
+
+The Transformer's quadratic cost in sequence length is the headline
+bottleneck. Two lines of work attack it: **algorithmic** approaches
+that approximate or restructure attention to be sub-quadratic, and
+**systems** approaches that keep exact attention but make it
+hardware-efficient. Both are now standard parts of large-scale
+training, and modern long-context models combine them with the SSM
+methods from the previous lesson.
+
+## The cost to attack
+
+Standard attention computes $\operatorname{softmax}(QK^\top/\sqrt{d})V$:
+
+- $QK^\top$: $O(N^2 d)$ FLOPs, materializes an $N \times N$ matrix.
+- $\operatorname{softmax}$: $O(N^2)$ FLOPs, requires the full matrix.
+- $A V$: $O(N^2 d)$ FLOPs.
+
+Memory is $O(N^2)$ for the attention matrix at training time. At
+$N = 100\text{K}$, that is 10 GB just for one attention layer's
+intermediate.
+
+## Linformer: low-rank approximation
+
+Wang et al. (2020). Project the keys and values to a small fixed
+dimension $k \ll N$ before computing attention:
+
+$$
+K' = E K \in \mathbb{R}^{k \times d}, \qquad V' = F V \in \mathbb{R}^{k \times d}.
+$$
+
+Attention is then $\operatorname{softmax}(Q K'^\top / \sqrt{d}) V'$ with
+size $N \times k$, which is $O(Nkd)$ cost: linear in $N$ for fixed $k$.
+
+Simple, works reasonably, but the low-rank assumption is empirical and
+may not hold for all input distributions.
+
+## Performer / Linear Attention: kernel feature map
+
+Choromanski et al. (2021). Replace softmax with a kernel:
+
+$$
+\operatorname{softmax}(q^\top k) \approx \phi(q)^\top \phi(k),
+$$
+
+with $\phi: \mathbb{R}^d \to \mathbb{R}^m$ a random feature map. Then
+attention rewrites:
+
+$$
+A V = \phi(Q)\,\phi(K)^\top\, V = \phi(Q)\,(\phi(K)^\top V).
+$$
+
+Compute $\phi(K)^\top V \in \mathbb{R}^{m \times d}$ first ($O(N m d)$
+cost), then multiply by $\phi(Q)$ ($O(N m d)$ cost). Total cost
+$O(Nmd)$ instead of $O(N^2 d)$.
+
+Performers use random features that approximate the softmax kernel
+unbiased. Other "linear attention" variants use elu+1, ReLU, or
+other kernels.
+
+Practical quality on language modeling: 1-2 perplexity worse than full
+attention at the same parameter count, but the linear scaling lets you
+trade those points for longer context or more parameters.
+
+## Sparse attention
+
+Restrict attention to a sparse pattern instead of all $N \times N$:
+
+- **Local attention**: each token attends only to the $w$ nearest
+  neighbors. $O(Nw)$ cost.
+- **Strided attention**: attend to every $k$-th token plus a local
+  window. Used in Sparse Transformer.
+- **Global tokens**: a few special tokens attend to everything; everyone
+  attends to them; otherwise local.
+
+**Longformer** and **BigBird** combine local + global + random patterns
+to achieve linear cost with provable expressiveness.
+
+## FlashAttention: exact, IO-aware
+
+Dao et al. (2022). Keep the exact softmax-attention computation, but
+implement it as a **fused CUDA kernel** that tiles the computation
+into chunks fitting in fast GPU SRAM:
+
+1. Split $Q$, $K$, $V$ into blocks.
+2. For each block of $Q$, iterate over blocks of $K$ and $V$,
+   incrementally computing the softmax via online running statistics.
+3. Never materialize the full $N \times N$ attention matrix in HBM
+   (slow GPU memory); keep it in SRAM (fast).
+
+Result: 2-4x faster than the standard implementation, $O(N)$ memory
+instead of $O(N^2)$ for the intermediate matrix.
+
+FlashAttention is now the default in every production Transformer
+training pipeline. **FlashAttention-2** further improves parallelism;
+**FlashAttention-3** uses NVIDIA Hopper-specific instructions for
+another 1.5-2x speedup.
+
+The key insight: attention is bottlenecked by **memory bandwidth**,
+not FLOPs. FlashAttention does the same FLOPs but moves much less data
+between memory tiers.
+
+## Approximate vs exact
+
+Linear-attention methods make the FLOPs cheaper at some accuracy cost;
+FlashAttention makes the same exact computation faster by being kinder
+to the memory hierarchy.
+
+For most production use cases as of 2024:
+
+- **FlashAttention** is the no-brainer baseline.
+- **Linear / sparse attention** is used when context length is so long
+  ($>100\text{K}$ tokens) that even FlashAttention is too expensive.
+- **SSMs and hybrids** (next lesson) compete with all of the above for
+  long-context modeling.
+
+## The KV-cache angle
+
+At inference, attention's quadratic cost shows up differently: the
+**KV cache** stores keys and values for all preceding tokens, growing
+linearly with context length. Each generated token requires attention
+against the full cache, so per-token inference is $O(N)$ even with
+linear-attention or FlashAttention.
+
+For 1M-token contexts, the KV cache alone is gigabytes. Solutions:
+
+- **Multi-query attention (MQA)** and **grouped-query attention (GQA)**:
+  share keys and values across heads, reducing cache size by factors
+  of 8-64.
+- **Paged attention** (vLLM): page the KV cache like virtual memory.
+- **SSMs**: constant cache size regardless of context.
+
+## The big picture
+
+The Transformer's quadratic attention has been attacked from every
+angle: lower-rank approximations, sparse patterns, kernel features,
+memory-aware kernels, and complete architectural replacements. The next
+lesson covers the synthesis: hybrid architectures that combine the
+strengths of multiple sequence-mixing operations.
