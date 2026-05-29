@@ -86,6 +86,27 @@ print(f"Corrupted: P(Paris) = {corrupt_probs[target_token]:.4f}")
 # Patch post-MLP activation from clean run into corrupted run
 patched_probs = model.patched_forward(corrupted_ids, "clean", "post_mlp")
 print(f"Patched:   P(Paris) = {patched_probs[target_token]:.4f}  (recovered?)")
+
+# --- Representation engineering ---
+# Steer the model by adding a concept direction to the residual stream.
+
+def steer(model, token_ids, direction, alpha, layer_idx):
+    """Add alpha * direction to the post-MLP residual. direction: (d,) unit vector."""
+    x = model.W_emb[token_ids].mean(axis=0)
+    x_after_mlp = x + np.tanh(model.W_mlp @ x)
+    x_steered = x_after_mlp + alpha * direction / (np.linalg.norm(direction) + 1e-9)
+    return softmax(model.W_out @ x_steered)
+
+# Find a direction (honest vs. dishonest activations, simulated)
+rng = np.random.default_rng(0)
+honest_acts    = rng.normal(0.5, 0.1, (20, d))   # simulated
+dishonest_acts = rng.normal(-0.5, 0.1, (20, d))
+direction = honest_acts.mean(0) - dishonest_acts.mean(0)
+
+# Steer generation
+for alpha in [-2.0, 0.0, 2.0]:
+    probs = steer(model, clean_ids, direction, alpha, layer_idx=1)
+    print(f"alpha={alpha:+.1f}: P(target) = {probs[target_token]:.4f}")
 ```
 
 ## Representation engineering
@@ -113,29 +134,7 @@ where $\alpha > 0$ steers toward the concept; $\alpha < 0$ steers away.
 
 Empirically, adding the "honesty" direction reduces dishonest outputs; adding "happiness"
 direction makes the model generate more positive text. The steering is graded and reversible.
-
-```python
-def steer(model, token_ids, direction, alpha, layer_idx):
-    """
-    Simplified: add alpha * direction to the post-MLP residual.
-    direction: (d,) unit vector.
-    """
-    x = model.W_emb[token_ids].mean(axis=0)
-    x_after_mlp = x + np.tanh(model.W_mlp @ x)
-    x_steered = x_after_mlp + alpha * direction / (np.linalg.norm(direction) + 1e-9)
-    return softmax(model.W_out @ x_steered)
-
-# Find a direction (honest vs. dishonest activations, simulated)
-rng = np.random.default_rng(0)
-honest_acts    = rng.normal(0.5, 0.1, (20, d))   # simulated
-dishonest_acts = rng.normal(-0.5, 0.1, (20, d))
-direction = honest_acts.mean(0) - dishonest_acts.mean(0)
-
-# Steer generation
-for alpha in [-2.0, 0.0, 2.0]:
-    probs = steer(model, clean_ids, direction, alpha, layer_idx=1)
-    print(f"alpha={alpha:+.1f}: P(target) = {probs[target_token]:.4f}")
-```
+The runnable demo above shows all three steps: patching, direction extraction, and steering.
 
 ## Relation to SAEs
 

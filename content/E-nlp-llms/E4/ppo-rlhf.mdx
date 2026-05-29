@@ -108,9 +108,11 @@ def rlhf_step(policy, ref_model, reward_model, value_model, prompts, optimizer, 
         rewards    = reward_model(prompts, responses)   # (B,)
         # Value estimates for advantage computation
         values     = value_model(prompts, responses)    # (B, T)
+        # Snapshot of policy log-probs for importance sampling (frozen)
+        old_logps  = policy.log_probs(prompts, responses)
 
     # 2. Compute per-token rewards with KL penalty
-    policy_logps = policy.log_probs(prompts, responses)  # (B, T)
+    policy_logps = policy.log_probs(prompts, responses)  # (B, T) — with grad
     kl_per_token = policy_logps - ref_logps              # (B, T)
     r_dense      = -beta * kl_per_token                  # (B, T)
     r_dense[:, -1] += rewards                            # terminal reward at last step
@@ -118,8 +120,7 @@ def rlhf_step(policy, ref_model, reward_model, value_model, prompts, optimizer, 
     # 3. Compute advantages (simplified -- use GAE in practice)
     advantages = r_dense - values
 
-    # 4. Old log-probs for importance sampling
-    old_logps = policy_logps.detach()
+    # 4. PPO objective uses old_logps from the rollout snapshot
 
     # 5. PPO objective
     ratio = torch.exp(policy_logps - old_logps)          # (B, T)

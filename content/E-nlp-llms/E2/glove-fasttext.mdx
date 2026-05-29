@@ -95,8 +95,9 @@ for epoch in range(200):
             diff = V_emb[i] @ U_emb[k] + b_v[i] + b_u[k] - np.log(X[i, k])
             loss += w * diff ** 2
             grad = 2 * w * diff
+            v_i = V_emb[i].copy()
             V_emb[i] -= lr * grad * U_emb[k]
-            U_emb[k] -= lr * grad * V_emb[i]
+            U_emb[k] -= lr * grad * v_i
             b_v[i]   -= lr * grad
             b_u[k]   -= lr * grad
     if (epoch + 1) % 100 == 0:

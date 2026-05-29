@@ -114,8 +114,8 @@ import numpy as np
 
 def layer_norm(x, gamma, beta, eps=1e-5):
     mu    = x.mean(axis=-1, keepdims=True)
-    sigma = x.std(axis=-1, keepdims=True)
-    return gamma * (x - mu) / (sigma + eps) + beta
+    var   = x.var(axis=-1, keepdims=True)
+    return gamma * (x - mu) / np.sqrt(var + eps) + beta
 
 def gelu(x):
     return 0.5 * x * (1 + np.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * x**3)))

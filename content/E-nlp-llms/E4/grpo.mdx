@@ -77,25 +77,27 @@ def grpo_step(policy, ref_model, reward_fn, prompts, G=8, beta=0.04, eps=0.2):
     prompts: (B,) list of prompt strings
     G: group size (samples per prompt)
     """
-    all_responses, all_rewards = [], []
+    all_responses, all_rewards, all_log_pi_old = [], [], []
 
     with torch.no_grad():
         for prompt in prompts:
-            responses = [policy.generate(prompt, do_sample=True) for _ in range(G)]
-            rewards   = [reward_fn(prompt, r) for r in responses]
+            responses   = [policy.generate(prompt, do_sample=True) for _ in range(G)]
+            rewards     = [reward_fn(prompt, r) for r in responses]
+            log_pi_olds = [policy.log_probs(prompt, r) for r in responses]
             all_responses.append(responses)
             all_rewards.append(rewards)
+            all_log_pi_old.append(log_pi_olds)
 
     total_loss = 0.0
-    for i, (prompt, responses, rewards) in enumerate(zip(prompts, all_responses, all_rewards)):
+    for i, (prompt, responses, rewards, log_pi_olds) in enumerate(
+            zip(prompts, all_responses, all_rewards, all_log_pi_old)):
         r_tensor = torch.tensor(rewards, dtype=torch.float)
         # Group-relative advantage
         A = (r_tensor - r_tensor.mean()) / (r_tensor.std() + 1e-8)
 
-        for j, (response, adv) in enumerate(zip(responses, A)):
-            log_pi     = policy.log_probs(prompt, response)
-            log_pi_old = log_pi.detach()
-            log_ref    = ref_model.log_probs(prompt, response)
+        for j, (response, adv, log_pi_old) in enumerate(zip(responses, A, log_pi_olds)):
+            log_pi  = policy.log_probs(prompt, response)
+            log_ref = ref_model.log_probs(prompt, response)
 
             ratio = torch.exp(log_pi - log_pi_old)
             clip  = ratio.clamp(1 - eps, 1 + eps)
