@@ -1,0 +1,169 @@
+---
+title: "Decoding strategies"
+pillar: E
+subId: E5
+lessonId: decoding
+order: 1
+estimatedMinutes: 20
+goal: "Implement greedy, beam search, top-k sampling, nucleus (top-p) sampling, and temperature scaling; understand the quality-diversity tradeoff each controls."
+prerequisites: ["E3/decoder-only"]
+---
+
+A language model produces a probability distribution over the next token; **decoding**
+is the algorithm that converts this distribution into a sequence of tokens. Different
+decoding strategies make fundamentally different tradeoffs between output quality and
+diversity.
+
+## Greedy decoding
+
+At each step, pick the most probable next token:
+
+$$
+y_t = \arg\max_{v \in \mathcal{V}} p(v \mid y_{<t}, x).
+$$
+
+Greedy is fast and deterministic. It is suboptimal because a high-probability first token
+may lead to a poor overall sequence -- greedy commits to a choice before seeing the
+consequences.
+
+## Beam search
+
+Maintain $k$ (the beam width) candidate sequences ("beams") simultaneously. At each step,
+expand every beam by all vocabulary tokens and keep the $k$ sequences with the highest
+cumulative log-probability:
+
+```
+Initialize: beams = [([BOS], 0.0)]
+For each step t:
+    candidates = []
+    For each (sequence, log_prob) in beams:
+        For each token v in top_K candidates:
+            candidates.append((sequence + [v], log_prob + log p(v | sequence)))
+    beams = top_k(candidates, k=beam_width)
+Return: beam with highest log_prob / length_penalty
+```
+
+**Length penalty:** sequences tend to have lower log-probability as they grow (each
+token multiplies by a $< 1$ factor). A length penalty $\alpha$ normalizes:
+$\text{score}(y) = \log p(y) / |y|^\alpha$.
+
+**Advantages:** finds higher-probability sequences than greedy.
+
+**Disadvantages:** computationally $k\times$ more expensive; tends to produce generic,
+high-probability outputs that are less diverse and sometimes less useful than sampling.
+
+## Temperature scaling
+
+Before applying softmax, divide the logits by a temperature $\tau > 0$:
+
+$$
+p_\tau(v) = \frac{\exp(l_v / \tau)}{\sum_{u} \exp(l_u / \tau)}.
+$$
+
+- $\tau \to 0$: $p_\tau \to$ one-hot on the most probable token (greedy).
+- $\tau = 1$: original model distribution.
+- $\tau > 1$: flatter distribution, more diverse (but lower probability) outputs.
+- $\tau \to \infty$: uniform distribution over vocabulary.
+
+Temperature is the simplest diversity knob; typical values are 0.7-1.0 for generation tasks.
+
+## Top-k sampling
+
+Sample from the $k$ most probable tokens, renormalized:
+
+$$
+p_{\text{top-}k}(v) = \frac{p(v) \cdot \mathbf{1}[v \in \text{top-}k]}{\sum_{u \in \text{top-}k} p(u)}.
+$$
+
+Top-k with $k = 1$ is greedy; $k = V$ is unrestricted sampling. A fixed $k$ ignores the
+shape of the probability distribution: with $k = 50$, if the model is very confident
+(most mass on 1-2 tokens), you still sample from 50 tokens including many near-zero
+probability ones.
+
+## Nucleus (top-p) sampling
+
+**Top-p sampling / nucleus sampling (Holtzman et al., 2020)** adapts the cutoff to the
+distribution shape: keep the smallest set of tokens whose cumulative probability exceeds $p$:
+
+$$
+\mathcal{N}_p(x_{<t}) = \text{smallest set } S \text{ s.t. } \sum_{v \in S} p(v \mid x_{<t}) \ge p.
+$$
+
+Sample uniformly from $\mathcal{N}_p$. When the distribution is peaked (model is confident),
+$|\mathcal{N}_p|$ is small. When the distribution is flat (model is uncertain), $|\mathcal{N}_p|$ is large.
+
+Typical value: $p = 0.9$ or $p = 0.95$.
+
+## Combined in practice
+
+Production APIs typically combine temperature + top-p (or top-k). A common recipe:
+temperature $\tau = 0.8$, top-p $= 0.95$ -- temperature flattens the distribution,
+top-p cuts off the tail.
+
+```python
+import numpy as np
+
+def softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+def temperature_scale(logits, T):
+    return logits / T
+
+def top_k_filter(probs, k):
+    """Zero out all but the top-k probabilities."""
+    idx = np.argsort(probs)[::-1]
+    mask = np.zeros_like(probs, dtype=bool)
+    mask[idx[:k]] = True
+    filtered = probs * mask
+    return filtered / filtered.sum()
+
+def top_p_filter(probs, p):
+    """Zero out probabilities below the nucleus cutoff."""
+    sorted_idx = np.argsort(probs)[::-1]
+    sorted_probs = probs[sorted_idx]
+    cumsum = np.cumsum(sorted_probs)
+    # Keep tokens until cumulative prob >= p
+    cutoff_mask = cumsum - sorted_probs < p   # include the token that crosses p
+    keep = np.zeros_like(probs, dtype=bool)
+    keep[sorted_idx[cutoff_mask]] = True
+    filtered = probs * keep
+    return filtered / filtered.sum()
+
+def sample_token(logits, temperature=1.0, top_k=None, top_p=None, seed=None):
+    rng    = np.random.default_rng(seed)
+    probs  = softmax(temperature_scale(logits, temperature))
+    if top_k is not None:
+        probs = top_k_filter(probs, top_k)
+    if top_p is not None:
+        probs = top_p_filter(probs, top_p)
+    return rng.choice(len(probs), p=probs)
+
+# Demo: 10-token vocabulary, random logits
+V      = 10
+logits = np.array([2.0, 1.5, 0.5, 0.3, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0])
+
+print("Greedy:", logits.argmax())
+print("Temp=0.5, top-p=0.9:", sample_token(logits, temperature=0.5, top_p=0.9, seed=0))
+print("Temp=1.0, top-k=5:  ", sample_token(logits, temperature=1.0, top_k=5,   seed=0))
+print("Probs (T=1.0):", softmax(logits).round(3))
+```
+
+## Repetition penalty
+
+LLMs in sampling mode often repeat phrases or whole sentences. A **repetition penalty**
+(Press et al., 2020) downscales logits of previously generated tokens:
+
+$$
+l'_v = \begin{cases} l_v / \text{penalty} & v \in \text{generated tokens} \\ l_v & \text{otherwise} \end{cases}
+$$
+
+with penalty $> 1$ (typical: 1.1-1.3). This discourages direct repetition without
+forbidding reuse of common words.
+
+## Min-p sampling
+
+**Min-p (Nguyen et al., 2024)** is a newer alternative to top-p: instead of a fixed
+cumulative probability cutoff, filter out any token whose probability falls below
+$p_{\text{min}} \times p_{\text{top}}$ (a fraction of the top token's probability).
+This adapts the cutoff to both the distribution shape and the top token's confidence.

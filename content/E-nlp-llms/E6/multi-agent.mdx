@@ -1,0 +1,140 @@
+---
+title: "Multi-agent systems"
+pillar: E
+subId: E6
+lessonId: multi-agent
+order: 8
+estimatedMinutes: 15
+goal: "Decompose complex tasks across specialized agents with defined roles and communication protocols; contrast AutoGen's two-agent chat with CrewAI's role-based orchestration."
+prerequisites: ["react-agents"]
+codeExempt: true
+---
+
+A single LLM agent can handle many tasks autonomously. For complex, long-horizon tasks that
+require specialization, parallelism, or mutual validation, **multi-agent systems** decompose
+the work across multiple agents that communicate and collaborate.
+
+## Why multi-agent?
+
+**Long-horizon tasks:** a single agent's context window limits how much state it can track.
+Specialized sub-agents can handle sub-tasks with their own context.
+
+**Specialization:** a coder agent, a reviewer agent, and a tester agent can each be
+prompted and tooled for their specific role.
+
+**Parallelism:** independent sub-tasks can run simultaneously across agents, reducing
+wall-clock time.
+
+**Mutual validation:** one agent can generate, another can verify, reducing hallucination
+and error propagation.
+
+## AutoGen: conversation-based multi-agent
+
+**AutoGen** (Wu et al., Microsoft, 2023) organizes agents as **conversational participants**.
+Agents exchange messages and can call tools or delegate to other agents. The basic unit is
+a two-agent conversation: an **initiator** sends a message, an **executor** responds.
+
+**Key agent types in AutoGen:**
+- `AssistantAgent`: an LLM-powered agent with a system prompt and optional tools.
+- `UserProxyAgent`: represents the human (or an executor that can run code, tools, etc.).
+- `GroupChatManager`: routes messages among a group of agents.
+
+**Two-agent example:**
+```
+UserProxy: Implement a function that checks if a number is prime.
+Assistant: [generates Python code]
+UserProxy: [executes code, sees output, sends back results]
+Assistant: [sees the output, refines if needed]
+UserProxy: [confirms the code works]
+```
+
+This cycle continues until the UserProxy signals `TERMINATE`.
+
+**Group chat:**
+Multiple agents in a round-table with a manager that routes messages:
+- Coder agent: writes code.
+- Reviewer agent: reviews it for bugs.
+- Executor agent: runs tests.
+- Manager: decides which agent speaks next based on conversation state.
+
+## CrewAI: role-based orchestration
+
+**CrewAI** takes a different abstraction: agents have explicit **roles**, **goals**, and
+**backstories**. Tasks are assigned to agents, with defined dependencies and a sequential
+or hierarchical execution order.
+
+**Core concepts:**
+- **Agent:** an LLM with a role, goal, backstory, and set of tools.
+- **Task:** a specific piece of work assigned to an agent, with an expected output.
+- **Crew:** a group of agents and their tasks, with an execution process (sequential, hierarchical).
+
+**Example crew for research + writing:**
+```python
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Find and analyze recent advances in {topic}",
+    backstory="You are an expert at synthesizing complex research papers.",
+    tools=[search_tool, arxiv_tool],
+)
+writer = Agent(
+    role="Technical Writer",
+    goal="Write a clear summary of the research findings",
+    backstory="You specialize in making complex topics accessible.",
+)
+research_task = Task(
+    description="Research the latest advances in {topic}",
+    expected_output="A summary of 5 key papers with key findings",
+    agent=researcher,
+)
+writing_task = Task(
+    description="Write a blog post based on the research",
+    expected_output="A 500-word technical blog post",
+    agent=writer,
+    context=[research_task],  # depends on research_task's output
+)
+crew = Crew(agents=[researcher, writer],
+            tasks=[research_task, writing_task],
+            process=Process.sequential)
+```
+
+## Communication protocols
+
+**Shared message history:** all agents in a group see the full conversation. Simple, but
+context grows without bound for long tasks.
+
+**Structured handoffs:** each agent produces a typed artifact (JSON, markdown) that the
+next agent receives. More modular; easier to validate and debug.
+
+**Blackboard architecture:** agents write to and read from a shared structured store
+(a JSON object or database). No direct agent-to-agent messages; coordination via shared state.
+
+**Pub-sub events:** agents publish events to queues; other agents subscribe and react.
+Used in production agent systems (Temporal, Vercel Queues) for durable, fault-tolerant
+orchestration.
+
+## Challenges
+
+**Context accumulation:** long multi-agent conversations balloon the context window of
+downstream agents. Mitigation: summarization agents, explicit state truncation.
+
+**Error propagation:** a mistake in an early agent's output compounds as downstream agents
+build on it. Mitigation: validation checkpoints, redundant agents for critical tasks.
+
+**Cost:** each agent LLM call has latency and token cost. Hierarchical designs with a
+fast router model dispatching to specialized agents reduce cost.
+
+**Reliability:** multi-agent systems are brittle -- an agent may loop, produce malformed
+output, or deviate from its role. Production systems require timeouts, retry logic, and
+human-in-the-loop checkpoints.
+
+## Emerging patterns
+
+**LLM-as-orchestrator + specialized tools:** a central LLM orchestrates tool-calling
+specialists (code executor, retriever, browser agent) via a router. Simpler and more
+reliable than full multi-LLM systems.
+
+**Supervisor-worker hierarchy:** a supervisor agent decomposes a task and delegates to
+worker agents; reviews their outputs and decides when to stop or retry.
+
+**Debate:** two agents argue opposing positions; a judge agent synthesizes the best answer.
+Improves factual accuracy by forcing claims to be defended.

@@ -1,0 +1,114 @@
+---
+title: "ELMo and contextual embeddings"
+pillar: E
+subId: E2
+lessonId: elmo
+order: 5
+estimatedMinutes: 16
+goal: "Train a bidirectional language model and extract ELMo representations as a weighted sum of layer activations; contrast with static word2vec."
+prerequisites: ["lstm-gru"]
+---
+
+Word2vec assigns a single vector to each word type, regardless of context. "Bank" in "river
+bank" and "bank" in "central bank" receive the same embedding. **ELMo** (Embeddings from
+Language Models; Peters et al., 2018) produces **contextual embeddings**: the representation
+of each token depends on the entire surrounding sentence.
+
+## Bidirectional language model
+
+ELMo's backbone is a **biLM**: two independent language models trained on the same corpus,
+one reading left-to-right, one reading right-to-left.
+
+**Forward LM:** $p(x_1, \dots, x_T) = \prod_t p(x_t \mid x_1, \dots, x_{t-1})$.
+
+**Backward LM:** $p(x_1, \dots, x_T) = \prod_t p(x_t \mid x_{t+1}, \dots, x_T)$.
+
+Each LM is an $L$-layer stacked LSTM. The joint log-likelihood:
+
+$$
+\mathcal{L} = \sum_t \left[ \log p(x_t \mid x_{<t}; \Theta_{\text{fwd}}) + \log p(x_t \mid x_{>t}; \Theta_{\text{bwd}}) \right].
+$$
+
+Parameters are partially shared: character-level CNN token embeddings and the softmax
+projection are tied; LSTM weights are separate.
+
+## The three layers
+
+After training, each token $x_t$ is associated with $L+1$ vectors per direction:
+
+- Layer 0: the token embedding (from the character CNN, same for both directions).
+- Layers 1 to $L$: the hidden state of LSTM layer $\ell$ (forward or backward).
+
+For a 2-layer biLM, each token has 5 vectors: 1 embedding + 2 forward LSTM states + 2
+backward LSTM states. ELMo concatenates forward and backward:
+
+$$
+\mathbf{r}_t^\ell = [\overrightarrow{h}_t^{\ell}; \overleftarrow{h}_t^{\ell}], \quad \ell = 0, 1, \dots, L.
+$$
+
+## ELMo representations
+
+Instead of using just the top layer, ELMo takes a **task-specific weighted sum** of all
+layers. For downstream task $k$, the ELMo representation of token $t$ is:
+
+$$
+\mathbf{e}_t^{\text{ELMo}} = \gamma^k \sum_{\ell=0}^{L} s_\ell^k\, \mathbf{r}_t^\ell,
+$$
+
+where $\mathbf{s}^k = \text{softmax}(\mathbf{w}^k)$ are task-specific layer weights
+(learned scalars), and $\gamma^k$ is a task-specific scaling factor. Both are learned
+during downstream fine-tuning while the biLM weights are frozen.
+
+**Why layer weighting?** Different layers encode different information:
+- Lower layers capture syntax (POS, NER-style surface features).
+- Upper layers capture semantics and word sense disambiguation.
+Different tasks benefit from different mixes.
+
+## ELMo vs static embeddings
+
+| Property | word2vec / GloVe | ELMo |
+|----------|-----------------|------|
+| Representation | One vector per word type | One vector per token occurrence |
+| Context | None | Full sentence (bidirectional) |
+| Polysemy | Single vector blends all senses | Different vectors per context |
+| Usage | Fixed at inference | Frozen biLM + task fine-tuning |
+
+ELMo achieved large gains on NER, coreference, SQuAD, and sentiment at its release.
+
+## Conceptual implementation (biLM)
+
+```python-static
+import torch
+import torch.nn as nn
+
+class BiLM(nn.Module):
+    def __init__(self, vocab_size, embed_dim, hidden_dim, n_layers):
+        super().__init__()
+        self.embed = nn.Embedding(vocab_size, embed_dim)
+        self.fwd_lstm = nn.LSTM(embed_dim, hidden_dim, n_layers, batch_first=True)
+        self.bwd_lstm = nn.LSTM(embed_dim, hidden_dim, n_layers, batch_first=True)
+        self.proj = nn.Linear(hidden_dim, vocab_size)   # shared output projection
+
+    def forward(self, token_ids):
+        # token_ids: (B, T)
+        emb = self.embed(token_ids)                     # (B, T, E)
+        fwd_hs, _ = self.fwd_lstm(emb)                  # (B, T, H)
+        bwd_hs, _ = self.bwd_lstm(torch.flip(emb, [1])) # reverse sequence
+        bwd_hs    = torch.flip(bwd_hs, [1])              # flip back
+
+        fwd_logits = self.proj(fwd_hs[:, :-1])           # predict next token
+        bwd_logits = self.proj(bwd_hs[:, 1:])            # predict prev token
+
+        elmo_reps = torch.cat([fwd_hs, bwd_hs], dim=-1)  # (B, T, 2H)
+        return fwd_logits, bwd_logits, elmo_reps
+```
+
+## The path to BERT
+
+ELMo showed that pretraining deep bidirectional LMs on large corpora produces transferable
+representations. Its limitation: the forward and backward models are trained independently
+and only concatenated; they never jointly attend to the full context at each layer.
+
+BERT (E3) fixes this with a Transformer encoder trained with **masked language modeling** --
+the model predicts randomly masked tokens using bidirectional attention in every layer, not
+just at the output.

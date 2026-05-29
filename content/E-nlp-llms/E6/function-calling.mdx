@@ -1,0 +1,166 @@
+---
+title: "Tool use and function calling"
+pillar: E
+subId: E6
+lessonId: function-calling
+order: 4
+estimatedMinutes: 18
+goal: "Teach an LLM to emit structured JSON tool calls, parse tool outputs, and continue the conversation; implement a minimal tool-use loop with a calculator and search tool."
+prerequisites: ["E3/decoder-only"]
+---
+
+An LLM cannot access real-time data, run code, or interact with external systems. **Tool
+use** (also called function calling) extends the model's capabilities by teaching it to
+emit structured requests to external tools, receive their results, and continue reasoning.
+
+## The function calling protocol
+
+Tool use is implemented as a special conversation structure:
+
+1. **System prompt:** list available tools in a structured format (JSON schema describing
+   each tool's name, description, and parameters).
+2. **Model turn:** instead of a natural language response, the model emits a structured
+   `tool_use` message specifying which tool to call and with what arguments.
+3. **Tool turn:** the application executes the tool and returns the result as a
+   `tool_result` message.
+4. **Model turn:** the model reads the result and generates a final response (or calls
+   another tool).
+
+```mermaid
+graph LR
+    user["User: What is 2^32?"] --> llm["LLM"]
+    llm --> call["tool_use: calculator\n{expr: '2**32'}"]
+    call --> tool["Calculator tool\n→ 4294967296"]
+    tool --> llm2["LLM reads result"]
+    llm2 --> answer["2^32 = 4,294,967,296"]
+```
+
+## Tool definition schema
+
+```json
+{
+  "name": "calculator",
+  "description": "Evaluate a mathematical expression.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "description": "A Python-evaluable math expression, e.g. '2**32' or 'sin(pi/4)'"
+      }
+    },
+    "required": ["expression"]
+  }
+}
+```
+
+The model is trained to parse these schemas and emit valid JSON tool calls.
+
+## Implementing a tool-use loop
+
+```python
+import json
+import math
+
+# Define tools
+def calculator(expression: str) -> str:
+    try:
+        result = eval(expression, {"__builtins__": {}},
+                      {"sin": math.sin, "cos": math.cos, "pi": math.pi,
+                       "sqrt": math.sqrt, "log": math.log, "exp": math.exp})
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+def search(query: str) -> str:
+    # Placeholder -- in production this calls a real search API
+    results = {
+        "python creator": "Python was created by Guido van Rossum in 1991.",
+        "eiffel tower height": "The Eiffel Tower is 330 meters tall.",
+    }
+    for key, val in results.items():
+        if any(w in query.lower() for w in key.split()):
+            return val
+    return "No results found."
+
+TOOLS = {
+    "calculator": calculator,
+    "search": search,
+}
+
+def tool_use_loop(user_message, llm_fn, max_turns=5):
+    """
+    llm_fn: (messages, tools) -> (response_text, tool_calls_or_None)
+    """
+    messages = [{"role": "user", "content": user_message}]
+    for _ in range(max_turns):
+        response_text, tool_calls = llm_fn(messages, list(TOOLS.keys()))
+        if not tool_calls:
+            return response_text   # final answer
+        # Execute each tool call
+        tool_results = []
+        for call in tool_calls:
+            name   = call["name"]
+            args   = call["arguments"]
+            result = TOOLS[name](**args)
+            tool_results.append({"tool": name, "result": result})
+            print(f"[Tool] {name}({args}) -> {result}")
+        # Append tool results and continue
+        messages.append({"role": "assistant",
+                          "content": response_text,
+                          "tool_calls": tool_calls})
+        messages.append({"role": "tool",
+                          "content": json.dumps(tool_results)})
+    return "Max turns reached."
+
+# Simulated LLM function (replace with real API call)
+def mock_llm(messages, available_tools):
+    last_msg = messages[-1]["content"]
+    if "2^32" in last_msg or "2**32" in last_msg:
+        return ("", [{"name": "calculator", "arguments": {"expression": "2**32"}}])
+    if "tool" in last_msg.lower() and "result" in str(messages):
+        # After receiving tool result, generate final answer
+        return (f"Based on the calculation: 2^32 = {2**32}", None)
+    return ("I need to calculate this.", None)
+
+print(tool_use_loop("What is 2^32?", mock_llm))
+```
+
+## Parallel function calling
+
+When multiple independent tools are needed, modern APIs (Claude, GPT-4) support emitting
+multiple tool calls in a single turn:
+
+```json
+{
+  "tool_calls": [
+    {"name": "search", "arguments": {"query": "Python creator"}},
+    {"name": "calculator", "arguments": {"expression": "2024 - 1991"}}
+  ]
+}
+```
+
+Both tools are executed in parallel; results are returned together. This avoids
+sequential round-trips when tools are independent.
+
+## Agentic tool use patterns
+
+**Single-turn tool use:** one tool call, one answer. Useful for augmenting a single
+question with external data (e.g., weather, stock price).
+
+**Multi-turn tool use (chaining):** the model makes a series of tool calls, using
+each result to inform the next. Required for tasks like: "Find all papers by Y published
+after 2020, then summarize their key findings."
+
+**ReAct pattern** (next lesson): interleave reasoning and tool use explicitly -- the
+model generates a "Thought" before each tool call and "Observation" after each result.
+
+## Structured output enforcement
+
+Tool call schemas are enforced by the API: if the model emits an invalid JSON tool call,
+the API either rejects it or asks for a retry. This is implemented via constrained
+generation (guide the sampling process to only produce tokens consistent with the JSON
+schema) or post-hoc validation with retry.
+
+Libraries: Outlines, Instructor, Guidance -- constrain LLM output to schemas, types, or
+Pydantic models.

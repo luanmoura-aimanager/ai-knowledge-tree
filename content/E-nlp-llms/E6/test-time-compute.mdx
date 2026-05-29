@@ -1,0 +1,127 @@
+---
+title: "Test-time compute scaling"
+pillar: E
+subId: E6
+lessonId: test-time-compute
+order: 7
+estimatedMinutes: 20
+goal: "Scale inference compute by searching over reasoning paths with process reward models (PRMs); understand how o1 and DeepSeek-R1 use this to outperform training-only scaling."
+prerequisites: ["react-agents", "E4/grpo"]
+codeExempt: true
+---
+
+The scaling laws for pretraining tell us that spending more compute during training
+improves model quality. A complementary axis: spending more compute at **inference** time.
+
+**Test-time compute scaling** (Snell et al., 2024; Lightman et al., 2023) shows that with
+the right search algorithms and verifiers, allocating more inference FLOPs can match the
+gains from training a much larger model.
+
+## Why test-time compute helps
+
+An LLM generates one token at a time, conditioned on previous tokens. Each token is one
+inference step. A 100-step chain of thought uses 100x more inference compute than a
+one-token answer -- and as CoT demonstrated, this extra compute improves accuracy.
+
+Test-time compute scaling extends this: instead of one linear chain of thought, search
+over a **tree** of reasoning paths. More compute = explore more branches = higher
+probability of finding the correct answer.
+
+## Process reward models (PRMs)
+
+To guide search, we need a **verifier** that evaluates intermediate reasoning steps,
+not just the final answer. An **outcome reward model (ORM)** scores only the final
+answer; a **process reward model (PRM)** scores each step.
+
+**Training a PRM:**
+- Collect human annotations on the correctness of individual reasoning steps.
+- Or use **process supervision with Monte Carlo rollouts**: given a partial solution up
+  to step $k$, estimate the probability of reaching the correct answer by sampling
+  $N$ random continuations and checking which succeed.
+
+PRM scores $r_k \in [0, 1]$ for each step $k$ indicate whether the step is correct.
+The minimum score along a path gives the path quality.
+
+## Search algorithms with PRMs
+
+### Best-of-N sampling
+
+Generate $N$ complete solutions independently, score each with an ORM or PRM, and return
+the best:
+
+$$
+y^* = \arg\max_{y_1, \dots, y_N} r_{\text{ORM}}(x, y_i).
+$$
+
+Simple but requires generating $N$ full solutions. Effective when $N$ is large.
+
+### Beam search with process rewards
+
+Use the PRM to prune a beam during step-by-step generation:
+
+1. Start with beam width $B$ at step 0.
+2. At each step, expand all current beams by sampling $k$ continuations each.
+3. Score each candidate continuation with the PRM.
+4. Keep the top-$B$ candidates (pruning the rest).
+5. Continue until all beams are complete.
+
+This focuses computation on the most promising reasoning paths.
+
+### Monte Carlo Tree Search (MCTS)
+
+Model search as a tree:
+- **Nodes:** partial reasoning traces.
+- **Edges:** possible next steps.
+- **Value function:** PRM score at leaf; Monte Carlo rollouts for non-leaves.
+
+MCTS uses UCB (Upper Confidence Bound) to balance exploration (trying new branches) and
+exploitation (continuing promising branches):
+
+$$
+\text{UCB}(n) = V(n) + c \sqrt{\frac{\ln N_{\text{parent}}}{N(n)}},
+$$
+
+where $V(n)$ is the estimated value, $N(n)$ the visit count, and $c$ controls exploration.
+
+## OpenAI o1 and o3
+
+OpenAI's o1 and o3 models ("reasoning models") are trained with RLHF on long chains of
+thought and apply test-time compute scaling. Key characteristics:
+
+- **Long reasoning traces:** models generate 1,000-100,000 reasoning tokens before answering.
+- **Hidden reasoning:** the reasoning chain ("thinking" tokens) is not shown to the user
+  (only the final answer is).
+- **Token budget:** the API allows controlling how many "reasoning tokens" to allocate.
+  More tokens = more compute = better answers.
+- **Training:** GRPO or PPO with outcome-based verification rewards on math and code problems.
+
+**Scaling curve:** o1-preview significantly outperforms GPT-4o on AIME (math competition)
+at 25x more inference compute; o3 at 100x compute budget approaches human expert level.
+
+## DeepSeek-R1
+
+DeepSeek-R1 (DeepSeek, 2025) achieves comparable reasoning to o1 using GRPO with
+verifiable math and code rewards. Key insights:
+
+- **Cold start with a small amount of long-CoT SFT data** (before GRPO) prevents early
+  reward hacking and stabilizes training.
+- **Multi-stage pipeline:** base model → SFT on long-CoT → GRPO with math/code rewards →
+  rejection sampling (keep top-k GRPO outputs) → SFT on filtered data → GRPO again.
+- **Emergent self-reflection:** the model learns to check its own answers, backtrack on
+  errors, and try multiple approaches -- without explicit supervision of these behaviors.
+- **Distillation:** smaller models (1.5B-14B) trained to imitate R1's reasoning traces
+  achieve strong performance without the full RL training.
+
+## Compute allocation tradeoffs
+
+| Approach | Training compute | Inference compute | Best for |
+|----------|-----------------|------------------|----------|
+| Larger pretrained model | High | Low (per token) | Broad capability |
+| Best-of-N sampling | Low | Medium | Any verifiable task |
+| PRM + beam search | Medium (PRM training) | Medium | Step-by-step math |
+| MCTS | Low | High | Complex reasoning |
+| o1-style (GRPO + long CoT) | Medium (RL) | Very high | Math, code, science |
+
+Snell et al. (2024) show that compute-matched comparisons favor test-time scaling for
+math: a small model with best-of-N can match a large model trained with much more compute,
+as long as a verifier is available.

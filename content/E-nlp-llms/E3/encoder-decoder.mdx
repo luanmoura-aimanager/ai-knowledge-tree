@@ -1,0 +1,126 @@
+---
+title: "Encoder-decoder transformers: T5 and BART"
+pillar: E
+subId: E3
+lessonId: encoder-decoder
+order: 7
+estimatedMinutes: 18
+goal: "Add cross-attention between encoder and decoder stacks; frame every NLP task as text-to-text (T5) and see how BART adds denoising pretraining."
+prerequisites: ["decoder-only", "encoder-only"]
+---
+
+For tasks that map one sequence to another -- translation, summarization, question answering
+with generated answers -- the encoder-decoder architecture combines the full-context reading
+of an encoder with the sequential generation of a decoder.
+
+## Architecture
+
+The **encoder** is a stack of bidirectional transformer blocks (no causal mask) that reads
+the source sequence and produces a sequence of contextual representations
+$\mathbf{h}^e \in \mathbb{R}^{S \times d}$.
+
+The **decoder** is a stack of transformer blocks with two attention layers per block:
+1. **Masked self-attention**: causal, so the decoder can only attend to already-generated tokens.
+2. **Cross-attention**: attends over the encoder output $\mathbf{h}^e$.
+
+```mermaid
+graph LR
+    subgraph Encoder
+        E1["Block 1"] --> E2["Block 2"] --> EN["Block N"]
+    end
+    subgraph Decoder
+        D1["Masked Attn\n+ Cross-Attn\n+ FFN"] --> D2["..."] --> DN["Block N"]
+    end
+    EN -- "h^e (encoder output)" --> D1
+    D1
+    DN --> proj["unembed → logits"]
+```
+
+## Cross-attention
+
+In each decoder block, the cross-attention mechanism:
+
+- **Queries** come from the decoder's current hidden state.
+- **Keys and values** come from the encoder output $\mathbf{h}^e$ (fixed for the whole
+  decoding pass).
+- No causal mask -- the decoder can attend to all encoder positions.
+
+$$
+\text{CrossAttn}(\text{dec\_state},\, \mathbf{h}^e) = \text{Attention}(\text{dec\_state}\, W^Q,\ \mathbf{h}^e W^K,\ \mathbf{h}^e W^V).
+$$
+
+The cross-attention matrix $\alpha \in \mathbb{R}^{T \times S}$ shows which encoder
+positions each decoder position attends to -- like the Bahdanau attention matrix,
+but with the full Transformer's key-query parameterization.
+
+## T5: text-to-text transfer transformer
+
+**Raffel et al. (2020)** unified all NLP tasks under a single **text-to-text** format:
+every task is a sequence-to-sequence problem where both input and output are plain text.
+
+| Task | Input text | Output text |
+|------|-----------|------------|
+| Translation | `translate English to French: The cat is on the mat.` | `Le chat est sur le tapis.` |
+| Summarization | `summarize: <long article>` | `<short summary>` |
+| Sentiment | `sst2 sentence: The movie was great.` | `positive` |
+| QA | `question: Who wrote Hamlet? context: Hamlet was written by William Shakespeare.` | `William Shakespeare` |
+
+T5 pretrains with **span corruption** (a generalization of MLM): randomly select spans
+of tokens, replace each span with a single sentinel token `<extra_id_k>`, and train the
+model to reconstruct the original spans in the output.
+
+T5 uses a relative positional encoding rather than absolute; the decoder uses causal
+self-attention with position bias.
+
+## BART: denoising sequence-to-sequence
+
+**Lewis et al. (2020)** pretrain an encoder-decoder with a **denoising** objective:
+corrupt the source text with various noising functions, then reconstruct the original.
+
+Noising functions (BART uses all of these during pretraining):
+- **Token masking**: replace tokens with `[MASK]`.
+- **Token deletion**: delete tokens (decoder must infer their positions, unlike MLM).
+- **Text infilling**: replace a span with a single `[MASK]` (generalizes token masking).
+- **Sentence permutation**: shuffle sentences.
+- **Document rotation**: rotate so the document starts at a random token.
+
+The model is pretrained to output the original uncorrupted text. This pretrains both
+the encoder (to understand corrupted input) and the decoder (to generate text).
+
+BART is especially strong on generation tasks (summarization, dialogue, translation)
+because the decoder is trained as a full language model on clean text.
+
+## Comparison
+
+| Model | Pretraining | Strengths |
+|-------|------------|----------|
+| T5 | Span corruption (text-to-text) | Unified multitask framework; strong on structured tasks |
+| BART | Multi-task denoising | Abstractive summarization; dialogue generation |
+| mT5 | Multilingual span corruption | 101 languages in T5 framework |
+| Flan-T5 | T5 + instruction fine-tuning | Instruction following with encoder-decoder |
+
+```python-static
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+
+tokenizer = T5Tokenizer.from_pretrained("t5-small")
+model     = T5ForConditionalGeneration.from_pretrained("t5-small")
+
+# Summarization
+inputs = tokenizer(
+    "summarize: The cat sat on the mat. The mat was red. The cat was black.",
+    return_tensors="pt"
+)
+outputs = model.generate(**inputs, max_new_tokens=20)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+```
+
+## When to use encoder-decoder vs decoder-only
+
+**Encoder-decoder:** supervised text-to-text tasks (translation, structured summarization)
+where the input and output have a clear boundary and are potentially different lengths.
+Cross-attention gives a direct pathway from source to target.
+
+**Decoder-only:** open-ended generation, few-shot prompting, instruction following.
+Simpler architecture, easier to scale, and with instruction tuning can perform all
+encoder-decoder tasks via prompting. Modern practice increasingly favors large decoder-only
+models for both tasks.

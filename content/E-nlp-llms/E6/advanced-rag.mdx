@@ -1,0 +1,128 @@
+---
+title: "Advanced RAG: HyDE, rerankers, and GraphRAG"
+pillar: E
+subId: E6
+lessonId: advanced-rag
+order: 3
+estimatedMinutes: 18
+goal: "Generate a hypothetical document to improve sparse retrieval (HyDE), add a cross-encoder reranker to re-score retrieved passages, and connect entities in a knowledge graph (GraphRAG)."
+prerequisites: ["dense-retrieval"]
+codeExempt: true
+---
+
+Basic RAG retrieves passages using a query embedding, then passes them to an LLM. Several
+failure modes motivate extensions: query-document mismatch (the query is short and
+keyword-sparse while documents are verbose), poor passage ranking (relevant but non-top
+passages missed), and disconnected facts (answers requiring multi-hop reasoning across
+multiple documents). Three techniques address these systematically.
+
+## HyDE: Hypothetical Document Embeddings
+
+**HyDE (Gao et al., 2022)** inverts the retrieval direction: instead of searching for
+documents similar to the query, first generate a **hypothetical answer** to the query,
+then retrieve documents similar to that hypothetical answer.
+
+```
+1. Query: "What are the side effects of aspirin?"
+2. LLM generates hypothetical document:
+   "Aspirin commonly causes gastrointestinal side effects such as nausea, stomach
+    pain, and bleeding. It can also cause tinnitus at high doses..."
+3. Embed the hypothetical document.
+4. Retrieve the actual documents most similar to this embedding.
+```
+
+**Why this helps:** the hypothetical document is in the same style and vocabulary as
+the actual corpus, reducing the query-document distributional mismatch. The query embedding
+is a short keyword cluster; the hypothetical document is in the space of possible answers.
+
+**When it hurts:** if the LLM generates a hallucinated hypothetical answer far from the
+truth, the retrieval will find passages near the hallucination rather than the correct answer.
+HyDE works best when the LLM has enough prior knowledge to generate plausible hypotheticals.
+
+## Reranking
+
+After retrieving top-$K$ passages (e.g., $K=100$) with a bi-encoder, a **cross-encoder
+reranker** rescores each passage jointly with the query:
+
+$$
+\text{score}(q, d) = \text{CrossEncoder}([q; d]) \in \mathbb{R}.
+$$
+
+The cross-encoder sees full interaction between query and document tokens, catching
+fine-grained relevance signals that the independent bi-encoder embeddings cannot.
+After reranking, keep top-$k'$ (e.g., $k'=5$) for the LLM context.
+
+**Popular rerankers:** `BAAI/bge-reranker-large`, `cross-encoder/ms-marco-MiniLM-L-12-v2`,
+Cohere Rerank API.
+
+**Latency:** a cross-encoder on 100 passages adds ~100ms on a GPU; acceptable for
+quality-sensitive use cases.
+
+**Step-by-step retrieval + reranking:**
+
+```
+1. Embed query.
+2. Retrieve top-100 from FAISS (bi-encoder).
+3. Rerank top-100 with cross-encoder.
+4. Keep top-5; include in LLM prompt.
+```
+
+## GraphRAG
+
+Standard RAG retrieves independent passage chunks. For questions requiring multi-hop
+reasoning ("What city was the founder of the company that made the first iPhone born in?"),
+no single passage contains the full answer -- the answer requires chaining facts across
+multiple documents.
+
+**GraphRAG (Edge et al., 2024, Microsoft)** builds a **knowledge graph** from the
+document corpus and retrieves subgraphs rather than flat passages.
+
+### Building the graph
+
+1. **Entity extraction:** run an LLM over each passage to extract entities and their
+   relationships: `(Apple, founded_by, Steve Jobs)`, `(Steve Jobs, born_in, San Francisco)`.
+2. **Graph construction:** nodes are entities; edges are relationships with source citations.
+3. **Community detection:** cluster the graph into communities (related entity groups).
+   Summarize each community with an LLM.
+
+### Graph-based retrieval
+
+Two modes:
+
+**Local search:** find the entities mentioned in the query, retrieve their neighborhoods
+in the graph (adjacent entities and relationships), and pass the structured subgraph to
+the LLM.
+
+**Global search:** for broad questions ("What are the main themes in this corpus?"), use
+the community summaries rather than individual passages. The map-reduce pattern generates
+partial answers per community, then aggregates.
+
+### When GraphRAG helps
+
+- Queries requiring multi-hop reasoning across disconnected documents.
+- Summarization and theme identification over large corpora.
+- Structured domain knowledge (biomedical pathways, legal entities, financial relationships).
+
+**Cost:** building the graph requires many LLM calls (entity extraction per passage);
+typically 10-30x more expensive than simple RAG indexing.
+
+## Chunking and routing strategies
+
+**Recursive retrieval:** retrieve a parent chunk (section) when a child chunk (paragraph)
+matches; return both for more context.
+
+**Query routing:** classify the query type (factual, analytical, conversational) and use
+different retrieval strategies per type. Factual queries benefit from exact-match BM25;
+analytical queries benefit from graph-based retrieval.
+
+**Contextual compression:** after retrieval, use an LLM to compress each retrieved passage
+to only the parts relevant to the query, reducing context window usage.
+
+## Evaluation
+
+RAG evaluation is a two-stage problem:
+- **Retrieval quality:** Recall@k, NDCG@k on a labeled dataset.
+- **Generation quality:** faithfulness (does the answer match the context?), answer
+  relevance (does it answer the question?), context precision (is the retrieved context useful?).
+
+**RAGAS** (Shahul et al.) is a popular framework for all three metrics using LLM-as-judge.

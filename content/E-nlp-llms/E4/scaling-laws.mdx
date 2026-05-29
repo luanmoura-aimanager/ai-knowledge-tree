@@ -1,0 +1,106 @@
+---
+title: "Scaling laws: Kaplan and Chinchilla"
+pillar: E
+subId: E4
+lessonId: scaling-laws
+order: 2
+estimatedMinutes: 20
+goal: "Read Kaplan et al.'s power-law fits (loss vs parameters and tokens), then Chinchilla's correction: for a fixed compute budget, model size and token count should scale equally."
+prerequisites: ["pretraining-data"]
+codeExempt: true
+---
+
+Scaling a language model -- making it larger, training it longer -- predictably improves
+performance. **Scaling laws** quantify this relationship as empirical power laws, allowing
+practitioners to forecast model quality before committing to an expensive training run.
+
+## Kaplan et al. (2020): OpenAI scaling laws
+
+Kaplan et al. trained hundreds of models varying three quantities:
+- $N$: number of non-embedding parameters.
+- $D$: number of training tokens.
+- $C$: training compute (FLOPs), approximately $C \approx 6ND$.
+
+**Finding 1: power-law relationship between loss and each variable (holding the others
+constant and large enough):**
+
+$$
+L(N) \approx \left(\frac{N_c}{N}\right)^{\alpha_N}, \quad \alpha_N \approx 0.076,
+$$
+
+$$
+L(D) \approx \left(\frac{D_c}{D}\right)^{\alpha_D}, \quad \alpha_D \approx 0.095,
+$$
+
+where $N_c$ and $D_c$ are fitted constants. Cross-entropy loss on the test set decreases
+smoothly and predictably as a power law in either $N$ or $D$.
+
+**Finding 2: for a fixed compute budget $C$, model size should dominate.** Kaplan et al.
+found that for a given $C$, you should use the largest model that can be trained in the
+given compute budget (even if it means training for fewer tokens). This led to GPT-3 (175B
+parameters, 300B tokens) and the trend of training large models for relatively few tokens.
+
+## Chinchilla (Hoffmann et al., 2022)
+
+Kaplan et al.'s recommendation turned out to be wrong. Hoffmann et al. ran a more careful
+analysis with better-controlled experiments and found a different optimal allocation.
+
+**IsoFLOP analysis:** for a fixed compute budget $C$, vary $N$ and set
+$D = C / (6N)$ accordingly. Find the $(N, D)$ that minimizes final loss.
+
+**Finding:** the optimal allocation satisfies:
+
+$$
+N^* \propto C^{0.50}, \quad D^* \propto C^{0.50},
+$$
+
+i.e., **model size and token count should scale equally**. Doubling compute should be
+split equally between doubling $N$ and doubling $D$.
+
+**The Chinchilla rule of thumb:** for a compute-optimal run, train on approximately
+$D \approx 20 \cdot N$ tokens. For a 70B parameter model: $20 \times 70\text{B} = 1.4\text{T}$ tokens.
+
+## Chinchilla-optimal models
+
+| Model | $N$ | $D$ (tokens) | $D/N$ |
+|-------|-----|-------------|-------|
+| GPT-3 | 175B | 300B | 1.7x (undertrained) |
+| Chinchilla | 70B | 1.4T | 20x (optimal) |
+| LLaMA-2 70B | 70B | 2T | 28x (overtrained) |
+| LLaMA-3 70B | 70B | 15T | 214x (heavily overtrained) |
+
+LLaMA-2 and LLaMA-3 are **deliberately overtrained**: the compute budget is allocated
+toward more tokens at the cost of suboptimal compute efficiency. The reason: inference
+is expensive in deployment. A smaller, overtrained model is cheaper to serve than a
+larger, compute-optimal model with the same final loss.
+
+**"Compute-optimal" is optimal only for a one-shot training run.** If you will run the
+model for millions of inferences, the optimal allocation shifts: train smaller models
+longer.
+
+## Emergent abilities and phase transitions
+
+A separate empirical finding: certain capabilities (multi-step arithmetic, code generation,
+multi-hop reasoning) appear **abruptly** at certain scale thresholds rather than improving
+gradually. This is called **emergence**.
+
+The origin is contested:
+- **Measurement artifact (Wei et al.):** metrics with step functions (right/wrong) show
+  phase transitions; smooth metrics show gradual improvement throughout.
+- **Genuine phase transition:** the model qualitatively changes its algorithm for certain
+  tasks at a threshold parameter count.
+
+The implication for practitioners: do not assume smooth performance scaling for all metrics.
+Some capabilities may be present-or-absent at given scales.
+
+## Scaling laws for fine-tuning and alignment
+
+Scaling laws for pretraining don't directly apply to fine-tuning:
+
+- SFT quality saturates faster with data size than pretraining.
+- RLHF reward signal quality matters more than quantity.
+- Instruction following improves with model scale, but safety and alignment properties
+  don't follow the same power laws.
+
+The practical lesson: spend most of the compute budget on pretraining (where scaling laws
+give predictable returns), then fine-tune efficiently with smaller datasets.

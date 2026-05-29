@@ -1,0 +1,137 @@
+---
+title: "Group relative policy optimization (GRPO)"
+pillar: E
+subId: E4
+lessonId: grpo
+order: 7
+estimatedMinutes: 18
+goal: "Replace the value baseline in PPO with a group-relative reward; show how this simplifies the training loop and scales to DeepSeek-R1-style reasoning."
+prerequisites: ["ppo-rlhf"]
+---
+
+PPO requires a trained value model (the critic) to compute advantages. Training two models
+simultaneously -- the policy and the value network -- is expensive and adds complexity.
+**Group Relative Policy Optimization (GRPO, Shao et al., 2024)** eliminates the value model
+by estimating baselines from a **group** of responses sampled from the current policy.
+
+## The core idea
+
+Instead of training a neural value model $V_\psi(s_t)$ to estimate expected return, GRPO
+samples $G$ responses $\{y_1, \dots, y_G\}$ from the policy for the same prompt $x$ and
+uses the **group mean reward** as the baseline:
+
+$$
+A_i = r_i - \frac{1}{G} \sum_{j=1}^{G} r_j,
+$$
+
+where $r_i = r_\phi(x, y_i)$ is the reward for response $i$. The advantage $A_i$
+measures how much better response $i$ is compared to the average response from the
+current policy -- a form of **self-normalized reward**.
+
+This is essentially REINFORCE with leave-one-out baseline, adapted to the LLM setting.
+
+## The GRPO objective
+
+For each group of $G$ responses, the objective mirrors PPO's clipped surrogate:
+
+$$
+\mathcal{L}_{\text{GRPO}} = -\frac{1}{G} \sum_{i=1}^{G} \min\!\left(\rho_i \hat{A}_i,\ \text{clip}(\rho_i, 1-\epsilon, 1+\epsilon) \hat{A}_i\right) + \beta\, \mathrm{KL}(\pi_\theta \| \pi_{\text{ref}}),
+$$
+
+where $\rho_i = \pi_\theta(y_i|x) / \pi_{\theta_{\text{old}}}(y_i|x)$ and
+$\hat{A}_i = (A_i - \mu_A) / \sigma_A$ is the normalized advantage.
+
+The KL penalty (against the SFT reference model) prevents reward hacking.
+
+## Normalizing advantages
+
+GRPO normalizes advantages within the group:
+
+$$
+\hat{A}_i = \frac{A_i - \text{mean}(\{A_j\}_{j=1}^G)}{\text{std}(\{A_j\}_{j=1}^G) + \epsilon}.
+$$
+
+This normalization:
+- Makes the objective invariant to the reward scale (no need to carefully tune reward magnitude).
+- Stabilizes gradient magnitudes throughout training.
+
+## Verifiable reward functions
+
+GRPO is particularly powerful when the reward function is **verifiable** -- when you can
+check the correctness of an answer without human annotation:
+
+- **Mathematics:** did the model reach the correct numerical answer?
+- **Code:** does the generated function pass unit tests?
+- **Formal verification:** does the proof check?
+
+With a verifiable reward $r \in \{0, 1\}$, there is no need for a reward model at all.
+The policy is trained directly with binary correctness signals.
+
+## GRPO implementation sketch
+
+```python-static
+import torch
+
+def grpo_step(policy, ref_model, reward_fn, prompts, G=8, beta=0.04, eps=0.2):
+    """
+    prompts: (B,) list of prompt strings
+    G: group size (samples per prompt)
+    """
+    all_responses, all_rewards, all_log_pi_old = [], [], []
+
+    with torch.no_grad():
+        for prompt in prompts:
+            responses   = [policy.generate(prompt, do_sample=True) for _ in range(G)]
+            rewards     = [reward_fn(prompt, r) for r in responses]
+            log_pi_olds = [policy.log_probs(prompt, r) for r in responses]
+            all_responses.append(responses)
+            all_rewards.append(rewards)
+            all_log_pi_old.append(log_pi_olds)
+
+    total_loss = 0.0
+    for i, (prompt, responses, rewards, log_pi_olds) in enumerate(
+            zip(prompts, all_responses, all_rewards, all_log_pi_old)):
+        r_tensor = torch.tensor(rewards, dtype=torch.float)
+        # Group-relative advantage
+        A = (r_tensor - r_tensor.mean()) / (r_tensor.std() + 1e-8)
+
+        for j, (response, adv, log_pi_old) in enumerate(zip(responses, A, log_pi_olds)):
+            log_pi  = policy.log_probs(prompt, response)
+            log_ref = ref_model.log_probs(prompt, response)
+
+            ratio = torch.exp(log_pi - log_pi_old)
+            clip  = ratio.clamp(1 - eps, 1 + eps)
+            ppo_loss = -torch.min(ratio * adv, clip * adv).mean()
+            kl_loss  = beta * (log_pi - log_ref).mean()
+            total_loss += ppo_loss + kl_loss
+
+    return total_loss / (len(prompts) * G)
+```
+
+## GRPO and DeepSeek-R1
+
+GRPO is the training algorithm behind **DeepSeek-R1** (DeepSeek, 2025), which uses
+pure RL (no SFT warm-up) with GRPO and a verifiable math reward to train a model that
+generates long reasoning chains before answering.
+
+Key findings from DeepSeek-R1:
+- With only binary correctness rewards (no process reward), the model spontaneously develops
+  self-reflection, backtracking, and extended chain-of-thought.
+- The emergent reasoning behavior appears without explicit supervision of the reasoning steps.
+- A "cold start" with a small amount of SFT on curated reasoning chains before GRPO prevents
+  reward hacking and improves final performance.
+
+## Comparison: PPO vs DPO vs GRPO
+
+| Property | PPO | DPO | GRPO |
+|----------|-----|-----|------|
+| Requires reward model | Yes | No | Sometimes |
+| Requires value model | Yes | No | No |
+| Requires reference model | Yes | Yes | Yes |
+| Online (policy rollouts) | Yes | No | Yes |
+| Works with verifiable rewards | Yes | No | Yes |
+| Computational cost | Highest | Lowest | Medium |
+
+GRPO occupies a useful middle ground: simpler than PPO (no value model), but online
+(generates new rollouts) and compatible with verifiable rewards -- making it the method
+of choice for reasoning-oriented RL.

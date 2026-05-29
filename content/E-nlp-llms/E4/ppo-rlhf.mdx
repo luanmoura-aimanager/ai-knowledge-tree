@@ -1,0 +1,151 @@
+---
+title: "RLHF with PPO"
+pillar: E
+subId: E4
+lessonId: ppo-rlhf
+order: 5
+estimatedMinutes: 25
+goal: "Run the four-model RLHF training loop (policy, reference, reward, value), derive the PPO clipped surrogate objective, and see how the KL penalty prevents reward hacking."
+prerequisites: ["reward-modeling", "D1/dl-optimizers"]
+---
+
+The reward model gives a scalar signal for a complete response, but it is non-differentiable
+with respect to the token selection (argmax / sampling is not differentiable). **Reinforcement
+learning from human feedback (RLHF)** uses policy gradient methods to optimize the language
+model policy with this reward signal.
+
+## The RLHF problem formulation
+
+Frame language generation as a Markov Decision Process:
+- **State** $s_t = (x, y_1, \dots, y_{t-1})$: the prompt plus tokens generated so far.
+- **Action** $a_t = y_t$: the next token sampled.
+- **Reward:** $r_T = r_\phi(x, y)$ at the final step; 0 otherwise. (Sparse terminal reward.)
+- **Policy** $\pi_\theta(a_t \mid s_t)$: the language model.
+
+We want to maximize:
+
+$$
+\mathcal{J}(\theta) = \mathbb{E}_{x \sim \mathcal{D},\ y \sim \pi_\theta(y|x)}\bigl[r_\phi(x, y)\bigr] - \beta\, \mathrm{KL}(\pi_\theta \| \pi_{\mathrm{ref}}),
+$$
+
+where $\pi_{\mathrm{ref}}$ is the SFT model (frozen) and $\beta$ controls how far the
+policy is allowed to drift.
+
+**Why the KL penalty?** Without it, the policy will maximize the reward model by
+finding adversarial outputs that score high but are low-quality (reward hacking).
+The KL term keeps the policy close to the sensible SFT distribution.
+
+## The four models in RLHF
+
+At any point during RLHF training, four model instances are active:
+
+1. **Policy $\pi_\theta$:** the LLM being trained. Generates responses; gradients flow through it.
+2. **Reference $\pi_{\text{ref}}$:** the frozen SFT model. Provides the KL baseline.
+3. **Reward model $r_\phi$:** the frozen preference model. Scores complete responses.
+4. **Value model $V_\psi$:** predicts the expected future reward from a given state (the critic).
+   Initialized from the reward model backbone.
+
+The value model is needed to compute the **advantage** for variance reduction in the policy gradient.
+
+## Policy gradient: REINFORCE
+
+The basic policy gradient (REINFORCE):
+
+$$
+\nabla_\theta \mathcal{J}(\theta) = \mathbb{E}\left[ \sum_t \nabla_\theta \log \pi_\theta(y_t \mid s_t) \cdot R_t \right],
+$$
+
+where $R_t = r_T - V(s_t)$ is the **advantage**: how much better than expected was the reward.
+The baseline $V(s_t)$ reduces variance without changing the expectation.
+
+## Proximal Policy Optimization (PPO)
+
+REINFORCE has high variance and large gradient steps can destabilize training. PPO (Schulman
+et al., 2017) adds two stabilization mechanisms:
+
+**1. Importance sampling ratio.** Reuse old rollouts for multiple gradient steps using
+importance weights:
+
+$$
+\rho_t = \frac{\pi_\theta(y_t \mid s_t)}{\pi_{\theta_{\text{old}}}(y_t \mid s_t)}.
+$$
+
+**2. Clipped surrogate objective.** Clip $\rho_t$ to $[1-\epsilon, 1+\epsilon]$ to
+prevent excessively large policy updates:
+
+$$
+\mathcal{L}_{\text{PPO}} = \mathbb{E}_t \left[ \min\!\left( \rho_t A_t,\ \text{clip}(\rho_t, 1-\epsilon, 1+\epsilon) A_t \right) \right],
+$$
+
+where $A_t$ is the advantage and $\epsilon \approx 0.2$.
+
+The minimum takes the smaller (more conservative) of the clipped and unclipped objectives,
+ensuring the policy can improve but cannot make large moves that might overshoot.
+
+## The KL-modified reward
+
+In practice, the reward signal per token is the terminal reward minus a KL penalty per token:
+
+$$
+\hat{r}_t = \begin{cases} r_\phi(x, y) - \beta \log \frac{\pi_\theta(y_t | s_t)}{\pi_{\text{ref}}(y_t | s_t)} & t = T \\ -\beta \log \frac{\pi_\theta(y_t | s_t)}{\pi_{\text{ref}}(y_t | s_t)} & t < T \end{cases}
+$$
+
+This transforms the sparse terminal reward into a dense per-token signal, making the credit
+assignment problem tractable.
+
+## The RLHF training loop
+
+```python-static
+import torch
+
+def rlhf_step(policy, ref_model, reward_model, value_model, prompts, optimizer, beta=0.1, eps=0.2):
+    # 1. Generate responses with the current policy
+    with torch.no_grad():
+        responses = policy.generate(prompts, max_new_tokens=128, do_sample=True)
+        # Log-probs under reference model
+        ref_logps  = ref_model.log_probs(prompts, responses)
+        # Reward scores
+        rewards    = reward_model(prompts, responses)   # (B,)
+        # Value estimates for advantage computation
+        values     = value_model(prompts, responses)    # (B, T)
+        # Snapshot of policy log-probs for importance sampling (frozen)
+        old_logps  = policy.log_probs(prompts, responses)
+
+    # 2. Compute per-token rewards with KL penalty
+    policy_logps = policy.log_probs(prompts, responses)  # (B, T) — with grad
+    kl_per_token = policy_logps - ref_logps              # (B, T)
+    r_dense      = -beta * kl_per_token                  # (B, T)
+    r_dense[:, -1] += rewards                            # terminal reward at last step
+
+    # 3. Compute advantages (simplified -- use GAE in practice)
+    advantages = r_dense - values
+
+    # 4. PPO objective uses old_logps from the rollout snapshot
+
+    # 5. PPO objective
+    ratio = torch.exp(policy_logps - old_logps)          # (B, T)
+    obj1  = ratio * advantages
+    obj2  = ratio.clamp(1 - eps, 1 + eps) * advantages
+    loss  = -torch.min(obj1, obj2).mean()
+
+    # 6. Value loss (MSE against actual returns)
+    returns     = advantages + values.detach()
+    value_loss  = ((value_model(prompts, responses) - returns) ** 2).mean()
+
+    total_loss = loss + 0.5 * value_loss
+    optimizer.zero_grad()
+    total_loss.backward()
+    torch.nn.utils.clip_grad_norm_(policy.parameters(), 1.0)
+    optimizer.step()
+    return total_loss.item()
+```
+
+## Limitations of PPO-RLHF
+
+- **Complexity:** requires four model instances simultaneously, substantial GPU memory.
+- **Instability:** PPO is sensitive to learning rate, KL coefficient, and advantage normalization.
+- **Value model:** requires training a separate value head, which adds a second optimization loop.
+
+DPO (next lesson) eliminates the reward model and value model entirely by showing that the
+optimal policy under the KL-penalized RLHF objective can be expressed as a closed-form
+function of the preference data.
