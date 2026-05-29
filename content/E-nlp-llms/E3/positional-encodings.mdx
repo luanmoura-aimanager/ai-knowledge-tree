@@ -43,13 +43,14 @@ import matplotlib
 matplotlib.use('Agg')
 
 def sinusoidal_pe(T, d):
-    """Returns (T, d) sinusoidal positional encoding matrix."""
+    """Returns (T, d) sinusoidal positional encoding matrix. d must be even."""
+    assert d % 2 == 0, "d must be even for sinusoidal PE"
     pe = np.zeros((T, d))
     pos = np.arange(T)[:, None]          # (T, 1)
     dim = np.arange(0, d, 2)[None, :]   # (1, d/2)
-    angles = pos / 10000 ** (dim / d)
-    pe[:, 0::2] = np.sin(angles)
-    pe[:, 1::2] = np.cos(angles)
+    angles = pos / 10000 ** (dim / d)   # (T, d/2)
+    pe[:, 0::2] = np.sin(angles)        # (T, d/2) -> even columns
+    pe[:, 1::2] = np.cos(angles)        # (T, d/2) -> odd columns
     return pe
 
 pe = sinusoidal_pe(T=64, d=128)
