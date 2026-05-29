@@ -1,0 +1,132 @@
+---
+title: "Multi-head attention"
+pillar: E
+subId: E3
+lessonId: multi-head-attention
+order: 2
+estimatedMinutes: 18
+goal: "Project queries, keys, and values into h parallel subspaces, run h attention heads, and concatenate; show that heads learn complementary patterns."
+prerequisites: ["self-attention"]
+---
+
+A single attention head computes one weighted average over all value vectors. Different
+positions might need to attend to different aspects of the context simultaneously --
+syntactic head agreements, coreference, and positional proximity are all different signals.
+**Multi-head attention** runs $h$ attention heads in parallel on different linear projections
+of the input, then concatenates their outputs.
+
+## The multi-head mechanism
+
+Given input $X \in \mathbb{R}^{T \times d_{\text{model}}}$, multi-head attention with
+$h$ heads and head dimension $d_k = d_v = d_{\text{model}} / h$:
+
+For each head $i = 1, \dots, h$:
+
+$$
+\text{head}_i = \text{Attention}(X W_i^Q,\ X W_i^K,\ X W_i^V),
+$$
+
+where $W_i^Q, W_i^K \in \mathbb{R}^{d_{\text{model}} \times d_k}$ and
+$W_i^V \in \mathbb{R}^{d_{\text{model}} \times d_v}$ are per-head projection matrices.
+
+Concatenate all heads and apply an output projection:
+
+$$
+\text{MHA}(X) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)\, W^O,
+$$
+
+where $W^O \in \mathbb{R}^{h d_v \times d_{\text{model}}}$ projects back to
+$d_{\text{model}}$.
+
+## Parameter count
+
+Each head has three projection matrices of size $d_{\text{model}} \times d_k$. With
+$h$ heads and $d_k = d_{\text{model}}/h$:
+
+$$
+3h \cdot d_{\text{model}} \cdot \frac{d_{\text{model}}}{h} + d_{\text{model}}^2
+= 3 d_{\text{model}}^2 + d_{\text{model}}^2
+= 4 d_{\text{model}}^2.
+$$
+
+Same total as one head of size $d_{\text{model}}$, but split across $h$ subspaces. The
+output projection adds no parameters beyond what a single full-rank projection would cost.
+
+## Why multiple heads?
+
+Each head learns different projection matrices, so it attends to a different subspace of
+the representation. Empirically:
+
+- Some heads specialize in **positional patterns** (attending to the previous token or
+  the first token).
+- Some heads capture **syntactic structure** (subject-verb agreement, dependency relations).
+- Some heads implement **coreference** (associating pronouns with their referents).
+
+No head is forced into these roles -- they emerge from training. Multi-head attention gives
+the model enough capacity to represent all these patterns simultaneously.
+
+## Implementation (batched)
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+class MultiHeadAttention:
+    def __init__(self, d_model, n_heads, seed=0):
+        assert d_model % n_heads == 0
+        rng = np.random.default_rng(seed)
+        s = 0.02
+        self.h  = n_heads
+        self.dk = d_model // n_heads
+        # Stack all h projections into one matrix for efficiency
+        self.Wq = rng.normal(0, s, (d_model, d_model))   # (d, d)
+        self.Wk = rng.normal(0, s, (d_model, d_model))
+        self.Wv = rng.normal(0, s, (d_model, d_model))
+        self.Wo = rng.normal(0, s, (d_model, d_model))
+
+    def split_heads(self, x):
+        """x: (T, d_model) -> (h, T, dk)"""
+        T, d = x.shape
+        return x.reshape(T, self.h, self.dk).transpose(1, 0, 2)
+
+    def forward(self, x, mask=None):
+        """x: (T, d_model). mask: (T, T) boolean."""
+        T, d = x.shape
+        Q = self.split_heads(x @ self.Wq)   # (h, T, dk)
+        K = self.split_heads(x @ self.Wk)
+        V = self.split_heads(x @ self.Wv)
+
+        # Scaled dot-product attention for all heads simultaneously
+        scores = Q @ K.transpose(0, 2, 1) / np.sqrt(self.dk)  # (h, T, T)
+        if mask is not None:
+            scores[:, mask] = -1e9
+        attn = softmax(scores)                                  # (h, T, T)
+        out  = attn @ V                                         # (h, T, dk)
+
+        # Concatenate heads: (h, T, dk) -> (T, d_model)
+        out = out.transpose(1, 0, 2).reshape(T, d)
+        return out @ self.Wo, attn                              # (T, d_model), (h, T, T)
+
+T, d_model, h = 6, 16, 4
+mha = MultiHeadAttention(d_model, h)
+x   = np.random.randn(T, d_model)
+mask = np.triu(np.ones((T, T), dtype=bool), k=1)  # causal
+
+out, attn = mha.forward(x, mask=mask)
+print("Output shape:", out.shape)          # (T, d_model)
+print("Attention shape:", attn.shape)      # (h, T, T)
+print("Head 0 attention (first 3 tokens):")
+print(np.round(attn[0, :3, :3], 3))
+```
+
+## Efficient implementation note
+
+In practice, the $h$ projections are fused into a single matrix multiply producing
+$(B, T, 3 d_{\text{model}})$ and then split into Q, K, V -- a factor-of-3 memory
+reduction and better GPU utilization vs. $3h$ separate matrix multiplies.
+
+The next lesson assembles multi-head attention, a position-wise feed-forward network,
+residual connections, and layer normalization into the full **transformer block**.

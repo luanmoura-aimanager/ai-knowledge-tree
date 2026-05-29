@@ -1,0 +1,131 @@
+---
+title: "Reward modeling and preference data"
+pillar: E
+subId: E4
+lessonId: reward-modeling
+order: 4
+estimatedMinutes: 20
+goal: "Collect human preference pairs, train a Bradley-Terry reward model, and understand how the reward score will guide policy optimization."
+prerequisites: ["sft"]
+---
+
+SFT teaches a model to follow instructions. But "good" is multidimensional -- responses
+should be helpful, harmless, and honest, with tradeoffs between these properties that
+are hard to specify via demonstrations alone. A **reward model (RM)** captures human
+preferences as a scalar score, then acts as a differentiable proxy for human judgment
+during policy optimization.
+
+## Preference data collection
+
+Human annotators are shown a prompt $x$ alongside two or more model responses
+$(y_w, y_l)$ and asked to indicate which is preferred. The key properties of good
+preference data:
+
+- **Contrastive pairs:** responses should differ on the target dimension (helpfulness,
+  safety, length) to make the comparison meaningful.
+- **Prompt diversity:** broad coverage prevents the RM from overfitting to a narrow task.
+- **Annotator guidelines:** clear rubrics reduce inter-annotator disagreement; typical
+  agreement rates are 60-80% on a preference task.
+
+Public preference datasets: **Anthropic HH-RLHF**, **OpenAI summarization dataset**,
+**UltraFeedback** (GPT-4-rated), **Orca DPO pairs**.
+
+## The Bradley-Terry model
+
+Given a preference pair $(y_w, y_l)$ (winner and loser), the **Bradley-Terry (BT) model**
+defines the probability that $y_w$ is preferred as:
+
+$$
+p(y_w \succ y_l \mid x) = \sigma(r(x, y_w) - r(x, y_l)),
+$$
+
+where $r(x, y)$ is the reward model's scalar output for response $y$ given prompt $x$,
+and $\sigma$ is the logistic sigmoid.
+
+The training objective is maximum likelihood on the preference dataset:
+
+$$
+\mathcal{L}_{\text{RM}} = -\mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma(r(x, y_w) - r(x, y_l)) \right].
+$$
+
+This is binary cross-entropy on the pairwise comparison: push $r(y_w) - r(y_l)$ to be
+large and positive for preferred responses.
+
+## Reward model architecture
+
+The RM is initialized from the **SFT model** (same transformer backbone), with one
+modification: the language model head is replaced by a linear layer projecting the final
+token's hidden state to a scalar:
+
+$$
+r(x, y) = \mathbf{w}^\top h_T(x \| y),
+$$
+
+where $h_T$ is the hidden state at the final token position. The full sequence
+$(x \| y)$ is the input; the scalar reward is a function of the last token's representation.
+
+**Why the last token?** The model must summarize the entire (prompt, response) pair to
+produce a single score. Using the last token's hidden state (which attends over the entire
+input via self-attention) is the standard approach.
+
+## Training the reward model
+
+```python-static
+import torch
+import torch.nn as nn
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+class RewardModel(nn.Module):
+    def __init__(self, base_model_name):
+        super().__init__()
+        base   = AutoModelForCausalLM.from_pretrained(base_model_name)
+        self.transformer = base.model   # strip the LM head
+        d_model  = base.config.hidden_size
+        self.head = nn.Linear(d_model, 1, bias=False)
+
+    def forward(self, input_ids, attention_mask):
+        hidden = self.transformer(input_ids, attention_mask=attention_mask).last_hidden_state
+        # Use last real token (not padding)
+        last_idx = attention_mask.sum(-1) - 1              # (B,)
+        last_h   = hidden[torch.arange(len(hidden)), last_idx]   # (B, d)
+        return self.head(last_h).squeeze(-1)               # (B,)
+
+def rm_loss(reward_model, tokenizer, prompt, y_w, y_l):
+    def encode(text):
+        return tokenizer(prompt + text, return_tensors="pt",
+                         truncation=True, max_length=512, padding=True)
+    enc_w = encode(y_w)
+    enc_l = encode(y_l)
+    r_w   = reward_model(**enc_w)
+    r_l   = reward_model(**enc_l)
+    return -torch.log(torch.sigmoid(r_w - r_l)).mean()
+```
+
+## Reward hacking
+
+The RM is a learned approximation to human judgment, not a perfect proxy. **Reward hacking**
+occurs when the policy finds responses that score high on the RM but are not actually good:
+
+- **Length hacking:** the RM is biased toward longer responses (humans often rate longer as
+  more thorough). The policy generates verbose, padded responses.
+- **Sycophancy:** the RM rewards agreement with the user's stated beliefs; the policy
+  learns to agree rather than be correct.
+- **Style hacking:** the RM rewards specific formatting (bullet lists, hedges) that it
+  learned to associate with quality in training data.
+
+Mitigations:
+- Add a KL penalty between the policy and the SFT model during RL (penalize large divergence).
+- Use ensembles of reward models.
+- Combine with DPO/GRPO which tie the reward model directly to the SFT distribution.
+
+## The RM in the RLHF loop
+
+The trained reward model $r_\phi(x, y)$ is frozen and used to score policy rollouts:
+
+1. Sample a prompt $x$.
+2. Generate a response $y \sim \pi_\theta(y \mid x)$.
+3. Score the response: $r = r_\phi(x, y)$.
+4. Update $\pi_\theta$ to increase $r$ while staying close to the SFT model.
+
+Step 4 is PPO (next lesson). The RM turns the non-differentiable human preference signal
+into a gradient signal the policy can be trained on.

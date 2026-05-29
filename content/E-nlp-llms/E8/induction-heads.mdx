@@ -1,0 +1,139 @@
+---
+title: "Induction heads"
+pillar: E
+subId: E8
+lessonId: induction-heads
+order: 3
+estimatedMinutes: 18
+goal: "Identify the two-head induction circuit (previous-token head + induction head) that implements in-context learning; show how ablating it destroys few-shot performance."
+prerequisites: ["circuits"]
+---
+
+**Induction heads** (Olsson et al., 2022) are specific attention heads that implement a
+primitive form of in-context learning: if the pattern $[A][B] \dots [A]$ appears in the
+context, an induction head at the second $[A]$ predicts $[B]$ as the next token. This
+mechanism generalizes to sequences of tokens, enabling the model to copy and extend
+patterns from anywhere in the context.
+
+## The task: in-context pattern completion
+
+Consider the context:
+
+```
+...the cat sat on the mat...the cat
+```
+
+At the final "cat", the model should predict "sat" (completing the repeated phrase). This
+requires attending back to the earlier occurrence of "cat" and reading the token that
+followed it. An induction head does exactly this.
+
+## The two-head circuit
+
+Induction is implemented by two attention heads working in sequence:
+
+**1. Previous-token head (layer $\ell$):** for each position $t$, copies the embedding
+of the previous token $t-1$ into the residual stream at position $t$. After this head,
+position $t$ contains information about the token $t-1$ (in addition to the token itself).
+
+**2. Induction head (layer $\ell' > \ell$):** for each position $t$ with current token
+$A$, looks for positions where the previous token was also $A$ (using the information
+written by the previous-token head). Attends to those positions and reads their current
+token (the token after the previous $A$ in context).
+
+```
+Context:  [the] [cat] [sat] ... [the] [cat]
+                                       ↑
+            Previous-token head writes [the] info at this position.
+            Induction head finds earlier [the][cat] → predicts [sat].
+```
+
+## Detecting induction heads
+
+**Prefix matching score:** run the model on repeated random tokens (e.g.,
+$[1][2][3][4][1][2][3][4]$). An induction head will attend from position $4+k$ back to
+position $k$, forming a below-diagonal band in the attention pattern.
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+def induction_score(attn_pattern):
+    """
+    Measure how strongly the attention pattern follows the induction diagonal.
+    For repeated-token input of length 2T, the induction head attends to
+    position t-T for each position t (the previous occurrence of the same token).
+    attn_pattern: (T, T)
+    Returns: scalar in [0, 1], higher = more induction-like.
+    """
+    T = attn_pattern.shape[0]
+    if T < 4:
+        return 0.0
+    # For the second half of the sequence, the induction target is T//2 positions back
+    half = T // 2
+    scores = [attn_pattern[t, t - half] for t in range(half, T) if t - half >= 0]
+    return float(np.mean(scores)) if scores else 0.0
+
+def prev_token_score(attn_pattern):
+    """Measure how strongly the pattern attends to the immediately preceding token."""
+    T = attn_pattern.shape[0]
+    scores = [attn_pattern[t, t-1] for t in range(1, T)]
+    return float(np.mean(scores))
+
+# Simulate a previous-token head
+T = 8
+prev_logits = np.full((T, T), -10.0)
+for t in range(1, T):
+    prev_logits[t, t-1] = 5.0
+prev_logits[0, 0] = 5.0
+prev_pattern = softmax(prev_logits)
+
+# Simulate an induction head (for T=8 with T//2=4 half-period)
+ind_logits = np.full((T, T), -10.0)
+for t in range(T//2, T):
+    ind_logits[t, t - T//2] = 5.0   # attend T//2 positions back
+for t in range(T//2):
+    ind_logits[t, 0] = 5.0          # first half: fallback to position 0
+ind_pattern = softmax(ind_logits)
+
+print("Previous-token head:")
+print(f"  prev_token_score = {prev_token_score(prev_pattern):.3f}")
+print(f"  induction_score  = {induction_score(prev_pattern):.3f}")
+print("\nInduction head:")
+print(f"  prev_token_score = {prev_token_score(ind_pattern):.3f}")
+print(f"  induction_score  = {induction_score(ind_pattern):.3f}")
+```
+
+## Induction heads and in-context learning
+
+**Olsson et al. (2022)** found that:
+
+1. Induction heads appear **abruptly** during training (a "phase transition") and are
+   responsible for a sudden jump in in-context learning ability.
+
+2. **Ablating induction heads** (setting their output to zero) reduces in-context learning
+   performance dramatically: few-shot prompting becomes nearly as poor as zero-shot.
+
+3. The same heads that copy patterns in synthetic repeated-token tasks also support
+   abstract in-context learning (new task learning from examples) in natural language.
+
+This is a strong claim: a specific, interpretable mechanism -- the two-head induction
+circuit -- is largely responsible for the emergent ability of in-context learning.
+
+## Generalization of induction
+
+The induction head's core operation is:
+
+> "If the current context matches the beginning of a pattern I've seen before, continue
+> that pattern."
+
+This generalizes far beyond literal token copying:
+- **Fuzzy induction:** attention to semantically similar, not just identical, tokens.
+- **Compositional induction:** continuing patterns based on abstract categories
+  (e.g., continuing "red: rouge, blue: bleu, green: ___" requires category-level induction).
+- **Algorithm induction:** completing arithmetic patterns, code completions, logic chains.
+
+These generalized forms involve more complex circuits built on top of the basic induction
+primitive.

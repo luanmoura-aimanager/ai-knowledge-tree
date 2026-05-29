@@ -1,0 +1,103 @@
+---
+title: "Pretraining data curation"
+pillar: E
+subId: E4
+lessonId: pretraining-data
+order: 1
+estimatedMinutes: 18
+goal: "Survey the pipeline that turns raw web crawls into a clean pretraining corpus: quality filtering, deduplication, domain mixing, and data curricula."
+prerequisites: ["E3/decoder-only"]
+codeExempt: true
+---
+
+Training a large language model begins before a single gradient is computed: with
+**data curation**. The quality and composition of the pretraining corpus is one of the
+largest determinants of model capability, often more important than architectural choices.
+
+## Sources
+
+**Common Crawl** is the dominant source: petabytes of raw web data, re-crawled monthly.
+Roughly 70% of the pretraining data for most open LLMs originates here.
+
+Other high-quality sources:
+
+- **Books:** Project Gutenberg, Books3, BookCorpus -- long-form coherent text that trains
+  on long-range dependencies.
+- **Code:** GitHub, The Stack, StarCoder data -- improves reasoning and structured output.
+- **Scientific papers:** ArXiv, Semantic Scholar -- technical vocabulary and reasoning.
+- **Wikipedia and Wikidata:** factual, encyclopedic text in many languages.
+- **Curated high-quality web:** OpenWebText, C4 (Google's cleaned CommonCrawl), FineWeb.
+
+## Quality filtering
+
+Raw web data is mostly noise. A multi-stage filtering pipeline removes low-quality content:
+
+**1. Language identification.** Keep only the target language(s). FastText language ID on
+every document; discard anything with confidence < 0.65.
+
+**2. Perplexity filter.** Train a small n-gram LM on high-quality text (Wikipedia).
+Compute perplexity of each web document; discard the high-perplexity tail (random text,
+spam, machine-generated filler).
+
+**3. Heuristic filters.** Rules that fire on known low-quality patterns:
+- Documents shorter than 100 tokens (stubs).
+- Documents where most "words" are not in a dictionary.
+- Documents with excessive punctuation, repetition, or boilerplate.
+- HTML artifacts (excessive tags, escape sequences).
+
+**4. Safety filtering.** Remove known CSAM hashes (PhotoDNA), extreme hate speech
+(classifiers), and personal information (PII scrubbing with regex + NER).
+
+## Deduplication
+
+Near-duplicate documents inflate the effective dataset size without adding information,
+and can cause **memorization** (the model learns to copy rather than generalize).
+
+**MinHash / LSH deduplication.** Represent each document as a set of $k$-shingles (n-grams
+of characters or tokens). Two documents are near-duplicates if their Jaccard similarity
+$|A \cap B| / |A \cup B|$ exceeds a threshold (typically 0.8). MinHash with locality-
+sensitive hashing (LSH) finds approximate near-duplicates in $O(N)$ rather than $O(N^2)$.
+
+**Exact deduplication.** SHA-256 hashes of document text; remove identical documents.
+
+The Chinchilla paper found that deduplication improved data quality enough to shift the
+optimal data mix significantly -- 1T deduplicated tokens is worth more than 2T raw tokens.
+
+## Domain mixing
+
+Different domains contribute different capabilities. A pure web corpus is mediocre at
+code, math, and multi-step reasoning. LLaMA-3 and Qwen report mixing ratios approximately:
+
+| Domain | Rough weight |
+|--------|-------------|
+| Web text | 45-60% |
+| Code | 15-25% |
+| Books | 5-10% |
+| Scientific text | 5-10% |
+| Wikipedia | 2-5% |
+| Multilingual | varies |
+
+These are rough; exact ratios are closely guarded. Code-heavy mixes improve reasoning
+("let's think step by step" is a form of code-style planning).
+
+## Data curricula
+
+**Static mix:** sample from all domains at fixed proportions throughout training.
+
+**Curriculum learning:** change the mix during training. A common pattern:
+1. Early training: broad web data for general language understanding.
+2. Mid training: upweight code, math, and high-quality text.
+3. Cool-down: fine-tuning-adjacent data (instruction following, conversations).
+
+LLaMA-3's "annealing" phase in the last ~10% of tokens upweights high-quality sources
+(GitHub, scientific papers) and runs at a very low learning rate.
+
+## Tokenization and sequence packing
+
+After filtering, documents are tokenized and packed into fixed-length windows (e.g.,
+4096 or 8192 tokens). **Packing without padding:** concatenate documents with a separator
+token and slice into fixed-length chunks. This maximizes GPU utilization -- no wasted
+compute on padding tokens.
+
+For long documents that span multiple chunks, the model never sees the document boundary
+across chunks (gradient is not backpropagated across chunk boundaries in most implementations).

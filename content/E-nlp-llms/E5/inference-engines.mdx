@@ -1,0 +1,114 @@
+---
+title: "Inference engines: vLLM, TGI, SGLang"
+pillar: E
+subId: E5
+lessonId: inference-engines
+order: 6
+estimatedMinutes: 15
+goal: "Survey the architecture of production inference servers: how vLLM, TGI, and SGLang implement PagedAttention, speculative decoding, and structured output scheduling."
+prerequisites: ["paged-attention", "speculative-decoding"]
+codeExempt: true
+---
+
+Deploying an LLM is not the same as running one locally. A production inference server
+must handle hundreds of concurrent requests, minimize latency, maximize GPU utilization,
+and support features like streaming, structured output, and model quantization. Several
+open-source frameworks have emerged to solve this problem.
+
+## vLLM
+
+**vLLM** (Kwon et al., UC Berkeley, 2023) introduced PagedAttention and continuous batching
+as open-source software. It is the most widely used open-source inference framework.
+
+**Architecture:**
+- **Scheduler:** manages request queues, priorities, and prefill/decode batching.
+- **Worker processes:** one per GPU; each runs the model forward pass.
+- **Block manager:** allocates and frees physical KV cache blocks; maintains block tables
+  per request.
+- **Attention kernels:** custom CUDA kernels implementing PagedAttention's block-based
+  K/V access pattern.
+
+**Key features:**
+- Tensor parallelism: split attention heads across GPUs (pipeline and data-parallel too).
+- Speculative decoding with configurable draft model or n-gram draft.
+- Quantization: GPTQ, AWQ, FP8.
+- Prefix caching: automatic detection and sharing of common prompt prefixes.
+- Structured output: regex-constrained decoding and JSON schema enforcement via Outlines.
+
+**API:** OpenAI-compatible REST API, making it a drop-in replacement for the OpenAI API
+for self-hosted models.
+
+## TGI (Text Generation Inference)
+
+**TGI** (Hugging Face) is the inference server used to power the Hugging Face Inference API.
+
+**Key features:**
+- Flash Attention 2 integration for memory-efficient attention.
+- Paged Attention (added after vLLM).
+- Continuous batching with token streaming.
+- Quantization: GPTQ, AWQ, bitsandbytes (8-bit, 4-bit).
+- Custom Rust router for request management and load balancing.
+- First-class support for Hugging Face Hub model loading.
+
+**Differentiator:** tighter HuggingFace ecosystem integration; easier to deploy models
+directly from the Hub without format conversion.
+
+## SGLang
+
+**SGLang** (Zheng et al., UC Berkeley, 2024) focuses on **structured generation** and
+complex LLM programs.
+
+**Key features:**
+- **RadixAttention:** extends PagedAttention's prefix caching with a radix tree structure,
+  automatically detecting and sharing any common prefix (not just the full prompt). This
+  is especially powerful for applications with many few-shot examples, tool definitions,
+  or shared system prompts.
+- **Structured output:** first-class support for constrained generation (JSON, regex,
+  grammar) with efficient incremental scheduling.
+- **Multi-call programs:** the SGLang DSL lets users express multi-call LLM pipelines
+  (agents, tree-of-thought, multi-turn) as Python programs, with automatic batching and
+  KV cache reuse across calls.
+- **Speculative decoding:** EAGLE-style draft heads.
+
+**Use case:** applications that run complex LLM programs with branching, tool calls, and
+structured outputs benefit most from SGLang's scheduling primitives.
+
+## TensorRT-LLM
+
+**TensorRT-LLM** (NVIDIA) is a closed-source framework that compiles LLM graphs to
+highly optimized CUDA kernels for NVIDIA GPUs.
+
+- Fused attention kernels optimized per GPU architecture.
+- INT8/INT4/FP8 quantization with NVIDIA-optimized compute.
+- In-flight batching, speculative decoding.
+- Strongest throughput on NVIDIA hardware, especially H100/H200.
+- Less flexibility than vLLM for experimentation.
+
+## Feature comparison
+
+| Feature | vLLM | TGI | SGLang |
+|---------|------|-----|--------|
+| PagedAttention | Yes | Yes | Yes (RadixAttention) |
+| Continuous batching | Yes | Yes | Yes |
+| Prefix caching | Yes | Partial | Yes (radix tree) |
+| Speculative decoding | Yes | No | Yes (EAGLE) |
+| Structured output | Via Outlines | Limited | Native |
+| Multi-GPU TP/PP | Yes | Yes | Yes |
+| OpenAI-compatible API | Yes | Yes | Yes |
+| Primary use case | General serving | HF ecosystem | Structured programs |
+
+## Choosing a framework
+
+**vLLM:** best default for most use cases. Well-maintained, wide model support, active community.
+
+**TGI:** preferred when deeply integrated with HuggingFace Hub; better for quick deployment
+of new HF models.
+
+**SGLang:** preferred for complex LLM programs, agent frameworks, or applications with
+heavy structured output requirements.
+
+**TensorRT-LLM:** preferred for maximum throughput on NVIDIA hardware in production at scale,
+where the engineering overhead of compilation is justified.
+
+The inference engine is invisible to end users but determines the cost and latency of
+every API call.

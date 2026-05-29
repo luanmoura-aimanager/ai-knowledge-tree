@@ -1,0 +1,102 @@
+---
+title: "Constitutional AI and RLAIF"
+pillar: E
+subId: E4
+lessonId: rlaif
+order: 8
+estimatedMinutes: 18
+goal: "Replace human feedback with AI feedback: have a supervisor model critique and revise responses using a written constitution, then train the policy with RL."
+prerequisites: ["dpo"]
+codeExempt: true
+---
+
+RLHF relies on human annotators to label preferences, which is expensive, slow, and hard
+to scale. **Reinforcement Learning from AI Feedback (RLAIF)** replaces human feedback with
+AI-generated feedback: a strong AI supervisor (the "critic") evaluates or revises responses
+based on a set of principles, and those AI labels are used to train the target policy.
+
+## Constitutional AI (CAI)
+
+**Constitutional AI (Anthropic, 2022)** is the original RLAIF approach. It proposes a
+two-stage process guided by a written **constitution** -- a set of human-authored principles
+describing desired behavior (helpful, harmless, honest, not discriminatory, etc.).
+
+### Stage 1: Supervised learning from AI revisions (SL-CAI)
+
+1. **Generate initial responses.** The model responds to prompts, including potentially
+   harmful ones (to expose failure modes).
+2. **Critique with the constitution.** A supervisor model (often the same model, or a
+   stronger one) is prompted to critique the response based on a randomly selected
+   constitutional principle:
+   > *"Identify ways in which the assistant's last response is harmful, unethical, racist,
+   > sexist, toxic, dangerous, or illegal."*
+3. **Revise.** The supervisor is then prompted to revise the response to address its critique.
+4. **Supervised fine-tuning.** Fine-tune the target model on (prompt, revised response) pairs.
+
+Repeating critique-and-revise multiple times improves response quality.
+
+### Stage 2: RL from AI feedback (RLAIF)
+
+1. **Generate preference data from AI comparisons.** Present pairs of responses to the
+   supervisor model and ask it to choose which is less harmful based on a constitutional
+   principle:
+   > *"Which response is less likely to contain harmful or unethical content?"*
+2. **Train a reward model** on these AI-labeled pairs (using the BT framework as in RLHF).
+3. **RL fine-tuning.** Apply PPO or DPO using the AI-trained reward model.
+
+The entire feedback loop requires **no human preference annotation** after the initial
+constitution is written.
+
+## The constitution
+
+A typical CAI constitution includes principles such as:
+
+- Choose the response that is least likely to contain harmful, biased, or dishonest content.
+- Prefer responses that acknowledge uncertainty when appropriate.
+- Choose responses that least likely assist in planning or executing harmful actions.
+- Prefer responses that best balance helpfulness with harmlessness.
+
+These are abstract principles; the AI evaluator interprets them in context. Different
+principles are randomly sampled for different comparisons, providing diverse supervision.
+
+## Self-critique chain
+
+A key insight from CAI: the **same model** used to generate responses can be prompted to
+critique them, without a separate stronger model. A model can identify problems it created
+when given explicit prompting to look for them.
+
+This self-critique chain is a form of **process supervision**: the model has access to
+its own intermediate reasoning. The revised responses are often substantially safer and
+more helpful than the original, demonstrating that the model "knows" what a better response
+looks like even if it doesn't produce it without explicit prompting.
+
+## Scalable oversight
+
+RLAIF is an instance of the broader research agenda of **scalable oversight**: designing
+supervision mechanisms that remain effective as AI systems become more capable than human
+supervisors.
+
+As AI capabilities grow:
+- Humans cannot verify complex reasoning steps.
+- AI supervisors can evaluate arguments humans cannot.
+- The constitution provides a fixed, human-authored value anchor even when the AI supervisor
+  is much more capable than the human annotators.
+
+**Iterated amplification:** a related approach where a human augmented by an AI assistant
+acts as the supervisor for training a more capable AI -- forming a recursive oversight
+structure. Weak Supervision (next lesson E8) provides an empirical test of this idea.
+
+## RLAIF vs RLHF in practice
+
+| Aspect | RLHF | RLAIF |
+|--------|------|-------|
+| Feedback cost | High (human annotators) | Low (API calls to supervisor) |
+| Speed | Slow (annotation pipeline) | Fast (automated) |
+| Scale | Limited by annotator throughput | Scales with compute |
+| Quality | Human-grounded, diverse | Depends on supervisor quality |
+| Consistency | Low (inter-annotator disagreement) | High |
+| Bias | Human biases | Supervisor model biases |
+
+**Hybrid approach (LLM-as-judge):** modern systems use RLHF for initial alignment and
+RLAIF for continued self-improvement. Frameworks like Llama-2-chat use human feedback for
+safety-critical principles and LLM-generated feedback for general helpfulness.

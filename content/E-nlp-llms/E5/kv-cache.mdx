@@ -1,0 +1,159 @@
+---
+title: "KV cache"
+pillar: E
+subId: E5
+lessonId: kv-cache
+order: 2
+estimatedMinutes: 18
+goal: "Cache key and value tensors for all previous tokens so each new token incurs only one new attention row, reducing per-token cost from O(T^2) to O(T)."
+prerequisites: ["decoding"]
+---
+
+Without caching, generating a response of $T$ tokens requires $T$ forward passes, each
+attending over an increasingly long sequence. The $t$-th forward pass computes attention
+over all $t$ tokens: total cost $\sum_{t=1}^T O(t \cdot d) = O(T^2 \cdot d)$.
+
+The **KV cache** eliminates this redundancy: compute and store the key and value matrices
+for all previous tokens, then reuse them for each new token.
+
+## Why keys and values are reusable
+
+At each attention layer, for position $j < t$ (a previously generated token):
+
+$$
+k_j = x_j W^K, \quad v_j = x_j W^V.
+$$
+
+The token $x_j$ does not change after it is generated. Neither does the weight matrix
+$W^K$ or $W^V$. Therefore $k_j$ and $v_j$ are identical in every forward pass that
+includes position $j$. There is no need to recompute them.
+
+**Queries** are different: the query at position $t$ is $q_t = x_t W^Q$, which is computed
+fresh at each step (it depends on the new token $x_t$).
+
+## The cached forward pass
+
+**Prefill phase:** process the full prompt in one forward pass (all tokens in parallel),
+compute all K and V tensors, store them in the cache.
+
+**Decode phase:** for each new token:
+1. Compute $q_t, k_t, v_t$ for the new token only.
+2. Append $k_t, v_t$ to the cache.
+3. Compute attention: $q_t$ attends over the full cache (all $k_j, v_j$ for $j \le t$).
+4. Produce logits for token $t+1$.
+
+Each decode step costs $O(T_{\text{cache}} \cdot d)$ (one attention row), not
+$O(T_{\text{cache}}^2 \cdot d)$.
+
+## Memory cost of the KV cache
+
+For a model with $L$ layers, $h$ attention heads, head dimension $d_h$, and a sequence
+of $T$ tokens at precision bf16 (2 bytes):
+
+$$
+\text{KV cache size} = 2 \times L \times h \times d_h \times T \times 2 \text{ bytes}.
+$$
+
+The factor of 2 is for keys and values. For LLaMA-3 70B ($L=80$, $h_{\text{KV}}=8$,
+$d_h=128$, using GQA):
+
+$$
+2 \times 80 \times 8 \times 128 \times T \times 2 = 327{,}680 \times T \text{ bytes}.
+$$
+
+At $T = 4096$ tokens: $\approx 1.3$GB per request. At $T = 128{,}000$ tokens: $\approx 40$GB.
+
+This is why long-context serving is memory-bottlenecked. Techniques like PagedAttention
+(next-to-next lesson) manage this memory efficiently.
+
+## Prefill vs decode throughput
+
+The two phases have different hardware characteristics:
+
+| Phase | Compute bound? | Bottleneck |
+|-------|---------------|-----------|
+| Prefill | Yes (large matrix multiply) | GPU compute |
+| Decode | No (sequential, small QK multiply) | Memory bandwidth |
+
+During decode, the GPU spends most time loading the model weights and KV cache from HBM
+(high-bandwidth memory) into registers -- not computing. This is why decode throughput is
+memory-bandwidth limited.
+
+## Implementation sketch
+
+```python
+import numpy as np
+
+class AttentionWithKVCache:
+    def __init__(self, d_model, n_heads, max_len):
+        self.h  = n_heads
+        self.dk = d_model // n_heads
+        self.max_len = max_len
+        rng = np.random.default_rng(0)
+        s   = 0.02
+        self.Wq = rng.normal(0, s, (d_model, d_model))
+        self.Wk = rng.normal(0, s, (d_model, d_model))
+        self.Wv = rng.normal(0, s, (d_model, d_model))
+        self.Wo = rng.normal(0, s, (d_model, d_model))
+        d = d_model
+        # Pre-allocate KV cache
+        self.k_cache = np.zeros((max_len, d))
+        self.v_cache = np.zeros((max_len, d))
+        self.cache_len = 0
+
+    def prefill(self, x):
+        """x: (T, d_model) -- process prompt all at once."""
+        T = x.shape[0]
+        self.k_cache[:T] = x @ self.Wk
+        self.v_cache[:T] = x @ self.Wv
+        self.cache_len = T
+        # Full attention over prompt
+        return self._attend_full(x @ self.Wq, x @ self.Wk, x @ self.Wv)
+
+    def decode_one(self, x_new):
+        """x_new: (1, d_model) -- process single new token."""
+        k_new = x_new @ self.Wk   # (1, d)
+        v_new = x_new @ self.Wv
+        # Append to cache
+        t = self.cache_len
+        self.k_cache[t] = k_new[0]
+        self.v_cache[t] = v_new[0]
+        self.cache_len += 1
+        # Attend: one query row over the full cache
+        q = x_new @ self.Wq   # (1, d)
+        K = self.k_cache[:self.cache_len]   # (t+1, d)
+        V = self.v_cache[:self.cache_len]
+        scores = q @ K.T / np.sqrt(self.dk)
+        attn   = np.exp(scores - scores.max())
+        attn  /= attn.sum()
+        return (attn @ V) @ self.Wo   # (1, d)
+
+    def _attend_full(self, Q, K, V):
+        T  = Q.shape[0]
+        scores = Q @ K.T / np.sqrt(self.dk)
+        mask   = np.triu(np.ones((T, T), dtype=bool), k=1)
+        scores[mask] = -1e9
+        attn = np.exp(scores - scores.max(-1, keepdims=True))
+        attn /= attn.sum(-1, keepdims=True)
+        return (attn @ V) @ self.Wo
+
+d, h, T_max = 32, 4, 128
+attn_layer = AttentionWithKVCache(d, h, T_max)
+
+# Prefill with 5-token prompt
+prompt = np.random.randn(5, d)
+out_prefill = attn_layer.prefill(prompt)
+print("Prefill output shape:", out_prefill.shape)
+
+# Decode 3 more tokens
+for i in range(3):
+    new_token = np.random.randn(1, d)
+    out = attn_layer.decode_one(new_token)
+    print(f"  Decode step {i+1}: cache_len={attn_layer.cache_len}, out_norm={np.linalg.norm(out):.3f}")
+```
+
+## KV cache with GQA
+
+With Grouped-Query Attention (GQA), only $g$ key/value heads are stored instead of $h$
+query heads. The KV cache memory is reduced by $h/g$ -- the primary motivation for GQA
+in production models.

@@ -1,0 +1,131 @@
+---
+title: "Text-to-image: DALL-E, Stable Diffusion, Midjourney"
+pillar: E
+subId: E7
+lessonId: text-to-image
+order: 5
+estimatedMinutes: 18
+goal: "Condition a diffusion model on a CLIP text embedding; contrast DALL-E 2 (CLIP prior + decoder), Stable Diffusion (latent diffusion + cross-attention), and classifier-free guidance."
+prerequisites: ["clip", "D4/diffusion"]
+codeExempt: true
+---
+
+Text-to-image generation is the task of synthesizing a photorealistic (or stylized) image
+from a natural language description. The three dominant approaches -- DALL-E 2, Stable
+Diffusion, and Midjourney -- share a foundation in diffusion models and CLIP-based text
+conditioning, but differ in architecture and training.
+
+## Text conditioning: the core mechanism
+
+A diffusion model learns to denoise images. Without conditioning, it samples from the
+image marginal distribution $p(x)$. To condition on text $y$, we sample from
+$p(x \mid y)$: images that match the text description.
+
+The text string $y$ is encoded by a CLIP text encoder or a language model into a fixed-
+dimensional embedding $\mathbf{c} = \text{TextEnc}(y)$. This embedding is injected into
+the diffusion model's denoising network at each step.
+
+**Injection via cross-attention:** the denoising network (typically a U-Net or DiT) uses
+cross-attention layers where the image features (queries) attend to the text embedding
+(keys and values):
+
+$$
+\text{CrossAttn}(Q, K, V) = \text{softmax}\!\left(\frac{Q_\text{img} K_\text{text}^\top}{\sqrt{d}}\right) V_\text{text}.
+$$
+
+This mechanism is the same as in the Transformer encoder-decoder (E3), but now the
+"source sequence" is the text embedding and the "target" is the noisy image.
+
+## Classifier-free guidance (CFG)
+
+Training the diffusion model conditional on text $y$ requires paired (text, image) data.
+But we also want to **amplify** the conditioning effect at inference time.
+
+**Classifier-free guidance** (Ho and Salimans, 2022) trains a single model on both
+conditional ($y$) and unconditional ($y = \emptyset$, text dropped out randomly at training)
+inputs. At inference, combine both predictions:
+
+$$
+\hat{\epsilon}(x_t, y) = \epsilon(x_t, \emptyset) + w \cdot [\epsilon(x_t, y) - \epsilon(x_t, \emptyset)],
+$$
+
+where $w > 1$ is the **guidance scale**. The second term amplifies the difference between
+conditional and unconditional predictions, steering the sample toward high-fidelity text
+alignment at the cost of diversity.
+
+- $w = 1$: standard conditional generation.
+- $w = 7{-}10$: strong text alignment but lower diversity (typical for DALL-E 2, SD).
+- $w \to \infty$: overfit to the text; outputs lose realism.
+
+## DALL-E 2 (OpenAI, 2022)
+
+**Two-stage pipeline:**
+
+1. **CLIP prior:** given the text embedding $\mathbf{c}_\text{text}$, train a diffusion
+   model to generate the corresponding CLIP **image embedding** $\mathbf{c}_\text{img}$:
+   $p(\mathbf{c}_\text{img} \mid \mathbf{c}_\text{text})$.
+
+2. **Unclip decoder:** given $\mathbf{c}_\text{img}$, generate the image pixels with a
+   second diffusion model: $p(x \mid \mathbf{c}_\text{img})$.
+
+The CLIP image embedding captures semantic content but not photographic details, so the
+decoder has freedom in style, lighting, and composition.
+
+**Variations:** fixing $\mathbf{c}_\text{text}$ and sampling different $\mathbf{c}_\text{img}$
+values produces semantically similar images with different visual styles.
+
+## Stable Diffusion: latent diffusion
+
+**Stable Diffusion (Rombach et al., 2022)** reduces compute by running the diffusion
+process in a compressed **latent space** rather than pixel space.
+
+1. **VAE encoder:** compress the image $x \in \mathbb{R}^{H \times W \times 3}$ to a latent
+   $z \in \mathbb{R}^{H/8 \times W/8 \times 4}$ (8x spatial compression, 4 latent channels).
+
+2. **Diffusion in latent space:** train the denoising U-Net on $z$ with text conditioning
+   via cross-attention:
+   $$z_{t-1} \leftarrow \text{Denoise}(z_t, \mathbf{c}_\text{text}, t).$$
+
+3. **VAE decoder:** decode the final latent $z_0$ back to pixel space.
+
+**Efficiency:** operating on $64 \times 64$ latents (for a 512px image) vs. $512 \times 512$
+pixels reduces memory and compute by 64x, enabling training on consumer GPUs and inference
+in seconds.
+
+**Text encoder:** Stable Diffusion 1.x uses CLIP ViT-L text encoder; SD 2.x uses OpenCLIP;
+SD 3 uses three text encoders (CLIP-L, OpenCLIP-G, and T5-XXL) whose embeddings are
+concatenated.
+
+## SDXL and SD 3: scaling up
+
+**SDXL (2023):** larger U-Net (2.6B parameters) with an additional refiner diffusion model
+for high-frequency details. Second-stage refinement conditions on the base model's output.
+
+**SD 3 and SD 3.5 (2024):** replace the U-Net with a **Diffusion Transformer (DiT)**:
+- Patch the latent into tokens.
+- Apply transformer blocks with multi-modal attention (image patches and text tokens in
+  the same attention operation).
+- Separate streams for image and text that merge via attention.
+
+DiT-based models scale better with parameters and produce more coherent text in images.
+
+## Midjourney
+
+Midjourney's architecture is proprietary. Known characteristics:
+- Strong artistic style; optimized for aesthetic quality over photorealism.
+- Rumored to use a proprietary diffusion model trained on curated aesthetic data.
+- RLHF-style feedback (users can upscale/vary; winning variants are used in training).
+- V6 shows significantly improved text rendering and prompt adherence.
+
+## Evaluation
+
+| Metric | Measures |
+|--------|---------|
+| FID (Frechet Inception Distance) | Distribution match between real and generated images |
+| CLIP score | Text-image alignment |
+| Human preference (ELO) | Aesthetic quality and instruction following |
+| DrawBench | Compositional generation (count, color, position) |
+
+All three systems score high on CLIP and FID but differ substantially on human preference
+and compositional accuracy. Text rendering (letters in images) remains an active challenge,
+partially addressed by SD 3 and DALL-E 3.

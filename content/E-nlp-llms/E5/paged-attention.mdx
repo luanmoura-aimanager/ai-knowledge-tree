@@ -1,0 +1,119 @@
+---
+title: "PagedAttention and continuous batching"
+pillar: E
+subId: E5
+lessonId: paged-attention
+order: 5
+estimatedMinutes: 18
+goal: "Manage KV cache as fixed-size pages mapped to logical blocks (PagedAttention), and use continuous batching to saturate GPU throughput across requests of different lengths."
+prerequisites: ["kv-cache"]
+codeExempt: true
+---
+
+In production LLM serving, requests arrive at different times and have different prompt
+and generation lengths. Naive serving allocates a contiguous block of GPU memory per
+request -- large enough for the maximum possible output length. This wastes memory and
+limits concurrency.
+
+**PagedAttention** (Kwon et al., 2023, vLLM) and **continuous batching** are the two
+key techniques that make production LLM serving efficient.
+
+## The memory waste problem
+
+A 70B model at 4-bit quantization uses ~35GB for weights. On a single 80GB A100:
+- Weights: 35GB
+- Available for KV cache: 45GB
+
+At sequence length 4096, one 70B LLaMA-3 request uses ~320MB of KV cache (see kv-cache
+lesson). Serving 140 concurrent requests would need 44.8GB -- just barely fitting.
+
+**The problem:** a request that will generate 200 tokens but was allocated space for 4096
+wastes 3896 token slots. With fragmented, variable-length sequences, effective utilization
+of the KV cache is typically 20-40%.
+
+## PagedAttention: OS-inspired memory management
+
+PagedAttention treats KV cache memory like an OS virtual memory system:
+
+**Physical KV blocks:** the GPU memory is divided into fixed-size **blocks** (typically
+16 or 32 token slots). Each block stores the K and V tensors for a fixed number of tokens.
+
+**Logical sequence:** each request has a **logical sequence** of KV entries. Logical
+sequence positions are mapped to physical blocks via a **block table** (like a page table
+in virtual memory).
+
+**Non-contiguous storage:** consecutive logical tokens can reside in non-contiguous physical
+blocks. The attention kernel is modified to follow the block table when loading K and V.
+
+**Benefits:**
+- **No pre-allocation waste:** blocks are allocated on-demand as tokens are generated.
+- **Block sharing:** multiple requests that share the same prompt prefix can share the
+  same physical KV blocks (copy-on-write if they diverge). This is critical for
+  chatbot system prompts shared across thousands of sessions.
+- **Fragmentation $\approx$ 0:** less than one block of waste per sequence.
+
+## Block table example
+
+For a sequence with 5 tokens, block size 2:
+
+```
+Logical sequence:  [t0, t1, t2, t3, t4]
+Block table:       {0 -> block 7, 1 -> block 3, 2 -> block 11}
+                   (logical block 0 = tokens 0-1 stored in physical block 7, etc.)
+```
+
+The attention kernel uses the block table to locate and load the correct K,V tensors
+during each attention computation.
+
+## Attention kernel modification
+
+Standard causal attention computes:
+
+$$
+\text{Attn}(q_t) = \text{softmax}\!\left(\frac{q_t K_{0:t}^\top}{\sqrt{d_k}}\right) V_{0:t}.
+$$
+
+With PagedAttention, $K_{0:t}$ and $V_{0:t}$ are loaded block-by-block, following the
+block table. Each block is fetched from its physical location and the attention accumulates
+across blocks using a running softmax numerically.
+
+## Continuous batching
+
+**Without continuous batching (static batching):** a batch of $B$ requests runs
+together until the longest request finishes. Short requests in the batch complete early
+but hold their GPU slots, blocking new requests.
+
+**Continuous batching (Orca, 2022):** replace finished requests with new ones at the
+end of each decode step, without waiting for the entire batch to finish.
+
+```
+Step 1: [req_A, req_B, req_C, req_D]  -- all decoding
+Step 2: [req_A, req_B, req_C, req_D]  -- req_C finishes
+Step 3: [req_A, req_B,  req_E, req_D]  -- req_E immediately starts (infill)
+Step 4: [req_A,  req_F,  req_E, req_D]  -- req_B finishes, req_F starts
+```
+
+This "in-flight batching" keeps the GPU fully saturated. In combination with PagedAttention,
+it enables fine-grained scheduling of token generation across hundreds of concurrent requests.
+
+## Prefill-decode disaggregation
+
+A newer architectural pattern: separate the prefill and decode compute onto different GPU
+pools.
+
+- **Prefill workers:** compute-bound; process full prompts in batches. Can run at high
+  utilization because all tokens process in parallel.
+- **Decode workers:** memory-bandwidth bound; generate tokens autoregressively.
+  Continuous batching maximizes their utilization.
+
+This disaggregation avoids the "prefill-decode interference" problem (a long prefill
+blocks all decode steps in the same batch) and allows independent scaling of each phase.
+
+## Impact
+
+In the original vLLM paper, PagedAttention + continuous batching achieved:
+- 2-4x higher throughput than HuggingFace Transformers' naive batching.
+- Near-zero KV cache fragmentation vs. 60-80% waste with static allocation.
+
+These techniques are now standard in all production LLM serving frameworks (vLLM, TGI,
+SGLang, TensorRT-LLM).

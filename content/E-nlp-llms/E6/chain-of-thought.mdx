@@ -1,0 +1,142 @@
+---
+title: "Chain-of-thought and self-consistency"
+pillar: E
+subId: E6
+lessonId: chain-of-thought
+order: 5
+estimatedMinutes: 16
+goal: "Elicit multi-step reasoning with few-shot CoT prompting; then sample multiple reasoning paths and majority-vote the final answer (self-consistency)."
+prerequisites: ["function-calling"]
+---
+
+LLMs solve easy questions well but struggle with tasks requiring multiple reasoning steps.
+The failure mode is systematic: the model "jumps to the answer" without explicitly working
+through intermediate steps. **Chain-of-thought (CoT) prompting** makes the intermediate
+steps part of the output, dramatically improving accuracy on multi-step tasks.
+
+## Chain-of-thought prompting
+
+**Few-shot CoT (Wei et al., 2022):** include exemplars in the prompt that demonstrate
+reasoning step by step, not just the final answer.
+
+**Standard prompting:**
+```
+Q: Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can has 3 balls.
+   How many tennis balls does he have now?
+A: 11.
+```
+
+**Chain-of-thought prompting:**
+```
+Q: Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can has 3 balls.
+   How many tennis balls does he have now?
+A: Roger starts with 5 balls. 2 cans × 3 balls = 6 balls from cans.
+   5 + 6 = 11. The answer is 11.
+```
+
+The model learns from the exemplar that it should reason through steps before answering.
+
+**Zero-shot CoT:** add "Let's think step by step" to the prompt without exemplars.
+Surprisingly effective; works because this phrase is strongly associated with careful
+reasoning in the pretraining corpus.
+
+**Why CoT works:** reasoning through steps allocates more computation (more tokens) to
+the problem. Each token generation is one inference step; a 100-step solution uses 100x
+more compute than a one-token answer. This is a form of test-time compute scaling.
+
+## Implementation: CoT prompting
+
+```python
+def build_cot_prompt(question, exemplars):
+    """
+    exemplars: list of (question, chain_of_thought, answer) tuples
+    """
+    prompt = ""
+    for q, cot, a in exemplars:
+        prompt += f"Q: {q}\nA: {cot} The answer is {a}.\n\n"
+    prompt += f"Q: {question}\nA:"
+    return prompt
+
+exemplars = [
+    (
+        "Sarah has 3 apples. She gives 1 to Tom and buys 4 more. How many does she have?",
+        "Sarah starts with 3 apples. She gives 1 away: 3 - 1 = 2. She buys 4 more: 2 + 4 = 6.",
+        "6"
+    ),
+    (
+        "A car travels 60 mph for 2.5 hours. How far does it travel?",
+        "Distance = speed × time = 60 × 2.5 = 150 miles.",
+        "150 miles"
+    ),
+]
+
+question = "A store has 48 oranges. They sell 3/4 of them in the morning. How many are left?"
+prompt = build_cot_prompt(question, exemplars)
+print(prompt)
+```
+
+## Self-consistency (Wang et al., 2023)
+
+A single reasoning chain can make errors. **Self-consistency** addresses this by sampling
+$n$ diverse reasoning paths and taking a **majority vote** over the final answers:
+
+1. Set temperature $> 0$ (e.g., $T = 0.7$).
+2. Sample $n$ completions (e.g., $n = 10$).
+3. Extract the final answer from each.
+4. Return the most frequent answer.
+
+**Why diversity helps:** different reasoning paths may commit different errors, but correct
+paths are more likely to converge on the same answer.
+
+```python
+from collections import Counter
+
+def self_consistent_answer(llm_fn, prompt, n_samples=10, temperature=0.7):
+    """
+    llm_fn: (prompt, temperature) -> completion string
+    Returns: (best_answer, all_answers)
+    """
+    answers = []
+    for _ in range(n_samples):
+        completion = llm_fn(prompt, temperature)
+        # Extract answer (assume format "The answer is X.")
+        if "The answer is" in completion:
+            ans = completion.split("The answer is")[-1].strip().rstrip(".")
+            answers.append(ans)
+    counter = Counter(answers)
+    best    = counter.most_common(1)[0][0] if counter else None
+    return best, answers
+
+# Simulate (replace with real LLM calls)
+import random
+def mock_llm(prompt, temperature):
+    # Simulate 80% chance of correct answer "12", 20% chance of error
+    if random.random() < 0.8:
+        return "12 apples / 4 friends = 3 each. The answer is 3."
+    else:
+        return "I count 12 apples. The answer is 12."  # wrong
+
+random.seed(42)
+best, all_answers = self_consistent_answer(mock_llm, "Some prompt", n_samples=10)
+print(f"Best answer: {best}")
+print(f"All answers: {Counter(all_answers)}")
+```
+
+Self-consistency improves accuracy on arithmetic (GSM8K, MATH) and commonsense
+reasoning (StrategyQA, ARC) by 5-20% over single-sample greedy decoding.
+
+## Variants and extensions
+
+**Least-to-most prompting:** decompose a hard problem into easier subproblems, solve
+them sequentially, then compose.
+
+**Auto-CoT (Zhang et al.):** automatically generate CoT exemplars using the model
+itself (zero-shot), cluster questions, and sample representative exemplars.
+
+**Program-of-thought (PoT):** generate Python code as the reasoning chain and execute
+it. Offloads arithmetic and combinatorics to a Python interpreter, eliminating calculation
+errors.
+
+**Tree-of-thought (ToT):** explore multiple reasoning paths simultaneously as a tree
+(using BFS or DFS), evaluating intermediate states and pruning unpromising branches.
+Generalization of self-consistency to structured search.

@@ -1,0 +1,163 @@
+---
+title: "Conditional random fields"
+pillar: E
+subId: E1
+lessonId: crf
+order: 5
+estimatedMinutes: 20
+goal: "Replace the HMM generative assumptions with a discriminative linear-chain CRF; derive the forward algorithm for the partition function and the Viterbi path for decoding."
+prerequisites: ["hmm-pos-ner"]
+---
+
+The HMM is a **generative model**: it specifies a joint $p(\mathbf{x}, \mathbf{y})$ by
+modeling how labels generate words. This forces two independence assumptions: the current
+word depends only on the current label ($B_{yx}$), and the current label depends only on
+the previous label ($A_{ij}$). In practice, knowing the whole sentence is invaluable -- the
+POS tag of "run" depends on whether the next word is a noun or a comma.
+
+A **Conditional Random Field (CRF)** is a discriminative model: it directly parameterizes
+$p(\mathbf{y} \mid \mathbf{x})$ without modeling the word distribution, freeing it to
+condition on arbitrary features of the full input.
+
+## The linear-chain CRF
+
+The **linear-chain CRF** matches the HMM's factorization structure but uses log-linear
+(exponential family) potentials:
+
+$$
+p(\mathbf{y} \mid \mathbf{x}) = \frac{1}{Z(\mathbf{x})} \exp\!\left( \sum_{t=1}^{T} \sum_k \lambda_k f_k(y_{t-1}, y_t, \mathbf{x}, t) \right),
+$$
+
+where $f_k$ are **feature functions** (arbitrary functions of the previous tag, current tag,
+the whole sentence, and position), $\lambda_k$ are learned weights, and
+
+$$
+Z(\mathbf{x}) = \sum_{\mathbf{y}'} \exp\!\left( \sum_{t,k} \lambda_k f_k(y'_{t-1}, y'_t, \mathbf{x}, t) \right)
+$$
+
+is the **partition function**, a sum over all $K^T$ tag sequences.
+
+## Features
+
+A CRF can use any feature. Common ones for POS/NER:
+
+- Is the current word capitalized? (strong signal for proper nouns / entities)
+- Does the current word end in "-ing"? (often a verb)
+- Is the previous word "Mr."? (suggests a person name follows)
+- Is the current word in a gazetteer of known locations?
+
+These features all condition on $\mathbf{x}$, which is why a CRF can extract information
+the generative HMM cannot.
+
+## Computing $Z(\mathbf{x})$: the forward algorithm
+
+Direct summation over $K^T$ sequences is exponential. The chain factorization makes
+$Z(\mathbf{x})$ decomposable by dynamic programming.
+
+Define the **forward variable** $\alpha_t(j)$ as the sum of the unnormalized scores of
+all partial paths $(y_1, \dots, y_t)$ ending in state $j$:
+
+$$
+\alpha_1(j) = \exp\!\left( \sum_k \lambda_k f_k(\text{start}, j, \mathbf{x}, 1) \right),
+$$
+
+$$
+\alpha_t(j) = \sum_{i} \alpha_{t-1}(i) \cdot \exp\!\left( \sum_k \lambda_k f_k(i, j, \mathbf{x}, t) \right).
+$$
+
+Then $Z(\mathbf{x}) = \sum_j \alpha_T(j)$.
+
+The partition function runs in $O(TK^2)$, same as Viterbi.
+
+## Training: maximum conditional likelihood
+
+Minimize the negative log-likelihood on the labeled corpus:
+
+$$
+\mathcal{L}(\boldsymbol\lambda) = -\sum_{({\mathbf{x}}, {\mathbf{y}}) \in \mathcal{D}} \left[ \text{score}(\mathbf{x}, \mathbf{y}) - \log Z(\mathbf{x}) \right] + \frac{\mu}{2} \|\boldsymbol\lambda\|^2.
+$$
+
+The gradient with respect to $\lambda_k$ is:
+
+$$
+\frac{\partial \mathcal{L}}{\partial \lambda_k} = \mathbb{E}_{p(\mathbf{y}|\mathbf{x})}\left[\sum_t f_k(y_{t-1}, y_t, \mathbf{x}, t)\right] - \sum_t f_k(y_{t-1}^*, y_t^*, \mathbf{x}, t),
+$$
+
+i.e., the **expected feature count** under the model minus the **observed feature count**
+under the gold labels. L-BFGS or gradient descent minimizes this efficiently.
+
+## Decoding: Viterbi (same as HMM)
+
+Replace the HMM's $\log B_{j, x_t} + \log A_{ij}$ potential with the CRF's
+$\sum_k \lambda_k f_k(i, j, \mathbf{x}, t)$:
+
+$$
+v_t(j) = \max_i \bigl[ v_{t-1}(i) + \psi_t(i, j) \bigr], \quad
+\psi_t(i, j) = \sum_k \lambda_k f_k(i, j, \mathbf{x}, t).
+$$
+
+The Viterbi algorithm is otherwise identical.
+
+## A minimal CRF on toy data
+
+```python
+import numpy as np
+from scipy.special import logsumexp
+
+# Tags: 0=O, 1=B-PER, 2=I-PER
+# Features: (bias, word_is_capitalized, prev_is_O, prev_is_B, prev_is_I) -> per (y_prev, y_cur) pair
+# For simplicity: score(y_prev, y_cur, x_t) = T_matrix[y_prev, y_cur] + E[y_cur, x_t_feature]
+
+K = 3  # tags
+
+def forward(log_potentials):
+    """log_potentials[t, i, j] = log psi_t(i, j). Returns log Z."""
+    T = log_potentials.shape[0]
+    # alpha[j] = log sum_paths ending in j at step t
+    alpha = log_potentials[0, 0, :]  # assume start = tag 0
+    for t in range(1, T):
+        alpha = logsumexp(alpha[:, None] + log_potentials[t], axis=0)
+    return logsumexp(alpha)
+
+def viterbi(log_potentials):
+    """Returns the best path."""
+    T = log_potentials.shape[0]
+    v    = np.full((T, K), -np.inf)
+    psi  = np.zeros((T, K), dtype=int)
+    v[0] = log_potentials[0, 0, :]
+    for t in range(1, T):
+        scores = v[t - 1, :, None] + log_potentials[t]   # (K, K)
+        psi[t] = scores.argmax(axis=0)
+        v[t]   = scores.max(axis=0)
+    path = np.zeros(T, dtype=int)
+    path[-1] = v[-1].argmax()
+    for t in range(T - 2, -1, -1):
+        path[t] = psi[t + 1, path[t + 1]]
+    return path
+
+# Toy log potentials: favor O->B transition at t=1, B->I at t=2
+log_psi = np.array([
+    [[0, 2, -10], [-10, -10, -10], [-10, -10, -10]],   # t=1: from start (tag 0=O)
+    [[0, -10, -10], [-10, 0, 2], [-10, -10, 0]],         # t=2: B->I strong
+    [[0, -10, -10], [-10, 0, -10], [-10, -10, 2]],       # t=3: I->I or I->O
+], dtype=float)
+
+log_Z = forward(log_psi)
+path  = viterbi(log_psi)
+print(f"log Z = {log_Z:.3f}")
+print(f"Viterbi path: {['O','B-PER','I-PER'][y] for y in path}")
+```
+
+## CRF vs HMM: the key difference
+
+| Property | HMM | Linear-chain CRF |
+|----------|-----|-----------------|
+| Model type | Generative | Discriminative |
+| Conditions on | Current word only | Full sentence |
+| Features | Fixed (emission/transition) | Arbitrary |
+| Training | MLE counting | CML (gradient) |
+| Decoding | Viterbi | Viterbi (same) |
+
+Modern NER systems stack a CRF on top of a pre-trained transformer encoder (BERT+CRF):
+the encoder produces contextual embeddings for each token, and the CRF layer enforces
+BIO transition constraints during decoding.

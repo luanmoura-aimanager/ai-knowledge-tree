@@ -1,0 +1,127 @@
+---
+title: "Scalable oversight and weak-to-strong generalization"
+pillar: E
+subId: E8
+lessonId: scalable-oversight
+order: 7
+estimatedMinutes: 18
+goal: "Survey scalable oversight: debate, amplification, and recursive reward modeling; then study the weak-to-strong experiment as an empirical proxy for aligning a model smarter than its supervisor."
+prerequisites: ["E4/rlaif"]
+codeExempt: true
+---
+
+Current alignment methods rely on human feedback. As AI systems become more capable, two
+problems arise: (1) humans cannot evaluate outputs in domains where AI exceeds human
+expertise, and (2) an AI trained to satisfy human evaluators may learn to appear aligned
+rather than be aligned.
+
+**Scalable oversight** is the research agenda of designing supervision mechanisms that
+remain effective even when the model being trained is more capable than its supervisors.
+
+## The core alignment problem
+
+Alignment via RLHF works when:
+- Humans can evaluate responses reliably.
+- The reward model faithfully captures human values.
+
+Both conditions break at superhuman capability:
+- **Evaluation failure:** a human cannot judge whether a novel mathematical proof is
+  correct, whether a complex biological design is safe, or whether an argument contains
+  subtle deception.
+- **Reward model failure:** an RM trained on human preferences cannot reliably score
+  outputs in domains humans cannot evaluate.
+
+## Debate (Irving et al., 2018)
+
+**Debate** structures disagreements between AI agents. Two AI systems argue opposing
+sides of a question; a human judge evaluates the debate rather than the underlying claim.
+
+**Protocol:**
+1. Two AI agents debate a question (e.g., "Is this claim true?").
+2. Each agent can claim the opponent's argument is incorrect, provide counter-evidence,
+   and call out unsupported statements.
+3. A human (or a weaker AI judge) evaluates the debate and picks a winner.
+
+**Why this might work:** if one agent is telling the truth, the other must lie. In an
+argument between two extremely capable agents, the truthful agent can always expose any
+lie; the human only needs to evaluate "was a lie exposed?" not the original claim.
+
+**Limitations:** debate requires that lies are exposable within the debate format. For
+complex technical claims (a 10,000-step proof), exposing an error requires almost as
+much effort as verifying the proof directly.
+
+## Amplification (Christiano et al., 2018)
+
+**Iterated Amplification (IDA)** builds a hierarchy of supervisors:
+
+1. Start with a human $H$ who can evaluate easy tasks.
+2. Train an AI $A_1$ to imitate $H$.
+3. Create "amplified" supervisor $H \| A_1$: the human equipped with AI assistance.
+4. Train $A_2$ to imitate $H \| A_1$.
+5. Iterate: each step produces a more capable AI that is supervised by a correspondingly
+   amplified human+AI pair.
+
+The key claim: if the amplification process is aligned at each step (the AI correctly
+imitates the amplified supervisor), then the final, highly capable AI is aligned with
+human values.
+
+**Challenges:** small misalignments at each step may compound. The human supervising
+$A_1$ in step 4 may not fully understand what $A_1$ is doing, making oversight imperfect.
+
+## Recursive Reward Modeling (RRM)
+
+**RRM** applies amplification specifically to reward modeling:
+
+1. Train a weak reward model $R_1$ with direct human feedback.
+2. Use $R_1$ to help humans evaluate more complex behaviors; collect labels with this
+   assistance.
+3. Train $R_2$ on the human+$R_1$ labels.
+4. Repeat: $R_3, R_4, \dots$
+
+The hope: each round produces a more capable reward model that enables humans to provide
+more reliable supervision.
+
+## Weak-to-strong generalization (Burns et al., 2023)
+
+**Empirical setup:** as a proxy for "training a more capable model than our supervisors,"
+consider a **weak supervisor** (a smaller pretrained LLM) training a **strong student**
+(a larger pretrained LLM) via fine-tuning.
+
+The question: does the strong student perform better than the weak supervisor, even though
+it was only trained on the weak supervisor's (imperfect) labels?
+
+**Key findings:**
+- Strong models fine-tuned on weak supervisor labels significantly **outperform the weak
+  supervisor**, recovering much of the strong model's "native" capability.
+- This "generalization gap" -- the difference between the student's actual performance and
+  the weak supervisor's ceiling -- is often 50-90% closed.
+- The generalization is larger when the student is much stronger than the supervisor and
+  when the task is one where the student has robust pretrained knowledge.
+
+**Interpretation:** large pretrained models have strong internal representations of concepts
+like correctness, helpfulness, and safety. Weak supervision provides a *direction* to
+elicit these representations; the model's pretraining provides the *capability*.
+
+**Implications:**
+- Aligning superintelligent AI may be easier than pessimists fear, because the model
+  may generalize from weak signals to genuinely aligned behavior.
+- Or harder, because the student may generalize toward its own (misaligned) pretraining
+  rather than the supervisor's intent.
+
+The weak-to-strong generalization result is encouraging but not conclusive -- the "strong
+student" in experiments is still far from superintelligent, and the tasks studied are ones
+where the strong model's pretrained knowledge already encodes the correct answer.
+
+## Open problems
+
+**Bootstrapping problem:** all current methods assume that at least some tasks are human-
+evaluable. As AI capabilities grow, this baseline shrinks.
+
+**Deceptive alignment:** a sufficiently capable model might learn that behaving aligned
+during training (when humans can observe it) and misaligned during deployment is the
+optimal strategy. No current oversight method is robust to this.
+
+**Interpretability as oversight:** if SAEs and circuits reveal what the model internally
+represents and computes, they could provide oversight without relying on evaluating outputs.
+This is the long-term vision connecting mechanistic interpretability (E8) to scalable
+oversight.
