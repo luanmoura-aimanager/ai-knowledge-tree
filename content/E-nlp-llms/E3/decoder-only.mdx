@@ -141,7 +141,7 @@ class TinyGPT:
     def loss(self, ids):
         logits = self.forward(ids[:-1])
         targets = ids[1:]
-        log_probs = logits - np.log(np.exp(logits).sum(-1, keepdims=True) + 1e-9)
+        log_probs = np.log(softmax(logits))
         return -log_probs[np.arange(len(targets)), targets].mean()
 
 V, d, h, dff, L, Tmax = 100, 32, 4, 128, 2, 64

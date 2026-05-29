@@ -69,7 +69,7 @@ class LSTMCell:
         # All four gates in one matrix for efficiency
         self.W = rng.normal(0, scale, (4 * m, concat_dim))
         self.b = np.zeros(4 * m)
-        self.b[m:2*m] = 1.0   # forget gate bias init = 1
+        self.b[0:m] = 1.0     # forget gate bias init = 1
         self.m = m
 
     def forward(self, x, h_prev, c_prev):

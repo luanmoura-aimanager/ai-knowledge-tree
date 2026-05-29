@@ -190,7 +190,7 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       id: "rlaif",
       title: "Constitutional AI and RLAIF",
       goal: "Replace human feedback with AI feedback: have a supervisor model critique and revise responses using a written constitution, then train the policy with RL.",
-      prerequisites: ["dpo"],
+      prerequisites: ["ppo-rlhf"],
       codeExempt: true,
     },
     {
@@ -273,7 +273,7 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       id: "chain-of-thought",
       title: "Chain-of-thought and self-consistency",
       goal: "Elicit multi-step reasoning with few-shot CoT prompting; then sample multiple reasoning paths and majority-vote the final answer (self-consistency).",
-      prerequisites: ["function-calling"],
+      prerequisites: [],
     },
     {
       id: "react-agents",

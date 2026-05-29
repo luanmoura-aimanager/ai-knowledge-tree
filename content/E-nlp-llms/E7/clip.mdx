@@ -82,11 +82,11 @@ def clip_loss(image_embs, text_embs, log_temp=np.log(1/0.07)):
     labels = np.arange(len(image_embs))
 
     # Image-to-text loss
-    log_probs_i2t = logits - np.log(np.exp(logits).sum(axis=1, keepdims=True) + 1e-9)
+    log_probs_i2t = np.log(softmax(logits, axis=1))
     loss_i2t = -log_probs_i2t[labels, labels].mean()
 
     # Text-to-image loss
-    log_probs_t2i = logits.T - np.log(np.exp(logits.T).sum(axis=1, keepdims=True) + 1e-9)
+    log_probs_t2i = np.log(softmax(logits.T, axis=1))
     loss_t2i = -log_probs_t2i[labels, labels].mean()
 
     return (loss_i2t + loss_t2i) / 2
