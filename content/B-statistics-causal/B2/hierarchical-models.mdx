@@ -95,7 +95,7 @@ group_means = np.array([d.mean() for d in data])
 
 # Plug-in hyperparameters (in practice estimated by EM or MCMC)
 grand_mean = np.concatenate(data).mean()
-tau2_hat   = max(group_means.var() - sigma_true**2 / ns.mean(), 0.1)
+tau2_hat   = max(group_means.var() - sigma_true**2 * np.mean(1/ns), 0.1)
 sigma2     = sigma_true**2
 
 # Partial-pooling estimates

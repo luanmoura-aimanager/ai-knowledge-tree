@@ -101,7 +101,7 @@ for _ in range(1000):
     b = rng.normal(5, 2, n_B)
     c = np.concatenate([a, b])
     obs = a.mean() - b.mean()
-    cnt = sum(abs(rng.permutation(c)[:n_A].mean() - rng.permutation(c)[n_A:].mean()) >= abs(obs)
+    cnt = sum(abs((p := rng.permutation(c))[:n_A].mean() - p[n_A:].mean()) >= abs(obs)
               for _ in range(199))
     perm_type1 += (cnt + 1) / 200 < 0.05
 print(f"Permutation Type I error: {perm_type1/1000:.3f}  (target 0.05)")

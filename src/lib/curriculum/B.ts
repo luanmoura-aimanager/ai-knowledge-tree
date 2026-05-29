@@ -151,7 +151,7 @@ export const B_CURRICULUM: Record<string, Lesson[]> = {
       id: "scm-dags",
       title: "Structural causal models and DAGs",
       goal: "Write a structural causal model as a DAG with structural equations; distinguish causes from associations and read intervention effects from the graph.",
-      prerequisites: ["potential-outcomes", "A2/markov-chains"],
+      prerequisites: ["potential-outcomes"],
     },
     {
       id: "d-separation",

@@ -115,7 +115,7 @@ print(f"Backdoor adj ATE: {ate_adj:.4f}")
 
 # Frontdoor: U -> X, X -> M -> Y, U -> Y  (U unobserved)
 U = rng.normal(0, 1, n)
-X2 = (rng.normal(0, 1, n) > 0).astype(float)     # X not confounded by U
+X2 = (0.8 * U + rng.normal(0, 1, n) > 0).astype(float)  # X confounded by U
 M  = 1.5 * X2 + rng.normal(0, 0.5, n)             # mediator
 Y2 = 2.0 * M + 0.8 * U + rng.normal(0, 0.5, n)   # Y confounded by U
 

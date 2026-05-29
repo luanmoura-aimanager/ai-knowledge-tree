@@ -6,7 +6,7 @@ lessonId: scm-dags
 order: 2
 estimatedMinutes: 22
 goal: "Write a structural causal model as a DAG with structural equations; distinguish causes from associations and read intervention effects from the graph."
-prerequisites: ["potential-outcomes", "A2/markov-chains"]
+prerequisites: ["potential-outcomes"]
 ---
 
 The potential outcomes framework is a calculus for causal effects. Structural causal
@@ -112,7 +112,6 @@ true_ate = (Y_do1 - Y_do0).mean()
 print(f"Interventional ATE: {true_ate:.4f}")
 
 # Conditional on C (adjusting for confounder)
-from numpy.polynomial import polynomial as P
 bins = np.percentile(C, [0, 25, 50, 75, 100])
 strata_ates = []
 for lo, hi in zip(bins[:-1], bins[1:]):
