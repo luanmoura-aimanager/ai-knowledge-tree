@@ -17,6 +17,7 @@ function loadMermaid() {
           primaryTextColor: "#e6e9f5",
           lineColor: "#9aa3c7",
           fontFamily: "ui-monospace, monospace",
+          fontSize: "15px",
         },
       });
       return m.default;
