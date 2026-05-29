@@ -267,6 +267,10 @@ This is the workflow for every new pillar. Follow it in order.
    Use `/code-review` (the bundled skill) to review the branch. Apply all confirmed
    and plausible findings, push a fix commit, then merge.
 
+6. **Always end by printing the PR link.**
+   After opening the PR (step 4) and after pushing any fix commits (step 5), print
+   the full GitHub PR URL so the user can navigate directly to it.
+
 ### Add a topic / subsection / connection / path
 Edit the relevant array in `src/lib/dag.ts`. Add `shortName` for new pillars and
 bump the graph grid (`cols`/`rows`) if you exceed 10 pillars.
