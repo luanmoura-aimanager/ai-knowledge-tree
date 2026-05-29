@@ -1,0 +1,134 @@
+---
+title: "Latent diffusion"
+pillar: D
+subId: D4
+lessonId: latent-diffusion
+order: 8
+estimatedMinutes: 14
+goal: "Run diffusion in a VAE's latent space (Stable Diffusion) and condition on text via cross-attention."
+prerequisites: ["diffusion", "vae-variants"]
+codeExempt: true
+---
+
+Pixel-space diffusion is expensive: 1000 steps × a forward pass on a
+$512 \times 512$ image is not feasible at scale. **Latent diffusion**
+(Rombach et al., 2022) runs the diffusion process in the lower-dimensional
+latent space of a pretrained autoencoder, then decodes the final latent
+to pixels. Stable Diffusion is the canonical example; the same recipe
+underlies every modern open-source text-to-image system.
+
+## The two-stage architecture
+
+**Stage 1: train an autoencoder.**
+
+- Encoder $E$ maps $x \in \mathbb{R}^{3 \times 512 \times 512}$ to a
+  latent $z \in \mathbb{R}^{4 \times 64 \times 64}$ (64× spatial
+  compression in pixel count, 192× in floats).
+- Decoder $D$ maps $z$ back to pixels.
+- Trained with VAE + perceptual + adversarial losses for high
+  reconstruction fidelity.
+- The autoencoder is frozen for stage 2.
+
+**Stage 2: train a diffusion model in latent space.**
+
+- Forward process: add noise to $z_0 = E(x_0)$ to get $z_t$.
+- Denoiser $\epsilon_\theta(z_t, t, c)$ predicts the noise, conditioned
+  on text $c$.
+- Loss: $\lVert \epsilon - \epsilon_\theta(z_t, t, c)\rVert^2$.
+- Sampling: start from $z_T \sim \mathcal{N}(0, I)$, denoise to $z_0$,
+  decode with $D$.
+
+The diffusion runs at $64 \times 64$ resolution instead of $512 \times 512$:
+**64× cheaper per step**.
+
+## Text conditioning
+
+Use a frozen text encoder (CLIP or T5) to embed the prompt into a
+sequence of token vectors. Inside the denoiser U-Net, add
+**cross-attention** layers where queries come from the image latent
+and keys/values come from the text embeddings:
+
+$$
+\text{CrossAttn}(z, c) = \operatorname{softmax}\!\left(\frac{(zW_Q)(cW_K)^\top}{\sqrt{d}}\right) cW_V.
+$$
+
+The denoiser learns to produce noise predictions that move the latent
+toward "image matches the text prompt".
+
+## Classifier-free guidance for text
+
+At training time, randomly drop the text condition (replace $c$ with
+an empty embedding) for ~10% of examples. At sampling time:
+
+$$
+\tilde \epsilon = (1 + w)\, \epsilon_\theta(z_t, t, c) - w\, \epsilon_\theta(z_t, t, \emptyset).
+$$
+
+Higher guidance scale $w$ sharpens the prompt adherence at the cost
+of variety. Typical $w \in [5, 12]$.
+
+## The denoiser U-Net
+
+The architecture used inside latent diffusion is a U-Net (D2 lesson):
+
+- Encoder downsamples in latent space.
+- Decoder upsamples with skip connections.
+- **Cross-attention** at each resolution mixes in text features.
+- **Self-attention** at low resolutions for long-range coherence.
+- **Time embedding** (sinusoidal + MLP) added to every feature map.
+
+Newer models (SD 3, SDXL, FLUX) use **Diffusion Transformers (DiT)**
+that replace the U-Net with a Transformer over latent patches, mirroring
+the ViT-vs-CNN trajectory.
+
+## Stable Diffusion model family
+
+- **SD 1.x**: U-Net, ~860M parameters in the U-Net, CLIP text encoder.
+  The reference open-source text-to-image model.
+- **SD 2.x**: switches to OpenCLIP and a v-parameterization for the
+  loss.
+- **SDXL**: larger U-Net + dual text encoders + refinement model.
+- **SD 3**: Diffusion Transformer + flow matching (next lesson) +
+  multimodal text encoder.
+- **FLUX, Imagen, DALL-E 3**: closed-source competitors with similar
+  recipes.
+
+## Image-to-image and inpainting
+
+Latent diffusion easily supports edits:
+
+- **Image-to-image**: start from $z_0 = E(x_{\text{prompt-image}})$,
+  add noise to a controlled timestep $t$, denoise from there. Smaller
+  $t$ preserves more of the prompt image.
+- **Inpainting**: mask part of the latent and replace with noise; the
+  denoiser fills in the masked region while respecting the unmasked
+  context.
+- **ControlNet** (Zhang et al., 2023): condition diffusion on auxiliary
+  signals (depth maps, edge maps, pose skeletons) via a sidecar
+  network.
+
+These compose with the same underlying diffusion model, so a single
+trained checkpoint serves many generation tasks.
+
+## What latent diffusion gave us
+
+Open-source, high-quality text-to-image generation at consumer
+hardware speeds. The Stable Diffusion 1.x release (August 2022)
+democratized image generation: anyone with a midrange GPU could
+generate, fine-tune, and remix. The downstream ecosystem (LoRA fine-
+tunes, ControlNets, custom checkpoints) is enormous.
+
+The same recipe powers latent **video** diffusion (Sora, Veo) and
+latent **audio** diffusion (AudioLDM).
+
+## Limits and current research
+
+- **Sampling speed**: still 20-50 steps in practice. Distillation
+  (consistency models, next lesson) brings this to 1-4 steps.
+- **Fine control**: prompt engineering is still finicky; reliable text
+  rendering, complex compositions, and precise control are open
+  problems.
+- **Long-form video**: temporal consistency over minutes is hard.
+
+The next lesson covers the continuous-time framework that's overtaking
+DDPM-style discrete diffusion: flow matching and rectified flow.

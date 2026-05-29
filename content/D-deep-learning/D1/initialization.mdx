@@ -1,0 +1,158 @@
+---
+title: "Xavier and He initialization"
+pillar: D
+subId: D1
+lessonId: initialization
+order: 6
+estimatedMinutes: 18
+goal: "Derive the variance-preserving initialization rules for tanh and ReLU networks, and see why bad initialization stalls training."
+prerequisites: ["activations"]
+---
+
+A randomly-initialized network's forward pass is a sequence of linear
+maps; its output variance grows or shrinks geometrically with depth
+unless each layer's variance is carefully matched to the activation that
+follows. **Xavier** (Glorot) for tanh and **He** for ReLU give the
+variance-preserving formulas. Bad initialization stalls training before
+gradient descent has a chance.
+
+## The variance-propagation problem
+
+Treat the inputs to layer $\ell$ as zero-mean random variables with
+variance $\operatorname{Var}(h^{(\ell-1)}_j) = v_{\ell-1}$. After the
+linear map $z^{(\ell)} = W^{(\ell)} h^{(\ell-1)}$, assuming independent
+zero-mean weights with variance $\sigma_W^2$:
+
+$$
+\operatorname{Var}(z^{(\ell)}_i) = d_{\ell-1}\, \sigma_W^2\, v_{\ell-1},
+$$
+
+where $d_{\ell-1}$ is the input dimension. If we want $\operatorname{Var}(z^{(\ell)}_i) = v_{\ell-1}$,
+the weight variance must be
+
+$$
+\sigma_W^2 = \frac{1}{d_{\ell-1}}.
+$$
+
+For the activation that follows, the variance contracts or expands by a
+factor that depends on the nonlinearity, which is where Xavier and He
+differ.
+
+## Xavier (Glorot) for tanh and sigmoid
+
+For tanh, around zero $\tanh(z) \approx z$, so the activation
+approximately preserves variance for small inputs. The Glorot
+initialization compromises between forward variance preservation
+(needs $\sigma_W^2 = 1/d_{\ell-1}$) and backward variance preservation
+(needs $\sigma_W^2 = 1/d_\ell$) by averaging:
+
+$$
+\sigma_W^2 = \frac{2}{d_{\ell-1} + d_\ell}.
+$$
+
+In code: $W_{ij} \sim \mathcal{N}(0, \sigma_W^2)$ or
+$W_{ij} \sim \text{Uniform}(-\sqrt{6/(d_{\ell-1} + d_\ell)},\ \sqrt{6/(d_{\ell-1} + d_\ell)})$.
+
+## He for ReLU
+
+ReLU zeros out the negative half of its inputs. For a zero-mean Gaussian
+$z$, $\mathbb{E}[\operatorname{ReLU}(z)^2] = \mathbb{E}[z^2]/2 = \operatorname{Var}(z)/2$.
+So ReLU halves the variance. To compensate, the weight variance must
+*double*:
+
+$$
+\sigma_W^2 = \frac{2}{d_{\ell-1}}.
+$$
+
+In code: $W_{ij} \sim \mathcal{N}(0, 2/d_{\ell-1})$. He initialization is
+the standard for any ReLU-family network (including GELU and Swish, which
+behave similarly enough that He's factor of 2 is a fine default).
+
+## Why bad initialization stalls
+
+If $\sigma_W^2$ is too small, $\operatorname{Var}(z^{(\ell)})$ shrinks
+geometrically: by layer 10, activations are vanishingly small, and the
+backward pass propagates zero gradients. The network is a constant
+function in practice; no learning happens.
+
+If $\sigma_W^2$ is too large, $\operatorname{Var}(z^{(\ell)})$ grows
+geometrically: by layer 10, activations saturate the nonlinearity (for
+tanh) or land in extreme regions (for ReLU). Backward gradients are
+unstable. Loss is NaN within a few steps.
+
+The right initialization keeps the variance roughly constant across
+layers, so a 30-layer network has the same activation scale at layer 30
+as at layer 1.
+
+## What changed with normalization
+
+Once **BatchNorm** or **LayerNorm** is inserted between layers, the
+initialization matters much less: normalization layers actively rescale
+activations to mean-zero, variance-one regardless of what came before.
+Modern networks rely on this safety net, so they can be slightly more
+forgiving with initialization than pre-normalization architectures.
+
+But the principle still applies: without normalization, careful
+initialization is the difference between a network that trains and one
+that does not.
+
+## Initialization for biases and special layers
+
+- **Biases**: initialize to zero, almost always.
+- **Output layer for classification**: same rule as hidden layers; the
+  softmax will sort itself out.
+- **Output layer for regression**: zero-init the weights so initial
+  predictions are zero; the loss then comes purely from the target.
+- **LSTM/GRU forget gates**: initialize bias to a positive value
+  ($+1$ or $+2$) so the gates start mostly open and gradients propagate.
+- **Transformer attention output projection**: zero-init or small init
+  helps stability in early training (used in many recent recipes).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def run_network(init_fn, depth=20, width=256, n_samples=1024, activation="relu"):
+    """Propagate random unit-variance inputs through `depth` layers with
+    the given initialization, and report the per-layer activation variance."""
+    X = rng.normal(size=(n_samples, width))
+    var = [X.var()]
+    h = X
+    for _ in range(depth):
+        W = init_fn(width, width, rng)
+        z = h @ W
+        if activation == "relu":
+            h = np.maximum(0, z)
+        elif activation == "tanh":
+            h = np.tanh(z)
+        var.append(h.var())
+    return var
+
+def naive(in_dim, out_dim, rng): return rng.normal(scale=0.05, size=(in_dim, out_dim))
+def xavier(in_dim, out_dim, rng):
+    return rng.normal(scale=np.sqrt(2 / (in_dim + out_dim)), size=(in_dim, out_dim))
+def he(in_dim, out_dim, rng):
+    return rng.normal(scale=np.sqrt(2 / in_dim), size=(in_dim, out_dim))
+
+# ReLU network: He should keep variance stable, others should shrink/grow
+print("Per-layer activation variance (depth=20, ReLU):")
+for name, fn in [("naive 0.05", naive), ("Xavier", xavier), ("He", he)]:
+    v = run_network(fn, activation="relu")
+    print(f"  {name:>10}: layer 0={v[0]:.3f}, layer 5={v[5]:.3f}, "
+          f"layer 10={v[10]:.3f}, layer 20={v[20]:.3f}")
+
+print("\nPer-layer activation variance (depth=20, tanh):")
+for name, fn in [("naive 0.05", naive), ("Xavier", xavier), ("He", he)]:
+    v = run_network(fn, activation="tanh")
+    print(f"  {name:>10}: layer 0={v[0]:.3f}, layer 5={v[5]:.3f}, "
+          f"layer 10={v[10]:.3f}, layer 20={v[20]:.3f}")
+```
+
+He keeps variance stable across the depth of a ReLU network; Xavier
+matches it for tanh. Naive small-scale initialization collapses variance
+to zero within a few layers. The next lesson installs normalization
+layers that make the network self-stabilizing even when initialization
+is imperfect.

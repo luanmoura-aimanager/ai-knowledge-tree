@@ -1,0 +1,162 @@
+---
+title: "Equivariant and geometric deep learning"
+pillar: D
+subId: D6
+lessonId: equivariant-dl
+order: 5
+estimatedMinutes: 14
+goal: "Build networks whose outputs transform predictably under symmetry groups (E(3)-equivariant nets for molecules)."
+prerequisites: ["graph-basics"]
+codeExempt: true
+---
+
+When data has a symmetry (a molecule looks the same after rotation; a
+prediction should not depend on the choice of coordinate frame), the
+network should *respect* that symmetry by construction. **Equivariant
+neural networks** are architectures whose outputs transform predictably
+under symmetry group actions. For physical sciences (chemistry,
+materials, physics, robotics) they are now state-of-the-art.
+
+## Equivariance and invariance
+
+For a group $G$ acting on inputs and outputs:
+
+- $f$ is **invariant** if $f(g \cdot x) = f(x)$ for all $g \in G$.
+- $f$ is **equivariant** if $f(g \cdot x) = g \cdot f(x)$.
+
+For molecule property prediction (a single scalar output), the task is
+invariant under E(3) = rotations + translations + reflections of the
+input coordinates. For force prediction (output is a vector), the task
+is equivariant: rotating the molecule rotates the forces.
+
+A standard MLP applied to raw coordinates is neither invariant nor
+equivariant. You can attempt to learn the symmetry from data, but that
+wastes capacity and generalizes poorly.
+
+## Why equivariance helps
+
+Three reasons:
+
+- **Sample efficiency**: the model doesn't need to see every rotation
+  of every molecule to predict on rotated molecules.
+- **Generalization**: predictions on novel rotations are exact, not
+  approximate.
+- **Inductive bias**: the architecture encodes a physical truth about
+  the data.
+
+For molecules, equivariant networks beat non-equivariant ones at the
+same parameter count, often by orders of magnitude in data efficiency.
+
+## Simple invariant features
+
+The easiest way to get invariance: feed the network only **invariant
+features** of the input.
+
+For 3D points $\{r_i\}$:
+
+- Pairwise distances $\lVert r_i - r_j\rVert$ (translation- and
+  rotation-invariant).
+- Angles formed by triples of points.
+- Dihedral angles formed by quadruples.
+
+A GNN where messages depend only on these invariant features is
+invariant by construction. **SchNet** (Schütt et al., 2018) does this:
+the message function uses radial-basis-expanded distances.
+
+This works well for small molecules and properties that depend on
+internal structure. It loses information when global orientation
+matters.
+
+## Equivariant networks: E(3)-equivariant message passing
+
+**E(3)** = rotations + translations + reflections in 3D.
+
+Make the messages and updates respect the group action:
+
+- Node features are split into **invariant scalars** and **equivariant
+  vectors** (or higher-order tensors).
+- Messages are constructed so vector outputs rotate when inputs rotate.
+- Updates respect this decomposition.
+
+Several architectures:
+
+- **EGNN** (Satorras et al., 2021): simple equivariant message passing
+  with explicit position updates. Easy to implement.
+- **NequIP** (Batzner et al., 2022): higher-order spherical-harmonic
+  features for force-field prediction. State of the art for molecular
+  dynamics.
+- **MACE** (Batatia et al., 2022): high-body-order equivariant
+  features for chemistry.
+- **eSCN, EquiFormer**: equivariant Transformers with attention
+  generalized to the equivariant setting.
+
+## What this enables
+
+**Molecular property prediction**: equivariant GNNs are state of the
+art on QM9, Open Catalyst, OC20, and other chemistry benchmarks.
+
+**Molecular dynamics with learned force fields**: equivariant nets can
+replace expensive DFT calculations for predicting forces in simulations
+of materials and molecules. This is a huge deal for chemistry and
+materials science.
+
+**Protein structure prediction**: AlphaFold 2's architecture, while not
+strictly E(3)-equivariant, takes inspiration from equivariant ideas
+(its invariant point attention layer).
+
+**Particle physics, astrophysics**: rotationally-invariant tasks
+benefit similarly.
+
+## Steerable equivariance
+
+The mathematically richest approach (Cohen & Welling, 2016; Weiler et
+al., 2018): use **steerable features** that decompose into irreducible
+representations of the group.
+
+For SO(3) (rotations), irreducible representations are indexed by
+order $\ell$ (the same $\ell$ as in spherical harmonics). Features of
+order 0 are scalars (invariant); features of order 1 are vectors;
+features of order 2 are second-order tensors; etc.
+
+Equivariant tensor operations (tensor products with Clebsch-Gordan
+coefficients) combine features of different orders in a way that
+respects rotation. This gives architectures with strong mathematical
+guarantees and impressive empirical performance.
+
+The downside: implementation is more complex than EGNN-style
+"equivariant message passing" with just vectors.
+
+## Beyond physics: equivariance in other domains
+
+- **Sets and permutations**: any set-input task should be permutation-
+  equivariant. DeepSets and most GNNs are built this way.
+- **Lattice symmetries**: for crystals and physics simulations, lattice
+  groups (cubic, hexagonal) drive equivariant networks.
+- **Lie group equivariance**: G-CNNs generalize 2D translation
+  equivariance (from CNNs) to arbitrary Lie group actions on images.
+
+## Practical recipe
+
+For a chemistry / 3D-data project:
+
+1. **Start with EGNN or NequIP** as a baseline. Simple, strong.
+2. **Use steerable architectures (MACE, Equiformer)** if you have
+   compute and need the last few percent.
+3. **Use specialized libraries** (e3nn, EquiformerV2) for steerable
+   features.
+
+For non-physics graphs without 3D coordinates, equivariance is less
+relevant and standard GNNs (GCN, GAT, Graph Transformers) win.
+
+## The bigger picture
+
+Equivariant networks formalize the idea that **architectures should
+respect the symmetries of the problem**. CNNs respect translation
+symmetry; GNNs respect permutation symmetry; E(3)-equivariant nets
+respect 3D rotation+translation+reflection.
+
+This thread (geometric deep learning) is a unifying view of deep
+learning architectures, and it has become a research field of its own.
+
+This closes the D6 GNN track. The final D7 subsection covers the
+training-systems infrastructure that makes large deep learning possible.

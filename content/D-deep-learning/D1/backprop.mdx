@@ -1,0 +1,172 @@
+---
+title: "Backpropagation"
+pillar: D
+subId: D1
+lessonId: backprop
+order: 2
+estimatedMinutes: 22
+goal: "Derive backprop as the reverse-mode chain rule on the computational graph of an MLP."
+prerequisites: ["mlp-forward"]
+---
+
+The forward pass computes $\hat y$ from $x$ and the parameters; training
+needs the derivative of the loss with respect to every parameter. The
+naive approach (finite differences, or one chain-rule application per
+parameter) is $O(P)$ forward passes for $P$ parameters: infeasible at
+modern scale. **Backpropagation** computes all $P$ gradients with a
+single backward pass, by reusing partial derivatives.
+
+## The setup: a computational graph
+
+A neural network is a **directed acyclic graph** of operations. Each node
+is a tensor; each edge is a function. For an MLP:
+
+$$
+z^{(\ell)} = W^{(\ell)} h^{(\ell-1)} + b^{(\ell)}, \qquad h^{(\ell)} = \sigma(z^{(\ell)}).
+$$
+
+The loss $\mathcal{L}$ is a function of the final output. Backprop walks
+this graph in reverse, accumulating gradients via the chain rule.
+
+## The chain rule on the graph
+
+Define the **upstream gradient** at any node $v$ as $\bar v = \partial \mathcal{L}/\partial v$.
+For a node $v$ that affects $\mathcal{L}$ only through its children $c_1, \dots, c_m$:
+
+$$
+\bar v = \sum_i \bar c_i \cdot \frac{\partial c_i}{\partial v}.
+$$
+
+This is the single law of backprop. To compute it efficiently, traverse
+the graph in **reverse topological order**: a node's gradient is computed
+only after all its children's gradients are known.
+
+## Per-layer derivatives
+
+For a linear layer $z = W h + b$ with downstream gradient $\bar z$:
+
+$$
+\bar W = \bar z\, h^\top, \qquad \bar b = \bar z, \qquad \bar h = W^\top \bar z.
+$$
+
+*Where these come from.* For the matrix entry $W_{ij}$,
+$\partial z_i/\partial W_{ij} = h_j$, so $\bar W_{ij} = \bar z_i\, h_j$,
+which is the outer product. For the bias, $\partial z_i/\partial b_i = 1$.
+For the input, $\partial z_i/\partial h_j = W_{ij}$, summed gives
+$W^\top \bar z$.
+
+For an elementwise nonlinearity $h = \sigma(z)$:
+
+$$
+\bar z = \bar h \odot \sigma'(z),
+$$
+
+where $\odot$ is elementwise multiplication. For ReLU, $\sigma'(z) = \mathbf{1}[z > 0]$;
+for sigmoid, $\sigma(z)(1 - \sigma(z))$; for tanh, $1 - \tanh^2(z)$.
+
+For the softmax + cross-entropy loss at the output (with one-hot true
+label $y$):
+
+$$
+\bar z^{(L)} = \hat y - y,
+$$
+
+a famously clean gradient. The exponential / log-of-softmax algebra
+collapses into a single residual.
+
+## The full backward pass
+
+For an $L$-layer MLP:
+
+1. **Forward.** Compute $h^{(0)}, z^{(1)}, h^{(1)}, \dots, z^{(L)}, \hat y, \mathcal{L}$.
+2. **Backward.** Start with $\bar z^{(L)} = \hat y - y$. For $\ell = L, L-1, \dots, 1$:
+   - $\bar W^{(\ell)} = \bar z^{(\ell)}\, h^{(\ell-1)\top}$
+   - $\bar b^{(\ell)} = \bar z^{(\ell)}$
+   - $\bar h^{(\ell-1)} = W^{(\ell)\top}\, \bar z^{(\ell)}$
+   - $\bar z^{(\ell-1)} = \bar h^{(\ell-1)} \odot \sigma'(z^{(\ell-1)})$
+
+Both passes have the same asymptotic cost (linear in parameter count).
+This is the **fundamental fact** of backprop: gradients cost no more than
+the forward pass, up to a constant factor.
+
+## Why it works
+
+The chain rule alone gives the answer in any order. The reverse traversal
+is the key efficiency: each partial derivative $\partial c/\partial v$ is
+computed exactly once, then multiplied by the already-computed $\bar c$.
+A forward traversal (forward-mode autodiff) would compute one column of
+the Jacobian per pass, costing $O(P)$ passes total; reverse mode
+computes one row (the gradient of the scalar loss) in one pass.
+
+For scalar-output networks, reverse mode is the right choice. For
+networks with many outputs and few inputs (rare in deep learning),
+forward mode wins.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Tiny 2-layer MLP: 3 -> 4 -> 2, softmax + cross-entropy loss
+N, d, h_dim, K = 20, 3, 4, 2
+X = rng.normal(size=(N, d))
+y = rng.integers(0, K, size=N)
+Y = np.eye(K)[y]                                  # one-hot
+
+W1 = rng.normal(scale=0.3, size=(d, h_dim))
+b1 = np.zeros(h_dim)
+W2 = rng.normal(scale=0.3, size=(h_dim, K))
+b2 = np.zeros(K)
+
+def relu(z):       return np.maximum(0.0, z)
+def relu_grad(z):  return (z > 0).astype(float)
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)
+    e = np.exp(z); return e / e.sum(axis=1, keepdims=True)
+
+# Forward
+z1 = X @ W1 + b1
+h1 = relu(z1)
+z2 = h1 @ W2 + b2
+p  = softmax(z2)
+loss = -np.mean(np.log(p[np.arange(N), y] + 1e-12))
+
+# Backward
+dz2 = (p - Y) / N                                  # softmax + CE collapse
+dW2 = h1.T @ dz2
+db2 = dz2.sum(axis=0)
+dh1 = dz2 @ W2.T
+dz1 = dh1 * relu_grad(z1)
+dW1 = X.T @ dz1
+db1 = dz1.sum(axis=0)
+
+# Verify each analytic gradient against finite differences
+def loss_for(params):
+    W1_, b1_, W2_, b2_ = params
+    z1 = X @ W1_ + b1_; h1 = relu(z1)
+    z2 = h1 @ W2_ + b2_; p = softmax(z2)
+    return -np.mean(np.log(p[np.arange(N), y] + 1e-12))
+
+def finite_diff(arr, name):
+    fd = np.zeros_like(arr); eps = 1e-5
+    flat = arr.ravel()
+    for i in range(flat.size):
+        delta = np.zeros_like(flat); delta[i] = eps
+        arr_p = (flat + delta).reshape(arr.shape)
+        arr_m = (flat - delta).reshape(arr.shape)
+        params_plus  = [arr_p if n == name else p for n, p in zip(["W1","b1","W2","b2"], [W1, b1, W2, b2])]
+        params_minus = [arr_m if n == name else p for n, p in zip(["W1","b1","W2","b2"], [W1, b1, W2, b2])]
+        fd.ravel()[i] = (loss_for(params_plus) - loss_for(params_minus)) / (2 * eps)
+    return fd
+
+fd_W1 = finite_diff(W1, "W1")
+print(f"max |analytic - finite diff| for W1: {np.max(np.abs(dW1 - fd_W1)):.2e}")
+fd_W2 = finite_diff(W2, "W2")
+print(f"max |analytic - finite diff| for W2: {np.max(np.abs(dW2 - fd_W2)):.2e}")
+```
+
+The analytic gradients match finite differences to floating-point
+precision, confirming the backward pass. The next lesson generalizes this
+hand-derived routine into an automatic differentiation engine.

@@ -1,0 +1,148 @@
+---
+title: "State space models and Mamba"
+pillar: D
+subId: D3
+lessonId: state-space-models
+order: 8
+estimatedMinutes: 16
+goal: "Replace attention with structured state space models (S4, Mamba) for linear-time sequence mixing."
+prerequisites: ["transformer-arch"]
+codeExempt: true
+---
+
+Self-attention is $O(N^2)$ in sequence length and quickly becomes a
+bottleneck. **State space models (SSMs)** offer a different
+sequence-mixing operation that runs in $O(N)$ time and $O(N)$ memory
+while matching or beating Transformer quality on long-context tasks.
+The line runs from continuous-time linear systems through S4 to Mamba,
+which is the modern hardware-aware variant powering long-context
+language models.
+
+## The starting point: linear state space systems
+
+A continuous-time linear SSM maps input $u(t) \in \mathbb{R}$ to output
+$y(t) \in \mathbb{R}$ via a hidden state $h(t) \in \mathbb{R}^d$:
+
+$$
+\dot h(t) = A\, h(t) + B\, u(t), \qquad y(t) = C\, h(t) + D\, u(t).
+$$
+
+Discretize with step size $\Delta$:
+
+$$
+h_k = \bar A\, h_{k-1} + \bar B\, u_k, \qquad y_k = C\, h_k.
+$$
+
+This is a **linear recurrent network**: hidden state evolves linearly,
+output is a linear projection. For input sequence $u_1, \dots, u_N$,
+the output can be computed:
+
+- **Recurrently**: $O(N)$ time, $O(d)$ memory per step.
+- **As a convolution**: $y = K * u$ for an appropriately defined
+  convolution kernel $K$. Used for parallel training.
+
+So SSMs are both linear RNNs (for sequential inference) and
+convolutions (for parallel training).
+
+## S4 (Structured State Space)
+
+Gu et al. (2022). The state matrix $A$ is parameterized as a
+**structured** matrix (HiPPO matrices) that gives the SSM a useful
+prior over long-range dependencies.
+
+Key contributions:
+
+- **HiPPO initialization**: $A$ is initialized to project the input
+  history onto Legendre polynomials, giving the model a built-in
+  inductive bias for compressing the past.
+- **Diagonal parameterization**: with the right basis, $A$ is
+  diagonal, and the convolution can be computed efficiently in
+  the frequency domain.
+- **Long Range Arena benchmark wins**: S4 dominated on synthetic
+  long-context tasks where Transformers struggled.
+
+S4 was the proof of concept that an alternative to attention could
+compete with Transformers on long-context modeling.
+
+## Mamba (2024)
+
+Gu and Dao. The breakthrough that made SSMs competitive with
+Transformers for language modeling.
+
+Two innovations:
+
+- **Selective SSM**: the state matrices $A, B, C$ become functions of
+  the input, not fixed parameters. The model **selects** what to
+  remember based on the current token. This is the SSM analog of
+  attention's content-based addressing.
+- **Hardware-aware kernel**: a custom CUDA kernel that fuses the SSM
+  computation, exploits the GPU memory hierarchy, and avoids
+  materializing the hidden state for the whole sequence.
+
+The resulting **Mamba block** is a drop-in replacement for the
+attention sublayer of a Transformer:
+
+```
+x = x + Mamba(LayerNorm(x))
+x = x + FFN(LayerNorm(x))
+```
+
+Mamba achieves Transformer-quality language modeling at sequence
+lengths where attention becomes infeasible (100K+ tokens), with
+constant-time per-token inference (no growing KV cache).
+
+## Mamba-2 (2024)
+
+Refinement of Mamba with:
+
+- **State space duality (SSD)**: a unified theoretical framework
+  showing SSMs and attention are special cases of a more general
+  family.
+- **Larger state dimensions**: efficient via the SSD reformulation.
+- **Improvements in modeling quality** at scale.
+
+The Mamba-2 paper showed that careful SSM design can match the
+parameter count vs perplexity curve of well-tuned Transformers.
+
+## Why SSMs might (or might not) replace attention
+
+**Strengths**:
+
+- **Linear scaling** in sequence length (training and inference).
+- **Constant inference memory**: no growing KV cache.
+- **Strong long-range modeling**: HiPPO and selective mechanisms.
+- **Hardware-friendly**: dense matrix-vector products, cache-friendly.
+
+**Weaknesses or open questions**:
+
+- **Local copy/lookup tasks** that attention nails: SSMs sometimes
+  underperform. Hybrid architectures (next-to-last D3 lesson) address
+  this.
+- **In-context learning** scaling laws: less well-studied than
+  Transformers.
+- **Less mature tooling**: the Transformer ecosystem (HuggingFace,
+  PyTorch primitives, training recipes) is decades ahead.
+
+Mamba and its descendants are clearly viable; whether they replace
+attention or coexist alongside it is an open question as of 2024.
+
+## The relationship to RNNs
+
+SSMs are linear RNNs with a specific parameterization. Compared to
+LSTM/GRU:
+
+- **Linear** vs gated nonlinear updates.
+- **Structured matrices** with mathematical properties (HiPPO) vs
+  general gates.
+- **Parallel training** via convolution view vs sequential.
+
+The selective version (Mamba) adds back input-dependence, recovering
+some of the gating flexibility of LSTM while preserving the parallel
+training story.
+
+## The big picture
+
+The next lesson covers another path to sub-quadratic sequence mixing:
+**linear attention**, which keeps the QKV machinery but replaces the
+softmax with a kernel feature map that lets the computation be
+reordered to linear cost.

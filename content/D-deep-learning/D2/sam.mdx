@@ -1,0 +1,127 @@
+---
+title: "Segment Anything"
+pillar: D
+subId: D2
+lessonId: sam
+order: 7
+estimatedMinutes: 14
+goal: "Build the SAM promptable segmentation pipeline (image encoder, prompt encoder, mask decoder) and its foundation-model training story."
+prerequisites: ["segmentation", "vit"]
+codeExempt: true
+---
+
+Meta AI's **Segment Anything Model (SAM)** is the closest thing vision
+has to a foundation model: one model that produces high-quality masks
+for any object the user points at, without per-task fine-tuning. The
+recipe is interesting beyond segmentation: pretrain a promptable model
+at scale on a synthetic-then-real data flywheel, and downstream task
+specialization becomes prompt engineering.
+
+## What SAM does
+
+Input: an image + a **prompt** (a point, a box, a rough mask, or a text
+in some variants).
+Output: a high-quality binary mask of the object the prompt refers to.
+
+The promptable interface is the key innovation. Instead of "predict
+masks for all objects of class X", SAM answers "predict the mask of the
+object that contains *this point* (or fits in *this box*)". This
+generalizes far better because the task is image-specific rather than
+class-specific.
+
+## Architecture (SAM 1)
+
+Three components:
+
+1. **Image encoder**: a ViT-H (Huge) trained to produce a dense feature
+   embedding of the image, $\sim 64 \times 64 \times 256$. Heavy ($\sim$600M
+   parameters) but run only once per image; cached for repeated prompts.
+2. **Prompt encoder**: tokenizes the prompt. Points and boxes become
+   spatial embeddings; rough masks are downsampled and concatenated.
+3. **Mask decoder**: a lightweight Transformer that takes the image
+   embedding and prompt tokens and produces a small set of candidate
+   masks plus quality scores. Predicts 3 masks per prompt to handle
+   ambiguity (you point at a person: do you mean the head, the upper
+   body, or the whole person?).
+
+The image encoder is the cost; the decoder is cheap (~4M parameters),
+so generating masks for many prompts on the same image is fast after the
+one-time encoder pass.
+
+## The data flywheel
+
+Training a foundation model needs a foundation-scale dataset. SAM's team
+built one with a **three-stage data engine**:
+
+1. **Assisted-manual**: human annotators labeled masks with help from a
+   weak initial model. Produced ~4M masks across ~100K images.
+2. **Semi-automatic**: the strengthened model auto-generated obvious
+   masks; humans filled in the rest. ~5M masks.
+3. **Fully automatic**: a grid of points was used as automated prompts;
+   high-confidence outputs were kept. ~1B masks across 11M images.
+
+The released **SA-1B dataset** has more than 1 billion masks. SAM is
+trained on this data with a combination of focal loss, dice loss, and
+IoU prediction loss.
+
+This **annotation flywheel** is now a standard recipe: bootstrap a model
+on a small human-labeled set, use it to scale up the data, retrain.
+Used in DALL-E 2 (CLIP-filtered data), GPT-4 (RLHF), and many other
+foundation models.
+
+## SAM 2 (video)
+
+The 2024 successor extends SAM to video:
+
+- The same image encoder + prompt encoder + mask decoder.
+- An additional **memory module**: features from past frames are
+  attended to when masking the current frame.
+- Trained on a video-mask dataset built with the same flywheel.
+
+Result: prompt once with a point or box, get masks tracking the same
+object across the entire video.
+
+## What SAM is good at and not
+
+**Strengths**:
+
+- Zero-shot transfer to almost any object class.
+- Pixel-precise masks even for thin or fragmented objects.
+- Composes naturally with detection (use a detector's box as the SAM
+  prompt to get a precise mask).
+- Interactive workflows: point, point, point, refine.
+
+**Limitations**:
+
+- No semantic labels: SAM gives you a mask, not a class name. Pair with
+  CLIP or a classifier for "what is the masked object".
+- Heavy: the ViT-H encoder is expensive, especially for high
+  resolutions. Smaller SAM variants (FastSAM, MobileSAM, EfficientSAM)
+  trade accuracy for speed.
+- Medical / specialized imaging: works less well out of the box; needs
+  fine-tuning.
+
+## Downstream uses
+
+- **Annotation accelerators**: human labels a box, SAM produces the
+  mask. 10-100x speedup over manual masking.
+- **Image editing**: pair with inpainting models (e.g. Stable Diffusion)
+  for "click and edit this object".
+- **Video object tracking**: prompt once, track across frames with SAM 2.
+- **3D extension**: SAM + multi-view + NeRF for 3D segmentation.
+
+## The promptable-foundation pattern
+
+The SAM recipe has broader resonance beyond segmentation:
+
+1. Identify a **promptable** task (output controlled by a flexible
+   user-specified prompt).
+2. Build a model that can take the prompt as input.
+3. Pretrain at scale via a data flywheel.
+4. Downstream specialization becomes prompt engineering, not
+   fine-tuning.
+
+This pattern is now being applied to many vision tasks (depth, normal
+estimation, etc.), and it is essentially how LLMs work too. The next
+lesson covers a different scaling story: pretraining vision models
+without labels.

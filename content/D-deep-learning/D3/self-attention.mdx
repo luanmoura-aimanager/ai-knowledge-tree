@@ -1,0 +1,185 @@
+---
+title: "Self-attention"
+pillar: D
+subId: D3
+lessonId: self-attention
+order: 5
+estimatedMinutes: 20
+goal: "Define scaled dot-product self-attention and explain why the softmax of QK^T gives a content-based mixing matrix."
+prerequisites: ["seq2seq-attention"]
+---
+
+The single operation behind the Transformer revolution: **self-attention**.
+Each token in a sequence computes a query, a key, and a value; the
+attention from token $i$ to token $j$ is the (scaled, softmaxed) inner
+product of $i$'s query with $j$'s key, used to weight $j$'s value into
+$i$'s output. Three projections, one softmax: content-based mixing across
+arbitrary positions in one parallel operation.
+
+## The operation
+
+Given a sequence of $N$ token embeddings stacked as
+$X \in \mathbb{R}^{N \times d}$:
+
+1. Project each token to a **query**, **key**, and **value** with
+   learned matrices $W_Q, W_K, W_V \in \mathbb{R}^{d \times d_k}$:
+   $$
+   Q = X W_Q, \quad K = X W_K, \quad V = X W_V.
+   $$
+2. Compute the **attention scores** as scaled dot products:
+   $$
+   S = \frac{Q K^\top}{\sqrt{d_k}}.
+   $$
+3. Apply softmax row-wise to get attention weights:
+   $$
+   A = \operatorname{softmax}_{\text{row}}(S).
+   $$
+4. The output is the weighted sum of values:
+   $$
+   Y = A V.
+   $$
+
+The output $Y \in \mathbb{R}^{N \times d_k}$ has one row per token, each
+a content-based mixture of the values of every other token.
+
+## What each piece does
+
+- **Query**: "what am I looking for?" Each token's query interrogates
+  the rest of the sequence.
+- **Key**: "what do I offer?" Each token's key says what it can answer.
+- **Value**: "what do I contribute?" Each token's value is what gets
+  mixed in if it is attended to.
+
+The softmax row $A_{i, :}$ is a probability distribution over the
+sequence, specifying how much token $i$ attends to each other token.
+
+## The $\sqrt{d_k}$ scaling
+
+Without scaling, the dot product $q^\top k$ has variance $d_k$ when
+$q, k$ are unit-variance Gaussians. Large $d_k$ pushes the softmax
+into the saturated regime where one entry dominates and gradients
+vanish. Dividing by $\sqrt{d_k}$ keeps the variance constant in $d_k$,
+preserving useful attention distributions.
+
+Without this scaling, training stalls for any reasonable head size.
+
+## Why it works
+
+Self-attention has three properties that make it dominant for sequences:
+
+- **Content-based addressing**: tokens find their relevant neighbors by
+  similarity, not position. A token can attend to anything anywhere.
+- **Parallel over positions**: all $N$ outputs are computed
+  simultaneously, unlike RNNs which serialize through time. GPU-friendly.
+- **Constant path length**: any pair of tokens is exactly one operation
+  away from influencing each other, no matter how far apart they are
+  in the sequence. RNNs have $O(N)$ path length; self-attention has
+  $O(1)$.
+
+The cost: **quadratic in sequence length**. Computing $QK^\top$ is
+$O(N^2 d_k)$ time and $O(N^2)$ memory. For long sequences (1k, 100k,
+1M tokens) this becomes the bottleneck, motivating the linear-attention
+and SSM lessons later.
+
+## Multi-head attention
+
+A single attention computation uses one fixed $d_k$. **Multi-head
+attention** runs $H$ parallel attentions on different $d_k$-dimensional
+projections of the input, then concatenates their outputs:
+
+$$
+\text{MultiHead}(X) = [\text{head}_1; \text{head}_2; \dots; \text{head}_H] W_O,
+$$
+
+where each $\text{head}_h = \text{Attention}(X W_Q^h, X W_K^h, X W_V^h)$
+and $W_O \in \mathbb{R}^{H d_k \times d}$ is a learned output
+projection.
+
+With $H = 8$ heads and $d_k = d/H = 64$ (for $d = 512$), each head can
+specialize: one head might attend to syntactic neighbors, another to
+semantic similarity, another to positional patterns. Empirically heads
+specialize without being told to.
+
+## Masking
+
+For autoregressive language modeling, the decoder must not see future
+tokens. Apply a **causal mask** to the attention scores:
+
+$$
+S_{i, j} = \begin{cases} S_{i, j} & j \le i \\ -\infty & j > i \end{cases}.
+$$
+
+After softmax, $A_{i, j} = 0$ for $j > i$. Token $i$ only attends to
+tokens at positions $\le i$.
+
+For variable-length sequences in a batch, a **padding mask** is also
+applied so padded positions get $-\infty$ scores.
+
+## Self-attention vs cross-attention
+
+- **Self-attention**: $Q$, $K$, $V$ all come from the same sequence.
+  Used in encoder layers and self-attention sublayers of decoder layers.
+- **Cross-attention**: $Q$ comes from the decoder, $K$ and $V$ come from
+  the encoder. The decoder queries the encoder's representation. Used
+  in encoder-decoder Transformers (translation, summarization).
+
+The next lesson assembles these primitives into the full Transformer.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def softmax(z, axis):
+    z = z - z.max(axis=axis, keepdims=True)
+    e = np.exp(z); return e / e.sum(axis=axis, keepdims=True)
+
+def attention(Q, K, V, mask=None):
+    d_k = Q.shape[-1]
+    S = Q @ K.T / np.sqrt(d_k)
+    if mask is not None:
+        S = np.where(mask, S, -np.inf)
+    A = softmax(S, axis=-1)
+    return A @ V, A
+
+# 5-token sequence, model dim 8
+N, d, d_k = 5, 8, 8
+X = rng.normal(size=(N, d))
+W_q = rng.normal(scale=0.3, size=(d, d_k))
+W_k = rng.normal(scale=0.3, size=(d, d_k))
+W_v = rng.normal(scale=0.3, size=(d, d_k))
+
+Q = X @ W_q; K = X @ W_k; V = X @ W_v
+Y, A = attention(Q, K, V)
+print(f"attention matrix shape: {A.shape}, output shape: {Y.shape}")
+print(f"each row of A sums to 1: {[round(a, 3) for a in A.sum(axis=1)]}")
+
+# Causal mask: lower-triangular ones
+causal = np.tril(np.ones((N, N))).astype(bool)
+Y_c, A_c = attention(Q, K, V, mask=causal)
+print(f"\ncausal attention matrix (row i can only see j <= i):")
+print(A_c.round(2))
+print(f"row 2 mass on positions > 2: {A_c[2, 3:].sum():.6f}  (should be 0)")
+
+# Multi-head: 4 heads, each with d_k = d / 4 = 2
+H = 4; d_k = d // H
+W_qm = rng.normal(scale=0.3, size=(H, d, d_k))
+W_km = rng.normal(scale=0.3, size=(H, d, d_k))
+W_vm = rng.normal(scale=0.3, size=(H, d, d_k))
+W_o = rng.normal(scale=0.3, size=(H * d_k, d))
+
+heads = []
+for h in range(H):
+    Qh = X @ W_qm[h]; Kh = X @ W_km[h]; Vh = X @ W_vm[h]
+    Yh, _ = attention(Qh, Kh, Vh)
+    heads.append(Yh)
+Y_multi = np.concatenate(heads, axis=-1) @ W_o
+print(f"\nmulti-head output shape: {Y_multi.shape}")
+```
+
+The attention matrix is row-stochastic, the causal mask zeroes out
+future positions, and the multi-head computation returns to the
+original embedding dimension. The next lesson stacks attention and FFN
+blocks into the full Transformer.

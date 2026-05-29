@@ -1,0 +1,130 @@
+---
+title: "Non-contrastive SSL (BYOL, DINO)"
+pillar: D
+subId: D5
+lessonId: non-contrastive-ssl
+order: 3
+estimatedMinutes: 14
+goal: "Avoid negatives entirely with predictor networks (BYOL) and student-teacher distillation (DINO)."
+prerequisites: ["contrastive-ssl"]
+codeExempt: true
+---
+
+Contrastive methods need lots of negatives, which forces large batches
+or queues. **Non-contrastive methods** prove this requirement is
+optional: with the right architectural tricks (a target network with
+stop-gradient, a predictor head), you can train great representations
+*without ever using negatives*. **BYOL** and **DINO** are the canonical
+methods.
+
+## The negatives problem
+
+InfoNCE-style contrastive learning needs negatives to prevent
+representation collapse: without something to push apart, the encoder
+can map every input to the same vector. The trivial fix (collect many
+negatives, use a big batch) is expensive.
+
+Non-contrastive methods solve collapse architecturally.
+
+## BYOL (Bootstrap Your Own Latent)
+
+Grill et al. (2020).
+
+Two networks:
+
+- **Online network** $f_\theta$ with a projection head $g_\theta$ and
+  an extra **predictor** $q_\theta$ (a small MLP).
+- **Target network** $f_\xi$ with projection head $g_\xi$ (no predictor).
+  The target's parameters are an exponential moving average of the
+  online network: $\xi \leftarrow \tau \xi + (1 - \tau) \theta$.
+
+For each input image, make two augmented views $v_1, v_2$. Compute:
+
+- Online: $z_1 = g_\theta(f_\theta(v_1))$, predictor $p_1 = q_\theta(z_1)$.
+- Target: $z_2 = g_\xi(f_\xi(v_2))$, with **stop-gradient** (no
+  gradient flows through the target).
+
+Loss: cosine distance between $p_1$ and $\text{sg}(z_2)$,
+symmetrized over the two views.
+
+Three architectural pieces prevent collapse:
+
+1. **Predictor on the online side**: an asymmetric architecture.
+2. **Stop-gradient on the target side**: the target acts as a fixed
+   moving target for the online network to chase, not a co-learner.
+3. **Moving-average target update**: target features are slow-moving
+   compared to online features.
+
+Without any of the three, BYOL collapses to constant features.
+
+Why it works precisely is still partly mysterious; empirically, the
+trio is sufficient.
+
+## DINO (Distillation with No Labels)
+
+Caron et al. (2021). The Transformer-friendly variant.
+
+Same two-network setup (student + teacher with EMA), but:
+
+- **Centering**: subtract a running mean from the teacher's outputs
+  before softmax. Prevents one dimension from dominating.
+- **Sharpening**: low temperature in the teacher's softmax. Sharpens
+  the target distribution.
+- **Cross-entropy loss** between student and teacher's softmax
+  distributions (instead of cosine distance).
+- **Multi-crop training**: multiple crops of different sizes per image,
+  with global crops fed to the teacher and all crops fed to the
+  student. The student learns to predict the global teacher view from
+  local crops.
+
+DINO produces remarkable emergent properties for ViTs:
+
+- **Object-aware attention**: the [CLS] token's attention map highlights
+  the main object without any localization supervision.
+- **k-NN classification** on frozen features hits 78% on ImageNet
+  without any labels.
+- **Linear probes** approach fully supervised accuracy.
+
+**DINOv2** (2023) scaled this to 142M curated images and 1B+ parameters,
+producing the best general-purpose vision backbone available open-source.
+
+## I-JEPA and related architectures
+
+**I-JEPA** (Image Joint-Embedding Predictive Architecture, LeCun et al.,
+2023). A predictor learns to predict the embeddings of masked image
+regions from context embeddings. Closer in spirit to masked language
+modeling but with predictions in embedding space, not pixel space.
+
+I-JEPA shows competitive performance with simpler training and faster
+convergence than masked image modeling (MAE, next lesson). Part of a
+broader research direction (V-JEPA for video) pushing predictive SSL.
+
+## Why non-contrastive is increasingly preferred
+
+- **No negatives required**: simpler infrastructure, smaller batches.
+- **Better scaling**: DINOv2 produces state-of-the-art features at the
+  scale where contrastive methods were saturating.
+- **Emergent semantic structure**: DINO's attention maps "discover"
+  objects without any object labels.
+
+The negative-free recipe (student-teacher EMA + asymmetric architecture
++ multi-crop) is now standard in vision SSL.
+
+## Practical recipe
+
+For a typical vision project:
+
+1. **Pretrained features**: start with DINOv2 or OpenCLIP weights.
+   Excellent out-of-the-box.
+2. **Linear probe** for a quick baseline.
+3. **Fine-tune** the backbone for the last few percentage points if
+   needed.
+4. **Train SSL from scratch** only if your domain is genuinely far
+   from natural images and you have millions of training images.
+
+Steps 1-3 cover the vast majority of vision projects.
+
+## The next lesson
+
+The next lesson covers the masked-modeling SSL approach, originally
+from BERT but now also dominant in vision (MAE).

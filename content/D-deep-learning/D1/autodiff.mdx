@@ -1,0 +1,163 @@
+---
+title: "Reverse-mode autodiff"
+pillar: D
+subId: D1
+lessonId: autodiff
+order: 3
+estimatedMinutes: 22
+goal: "Implement a tiny autodiff engine with `Value` nodes that record their parents and compute gradients on a backward pass."
+prerequisites: ["backprop"]
+---
+
+Backpropagation by hand works for one architecture; framework users want
+to write any function and get gradients automatically. **Reverse-mode
+automatic differentiation** records the operations that produced each
+value into a graph at runtime, then walks the graph backward to compute
+all gradients. Every modern deep-learning framework is a variation of
+this pattern.
+
+## The core idea: nodes that remember
+
+Wrap each scalar (later, tensor) in a `Value` object that stores three
+things:
+
+- the **forward value** (the number itself),
+- a **list of parent `Value` objects** that produced it,
+- a **closure that computes the local backward pass** given the upstream
+  gradient.
+
+Operations like `+`, `*`, `tanh` return new `Value` objects with their
+parents and closures populated. Running the forward pass thus *records*
+the graph; running the backward pass walks the recorded graph in
+reverse.
+
+## The two phases
+
+**Forward.** Every operation creates a new node and links it to its
+inputs. After running the loss, the graph is a DAG whose leaves are the
+network's inputs and parameters and whose root is the loss scalar.
+
+**Backward.** From the loss node, accumulate gradients into each parent
+using the chain rule. Visit nodes in reverse topological order so a
+node's gradient is finalized before its parents read it.
+
+## Toy implementation
+
+A minimal scalar autodiff engine in ~60 lines of Python. This is the
+shape every modern framework (PyTorch's `autograd`, JAX's transforms,
+TensorFlow's `GradientTape`) wraps in vector/tensor machinery.
+
+The two pieces:
+
+- The `Value` class with `data`, `grad`, `_prev` (parents), and a
+  per-op `_backward` closure that knows how to add to its parents'
+  `grad` field given the current node's gradient.
+- A top-level `backward()` method on the loss that does a topological
+  sort of the graph and runs each `_backward` in reverse order.
+
+That is the full pattern. Once it works for `+`, `*`, and `tanh`, every
+other smooth scalar function (`exp`, `log`, `**n`) follows the same
+template.
+
+## Tensor autodiff
+
+Production frameworks scale this up to **tensor autodiff**: each `Value`
+is replaced by a tensor, each operation has a vectorized forward and a
+vectorized backward (the **vector-Jacobian product** rather than scalar
+multiplication), and the engine batches operations for GPU execution.
+
+The conceptual structure is identical: nodes record operations forward,
+the backward pass walks the graph in reverse computing local Jacobian
+products.
+
+## Forward-mode vs reverse-mode
+
+Forward mode computes one *column* of the Jacobian per pass (the
+sensitivity of every output to one input). Reverse mode computes one
+*row* of the Jacobian per pass (the sensitivity of one output to every
+input).
+
+- Outputs $\gg$ inputs: forward mode wins.
+- Outputs $\ll$ inputs (typical neural networks: scalar loss, millions
+  of parameters): reverse mode wins by a factor of (# parameters).
+
+This is why every deep-learning framework defaults to reverse mode.
+
+## Limitations and extensions
+
+- **Control flow** (if/else, while loops) is handled naturally because
+  the graph is built dynamically by tracing the forward pass.
+- **In-place ops** require care: an autodiff engine has to detect when
+  a parent tensor is being mutated and either disallow or save a copy.
+- **Higher-order derivatives** come from running autodiff on the
+  gradient itself.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+class Value:
+    def __init__(self, data, _prev=()):
+        self.data = data
+        self.grad = 0.0
+        self._prev = _prev
+        self._backward = lambda: None
+
+    def __add__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
+        out = Value(self.data + other.data, (self, other))
+        def _backward():
+            self.grad += out.grad
+            other.grad += out.grad
+        out._backward = _backward
+        return out
+
+    def __mul__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
+        out = Value(self.data * other.data, (self, other))
+        def _backward():
+            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad
+        out._backward = _backward
+        return out
+
+    def tanh(self):
+        t = np.tanh(self.data)
+        out = Value(t, (self,))
+        def _backward():
+            self.grad += (1 - t * t) * out.grad
+        out._backward = _backward
+        return out
+
+    def backward(self):
+        topo, visited = [], set()
+        def build(v):
+            if v in visited: return
+            visited.add(v)
+            for p in v._prev: build(p)
+            topo.append(v)
+        build(self)
+        self.grad = 1.0
+        for v in reversed(topo): v._backward()
+
+# Test: f = tanh((a + b) * c), compute gradients with respect to a, b, c
+a = Value(2.0); b = Value(-1.0); c = Value(3.0)
+y = ((a + b) * c).tanh()
+y.backward()
+print(f"y = {y.data:.4f}, grad a = {a.grad:.4f}, grad b = {b.grad:.4f}, grad c = {c.grad:.4f}")
+
+# Verify against finite differences
+def f(av, bv, cv): return np.tanh((av + bv) * cv)
+eps = 1e-6
+fa = (f(2 + eps, -1, 3) - f(2 - eps, -1, 3)) / (2 * eps)
+fb = (f(2, -1 + eps, 3) - f(2, -1 - eps, 3)) / (2 * eps)
+fc = (f(2, -1, 3 + eps) - f(2, -1, 3 - eps)) / (2 * eps)
+print(f"finite diffs: {fa:.4f}, {fb:.4f}, {fc:.4f}")
+```
+
+The autodiff gradients match finite differences. The engine has no
+explicit knowledge of the function `f`; it derived everything from the
+operations recorded during the forward pass. The next lesson zooms out:
+*why* can these stacks of affine maps and nonlinearities fit any
+function?

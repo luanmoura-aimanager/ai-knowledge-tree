@@ -1,0 +1,118 @@
+---
+title: "Semantic and instance segmentation"
+pillar: D
+subId: D2
+lessonId: segmentation
+order: 6
+estimatedMinutes: 16
+goal: "Use U-Net for per-pixel labels and Mask R-CNN for per-instance masks, and understand encoder-decoder skip connections."
+prerequisites: ["object-detection"]
+codeExempt: true
+---
+
+Detection puts boxes around objects; **segmentation** assigns a class to
+every pixel. Two flavors: **semantic** (what class is this pixel?) and
+**instance** (which object does it belong to?). The dominant
+architectures are **U-Net** (semantic) and **Mask R-CNN** (instance),
+both of which combine an encoder with a decoder via skip connections.
+
+## Semantic vs instance vs panoptic
+
+- **Semantic segmentation**: each pixel gets a class label. Two cats in
+  the image both have the label "cat"; the network does not distinguish
+  them.
+- **Instance segmentation**: each pixel gets a class label *and* an
+  instance ID. Cat 1 is separated from cat 2.
+- **Panoptic segmentation**: union of the two. Stuff classes (sky,
+  grass: uncountable, no instances) labeled semantically; thing classes
+  (cat, person: countable) labeled per-instance.
+
+Each task uses a different output head on top of a similar encoder.
+
+## U-Net
+
+Ronneberger et al. (2015), originally for biomedical imaging:
+
+```
+encoder: downsample with conv + pool
+  64 -> 128 -> 256 -> 512 -> 1024 channels
+  resolution: H -> H/2 -> H/4 -> H/8 -> H/16
+decoder: upsample with transposed conv or interpolation
+  1024 -> 512 -> 256 -> 128 -> 64
+  resolution: H/16 -> H/8 -> H/4 -> H/2 -> H
+  At each level, concatenate the encoder's feature map of the same resolution.
+```
+
+The **U-shape** comes from the resolution profile. The skip connections
+(encoder-to-decoder concatenation at matching resolutions) carry
+**fine spatial detail** that the bottleneck cannot represent. Without
+skips, the upsampled output is blurry; with them, it can be pixel-precise.
+
+Output: per-pixel class logits. Train with per-pixel cross-entropy.
+
+U-Net's lasting impact: encoder-decoder with skip connections is now
+the default for dense prediction (segmentation, depth, normal
+estimation), monocular depth, and the noise-prediction backbone of
+diffusion models.
+
+## DeepLab, SegFormer, and Transformer alternatives
+
+Successors to U-Net for semantic segmentation:
+
+- **DeepLab v3+**: encoder is a pretrained CNN, decoder uses **atrous
+  (dilated) convolutions** to expand the receptive field without
+  downsampling, plus a small upsampling decoder.
+- **Swin / SegFormer**: Transformer backbone with a lightweight decoder.
+  Often matches or beats CNN encoder-decoders on benchmarks.
+- **Mask2Former**, **OneFormer**: unified mask-based formulation for
+  semantic, instance, and panoptic in one architecture.
+
+## Mask R-CNN (instance segmentation)
+
+Faster R-CNN's two-stage detector with a **mask head** appended:
+
+1. Region proposal network (same as Faster R-CNN).
+2. Per-proposal features extracted with **RoI Align** (a precise
+   spatial extraction that fixes RoI Pooling's quantization).
+3. Three parallel heads: classification, bounding-box regression, and a
+   per-class mask prediction (a small fully convolutional network that
+   outputs a $28 \times 28$ binary mask per proposal).
+4. Per-mask binary cross-entropy loss.
+
+Mask R-CNN is the standard instance-segmentation baseline. SOLOv2 and
+QueryInst are newer alternatives.
+
+## Panoptic segmentation
+
+Two approaches:
+
+- **Stuff branch + thing branch**: run semantic segmentation for stuff,
+  instance segmentation for things, merge with conflict resolution.
+- **Mask-based unified models**: predict a set of "masks" each labeled
+  as stuff or thing (Mask2Former). Cleaner; dominant in recent work.
+
+## Evaluation
+
+- **Semantic**: mean IoU across classes, pixel accuracy.
+- **Instance**: average precision over IoU thresholds at the **mask**
+  level (mask AP).
+- **Panoptic**: Panoptic Quality (PQ) = (true positives) / (true
+  positives + 0.5*(false positives + false negatives)), weighted by IoU.
+
+## Common challenges
+
+- **Class imbalance**: foreground pixels are rare. Class-weighted loss,
+  Dice loss (a per-class differentiable IoU), and focal loss help.
+- **Boundary precision**: U-Net's skip connections help, but boundary
+  IoU is still the main error mode. Boundary-aware losses help.
+- **Small instances**: high-resolution backbones, multi-scale training.
+- **Overlap and occlusion**: amodal segmentation predicts the full
+  shape including occluded parts; specialized methods needed.
+
+## What changed with foundation models
+
+The next lesson covers **Segment Anything (SAM)**, which trained a
+single promptable segmentation model on 1B masks and changed the
+practical defaults for segmentation. For most projects today, the right
+move is not to train a segmenter from scratch but to prompt SAM or
+fine-tune it.

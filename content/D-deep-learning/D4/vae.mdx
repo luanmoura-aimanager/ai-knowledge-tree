@@ -1,0 +1,193 @@
+---
+title: "Variational autoencoders"
+pillar: D
+subId: D4
+lessonId: vae
+order: 2
+estimatedMinutes: 20
+goal: "Derive the VAE's evidence lower bound and train it with the reparameterization trick."
+prerequisites: ["autoencoders", "A2/kl-cross-entropy"]
+---
+
+The plain autoencoder learns a useful bottleneck but its latent space
+is unstructured: sampling random codes gives garbage. The **variational
+autoencoder (VAE)** adds a probabilistic structure: each input maps to
+a *distribution* over latents, and a prior keeps that distribution
+well-behaved. Sampling becomes principled, the model has a likelihood,
+and the math (the ELBO) generalizes to a huge family of latent-variable
+models.
+
+## The generative story
+
+A VAE assumes data comes from a two-step process:
+
+1. Sample a latent $z \sim p(z)$ from a simple prior (typically
+   $\mathcal{N}(0, I)$).
+2. Sample $x \sim p_\theta(x \mid z)$ from a decoder distribution.
+
+The data likelihood is $p_\theta(x) = \int p_\theta(x \mid z)\, p(z)\, dz$.
+The integral is intractable for any interesting decoder, so we cannot
+maximize $\log p_\theta(x)$ directly.
+
+## The ELBO
+
+Introduce an **approximate posterior** $q_\phi(z \mid x)$ produced by an
+encoder. By the standard variational identity:
+
+$$
+\log p_\theta(x) = \mathbb{E}_{q_\phi(z \mid x)}\!\left[\log p_\theta(x \mid z)\right] - D_{\text{KL}}(q_\phi(z \mid x)\,\|\,p(z)) + D_{\text{KL}}(q_\phi(z \mid x)\,\|\,p_\theta(z \mid x)).
+$$
+
+The last KL is non-negative, so
+
+$$
+\log p_\theta(x) \ge \underbrace{\mathbb{E}_{q_\phi(z \mid x)}[\log p_\theta(x \mid z)]}_{\text{reconstruction}} - \underbrace{D_{\text{KL}}(q_\phi(z \mid x)\,\|\,p(z))}_{\text{prior matching}}.
+$$
+
+This is the **evidence lower bound (ELBO)**. Maximize it (equivalently,
+minimize its negation) jointly over $\theta$ and $\phi$.
+
+The two terms have intuitive readings:
+
+- **Reconstruction term**: the decoder should make $x$ likely given
+  $z$ sampled from the encoder. For a Gaussian decoder, this becomes
+  $-\lVert x - g_\theta(z)\rVert^2$, the same as the plain autoencoder.
+- **KL term**: the encoder distribution should stay close to the
+  prior. This prevents the encoder from collapsing to delta functions
+  (which would maximize reconstruction but make the latent space
+  useless).
+
+## Gaussian encoder
+
+The standard choice: $q_\phi(z \mid x) = \mathcal{N}(\mu_\phi(x),\ \operatorname{diag}(\sigma_\phi(x)^2))$,
+with $\mu_\phi$ and $\log \sigma_\phi$ produced by an encoder MLP.
+
+With this choice and standard normal prior $p(z) = \mathcal{N}(0, I)$,
+the KL has a closed form:
+
+$$
+D_{\text{KL}}(q_\phi \,\|\, p) = \frac{1}{2}\sum_j(\mu_j^2 + \sigma_j^2 - 1 - \log \sigma_j^2).
+$$
+
+No Monte Carlo estimation needed for the KL.
+
+## The reparameterization trick
+
+The reconstruction term requires sampling $z \sim q_\phi(z \mid x)$,
+which makes the loss non-differentiable in $\phi$ (you can't backprop
+through a sample).
+
+**Reparameterization**: write the sample as a deterministic function of
+$\phi$ and a standard normal noise:
+
+$$
+z = \mu_\phi(x) + \sigma_\phi(x) \odot \epsilon, \qquad \epsilon \sim \mathcal{N}(0, I).
+$$
+
+Now $z$ is a differentiable function of $\phi$ (with $\epsilon$ random
+but treated as input), and backprop flows through the sample. This is
+the key trick that made VAE training practical.
+
+## Training procedure
+
+1. Forward: encoder produces $\mu(x), \sigma(x)$; sample $z$ via
+   reparameterization; decoder produces $\hat x$.
+2. Loss: reconstruction + KL.
+3. Backward: gradient flows through both terms via reparameterization.
+
+Inference (generation): sample $z \sim \mathcal{N}(0, I)$ from the
+prior, decode. Because the KL term forced the encoder's posterior
+distributions to stay close to the prior, the prior is the "right"
+distribution to sample from.
+
+## Posterior collapse
+
+A common failure: the decoder is so expressive that it can fit the
+data without using $z$ at all. The encoder then becomes useless: it
+outputs the prior regardless of input, the KL term is zero, and the
+latent encodes nothing.
+
+Symptoms: KL term goes to zero, latent dimensions look like random
+noise, reconstructions ignore the encoder.
+
+Mitigations:
+
+- **KL annealing**: scale the KL term up over training (start with
+  0, end with 1).
+- **Free bits**: only penalize KL above a threshold per dimension.
+- **Architectural choices**: less expressive decoder, autoregressive
+  prior.
+
+## What VAEs are good at and not
+
+**Good at**:
+
+- Smooth, interpretable latent spaces (interpolation works).
+- Likelihood estimation (the ELBO is a true bound on log-likelihood).
+- Conditional generation when class labels or text are fed to the
+  decoder.
+- Building block for many later methods (latent diffusion uses a VAE).
+
+**Not as good as**:
+
+- Sample quality vs GANs (VAEs produce blurry samples because
+  Gaussian decoders smooth over uncertainty).
+- Sample quality vs diffusion (diffusion now dominates both).
+
+VAEs hold up best as a representation-learning backbone and as a
+component in larger pipelines (e.g., the autoencoder in Stable
+Diffusion is a VAE).
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# 1D toy: data from two well-separated modes
+n = 1000
+x = np.concatenate([rng.normal(-2, 0.3, n // 2), rng.normal(2, 0.3, n // 2)])
+
+# Simple VAE: encoder produces mu, log_sigma; decoder produces x_hat
+d_z, d_h = 2, 16
+def init(in_d, out_d): return rng.normal(scale=0.3 / np.sqrt(in_d), size=(in_d, out_d))
+W_enc1 = init(1, d_h); b_enc1 = np.zeros(d_h)
+W_mu = init(d_h, d_z); b_mu = np.zeros(d_z)
+W_logs = init(d_h, d_z); b_logs = np.zeros(d_z)
+W_dec1 = init(d_z, d_h); b_dec1 = np.zeros(d_h)
+W_dec2 = init(d_h, 1); b_dec2 = np.zeros(1)
+
+def encode(x):
+    h = np.maximum(0, x[:, None] @ W_enc1 + b_enc1)
+    return h @ W_mu + b_mu, h @ W_logs + b_logs
+
+def decode(z):
+    h = np.maximum(0, z @ W_dec1 + b_dec1)
+    return (h @ W_dec2 + b_dec2).ravel()
+
+def vae_step(x, lr=0.01, kl_weight=0.5):
+    mu, log_sigma = encode(x)
+    sigma = np.exp(log_sigma)
+    eps = rng.normal(size=mu.shape)
+    z = mu + sigma * eps
+    xhat = decode(z)
+    recon = np.mean((xhat - x)**2)
+    kl = 0.5 * np.mean(np.sum(mu**2 + sigma**2 - 1 - 2 * log_sigma, axis=1))
+    return recon, kl, mu, sigma, xhat
+
+# Train (single-step, no full backprop) just to check the forward and loss
+recon, kl, mu, sigma, xhat = vae_step(x)
+print(f"initial ELBO terms: recon = {recon:.3f}, KL = {kl:.3f}")
+print(f"latent means range: [{mu.min():.2f}, {mu.max():.2f}]")
+
+# Sampling from the prior and decoding gives synthetic data
+z_sample = rng.normal(size=(20, d_z))
+x_sample = decode(z_sample)
+print(f"sampled from prior, decoded: {x_sample.round(2)[:10]}")
+```
+
+The ELBO splits cleanly into reconstruction and KL; prior samples
+decode to outputs in the data range (training would push them toward
+the modes). The next lesson covers VAE variants that improve
+disentanglement and discrete-latent control.

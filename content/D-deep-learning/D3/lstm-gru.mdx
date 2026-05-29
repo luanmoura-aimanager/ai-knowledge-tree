@@ -1,0 +1,185 @@
+---
+title: "LSTM and GRU"
+pillar: D
+subId: D3
+lessonId: lstm-gru
+order: 3
+estimatedMinutes: 16
+goal: "Use gated recurrent cells to control information flow, fixing the vanishing-gradient problem of plain RNNs."
+prerequisites: ["rnn"]
+---
+
+The vanilla RNN's vanishing gradient comes from repeatedly multiplying
+small numbers through long products. **LSTM** and **GRU** introduce
+**gates** that let information flow through time *unmultiplied* by the
+recurrence Jacobian. The result: long-range dependencies become
+trainable, and RNNs dominated sequence modeling for nearly a decade.
+
+## LSTM (Long Short-Term Memory)
+
+Hochreiter and Schmidhuber (1997). Maintain **two** states per timestep:
+the **cell state** $c_t$ (the long-term memory) and the **hidden
+state** $h_t$ (the output). Four gates control how the cell state
+updates.
+
+Given input $x_t$ and previous states $(h_{t-1}, c_{t-1})$:
+
+**Gates** (each is a sigmoid-activated linear function):
+
+$$
+f_t = \sigma(W_f [x_t; h_{t-1}] + b_f) \quad \text{(forget)}
+$$
+
+$$
+i_t = \sigma(W_i [x_t; h_{t-1}] + b_i) \quad \text{(input)}
+$$
+
+$$
+o_t = \sigma(W_o [x_t; h_{t-1}] + b_o) \quad \text{(output)}
+$$
+
+**Candidate** new memory (tanh-activated):
+
+$$
+\tilde c_t = \tanh(W_c [x_t; h_{t-1}] + b_c).
+$$
+
+**Update**:
+
+$$
+c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t, \qquad h_t = o_t \odot \tanh(c_t),
+$$
+
+where $\odot$ is elementwise multiplication.
+
+The cell state $c_t$ updates linearly: $c_t = f_t \odot c_{t-1} + (\text{stuff})$.
+If $f_t$ is close to 1 (the forget gate is "open"), the gradient flows
+through the multiplicative chain $\prod_k f_{k+1}$ which can stay near
+1 over many timesteps. The vanishing gradient is no longer geometric.
+
+## What each gate does
+
+- **Forget gate** $f_t$: decides what fraction of the previous cell
+  state to keep. $f_t = 0$ erases memory; $f_t = 1$ preserves it.
+- **Input gate** $i_t$: decides what fraction of the new candidate
+  $\tilde c_t$ to write into memory.
+- **Output gate** $o_t$: decides what part of the cell state to expose
+  as the hidden state.
+
+The gates are learned, so the network adaptively controls memory based
+on the input.
+
+## GRU (Gated Recurrent Unit)
+
+Cho et al. (2014). A simpler alternative to LSTM with two gates instead
+of three and no separate cell state:
+
+$$
+z_t = \sigma(W_z [x_t; h_{t-1}] + b_z) \quad \text{(update)}
+$$
+
+$$
+r_t = \sigma(W_r [x_t; h_{t-1}] + b_r) \quad \text{(reset)}
+$$
+
+$$
+\tilde h_t = \tanh(W_h [x_t; r_t \odot h_{t-1}] + b_h)
+$$
+
+$$
+h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t.
+$$
+
+Same gating principle, fewer parameters, slightly faster training. In
+practice GRU and LSTM perform similarly; LSTM is the more common choice.
+
+## Forget gate initialization
+
+A practical detail: initialize the forget gate's bias $b_f$ to a positive
+value (typically $+1$ or $+2$). Sigmoid then starts near 1, the forget
+gate starts "mostly open", and gradients propagate through long
+sequences at the start of training. Without this trick, early in
+training the network forgets everything and never learns long
+dependencies.
+
+## When LSTMs win and lose
+
+**Won** (2014-2018): language modeling, machine translation,
+speech recognition, time-series forecasting.
+
+**Lost** to Transformers (2017+): the global context, parallel
+training, and superior scaling of attention beat LSTMs on every
+NLP benchmark.
+
+**Still useful**: streaming inference, very long context with limited
+memory, control/RL applications, and any domain where sequence is
+inherently online.
+
+## Bi-LSTM and stacked LSTM
+
+- **Bi-LSTM**: stack a forward-time LSTM and a backward-time LSTM;
+  concatenate their hidden states at each position. The output at every
+  position sees the whole sequence in both directions. Standard for
+  encoders.
+- **Stacked LSTM**: multiple LSTM layers on top of each other. Like
+  stacked MLPs but for sequences.
+
+The next lesson combines these encoder-decoder LSTM stacks with
+**attention** to handle longer dependencies.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def sigmoid(z): return 1 / (1 + np.exp(-z))
+
+def lstm_step(x, h_prev, c_prev, Wf, Wi, Wo, Wc, bf, bi, bo, bc):
+    z = np.concatenate([x, h_prev])
+    f = sigmoid(Wf @ z + bf)
+    i = sigmoid(Wi @ z + bi)
+    o = sigmoid(Wo @ z + bo)
+    c_tilde = np.tanh(Wc @ z + bc)
+    c = f * c_prev + i * c_tilde
+    h = o * np.tanh(c)
+    return h, c
+
+T, d_x, d_h = 30, 5, 16
+X = rng.normal(size=(T, d_x))
+
+# Initialize LSTM weights with bf positive (the trick)
+def init(out_dim, in_dim): return rng.normal(scale=0.1, size=(out_dim, in_dim))
+Wf = init(d_h, d_x + d_h); bf = np.ones(d_h) * 1.0          # forget bias = 1
+Wi = init(d_h, d_x + d_h); bi = np.zeros(d_h)
+Wo = init(d_h, d_x + d_h); bo = np.zeros(d_h)
+Wc = init(d_h, d_x + d_h); bc = np.zeros(d_h)
+
+h = np.zeros(d_h); c = np.zeros(d_h)
+H = []; C = []
+for t in range(T):
+    h, c = lstm_step(X[t], h, c, Wf, Wi, Wo, Wc, bf, bi, bo, bc)
+    H.append(h); C.append(c)
+H = np.array(H); C = np.array(C)
+print(f"hidden state norm at t=0, 10, 20, 29: "
+      f"{[round(np.linalg.norm(H[t]), 3) for t in [0, 10, 20, 29]]}")
+print(f"cell state norm at t=0, 10, 20, 29:   "
+      f"{[round(np.linalg.norm(C[t]), 3) for t in [0, 10, 20, 29]]}")
+
+# Forget-gate magnitude over time tells us how much memory is preserved
+forget_norms = []
+h_prev, c_prev = np.zeros(d_h), np.zeros(d_h)
+for t in range(T):
+    z = np.concatenate([X[t], h_prev])
+    f_gate = sigmoid(Wf @ z + bf)
+    forget_norms.append(f_gate.mean())
+    h_prev, c_prev = lstm_step(X[t], h_prev, c_prev, Wf, Wi, Wo, Wc, bf, bi, bo, bc)
+print(f"mean forget-gate value: {round(np.mean(forget_norms), 3)}  "
+      f"(starts near sigmoid(1)=0.73)")
+```
+
+The cell state norm remains stable across 30 timesteps because the
+forget gate (initialized to bias +1) is mostly open. The next lesson
+combines LSTMs with attention to handle variable-length input-output
+pairs.
