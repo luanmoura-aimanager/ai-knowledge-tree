@@ -1,0 +1,135 @@
+---
+title: "Multi-armed bandits"
+pillar: B
+subId: B4
+lessonId: multi-armed-bandits
+order: 4
+estimatedMinutes: 24
+goal: "Formalize the explore-exploit tradeoff, prove the UCB1 regret bound, and implement Thompson sampling for Bernoulli arms."
+prerequisites: ["power-analysis"]
+---
+
+In a traditional A/B test, traffic is split equally between arms throughout the
+experiment: exploration and exploitation are kept separate. A **multi-armed bandit**
+treats them simultaneously: each round, the algorithm observes which arms have
+performed well and allocates more traffic to them, while still occasionally trying
+others. The goal is to maximize cumulative reward, not just estimate arm means.
+
+## The bandit problem
+
+A slot machine has $K$ arms. Arm $k$ pays reward $r \sim \mathcal{D}_k$ with unknown
+mean $\mu_k$. At each round $t = 1, \ldots, T$:
+
+1. Choose arm $A_t \in \{1, \ldots, K\}$.
+2. Observe reward $R_t \sim \mathcal{D}_{A_t}$.
+
+**Regret** measures the cumulative gap to the optimal arm:
+
+$$
+\mathcal{R}_T = T\mu^* - \sum_{t=1}^T E[R_t],
+$$
+
+where $\mu^* = \max_k \mu_k$.
+
+## UCB1
+
+The **upper confidence bound** (UCB1; Auer et al., 2002) selects the arm with the
+highest upper confidence bound on its mean:
+
+$$
+A_t = \arg\max_k \left(\hat\mu_k + \sqrt{\frac{2\ln t}{n_k}}\right),
+$$
+
+where $\hat\mu_k$ is the sample mean for arm $k$ and $n_k$ is its pull count.
+
+**Intuition.** The bound $\sqrt{2\ln t / n_k}$ is large for rarely pulled arms
+(optimism forces exploration) and small for frequently pulled arms (exploitation
+wins when the evidence is strong).
+
+**Regret bound.** UCB1 achieves:
+
+$$
+\mathcal{R}_T \le \sum_{k: \mu_k < \mu^*} \frac{8\ln T}{\Delta_k} + \left(1 + \frac{\pi^2}{3}\right)\sum_{k: \mu_k < \mu^*} \Delta_k,
+$$
+
+where $\Delta_k = \mu^* - \mu_k$. This is $O(\ln T)$, and the bound is tight: no
+algorithm can achieve $o(\ln T)$ regret for all bandit instances.
+
+## Thompson sampling
+
+**Thompson sampling** is a Bayesian alternative. Maintain a posterior over each
+arm's mean; at each round, sample one value from each posterior and pull the arm
+with the highest sampled value.
+
+For Bernoulli rewards with Beta priors:
+
+1. Initialize $\alpha_k = \beta_k = 1$ (uniform prior) for all $k$.
+2. At round $t$: sample $\tilde\mu_k \sim \mathrm{Beta}(\alpha_k, \beta_k)$ for each $k$.
+3. Pull $A_t = \arg\max_k \tilde\mu_k$.
+4. Observe $R_t \in \{0, 1\}$ and update: $\alpha_{A_t} \mathrel{+}= R_t$, $\beta_{A_t} \mathrel{+}= 1-R_t$.
+
+Thompson sampling achieves the same $O(\ln T)$ regret as UCB1 and often performs
+better empirically.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+K = 5
+mu_true = np.array([0.1, 0.3, 0.5, 0.4, 0.2])  # arm means
+T = 2000
+
+def run_ucb1(T, mu, rng):
+    K = len(mu)
+    n  = np.zeros(K)
+    mu_hat = np.zeros(K)
+    rewards = []
+    # Pull each arm once
+    for k in range(K):
+        r = (rng.random() < mu[k])
+        n[k] += 1; mu_hat[k] = r
+        rewards.append(r)
+    for t in range(K, T):
+        ucb = mu_hat + np.sqrt(2 * np.log(t + 1) / (n + 1e-9))
+        k = ucb.argmax()
+        r = (rng.random() < mu[k])
+        n[k] += 1
+        mu_hat[k] += (r - mu_hat[k]) / n[k]
+        rewards.append(r)
+    return np.array(rewards)
+
+def run_thompson(T, mu, rng):
+    K = len(mu)
+    alpha = np.ones(K)
+    beta  = np.ones(K)
+    rewards = []
+    for _ in range(T):
+        samples = rng.beta(alpha, beta)
+        k = samples.argmax()
+        r = (rng.random() < mu[k])
+        alpha[k] += r
+        beta[k]  += 1 - r
+        rewards.append(r)
+    return np.array(rewards)
+
+mu_star = mu_true.max()
+r_ucb  = run_ucb1(T, mu_true, rng)
+r_ts   = run_thompson(T, mu_true, rng)
+r_rand = np.array([rng.random() < mu_true[rng.integers(K)] for _ in range(T)])
+
+cum_regret_ucb  = (mu_star - r_ucb).cumsum()
+cum_regret_ts   = (mu_star - r_ts).cumsum()
+cum_regret_rand = (mu_star - r_rand).cumsum()
+print(f"Cumulative regret at T={T}:")
+print(f"  UCB1:   {cum_regret_ucb[-1]:.1f}")
+print(f"  Thompson: {cum_regret_ts[-1]:.1f}")
+print(f"  Random: {cum_regret_rand[-1]:.1f}")
+```
+
+Both UCB1 and Thompson sampling accumulate far less regret than random arm selection,
+growing logarithmically while random grows linearly.
+
+The next lesson adds context: each round an arm's payoff depends on observable
+features of the user, turning the bandit into a contextual bandit.

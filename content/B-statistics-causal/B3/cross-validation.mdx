@@ -1,0 +1,119 @@
+---
+title: "Cross-validation strategies"
+pillar: B
+subId: B3
+lessonId: cross-validation
+order: 4
+estimatedMinutes: 20
+goal: "Build k-fold, leave-one-out, stratified, and time-series CV; characterize their bias-variance tradeoff and the conditions under which each is appropriate."
+prerequisites: ["B1/estimator-properties", "bootstrap"]
+---
+
+A model's training error underestimates its generalization error because the model
+has been fit to the training data. **Cross-validation** (CV) estimates generalization
+error by holding out a portion of the data during fitting, evaluating on the held-out
+set, and averaging over multiple splits.
+
+## K-fold cross-validation
+
+Partition the data into $K$ roughly equal folds. For $k = 1, \ldots, K$:
+
+1. Train the model on all folds except $k$.
+2. Evaluate on fold $k$, recording the test loss $L_k$.
+
+The CV estimate of generalization error is:
+
+$$
+\widehat{\mathrm{Err}}_K = \frac{1}{K}\sum_{k=1}^K L_k.
+$$
+
+**Bias-variance tradeoff:**
+- Large $K$ (e.g., $K=n$, leave-one-out): each training set is nearly the full dataset,
+  so the estimate is nearly unbiased. But the $n$ test scores are highly correlated
+  (each training set differs by only two points), giving high variance.
+- Small $K$ (e.g., $K=5$): each training set is smaller than the full dataset, so
+  the estimate is slightly pessimistic (biased upward). But the $K$ test scores are
+  less correlated, giving lower variance.
+
+The standard choice is $K = 10$, balancing both.
+
+## Leave-one-out CV
+
+$K = n$: train on $n-1$ points, test on 1, repeat $n$ times. For linear models,
+LOOCV has a closed-form shortcut via the hat matrix $H = X(X^TX)^{-1}X^T$:
+
+$$
+\mathrm{LOOCV} = \frac{1}{n}\sum_{i=1}^n \left(\frac{y_i - \hat y_i}{1 - H_{ii}}\right)^2,
+$$
+
+where $\hat y_i$ is the fitted value from the full model. No $n$ refits required.
+
+## Stratified CV
+
+For classification, a random split may put all instances of a rare class in the
+test fold. **Stratified CV** preserves the class distribution in each fold.
+
+## Time-series CV
+
+For time-ordered data, using future data to predict the past is data leakage.
+**Walk-forward CV** (also called expanding window or sliding window):
+
+- Train on $[1, t]$, test on $t+1$, for $t = n_0, n_0+1, \ldots, n-1$.
+- Or: train on $[t - w, t]$ (fixed window), test on $t+1$.
+
+This respects temporal ordering and estimates generalization to future data.
+
+## The bootstrap vs. CV
+
+The bootstrap also estimates generalization error via the $.632$ estimator:
+
+$$
+\hat{\mathrm{Err}}_{.632} = 0.368 \cdot \widehat{\mathrm{Err}}_{\mathrm{train}} + 0.632 \cdot \widehat{\mathrm{Err}}_{\mathrm{boot}}.
+$$
+
+For small datasets the bootstrap is less biased than 5-fold CV; for large datasets,
+5- or 10-fold CV is preferred.
+
+## Implementation
+
+```python-static
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import (cross_val_score, StratifiedKFold,
+                                      LeaveOneOut, TimeSeriesSplit)
+from sklearn.metrics import accuracy_score
+
+rng = np.random.default_rng(0)
+X, y = make_classification(n_samples=200, n_features=10, random_state=0)
+
+model = LogisticRegression(max_iter=500, random_state=0)
+
+# Standard k-fold
+scores_k5  = cross_val_score(model, X, y, cv=5,  scoring='accuracy')
+scores_k10 = cross_val_score(model, X, y, cv=10, scoring='accuracy')
+print(f"5-fold  CV: {scores_k5.mean():.4f} +/- {scores_k5.std():.4f}")
+print(f"10-fold CV: {scores_k10.mean():.4f} +/- {scores_k10.std():.4f}")
+
+# Stratified k-fold
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+scores_strat = cross_val_score(model, X, y, cv=skf, scoring='accuracy')
+print(f"Stratified 5-fold: {scores_strat.mean():.4f} +/- {scores_strat.std():.4f}")
+
+# LOOCV (small sample for speed)
+X_s, y_s = X[:50], y[:50]
+loo = LeaveOneOut()
+scores_loo = cross_val_score(model, X_s, y_s, cv=loo, scoring='accuracy')
+print(f"LOOCV (n=50): {scores_loo.mean():.4f} +/- {scores_loo.std():.4f}")
+
+# Time-series split
+tscv = TimeSeriesSplit(n_splits=5)
+scores_ts = cross_val_score(model, X, y, cv=tscv, scoring='accuracy')
+print(f"Time-series CV: {scores_ts.mean():.4f} +/- {scores_ts.std():.4f}")
+```
+
+The time-series CV score can differ from the i.i.d. CV score when temporal structure
+exists; here the data are i.i.d. so they are similar.
+
+B4 moves from estimating to deciding: experimental design, power analysis, and
+bandit algorithms for adaptive experimentation.

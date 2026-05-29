@@ -1,0 +1,137 @@
+---
+title: "Sampling distributions, standard error, and confidence intervals"
+pillar: B
+subId: B1
+lessonId: sampling-distributions
+order: 1
+estimatedMinutes: 22
+goal: "Treat a statistic as a random variable over repeated samples, derive its standard error via the CLT, and construct a frequentist confidence interval."
+prerequisites: ["A2/lln-clt", "A2/mle"]
+---
+
+You have a dataset of $n$ observations and you compute the sample mean $\bar{X}_n$.
+You report it. But how far could it be from the true population mean $\mu$?
+Answering that question requires thinking of $\bar{X}_n$ not as a fixed number but as
+a random variable: different samples from the same population produce different values.
+The distribution of a statistic over all possible samples is its **sampling distribution**.
+
+## The sample mean as a random variable
+
+Let $X_1, \ldots, X_n$ be i.i.d. draws from a population with mean $\mu$ and variance
+$\sigma^2 < \infty$. The sample mean is:
+
+$$
+\bar{X}_n = \frac{1}{n} \sum_{i=1}^n X_i.
+$$
+
+Two quantities follow immediately from linearity of expectation and independence.
+
+**Expectation:** $E[\bar{X}_n] = \mu$. The sample mean is an unbiased estimator of $\mu$.
+
+**Variance:**
+
+$$
+\mathrm{Var}(\bar{X}_n) = \mathrm{Var}\!\left(\frac{1}{n}\sum_i X_i\right) = \frac{1}{n^2} \sum_i \mathrm{Var}(X_i) = \frac{\sigma^2}{n}.
+$$
+
+The **standard error** (SE) is the standard deviation of the sampling distribution:
+
+$$
+\mathrm{SE}(\bar{X}_n) = \frac{\sigma}{\sqrt{n}}.
+$$
+
+Doubling the sample size shrinks the standard error by $\sqrt{2}$, not 2.
+
+## The CLT and approximate normality
+
+The Central Limit Theorem (see A2/lln-clt) says that regardless of the population shape:
+
+$$
+\frac{\bar{X}_n - \mu}{\sigma/\sqrt{n}} \xrightarrow{d} \mathcal{N}(0, 1).
+$$
+
+For large $n$ (a common rule of thumb is $n \ge 30$), we treat $\bar{X}_n$ as
+approximately normal. This is the engine behind most frequentist inference.
+
+## Confidence intervals
+
+A $95\%$ confidence interval (CI) for $\mu$ is a random interval that contains $\mu$
+in $95\%$ of repeated experiments. It is **not** a statement about the probability
+that $\mu$ lies in a particular realized interval: $\mu$ is fixed, unknown, and not
+random.
+
+**Construction when $\sigma$ is known.**
+
+From the CLT, $P\!\left(|\bar{X}_n - \mu| \le 1.96 \cdot \sigma/\sqrt{n}\right) \approx 0.95$.
+Rearranging:
+
+$$
+\left[\bar{X}_n - 1.96 \frac{\sigma}{\sqrt{n}},\; \bar{X}_n + 1.96 \frac{\sigma}{\sqrt{n}}\right].
+$$
+
+The constant $1.96$ is the $97.5$th percentile of $\mathcal{N}(0,1)$, the value $z^*$
+satisfying $P(-z^* \le Z \le z^*) = 0.95$.
+
+**When $\sigma$ is unknown** (the typical case), substitute the sample standard
+deviation $s = \sqrt{\frac{1}{n-1}\sum_i (X_i - \bar{X}_n)^2}$ and use the
+$t_{n-1}$ distribution instead of $\mathcal{N}(0,1)$. For $n \ge 30$ the $t$ and
+normal quantiles are nearly identical.
+
+## The general pattern
+
+The same logic extends to any estimator $\hat\theta$ that satisfies a CLT:
+
+$$
+\hat\theta \pm z^* \cdot \widehat{\mathrm{SE}}(\hat\theta),
+$$
+
+where $\widehat{\mathrm{SE}}$ is a consistent estimator of the standard error. The
+next lesson (method of moments) and the lesson on Fisher information both supply
+different ways to compute that SE.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# True population: Exponential(lambda=2) => mean=0.5, std=0.5
+lam = 2.0
+mu_true = 1.0 / lam
+sigma_true = 1.0 / lam
+
+n = 100
+n_experiments = 10_000
+sample_means = np.array([rng.exponential(1/lam, n).mean() for _ in range(n_experiments)])
+
+se_empirical = sample_means.std()
+se_theory    = sigma_true / np.sqrt(n)
+print(f"Empirical SE: {se_empirical:.4f}")
+print(f"Theoretical SE (sigma/sqrt(n)): {se_theory:.4f}")
+
+# Single-sample 95% CI using CLT approximation
+sample = rng.exponential(1/lam, n)
+xbar = sample.mean()
+s    = sample.std(ddof=1)
+z_star = 1.96
+ci_lo = xbar - z_star * s / np.sqrt(n)
+ci_hi = xbar + z_star * s / np.sqrt(n)
+print(f"95% CI: [{ci_lo:.4f}, {ci_hi:.4f}]  (true mean = {mu_true:.4f})")
+
+# Coverage simulation: fraction of CIs that contain mu_true
+covers = 0
+for _ in range(n_experiments):
+    x = rng.exponential(1/lam, n)
+    lo = x.mean() - 1.96 * x.std(ddof=1) / np.sqrt(n)
+    hi = x.mean() + 1.96 * x.std(ddof=1) / np.sqrt(n)
+    covers += (lo <= mu_true <= hi)
+print(f"Coverage: {covers/n_experiments:.3f}  (target: 0.95)")
+```
+
+The coverage simulation confirms that roughly 95% of intervals contain the true
+mean, which is exactly what the frequentist guarantee promises.
+
+The next lesson introduces method of moments, a second estimation strategy that
+derives estimates by matching population and sample moments instead of maximizing
+a likelihood.

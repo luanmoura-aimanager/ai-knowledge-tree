@@ -1,0 +1,122 @@
+---
+title: "Contextual bandits"
+pillar: B
+subId: B4
+lessonId: contextual-bandits
+order: 5
+estimatedMinutes: 24
+goal: "Extend bandits to contexts; implement LinUCB (linear upper confidence bound) with a ridge-regression reward model and prove its regret bound."
+prerequisites: ["multi-armed-bandits"]
+---
+
+In a multi-armed bandit, the payoff distribution of each arm is fixed. In practice,
+the right action depends on the current **context**: a recommendation algorithm should
+show a different article to a user interested in sports vs. technology. A
+**contextual bandit** observes a context vector $\mathbf{x}_t$ before choosing an arm,
+and the expected reward depends on both the arm and the context.
+
+## The contextual bandit
+
+At each round $t$:
+1. Observe context $\mathbf{x}_t \in \mathbb{R}^d$.
+2. Choose arm $A_t \in \{1, \ldots, K\}$.
+3. Observe reward $R_t$.
+
+The expected reward is $E[R_t \mid \mathbf{x}_t, A_t = k] = f_k(\mathbf{x}_t)$.
+The goal is to minimize regret against the policy that selects the best arm for
+each context.
+
+## LinUCB (linear UCB)
+
+**LinUCB** (Li et al., 2010) assumes the reward is linear in the context:
+
+$$
+E[R_t \mid \mathbf{x}_t, A_t = k] = \mathbf{x}_t^\top \boldsymbol{\theta}_k,
+$$
+
+where $\boldsymbol{\theta}_k \in \mathbb{R}^d$ is an arm-specific parameter vector.
+
+At each round, arm $k$ has been pulled with contexts $\mathbf{X}_k$ (rows) and
+rewards $\mathbf{r}_k$. The ridge regression estimate is:
+
+$$
+\hat{\boldsymbol{\theta}}_k = (A_k)^{-1} \mathbf{X}_k^\top \mathbf{r}_k,
+\quad A_k = \mathbf{X}_k^\top \mathbf{X}_k + \lambda I.
+$$
+
+The uncertainty in the mean prediction at $\mathbf{x}_t$ is:
+
+$$
+\mathrm{Var}[\mathbf{x}_t^\top \hat{\boldsymbol{\theta}}_k] = \mathbf{x}_t^\top A_k^{-1} \mathbf{x}_t.
+$$
+
+LinUCB selects the arm with the highest upper confidence bound:
+
+$$
+A_t = \arg\max_k \left(\mathbf{x}_t^\top \hat{\boldsymbol{\theta}}_k + \alpha \sqrt{\mathbf{x}_t^\top A_k^{-1} \mathbf{x}_t}\right),
+$$
+
+where $\alpha > 0$ controls the exploration bonus.
+
+**Regret bound.** Under mild assumptions, LinUCB achieves
+$\mathcal{R}_T = O(d\sqrt{T\ln^3(KT/\delta)})$ with probability $1-\delta$.
+The $\sqrt{T}$ rate (vs. $\ln T$ for fixed-mean bandits) reflects the harder
+learning problem when the parameters must be estimated from context-dependent data.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+K, d, T = 3, 4, 2000
+theta_true = rng.normal(0, 1, (K, d))
+alpha = 1.0
+lam   = 1.0
+
+# LinUCB per-arm state
+A_inv = [np.eye(d) / lam for _ in range(K)]   # (lambda*I)^{-1} initially
+b     = [np.zeros(d) for _ in range(K)]        # X^T r accumulator
+
+def predict(k, x):
+    th = A_inv[k] @ b[k]
+    ucb = x @ th + alpha * np.sqrt(x @ A_inv[k] @ x)
+    return ucb, th
+
+total_reward = 0
+best_reward  = 0
+for t in range(T):
+    x = rng.normal(0, 1, d)
+    x /= np.linalg.norm(x) + 1e-9        # unit context
+    best_k = max(range(K), key=lambda k: x @ theta_true[k])
+    best_reward += x @ theta_true[best_k]
+
+    ucbs = [predict(k, x)[0] for k in range(K)]
+    chosen = int(np.argmax(ucbs))
+    reward = x @ theta_true[chosen] + rng.normal(0, 0.1)
+    total_reward += reward
+
+    # Rank-1 update (Sherman-Morrison)
+    Ainv = A_inv[chosen]
+    Ax   = Ainv @ x
+    A_inv[chosen] = Ainv - np.outer(Ax, Ax) / (1 + x @ Ax)
+    b[chosen] += x * reward
+
+regret = best_reward - total_reward
+print(f"LinUCB total regret at T={T}: {regret:.2f}")
+print(f"Mean regret per round: {regret/T:.4f}")
+
+# Compare to random policy
+rnd_reward = sum(
+    rng.normal(0, 1, d) @ theta_true[rng.integers(K)]
+    for _ in range(T)
+)
+# Best minus random regret
+```
+
+The Sherman-Morrison update avoids the $O(d^3)$ matrix inversion at each step,
+reducing per-step cost to $O(d^2)$.
+
+B5 moves from experimentation to the deeper question of causality: when does
+an observed association reflect a real causal mechanism, and how can we estimate
+the effect of an intervention we did not run?

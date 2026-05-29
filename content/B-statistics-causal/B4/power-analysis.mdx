@@ -1,0 +1,131 @@
+---
+title: "Power analysis and sample size"
+pillar: B
+subId: B4
+lessonId: power-analysis
+order: 2
+estimatedMinutes: 20
+goal: "Define statistical power as 1-β, derive the required sample size for a two-sample z-test, and plot power as a function of n, δ, and α."
+prerequisites: ["ab-testing"]
+---
+
+Designing an experiment before running it requires choosing a sample size. Too small
+and the experiment is underpowered: real effects go undetected. Too large and
+resources are wasted. **Power analysis** formalizes the relationship between sample
+size, effect size, significance level, and power so that the experiment can be
+sized deliberately.
+
+## The four quantities
+
+Any power analysis involves four interdependent quantities. Fix three, and the fourth
+is determined.
+
+- $\alpha$: Type I error rate (false positive rate). Typically 0.05.
+- $\beta$: Type II error rate (false negative rate). Power $= 1 - \beta$; typically 0.80.
+- $\delta$: effect size (the true difference to detect).
+- $n$: sample size (per group for a two-sample test).
+
+## Derivation for the two-sample z-test
+
+$X_i \sim \mathcal{N}(\mu_A, \sigma^2)$, $Y_j \sim \mathcal{N}(\mu_B, \sigma^2)$,
+$n$ per group. The test statistic is:
+
+$$
+Z = \frac{\bar X - \bar Y}{\sigma\sqrt{2/n}}.
+$$
+
+Under $H_0$ ($\delta = 0$): $Z \sim \mathcal{N}(0, 1)$.
+
+Under $H_1$ ($\delta = \mu_B - \mu_A \ne 0$): $Z \sim \mathcal{N}(\lambda, 1)$ where
+the **noncentrality parameter** is $\lambda = \delta / (\sigma\sqrt{2/n})$.
+
+Power is:
+
+$$
+1 - \beta = P(|Z| > z_{\alpha/2} \mid \lambda)
+\approx \Phi(\lambda - z_{\alpha/2}) + \Phi(-\lambda - z_{\alpha/2}).
+$$
+
+For one-sided alternatives or when $\lambda \gg z_{\alpha/2}$, the second term
+is negligible and power $\approx \Phi(\lambda - z_{\alpha/2})$.
+
+Setting power $= 1 - \beta$, so $z_\beta = \Phi^{-1}(1-\beta)$:
+
+$$
+\lambda = z_{\alpha/2} + z_\beta \implies \frac{\delta}{\sigma\sqrt{2/n}} = z_{\alpha/2} + z_\beta.
+$$
+
+Solving for $n$:
+
+$$
+n = \frac{2\sigma^2(z_{\alpha/2} + z_\beta)^2}{\delta^2}.
+$$
+
+Dividing by $\sigma^2$ shows that what matters is the **standardized effect size**
+$\delta/\sigma$ (Cohen's $d$).
+
+## Cohen's $d$ and conventions
+
+Cohen (1988) defined small / medium / large effect sizes for the two-sample case:
+
+| Effect | $d = \delta/\sigma$ | Typical $n$ per group ($\alpha=0.05$, power $=0.80$) |
+|---|---|---|
+| Small | 0.2 | 394 |
+| Medium | 0.5 | 64 |
+| Large | 0.8 | 26 |
+
+These conventions are rough guides, not universal standards.
+
+## Sequential designs and alpha-spending
+
+Fixed-sample designs require committing to $n$ before looking at data. **Sequential
+tests** allow optional stopping with valid Type I error control by spending $\alpha$
+across multiple interim looks (O'Brien-Fleming, Lan-DeMets). The CUPED lesson
+continues this thread.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+import matplotlib
+matplotlib.use('Agg')
+
+# Required sample size for two-sample z-test
+def required_n(delta, sigma, alpha=0.05, power=0.80):
+    z_a = stats.norm.ppf(1 - alpha/2)
+    z_b = stats.norm.ppf(power)
+    return int(np.ceil(2 * sigma**2 * (z_a + z_b)**2 / delta**2))
+
+sigma = 1.0
+print("Sample size for two-sample z-test (sigma=1):")
+for d in [0.2, 0.5, 0.8, 1.0]:
+    n = required_n(d, sigma)
+    print(f"  delta={d:.1f} (Cohen's d={d:.1f}): n={n} per group")
+
+# Simulate power at different n
+def empirical_power(delta, sigma, n, alpha=0.05, n_sim=5000, rng=None):
+    if rng is None:
+        rng = np.random.default_rng(0)
+    reject = 0
+    for _ in range(n_sim):
+        x = rng.normal(0,     sigma, n)
+        y = rng.normal(delta, sigma, n)
+        z = (x.mean() - y.mean()) / (sigma * np.sqrt(2/n))
+        if abs(z) > stats.norm.ppf(0.975):
+            reject += 1
+    return reject / n_sim
+
+rng = np.random.default_rng(1)
+delta, sigma = 0.5, 1.0
+print("\nEmpirical power vs n (delta=0.5, sigma=1.0):")
+for n in [20, 40, 64, 100, 200]:
+    pw = empirical_power(delta, sigma, n, rng=rng)
+    print(f"  n={n:3d}: power={pw:.3f}")
+print(f"  Required n (theory): {required_n(delta, sigma)}")
+```
+
+The empirical power at the theoretically required $n=64$ is close to the target 0.80.
+
+The next lesson shows how CUPED reduces the effective variance of the outcome,
+which lowers the required sample size without collecting more data.

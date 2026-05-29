@@ -1,0 +1,128 @@
+---
+title: "Conjugate prior families"
+pillar: B
+subId: B2
+lessonId: conjugate-priors
+order: 2
+estimatedMinutes: 22
+goal: "Prove that Beta-Binomial, Dirichlet-Categorical, and Gaussian-Gaussian are conjugate pairs and derive the closed-form posterior update in each case."
+prerequisites: ["prior-likelihood-posterior", "A2/exponential-family"]
+---
+
+For most likelihood-prior combinations, the posterior has no closed form and must be
+approximated. A **conjugate prior** is a special case where the prior and posterior
+belong to the same parametric family, making the update an algebraic formula.
+
+## Definition
+
+A prior family $\mathcal{P}$ is **conjugate** to a likelihood $p(x \mid \theta)$ if
+for every prior $p(\theta) \in \mathcal{P}$ and every observation $x$, the posterior
+$p(\theta \mid x) \in \mathcal{P}$.
+
+Conjugacy is a property of the likelihood family, not a single distribution.
+
+## Beta-Binomial (from the previous lesson)
+
+**Likelihood.** $k \mid \theta \sim \mathrm{Binomial}(n, \theta)$.
+
+**Prior.** $\theta \sim \mathrm{Beta}(\alpha, \beta)$.
+
+**Posterior.** $\theta \mid k \sim \mathrm{Beta}(\alpha + k, \beta + n - k)$.
+
+The hyperparameters update by adding observed counts: $\alpha \leftarrow \alpha + k$
+and $\beta \leftarrow \beta + (n-k)$.
+
+## Dirichlet-Categorical
+
+**Likelihood.** A single categorical draw from $K$ categories: $x \mid \theta \sim \mathrm{Cat}(\theta)$,
+where $\theta \in \Delta^{K-1}$ (the probability simplex).
+
+**Prior.** $\theta \sim \mathrm{Dirichlet}(\boldsymbol{\alpha})$ with concentration
+$\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_K)$:
+
+$$
+p(\theta) \propto \prod_{k=1}^K \theta_k^{\alpha_k - 1}.
+$$
+
+**Posterior after observing counts $\mathbf{n} = (n_1, \ldots, n_K)$.**
+
+$$
+p(\theta \mid \mathbf{n}) \propto \prod_k \theta_k^{n_k + \alpha_k - 1}
+\implies \theta \mid \mathbf{n} \sim \mathrm{Dirichlet}(\boldsymbol{\alpha} + \mathbf{n}).
+$$
+
+This is the natural generalization of Beta-Binomial to multiple categories.
+
+## Gaussian-Gaussian (known variance)
+
+**Likelihood.** $X_1, \ldots, X_n \mid \mu \sim \mathcal{N}(\mu, \sigma^2)$ with
+$\sigma^2$ known.
+
+**Prior.** $\mu \sim \mathcal{N}(\mu_0, \tau_0^2)$.
+
+**Posterior.** Multiplying Gaussian kernels and completing the square:
+
+$$
+\mu \mid x_{1:n} \sim \mathcal{N}(\mu_n, \tau_n^2),
+$$
+
+where the posterior precision $1/\tau_n^2$ and mean $\mu_n$ are:
+
+$$
+\frac{1}{\tau_n^2} = \frac{1}{\tau_0^2} + \frac{n}{\sigma^2}, \qquad
+\mu_n = \tau_n^2 \left(\frac{\mu_0}{\tau_0^2} + \frac{n\bar x}{\sigma^2}\right).
+$$
+
+In words: the posterior precision is the sum of prior precision and data precision.
+The posterior mean is a precision-weighted average of the prior mean and the sample mean.
+
+As $n \to \infty$, $\mu_n \to \bar x$ (the MLE) and $\tau_n^2 \to 0$: the data
+swamp the prior.
+
+## Conjugacy for exponential families
+
+The Beta, Dirichlet, and Gaussian-Gaussian patterns are all instances of a general
+theorem: every exponential family (A2/exponential-family) has a conjugate prior,
+and the posterior update reduces to adding sufficient statistics to the hyperparameters.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy.stats import dirichlet
+
+rng = np.random.default_rng(0)
+
+# Dirichlet-Categorical
+alpha0 = np.array([1.0, 1.0, 1.0])         # uniform Dirichlet prior
+theta_true = np.array([0.5, 0.3, 0.2])
+data = rng.choice(3, size=200, p=theta_true)
+counts = np.bincount(data, minlength=3)
+alpha_post = alpha0 + counts
+post_mean = alpha_post / alpha_post.sum()
+print(f"True theta: {theta_true}")
+print(f"Posterior mean: {post_mean.round(3)}")
+
+# Gaussian-Gaussian
+mu0, tau0_sq = 0.0, 4.0    # prior
+mu_true, sigma_sq = 2.5, 1.0
+n = 50
+x = rng.normal(mu_true, np.sqrt(sigma_sq), n)
+xbar = x.mean()
+prec_prior = 1.0 / tau0_sq
+prec_data  = n / sigma_sq
+prec_post  = prec_prior + prec_data
+tau_n_sq   = 1.0 / prec_post
+mu_n = tau_n_sq * (mu0 * prec_prior + xbar * prec_data)
+print(f"\nTrue mu: {mu_true}")
+print(f"Prior mean: {mu0}, Prior std: {np.sqrt(tau0_sq):.2f}")
+print(f"Posterior mean: {mu_n:.4f}, Posterior std: {np.sqrt(tau_n_sq):.4f}")
+```
+
+The posterior mean sits between the prior mean (0) and the sample mean,
+closer to the sample mean because $n=50$ observations carry much more precision
+than the prior.
+
+The next lesson stacks another layer on top by placing hyperpriors over the
+hyperparameters themselves, producing hierarchical models that share statistical
+strength across groups.

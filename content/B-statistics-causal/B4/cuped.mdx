@@ -1,0 +1,127 @@
+---
+title: "CUPED and variance reduction"
+pillar: B
+subId: B4
+lessonId: cuped
+order: 3
+estimatedMinutes: 18
+goal: "Apply CUPED to remove pre-experiment covariate variance from the outcome, and derive the effective variance reduction factor as 1 - ρ²."
+prerequisites: ["power-analysis"]
+---
+
+Most A/B tests waste statistical power because the outcome variable carries variance
+that is unrelated to the treatment. A user's pre-experiment behavior (clicks last
+week) predicts their post-experiment behavior (clicks this week) regardless of which
+variant they see. **CUPED** (Controlled-experiment Using Pre-Experiment Data;
+Deng et al., 2013) removes this predictable variance from the outcome, increasing
+power without collecting more data.
+
+## The idea
+
+For each user $i$ in the experiment, let:
+
+- $Y_i$: post-experiment outcome (clicks this week).
+- $X_i$: pre-experiment covariate (clicks last week), observed before treatment assignment.
+- $W_i \in \{0, 1\}$: treatment assignment (0 = control, 1 = treatment).
+
+Because $X_i$ is observed before randomization, it is independent of $W_i$
+(by design). The **CUPED-adjusted outcome** is:
+
+$$
+\tilde Y_i = Y_i - \theta (X_i - \bar X),
+$$
+
+where $\theta$ is chosen to minimize $\mathrm{Var}(\tilde Y_i)$.
+
+## Optimal $\theta$
+
+$$
+\mathrm{Var}(\tilde Y_i) = \mathrm{Var}(Y_i) - 2\theta \mathrm{Cov}(Y_i, X_i) + \theta^2 \mathrm{Var}(X_i).
+$$
+
+Setting the derivative with respect to $\theta$ to zero:
+
+$$
+\theta^* = \frac{\mathrm{Cov}(Y, X)}{\mathrm{Var}(X)}.
+$$
+
+This is the OLS regression coefficient of $Y$ on $X$.
+
+## Variance reduction
+
+At the optimal $\theta^*$:
+
+$$
+\mathrm{Var}(\tilde Y) = \mathrm{Var}(Y)(1 - \rho^2),
+$$
+
+where $\rho = \mathrm{Corr}(Y, X)$ is the Pearson correlation. The variance
+reduction factor is $1 - \rho^2$.
+
+For $\rho = 0.7$ (a common value for pre/post experiment metrics): variance
+is reduced by $51\%$, and the required sample size is halved (since required
+$n \propto \sigma^2$).
+
+## Unbiasedness
+
+Since $E[X_i] = \bar X$ in a large experiment and $E[X_i \mid W_i] = E[X_i]$ by
+randomization, the adjusted difference in means:
+
+$$
+(\bar{\tilde Y}_{\text{treat}} - \bar{\tilde Y}_{\text{ctrl}}) = (\bar Y_{\text{treat}} - \bar Y_{\text{ctrl}}) - \theta (\bar X_{\text{treat}} - \bar X_{\text{ctrl}}),
+$$
+
+has $E[\bar X_{\text{treat}} - \bar X_{\text{ctrl}}] = 0$, so CUPED does not change
+the expected value of the treatment effect estimate.
+
+## Multiple covariates
+
+With a vector of covariates $\mathbf{X}_i$, use the multivariate OLS coefficient:
+$\theta^* = \Sigma_{XX}^{-1} \Sigma_{XY}$, and the adjusted outcome is
+$\tilde Y_i = Y_i - \theta^{*\top}(\mathbf{X}_i - \bar{\mathbf{X}})$.
+The variance reduction is $1 - R^2$ where $R^2$ is from regressing $Y$ on $\mathbf{X}$.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+n = 500           # per group
+delta = 0.5       # true treatment effect
+rho   = 0.7       # pre/post correlation
+
+# Simulate correlated pre/post data
+# Y = delta*W + rho*X_std + noise, X ~ N(0,1)
+X = rng.normal(0, 1, 2*n)
+noise = rng.normal(0, np.sqrt(1 - rho**2), 2*n)
+W = np.array([0]*n + [1]*n)
+Y = delta * W + rho * X + noise
+
+# Estimate theta on combined data (in practice: train on control or pre-experiment)
+theta_hat = np.cov(Y, X)[0, 1] / np.var(X, ddof=1)
+Y_adj = Y - theta_hat * (X - X.mean())
+
+# Treatment effect estimates
+ctrl_mask = W == 0
+trt_mask  = W == 1
+
+ate_raw = Y[trt_mask].mean() - Y[ctrl_mask].mean()
+ate_adj = Y_adj[trt_mask].mean() - Y_adj[ctrl_mask].mean()
+
+se_raw = np.sqrt(Y[trt_mask].var(ddof=1)/n + Y[ctrl_mask].var(ddof=1)/n)
+se_adj = np.sqrt(Y_adj[trt_mask].var(ddof=1)/n + Y_adj[ctrl_mask].var(ddof=1)/n)
+
+print(f"True ATE: {delta}")
+print(f"Raw  ATE: {ate_raw:.4f}  SE={se_raw:.4f}")
+print(f"Adj  ATE: {ate_adj:.4f}  SE={se_adj:.4f}")
+print(f"Variance reduction: {1 - (se_adj/se_raw)**2:.3f}  (theoretical: {rho**2:.3f})")
+```
+
+The standard error of the adjusted estimator is about $\sqrt{1-\rho^2} \approx 0.71$
+times the raw SE, matching the theoretical prediction.
+
+The next lesson introduces multi-armed bandits, which replace the fixed-sample A/B
+test with an adaptive design that allocates more traffic to better-performing arms
+during the experiment.

@@ -1,0 +1,129 @@
+---
+title: "Structural causal models and DAGs"
+pillar: B
+subId: B5
+lessonId: scm-dags
+order: 2
+estimatedMinutes: 22
+goal: "Write a structural causal model as a DAG with structural equations; distinguish causes from associations and read intervention effects from the graph."
+prerequisites: ["potential-outcomes", "A2/markov-chains"]
+---
+
+The potential outcomes framework is a calculus for causal effects. Structural causal
+models (SCMs) provide a generative language for *why* those effects arise. An SCM
+represents the data-generating mechanism as a directed acyclic graph (DAG) plus a
+set of structural equations, one per variable.
+
+## Structural causal model
+
+An SCM $\mathcal{M}$ consists of:
+
+1. **Endogenous variables** $V = \{V_1, \ldots, V_n\}$: the observed quantities.
+2. **Exogenous variables** $U = \{U_1, \ldots, U_n\}$: independent background noise.
+3. **Structural equations**: $V_i = f_i(\mathrm{Pa}(V_i), U_i)$, where
+   $\mathrm{Pa}(V_i)$ are the direct causes (parents) of $V_i$ in the DAG.
+
+Each equation describes how $V_i$ is generated from its causes and noise, not just
+correlation.
+
+**Example: education, experience, and salary.**
+
+$$
+E = f_E(U_E), \quad X = f_X(E, U_X), \quad S = f_S(E, X, U_S).
+$$
+
+Here education $E$ affects both experience $X$ and salary $S$; experience also
+affects salary.
+
+## The DAG
+
+The DAG $G = (V, \mathcal{E})$ has a directed edge $V_i \to V_j$ if $V_i \in \mathrm{Pa}(V_j)$.
+"Acyclic" means no variable is its own ancestor. The DAG encodes causal structure,
+not statistical structure (correlations can arise via shared causes without direct edges).
+
+**Vocabulary:**
+
+- **Parent:** $V_i$ is a parent of $V_j$ if $V_i \to V_j$.
+- **Ancestor:** $V_i$ is an ancestor of $V_j$ if there is a directed path $V_i \to \cdots \to V_j$.
+- **Descendant:** $V_j$ is a descendant of $V_i$ if $V_i$ is an ancestor of $V_j$.
+- **Confounder:** a common cause $C$ with $C \to V_i$ and $C \to V_j$.
+
+## Intervention: the do-operator
+
+In the observational distribution, conditioning on $V_i = v$ changes the distribution
+over all variables by selecting a subpopulation. An **intervention** $do(V_i = v)$
+instead *sets* $V_i = v$ by severing its incoming edges:
+
+$$
+do(V_i = v): \text{ replace } V_i = f_i(\mathrm{Pa}(V_i), U_i) \text{ with } V_i = v.
+$$
+
+The interventional distribution $P(V \mid do(V_i = v))$ is computed from the
+**mutilated graph**: the original DAG with all edges into $V_i$ removed.
+
+**Observation vs. intervention.** In the salary example:
+
+$$
+P(S \mid E = e) \ne P(S \mid do(E = e)).
+$$
+
+$P(S \mid E = e)$ conditions on a subpopulation with high $E$ (which may also have
+higher $X$). $P(S \mid do(E = e))$ forcibly sets education for the whole population.
+
+## Identification conditions
+
+For the ATE to equal the naive difference in means, the potential outcomes framework
+requires **ignorability** (unconfoundedness):
+
+$$
+(Y(0), Y(1)) \perp W \mid X.
+$$
+
+In the SCM/DAG language, this means: once $X$ is conditioned on, no open
+back-door path connects $W$ to $Y$. The next lessons formalize this via d-separation.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 2000
+
+# SCM: C -> X, C -> Y, X -> Y
+# C: confounder, X: treatment, Y: outcome
+U_C = rng.normal(0, 1, n)
+U_X = rng.normal(0, 1, n)
+U_Y = rng.normal(0, 1, n)
+
+C = U_C
+X = 0.7 * C + U_X > 0     # binary treatment, P(X=1) increases with C
+X = X.astype(float)
+Y = 2.0 * X + 1.5 * C + U_Y  # true causal effect of X on Y is 2.0
+
+# Observational distribution
+naive_ate = Y[X==1].mean() - Y[X==0].mean()
+print(f"Naive ATE: {naive_ate:.4f}  (true: 2.0)")
+
+# Interventional: do(X=1) vs do(X=0) -- set X, break C->X edge
+Y_do1 = 2.0 * 1 + 1.5 * C + rng.normal(0, 1, n)
+Y_do0 = 2.0 * 0 + 1.5 * C + rng.normal(0, 1, n)
+true_ate = (Y_do1 - Y_do0).mean()
+print(f"Interventional ATE: {true_ate:.4f}")
+
+# Conditional on C (adjusting for confounder)
+from numpy.polynomial import polynomial as P
+bins = np.percentile(C, [0, 25, 50, 75, 100])
+strata_ates = []
+for lo, hi in zip(bins[:-1], bins[1:]):
+    mask = (C >= lo) & (C < hi)
+    eff  = Y[mask & (X==1)].mean() - Y[mask & (X==0)].mean()
+    strata_ates.append(eff)
+print(f"Stratified ATE:     {np.mean(strata_ates):.4f}  (adjusting for C)")
+```
+
+Conditioning on the confounder $C$ removes the selection bias and recovers the
+true effect.
+
+The next lesson introduces d-separation, the graphical rule for reading which
+conditional independencies follow from a DAG.

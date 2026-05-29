@@ -1,0 +1,144 @@
+---
+title: "Instrumental variables and 2SLS"
+pillar: B
+subId: B5
+lessonId: iv-estimation
+order: 7
+estimatedMinutes: 24
+goal: "State the three IV conditions, derive the Wald estimator and two-stage least squares, and identify the local average treatment effect (LATE)."
+prerequisites: ["propensity-scores"]
+---
+
+When confounders are unobserved, propensity-score methods fail. An **instrumental
+variable** (IV) provides an alternative: a variable $Z$ that affects treatment $W$
+but has no direct effect on the outcome $Y$ (except through $W$). Under these
+conditions, variation in $Z$ acts like a randomized experiment.
+
+## The three IV conditions
+
+Let $Z$ be the proposed instrument, $W$ the treatment, $Y$ the outcome, and $U$
+unobserved confounders.
+
+1. **Relevance:** $Z$ affects $W$. Formally, $\mathrm{Cov}(Z, W) \ne 0$.
+2. **Exclusion restriction:** $Z$ affects $Y$ only through $W$. No direct path
+   $Z \to Y$ (and no $Z \to U \to Y$).
+3. **Independence (exogeneity):** $Z$ is independent of the unmeasured confounders
+   $U$. Formally, $Z \perp U$.
+
+If any condition fails, the IV estimate is biased and inconsistent. Conditions 2
+and 3 are untestable from data alone and must be justified by design or domain
+knowledge.
+
+## The Wald estimator
+
+For a binary instrument $Z \in \{0, 1\}$ and binary treatment $W$, the Wald
+estimator is:
+
+$$
+\hat\tau_{\mathrm{IV}} = \frac{E[Y \mid Z=1] - E[Y \mid Z=0]}{E[W \mid Z=1] - E[W \mid Z=0]}.
+$$
+
+The numerator is the reduced-form effect (total effect of $Z$ on $Y$). The
+denominator is the first-stage effect (effect of $Z$ on $W$). Dividing scales
+the outcome effect by the fraction of units whose treatment status changes
+because of the instrument.
+
+**Derivation.** Since $Z \to W \to Y$ and $Z$ is exogenous:
+
+$$
+E[Y \mid Z=1] - E[Y \mid Z=0] = \tau \cdot (E[W \mid Z=1] - E[W \mid Z=0]).
+$$
+
+Solving: $\tau = \frac{\Delta Y}{\Delta W}$.
+
+## Two-stage least squares (2SLS)
+
+For continuous instruments and treatments, 2SLS generalizes the Wald estimator.
+
+**Stage 1:** regress $W$ on $Z$ (and any included covariates $X$):
+
+$$
+\hat W = Z\hat\gamma + X\hat\delta.
+$$
+
+**Stage 2:** regress $Y$ on $\hat W$ (predicted treatment) and $X$:
+
+$$
+Y = \hat W \hat\beta_{\mathrm{2SLS}} + X\hat\alpha + \varepsilon.
+$$
+
+$\hat\beta_{\mathrm{2SLS}}$ is the 2SLS estimator. Replacing $W$ with its predicted
+value $\hat W$ purges the endogeneity: $\hat W$ contains only variation from $Z$,
+which is exogenous.
+
+## Local average treatment effect (LATE)
+
+The IV estimator does not identify the ATE for the full population. It identifies
+the **LATE** (Imbens and Angrist, 1994): the average treatment effect for
+**compliers**, units whose treatment status is changed by the instrument.
+
+- **Always-takers:** $W = 1$ regardless of $Z$.
+- **Never-takers:** $W = 0$ regardless of $Z$.
+- **Compliers:** $W = Z$ (treatment status follows the instrument).
+- **Defiers:** $W = 1 - Z$ (excluded by the monotonicity assumption).
+
+$$
+\tau_{\mathrm{LATE}} = E[Y(1) - Y(0) \mid \text{complier}].
+$$
+
+The LATE equals the ATE only when all units are compliers (perfect compliance),
+which holds in a randomized experiment with full compliance.
+
+## Implementation
+
+```python
+import numpy as np
+from numpy.linalg import lstsq
+
+rng = np.random.default_rng(0)
+n = 5000
+
+# Instrument: Z binary (e.g., randomly assigned encouragement)
+# Confounder: U unobserved
+Z = rng.binomial(1, 0.5, n).astype(float)
+U = rng.normal(0, 1, n)      # unobserved confounder
+
+# First stage: W affected by Z and U
+W = (0.5 * Z + 0.8 * U + rng.normal(0, 1, n) > 0).astype(float)
+
+# True effect: Y(1) - Y(0) = 2 (constant)
+Y0 = 1.0 * U + rng.normal(0, 0.5, n)
+Y1 = Y0 + 2.0
+Y  = W * Y1 + (1 - W) * Y0
+
+# Naive OLS (biased: U is confounder)
+ols_b = lstsq(np.column_stack([np.ones(n), W]), Y, rcond=None)[0][1]
+
+# Wald estimator
+wald = (Y[Z==1].mean() - Y[Z==0].mean()) / (W[Z==1].mean() - W[Z==0].mean())
+
+# 2SLS
+X = np.column_stack([np.ones(n), Z])
+gamma = lstsq(X, W, rcond=None)[0]
+W_hat = X @ gamma
+X2 = np.column_stack([np.ones(n), W_hat])
+beta_2sls = lstsq(X2, Y, rcond=None)[0][1]
+
+print(f"True ATE (for compliers, LATE): 2.0")
+print(f"OLS estimate:  {ols_b:.4f}  (biased)")
+print(f"Wald estimate: {wald:.4f}")
+print(f"2SLS estimate: {beta_2sls:.4f}")
+
+# First-stage strength
+print(f"\nFirst stage coeff on Z: {gamma[1]:.4f}  (F-stat check: should be >> 10)")
+W_pred_var = W_hat.var()
+F_approx = W_pred_var / ((W - W_hat)**2).mean() * (n - 2)
+print(f"Approximate F-statistic: {F_approx:.1f}")
+```
+
+The OLS estimate is biased upward (positive confounding from $U$); 2SLS recovers
+the true LATE of 2.0. The large F-statistic in the first stage confirms the
+instrument is relevant.
+
+The next lesson covers difference-in-differences, which uses panel data and a
+parallel-trends assumption to estimate causal effects without an instrument.

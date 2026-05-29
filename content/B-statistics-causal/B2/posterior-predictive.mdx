@@ -1,0 +1,124 @@
+---
+title: "Posterior predictive distribution"
+pillar: B
+subId: B2
+lessonId: posterior-predictive
+order: 4
+estimatedMinutes: 20
+goal: "Marginalize the likelihood over the posterior to form the posterior predictive; compute it in closed form for the Beta-Binomial and Gaussian models."
+prerequisites: ["hierarchical-models"]
+---
+
+After updating to a posterior $p(\theta \mid x_{1:n})$, the goal is often to predict
+a new observation $\tilde x$. A point estimate $\hat\theta$ gives a single predictive
+distribution $p(\tilde x \mid \hat\theta)$ but ignores posterior uncertainty. The
+**posterior predictive distribution** integrates over the posterior:
+
+$$
+p(\tilde x \mid x_{1:n}) = \int p(\tilde x \mid \theta)\, p(\theta \mid x_{1:n})\, d\theta.
+$$
+
+This correctly propagates parameter uncertainty into predictions.
+
+## Beta-Binomial predictive
+
+Suppose $k \sim \mathrm{Binomial}(n, \theta)$ was observed, giving posterior
+$\theta \mid k \sim \mathrm{Beta}(\alpha', \beta')$ with $\alpha' = \alpha_0 + k$,
+$\beta' = \beta_0 + n - k$.
+
+For a new trial ($\tilde n = 1$):
+
+$$
+P(\tilde x = 1 \mid k) = \int_0^1 \theta \cdot \mathrm{Beta}(\theta; \alpha', \beta')\, d\theta = E[\theta \mid k] = \frac{\alpha'}{\alpha' + \beta'}.
+$$
+
+For $\tilde n > 1$ new trials, the predictive is the **Beta-Binomial** distribution:
+
+$$
+P(\tilde k = j \mid k) = \binom{\tilde n}{j} \frac{B(\alpha' + j,\; \beta' + \tilde n - j)}{B(\alpha', \beta')},
+$$
+
+where $B$ is the Beta function. Its variance exceeds a Binomial with the same mean
+because parameter uncertainty adds extra spread.
+
+## Gaussian predictive
+
+With prior $\mu \sim \mathcal{N}(\mu_0, \tau_0^2)$ and likelihood $X_i \mid \mu \sim \mathcal{N}(\mu, \sigma^2)$:
+
+**Posterior:** $\mu \mid x_{1:n} \sim \mathcal{N}(\mu_n, \tau_n^2)$ (from the conjugate update).
+
+**Predictive for $\tilde x$:**
+
+$$
+\tilde x \mid x_{1:n} \sim \mathcal{N}(\mu_n,\; \sigma^2 + \tau_n^2).
+$$
+
+The predictive variance $\sigma^2 + \tau_n^2$ has two components: irreducible noise
+$\sigma^2$ (always present) and posterior uncertainty $\tau_n^2$ (shrinks as $n$
+grows). As $n \to \infty$, $\tau_n^2 \to 0$ and the predictive approaches
+$\mathcal{N}(\bar x, \sigma^2)$.
+
+## Posterior predictive checks
+
+The posterior predictive is also used for **model checking**: simulate datasets
+$\tilde x$ from $p(\tilde x \mid x_{1:n})$ and compare them to the observed data
+using summary statistics. If the simulated summaries differ systematically from the
+observed ones, the model is misspecified.
+
+This is the Bayesian analog of residual analysis.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy.stats import beta as beta_dist, norm
+from scipy.special import betaln
+
+rng = np.random.default_rng(0)
+
+# Beta-Binomial predictive
+alpha0, beta0 = 2.0, 2.0
+n, k = 20, 6  # observed 6 heads in 20 flips
+a_post = alpha0 + k
+b_post = beta0 + n - k
+
+# Predictive P(X=j | data) for next 10 flips
+n_new = 10
+from scipy.special import comb
+j_vals = np.arange(n_new + 1)
+log_binom = np.log(comb(n_new, j_vals, exact=False))
+log_num   = betaln(a_post + j_vals, b_post + n_new - j_vals)
+log_denom = betaln(a_post, b_post)
+pred_pmf  = np.exp(log_binom + log_num - log_denom)
+pred_mean  = (j_vals * pred_pmf).sum()
+pred_var   = ((j_vals - pred_mean)**2 * pred_pmf).sum()
+print(f"Beta-Binomial predictive mean={pred_mean:.3f}, std={pred_var**0.5:.3f}")
+
+# Gaussian predictive
+mu0, tau0_sq = 0.0, 4.0
+sigma_sq = 1.0
+data = rng.normal(2.5, 1.0, 40)
+n_obs = len(data)
+prec_post = 1/tau0_sq + n_obs/sigma_sq
+tau_n_sq  = 1/prec_post
+mu_n      = tau_n_sq * (mu0/tau0_sq + data.mean()*n_obs/sigma_sq)
+pred_mean_g = mu_n
+pred_var_g  = sigma_sq + tau_n_sq
+x_new  = 2.8
+pred_prob = norm.pdf(x_new, pred_mean_g, pred_var_g**0.5)
+print(f"\nGaussian predictive: mean={pred_mean_g:.3f}, std={pred_var_g**0.5:.4f}")
+print(f"p(x_new={x_new} | data) = {pred_prob:.4f}")
+
+# Posterior predictive check: compare observed mean to predictive
+sims = [rng.normal(rng.normal(mu_n, tau_n_sq**0.5), sigma_sq**0.5, n_obs).mean()
+        for _ in range(2000)]
+obs_mean = data.mean()
+p_ppc = np.mean(np.array(sims) >= obs_mean)
+print(f"\nPPC: P(sim_mean >= obs_mean) = {p_ppc:.3f}  (near 0.5 = good fit)")
+```
+
+The PPC p-value near 0.5 indicates the model generates data whose mean distribution
+is consistent with the observed mean.
+
+The next lesson uses the marginal likelihood (the normalizing constant $p(x)$) to
+compare Bayesian models.

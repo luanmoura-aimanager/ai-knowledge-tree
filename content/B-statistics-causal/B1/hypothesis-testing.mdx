@@ -1,0 +1,123 @@
+---
+title: "Hypothesis testing: z, t, and χ² tests"
+pillar: B
+subId: B1
+lessonId: hypothesis-testing
+order: 5
+estimatedMinutes: 25
+goal: "State null and alternative hypotheses, derive the z-test and t-test for means and the χ² test for variance, and compute p-values from sampling distributions."
+prerequisites: ["sampling-distributions"]
+---
+
+An experiment produces data and you want to decide: is the effect real, or could it
+have arisen by chance under a null assumption? **Hypothesis testing** formalizes this
+decision. The framework is: specify a null hypothesis, compute how surprising the
+data would be if that null were true, and reject the null when the data are
+sufficiently surprising.
+
+## The framework
+
+A **null hypothesis** $H_0$ is the default: no effect, no difference. The **alternative**
+$H_1$ is what you are trying to detect.
+
+A **test statistic** $T$ is a function of the data whose sampling distribution is
+known under $H_0$.
+
+The **p-value** is the probability of seeing a test statistic as extreme as (or more
+extreme than) the observed $t_{\text{obs}}$, computed under $H_0$:
+
+$$
+p = P_{H_0}(|T| \ge |t_{\text{obs}}|).
+$$
+
+A small p-value ($p < \alpha$) is evidence against $H_0$. The significance level
+$\alpha$ (typically 0.05) is the tolerated Type I error rate: the probability of
+rejecting a true null.
+
+Two types of error:
+- **Type I (false positive):** reject $H_0$ when it is true. Rate $\le \alpha$.
+- **Type II (false negative):** fail to reject $H_0$ when it is false. Rate $\beta$; power $= 1-\beta$.
+
+## The z-test (known variance)
+
+Test $H_0: \mu = \mu_0$ against $H_1: \mu \ne \mu_0$ for a sample of size $n$ from
+$\mathcal{N}(\mu, \sigma^2)$ with $\sigma^2$ known.
+
+The test statistic is:
+
+$$
+Z = \frac{\bar X_n - \mu_0}{\sigma/\sqrt{n}} \sim \mathcal{N}(0,1) \text{ under } H_0.
+$$
+
+Reject $H_0$ when $|Z| > z_{\alpha/2}$, the $1 - \alpha/2$ quantile of $\mathcal{N}(0,1)$.
+
+## The t-test (unknown variance)
+
+When $\sigma^2$ is unknown, substitute $s$ (sample std, ddof=1):
+
+$$
+T = \frac{\bar X_n - \mu_0}{s/\sqrt{n}} \sim t_{n-1} \text{ under } H_0.
+$$
+
+The $t_{n-1}$ distribution has heavier tails than normal; for small $n$ this matters.
+As $n \to \infty$, $t_{n-1} \to \mathcal{N}(0,1)$.
+
+**Two-sample t-test.** For two independent groups with means $\mu_1, \mu_2$ and equal
+variances (pooled variance $s_p^2$):
+
+$$
+T = \frac{\bar X_1 - \bar X_2}{s_p\sqrt{1/n_1 + 1/n_2}} \sim t_{n_1+n_2-2}.
+$$
+
+The pooled variance is $s_p^2 = \frac{(n_1-1)s_1^2 + (n_2-1)s_2^2}{n_1+n_2-2}$.
+
+## The chi-squared test for variance
+
+Test $H_0: \sigma^2 = \sigma_0^2$. Under $H_0$:
+
+$$
+\chi^2 = \frac{(n-1)s^2}{\sigma_0^2} \sim \chi^2_{n-1}.
+$$
+
+The $\chi^2$ distribution is right-skewed; for a two-sided test, compare the
+statistic to the $\alpha/2$ and $1-\alpha/2$ quantiles.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+
+# One-sample t-test: does this sample come from mean=0?
+data = rng.normal(loc=0.3, scale=1.0, size=40)  # true mean slightly > 0
+t_stat, p_value = stats.ttest_1samp(data, popmean=0)
+print(f"One-sample t-test: t={t_stat:.4f}, p={p_value:.4f}")
+
+# Two-sample t-test: are two groups different?
+group_a = rng.normal(5.0, 1.0, 30)
+group_b = rng.normal(5.5, 1.0, 30)
+t2, p2 = stats.ttest_ind(group_a, group_b, equal_var=True)
+print(f"Two-sample t-test: t={t2:.4f}, p={p2:.4f}")
+
+# Chi-squared test: does variance match null?
+sigma0_sq = 1.0
+sample = rng.normal(0, 1.2, 50)  # true sigma slightly > 1
+n = len(sample)
+chi2_stat = (n - 1) * sample.var(ddof=1) / sigma0_sq
+p_chi2 = 2 * min(stats.chi2.cdf(chi2_stat, n-1),
+                  1 - stats.chi2.cdf(chi2_stat, n-1))
+print(f"Chi-squared variance test: chi2={chi2_stat:.4f}, p={p_chi2:.4f}")
+
+# Empirical Type I error at alpha=0.05 (should be ~0.05)
+n_trials = 10_000
+rejects = sum(stats.ttest_1samp(rng.normal(0,1,30), 0).pvalue < 0.05
+              for _ in range(n_trials))
+print(f"Empirical Type I error: {rejects/n_trials:.3f}")
+```
+
+The empirical Type I error near 0.05 confirms that the test is calibrated.
+
+The next lesson extends hypothesis testing to multiple groups simultaneously via
+ANOVA.
