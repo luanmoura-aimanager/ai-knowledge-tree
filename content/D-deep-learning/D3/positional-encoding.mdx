@@ -150,7 +150,7 @@ print(f"PE(1): {PE[1].round(2)}  (close to PE(0) by linear shift)")
 # RoPE: apply position-dependent rotation
 def rope(x, position):
     d = x.shape[-1]
-    theta = 10000.0 ** (-np.arange(0, d, 2) * 2.0 / d)
+    theta = 10000.0 ** (-np.arange(0, d, 2) / d)         # theta_i = 10000^(-2i/d), with np.arange(0,d,2) = 2i
     cos = np.cos(position * theta)
     sin = np.sin(position * theta)
     x_even = x[..., 0::2]; x_odd = x[..., 1::2]

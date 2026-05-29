@@ -86,10 +86,11 @@ $$
 Then the message passing is:
 
 $$
-h_i^{(\ell + 1)} = \sigma\!\left(\sum_{j \in \mathcal{N}(i)} \alpha_{ij}\, W h_j^{(\ell)}\right).
+h_i^{(\ell + 1)} = \sigma\!\left(\sum_{j \in \mathcal{N}(i) \cup \{i\}} \alpha_{ij}\, W h_j^{(\ell)}\right).
 $$
 
-The softmax is over the neighbors of $i$, so each $\alpha_{ij}$ is the
+The softmax is over the neighbors of $i$ together with $i$ itself
+(self-loop, as in the original GAT paper), so each $\alpha_{ij}$ is the
 fraction of attention $i$ pays to $j$.
 
 **Multi-head attention**: run $K$ parallel attention heads and

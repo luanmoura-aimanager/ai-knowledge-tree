@@ -127,7 +127,7 @@ sentences = [
 d = 8
 U = rng.normal(scale=0.1, size=(V, d))                     # input embeddings
 W = rng.normal(scale=0.1, size=(V, d))                     # output embeddings
-window = 1
+window = 2
 k_neg = 5
 
 def sigmoid(z): return 1 / (1 + np.exp(-z))
@@ -144,12 +144,16 @@ for epoch in range(50):
                 grad_o = (p_pos - 1) * U[c]
                 U[c] -= 0.1 * grad_c
                 W[o] -= 0.1 * grad_o
-                # Negative samples
+                # Negative samples (exclude the positive context and the center)
                 for _ in range(k_neg):
                     n = int(rng.integers(0, V))
+                    while n == o or n == c:
+                        n = int(rng.integers(0, V))
                     p_neg = sigmoid(U[c] @ W[n])
-                    U[c] -= 0.1 * p_neg * W[n]
-                    W[n] -= 0.1 * p_neg * U[c]
+                    grad_c = p_neg * W[n]                  # compute both grads BEFORE either update
+                    grad_n = p_neg * U[c]
+                    U[c] -= 0.1 * grad_c
+                    W[n] -= 0.1 * grad_n
 
 # Cosine similarity between learned embeddings
 def cos(u, v): return u @ v / (np.linalg.norm(u) * np.linalg.norm(v) + 1e-12)

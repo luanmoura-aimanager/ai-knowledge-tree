@@ -131,7 +131,7 @@ def run_network(init_fn, depth=20, width=256, n_samples=1024, activation="relu")
         var.append(h.var())
     return var
 
-def naive(in_dim, out_dim, rng): return rng.normal(scale=0.1, size=(in_dim, out_dim))
+def naive(in_dim, out_dim, rng): return rng.normal(scale=0.05, size=(in_dim, out_dim))
 def xavier(in_dim, out_dim, rng):
     return rng.normal(scale=np.sqrt(2 / (in_dim + out_dim)), size=(in_dim, out_dim))
 def he(in_dim, out_dim, rng):
@@ -139,13 +139,13 @@ def he(in_dim, out_dim, rng):
 
 # ReLU network: He should keep variance stable, others should shrink/grow
 print("Per-layer activation variance (depth=20, ReLU):")
-for name, fn in [("naive 0.1", naive), ("Xavier", xavier), ("He", he)]:
+for name, fn in [("naive 0.05", naive), ("Xavier", xavier), ("He", he)]:
     v = run_network(fn, activation="relu")
     print(f"  {name:>10}: layer 0={v[0]:.3f}, layer 5={v[5]:.3f}, "
           f"layer 10={v[10]:.3f}, layer 20={v[20]:.3f}")
 
 print("\nPer-layer activation variance (depth=20, tanh):")
-for name, fn in [("naive 0.1", naive), ("Xavier", xavier), ("He", he)]:
+for name, fn in [("naive 0.05", naive), ("Xavier", xavier), ("He", he)]:
     v = run_network(fn, activation="tanh")
     print(f"  {name:>10}: layer 0={v[0]:.3f}, layer 5={v[5]:.3f}, "
           f"layer 10={v[10]:.3f}, layer 20={v[20]:.3f}")

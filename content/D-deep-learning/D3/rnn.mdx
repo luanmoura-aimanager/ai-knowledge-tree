@@ -143,22 +143,24 @@ print(f"hidden state norm over time: {[round(np.linalg.norm(H[t]), 2) for t in r
 
 # Demonstrate vanishing gradient: compute |dh_T / dh_t| as t decreases
 def jacobian_product_norm(Wh, H, target):
-    """Product of one-step Jacobians from t to T-1."""
+    """Product of one-step Jacobians dh_{k+1}/dh_k = diag(1 - tanh^2(...)) @ Wh."""
     J = np.eye(Wh.shape[0])
     for k in range(target, len(H) - 1):
         D = np.diag(1 - H[k]**2)
-        J = (Wh.T @ D) @ J
+        J = (D @ Wh) @ J
     return np.linalg.norm(J)
 
-# Use a Wh with spectral radius < 1 (typical for stable training): vanishing
-Wh_small = 0.5 * rng.normal(size=(d_h, d_h))
+# Use a Wh with spectral radius ~ 0.5 (typical for stable training): vanishing.
+# An iid Gaussian matrix with std sigma has spectral radius ~ sigma * sqrt(d_h)
+# (circular law), so we scale by 1/sqrt(d_h) to control the radius directly.
+Wh_small = (0.5 / np.sqrt(d_h)) * rng.normal(size=(d_h, d_h))
 H_small = rnn_forward(X, Wx, Wh_small, b)
 norms_small = [jacobian_product_norm(Wh_small, H_small, t) for t in range(T - 1, -1, -5)]
 print(f"\nvanishing: ||dh_T/dh_t|| from late to early steps: "
       f"{[round(n, 3) for n in norms_small]}")
 
-# Use a Wh with spectral radius > 1: exploding
-Wh_big = 1.5 * rng.normal(size=(d_h, d_h))
+# Use a Wh with spectral radius ~ 1.5: exploding
+Wh_big = (1.5 / np.sqrt(d_h)) * rng.normal(size=(d_h, d_h))
 H_big = rnn_forward(X, Wx, Wh_big, b)
 norms_big = [jacobian_product_norm(Wh_big, H_big, t) for t in range(T - 1, -1, -5)]
 print(f"exploding: ||dh_T/dh_t|| from late to early steps: "

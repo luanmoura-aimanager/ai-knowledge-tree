@@ -141,29 +141,30 @@ W3 = init(2, 16); b3 = np.zeros(16)
 W4 = init(16, d); b4 = np.zeros(d)
 
 def relu(x): return np.maximum(0, x)
-def encode(X): return relu(relu(X @ W1 + b1) @ W2 + b2)
+def encode(X): return relu(X @ W1 + b1) @ W2 + b2          # signed bottleneck (no ReLU on top)
 def decode(z): return relu(z @ W3 + b3) @ W4 + b4
 def forward(X): return decode(encode(X))
 
 # Train with SGD on the reconstruction loss
-lr = 0.05
-for epoch in range(300):
-    Z = encode(X)
-    Xhat = decode(Z)
-    err = Xhat - X
-    # Gradient via numerical backprop on the small chain (manual for clarity)
-    grad_W4 = relu(Z @ W3 + b3).T @ err / n
-    grad_b4 = err.mean(axis=0)
-    grad_hid = (err @ W4.T) * (Z @ W3 + b3 > 0)
-    grad_W3 = Z.T @ grad_hid / n
-    grad_b3 = grad_hid.mean(axis=0)
-    grad_z = grad_hid @ W3.T
-    # backprop further through encoder
-    z_pre = relu(X @ W1 + b1) @ W2 + b2
-    grad_W2 = relu(X @ W1 + b1).T @ (grad_z * (z_pre > 0)) / n
-    grad_b2 = (grad_z * (z_pre > 0)).mean(axis=0)
+lr = 0.1
+for epoch in range(500):
     h_pre = X @ W1 + b1
-    grad_h = (grad_z * (z_pre > 0)) @ W2.T
+    h_enc = relu(h_pre)                                    # encoder hidden (post-relu)
+    Z = h_enc @ W2 + b2                                    # bottleneck (signed)
+    d_pre = Z @ W3 + b3
+    d_hid = relu(d_pre)                                    # decoder hidden
+    Xhat = d_hid @ W4 + b4
+    err = Xhat - X
+    # Manual backprop through the chain
+    grad_W4 = d_hid.T @ err / n
+    grad_b4 = err.mean(axis=0)
+    grad_d_pre = (err @ W4.T) * (d_pre > 0)
+    grad_W3 = Z.T @ grad_d_pre / n
+    grad_b3 = grad_d_pre.mean(axis=0)
+    grad_z = grad_d_pre @ W3.T                             # no ReLU on Z, so this is grad wrt Z directly
+    grad_W2 = h_enc.T @ grad_z / n
+    grad_b2 = grad_z.mean(axis=0)
+    grad_h = grad_z @ W2.T
     grad_W1 = X.T @ (grad_h * (h_pre > 0)) / n
     grad_b1 = (grad_h * (h_pre > 0)).mean(axis=0)
     W4 -= lr * grad_W4; b4 -= lr * grad_b4

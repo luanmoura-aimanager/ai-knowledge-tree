@@ -189,6 +189,7 @@ print(f"gradient {g_small} after loss scaling (x 1024) and unscaling: "
 ```
 
 fp16 has noticeable error on the matrix multiply but loss scaling
-rescues underflowing gradients; bf16 has the same approximation error
-but doesn't need loss scaling because of its wider exponent range. The
-next lesson handles a different memory tradeoff: gradient checkpointing.
+rescues underflowing gradients; bf16 has somewhat larger per-element
+approximation error (7-bit vs fp16's 10-bit mantissa) but its much wider
+exponent range removes the need for loss scaling entirely. The next
+lesson handles a different memory tradeoff: gradient checkpointing.

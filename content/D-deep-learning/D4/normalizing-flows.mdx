@@ -166,9 +166,9 @@ def stack_forward(x, layers):
 layers = [(s_fn, t_fn), (s_fn, t_fn), (s_fn, t_fn)]
 Z, log_det = stack_forward(X, layers)
 
-# log p(x) = log p(z) - sum log|det|
+# log p(x) = log p(z) + log|det df^{-1}/dx|  (stack_forward is the data->latent map)
 log_pz = -0.5 * np.sum(Z**2, axis=1) - 0.5 * d * np.log(2 * np.pi)
-log_px = log_pz - log_det
+log_px = log_pz + log_det
 print(f"log p(x) for a few samples: {log_px[:5].round(3)}")
 ```
 
