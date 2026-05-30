@@ -228,6 +228,49 @@ even before any prose exists (unwritten lessons show "coming soon").
 3. `contentStatus` flips to `available` on file presence. Verify the lesson page,
    sidebar highlight, prev/next, and prereq links; spot-run the `<PyRunner>` block.
 
+### Author a complete pillar (the standard workflow)
+
+This is the workflow for every new pillar. Follow it in order.
+
+1. **Sync with main.**
+   ```bash
+   git checkout main && git pull origin main
+   ```
+   Check the diff since the last pillar was merged:
+   ```bash
+   git log --oneline -5
+   git diff HEAD~1..HEAD --stat
+   ```
+
+2. **Create a feature branch.**
+   ```bash
+   git checkout -b feature/<letter>-<slug>-curriculum
+   # e.g. feature/f-probabilistic-graphical-models-curriculum
+   ```
+
+3. **Write the pillar in one session.**
+   - Read `src/lib/dag.ts` to enumerate all subsections and topics for the pillar.
+   - Create `src/lib/curriculum/<Letter>.ts` with ordered `Lesson[]` for every subsection.
+   - Import and spread it in `src/lib/curriculum/index.ts`.
+   - Create `content/<pillar-slug>/<SubId>/<lessonId>.mdx` for every lesson.
+   - Run `npm run build` and `npm run lint` before committing; both must be clean.
+
+4. **Commit and push, then open a PR.**
+   ```bash
+   git add src/lib/curriculum/<Letter>.ts src/lib/curriculum/index.ts content/<pillar-slug>/
+   git commit -m "Author <Letter>1-<Letter>N curricula and all N lessons (complete pillar <Letter>)"
+   git push -u origin feature/<letter>-<slug>-curriculum
+   gh pr create ...
+   ```
+
+5. **Run `/code-review` on the PR, then fix findings before merging.**
+   Use `/code-review` (the bundled skill) to review the branch. Apply all confirmed
+   and plausible findings, push a fix commit, then merge.
+
+6. **Always end by printing the PR link.**
+   After opening the PR (step 4) and after pushing any fix commits (step 5), print
+   the full GitHub PR URL so the user can navigate directly to it.
+
 ### Add a topic / subsection / connection / path
 Edit the relevant array in `src/lib/dag.ts`. Add `shortName` for new pillars and
 bump the graph grid (`cols`/`rows`) if you exceed 10 pillars.
@@ -244,11 +287,9 @@ Auth + progress activate when `DATABASE_URL` + `AUTH_*` are set. See
 
 ## What is intentionally NOT here
 
-- **Most lessons are unwritten.** Only the A1 curriculum (17 lessons) is defined
-  so far, with `A1/vector-spaces` and `A1/inner-products` authored as seeds.
-  Other subsections have empty curricula until defined. Authoring is
-  curriculum-first, in batches (order A → C → D → E → B → F → G → H → I → J);
-  unwritten lessons render a "coming soon" fallback.
+- **Most lessons are unwritten.** Pillars A, C, D, E, B are complete; F through J
+  are not yet authored. Authoring order: A → C → D → E → B → **F → G → H → I → J**.
+  Unwritten lessons render a "coming soon" fallback.
 - **Stale single-file content.** Earlier seed files `content/<slug>/<subId>.mdx`
   (A1–A5, E3, I3) predate the lesson model and are no longer read by any route;
   mine them when splitting their discipline into lessons, then remove.

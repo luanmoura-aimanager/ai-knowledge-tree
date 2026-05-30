@@ -1,0 +1,135 @@
+---
+title: "Causal forests and meta-learners"
+pillar: B
+subId: B5
+lessonId: causal-forests
+order: 10
+estimatedMinutes: 24
+goal: "Estimate conditional average treatment effects with the T-learner, S-learner, and X-learner, then understand how causal forests enforce honest splitting to avoid overfitting."
+prerequisites: ["double-ml"]
+---
+
+DML estimates a single average treatment effect $\theta$. In practice, the treatment
+effect varies by individual: $\tau(x) = E[Y(1) - Y(0) \mid X = x]$, the
+**conditional average treatment effect** (CATE). CATE estimation requires both
+modeling the heterogeneity and avoiding overfitting to noise.
+
+## Meta-learners
+
+Meta-learners wrap any ML model to estimate CATE.
+
+### T-learner (two-model learner)
+
+Train separate outcome models for treated and control:
+
+$$
+\hat\mu_1(x) = E[Y \mid X=x, W=1], \quad \hat\mu_0(x) = E[Y \mid X=x, W=0].
+$$
+
+CATE estimate: $\hat\tau_T(x) = \hat\mu_1(x) - \hat\mu_0(x)$.
+
+**Weakness.** Each model is trained on half the data. If treatments are rare,
+$\hat\mu_1$ is poorly estimated.
+
+### S-learner (single-model learner)
+
+Train one model on the combined data with $W$ as a feature:
+
+$$
+\hat\mu(x, w) = E[Y \mid X=x, W=w].
+$$
+
+CATE estimate: $\hat\tau_S(x) = \hat\mu(x, 1) - \hat\mu(x, 0)$.
+
+**Weakness.** Regularized models (trees, ridge) may shrink the treatment coefficient
+toward zero, absorbing treatment variation into main effects.
+
+### X-learner (cross-learner; Künzel et al., 2019)
+
+Three steps:
+
+1. Estimate $\hat\mu_0$ and $\hat\mu_1$ as in T-learner.
+2. Impute individual effects:
+   - Treated: $\tilde\tau_i = Y_i - \hat\mu_0(X_i)$ for $W_i = 1$.
+   - Control: $\tilde\tau_j = \hat\mu_1(X_j) - Y_j$ for $W_j = 0$.
+3. Fit regression models $\hat\tau_1$ on treated units (predict $\tilde\tau_i$ from $X_i$)
+   and $\hat\tau_0$ on control units.
+4. Combine: $\hat\tau_X(x) = e(x)\hat\tau_0(x) + (1-e(x))\hat\tau_1(x)$,
+   where $e(x)$ is the propensity score.
+
+The X-learner is more efficient when treated and control group sizes are unbalanced.
+
+## Causal forests (Wager and Athey, 2018)
+
+Random forests estimate means by averaging leaf values. **Causal forests** adapt
+this to CATE by replacing the outcome in each leaf with the local treatment effect.
+
+**Honest splitting.** A tree is **honest** if the data used to determine splits are
+separate from the data used to estimate leaf values. This prevents the tree from
+overfitting the treatment effect while searching for splits.
+
+Specifically, half the sample (the *splitting sample*) is used to build the tree;
+the other half (the *estimation sample*) is used to compute leaf means. The resulting
+estimator is asymptotically normal, enabling valid confidence intervals for CATE.
+
+**Algorithm sketch:**
+
+1. Build a forest of honest trees on the outcome residuals $\tilde Y = Y - \hat\ell(X)$
+   and treatment residuals $\tilde W = W - \hat m(X)$ (as in DML).
+2. For a query point $x$, collect its leaf neighbors in each tree.
+3. CATE estimate: local weighted regression of $\tilde Y$ on $\tilde W$ using
+   the forest's kernel weights.
+
+## Implementation
+
+```python-static
+import numpy as np
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.linear_model import LogisticRegression
+
+rng = np.random.default_rng(0)
+n = 2000
+
+X = rng.normal(0, 1, (n, 5))
+W = (0.3*X[:, 0] + rng.normal(0, 1, n) > 0).astype(float)
+# True CATE: tau(x) = 1 + x[:,0]  (linear heterogeneity)
+tau_true = 1 + X[:, 0]
+Y0 = 0.5*X[:, 0] + rng.normal(0, 1, n)
+Y1 = Y0 + tau_true
+Y  = W * Y1 + (1 - W) * Y0
+
+# T-learner
+t1 = GradientBoostingRegressor(n_estimators=100, random_state=0)
+t0 = GradientBoostingRegressor(n_estimators=100, random_state=0)
+t1.fit(X[W==1], Y[W==1])
+t0.fit(X[W==0], Y[W==0])
+tau_T = t1.predict(X) - t0.predict(X)
+
+# S-learner
+from numpy import column_stack
+Xw1 = column_stack([X, np.ones(n)])
+Xw0 = column_stack([X, np.zeros(n)])
+s_mod = GradientBoostingRegressor(n_estimators=100, random_state=0)
+s_mod.fit(column_stack([X, W]), Y)
+tau_S = s_mod.predict(Xw1) - s_mod.predict(Xw0)
+
+# X-learner
+imputed_treat = Y[W==1] - t0.predict(X[W==1])
+imputed_ctrl  = t1.predict(X[W==0]) - Y[W==0]
+x1 = GradientBoostingRegressor(n_estimators=100, random_state=0).fit(X[W==1], imputed_treat)
+x0 = GradientBoostingRegressor(n_estimators=100, random_state=0).fit(X[W==0], imputed_ctrl)
+e_hat = LogisticRegression().fit(X, W).predict_proba(X)[:, 1]
+tau_X = e_hat * x0.predict(X) + (1 - e_hat) * x1.predict(X)
+
+def rmse(est): return np.sqrt(((est - tau_true)**2).mean())
+print(f"T-learner RMSE: {rmse(tau_T):.4f}")
+print(f"S-learner RMSE: {rmse(tau_S):.4f}")
+print(f"X-learner RMSE: {rmse(tau_X):.4f}")
+```
+
+The X-learner typically outperforms T and S when groups are imbalanced; the S-learner
+often underestimates heterogeneity due to regularization.
+
+The next lesson connects causal reasoning to representation learning: when can
+observational data identify causal structure in the latent representations of
+neural networks?

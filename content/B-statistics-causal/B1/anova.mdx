@@ -1,0 +1,119 @@
+---
+title: "One-way ANOVA"
+pillar: B
+subId: B1
+lessonId: anova
+order: 6
+estimatedMinutes: 20
+goal: "Partition total sum of squares into between-group and within-group components, derive the F-statistic, and connect ANOVA to the simultaneous comparison of group means."
+prerequisites: ["hypothesis-testing"]
+---
+
+You have $k$ groups and a continuous outcome. The two-sample t-test handles $k=2$;
+for $k > 2$, running all pairwise t-tests inflates the Type I error (the
+multiple-testing problem addressed in the next lesson). **One-way ANOVA** tests
+whether any group mean differs from the others in a single test.
+
+## The model
+
+Group $j$ ($j = 1, \ldots, k$) contains $n_j$ observations. The model is:
+
+$$
+X_{ij} = \mu_j + \varepsilon_{ij}, \quad \varepsilon_{ij} \sim \mathcal{N}(0, \sigma^2),
+$$
+
+all errors independent with equal variance (homoscedasticity). The grand mean is
+$\bar X = \frac{1}{N}\sum_{j,i} X_{ij}$ with $N = \sum_j n_j$.
+
+**Null:** $H_0: \mu_1 = \mu_2 = \cdots = \mu_k$ (all group means equal).
+
+**Alternative:** at least one pair differs.
+
+## Variance decomposition
+
+Total variability is partitioned into two pieces:
+
+$$
+\underbrace{\sum_{j=1}^k \sum_{i=1}^{n_j} (X_{ij} - \bar X)^2}_{\text{SST}} =
+\underbrace{\sum_{j=1}^k n_j (\bar X_j - \bar X)^2}_{\text{SSB}} +
+\underbrace{\sum_{j=1}^k \sum_{i=1}^{n_j} (X_{ij} - \bar X_j)^2}_{\text{SSW}}.
+$$
+
+- **SSB** (sum of squares between groups): variation explained by group membership.
+- **SSW** (sum of squares within groups, or error): unexplained variation within groups.
+
+**Degrees of freedom:** $\mathrm{df}_B = k-1$, $\mathrm{df}_W = N-k$.
+
+**Mean squares:**
+
+$$
+\mathrm{MSB} = \frac{\mathrm{SSB}}{k-1}, \qquad \mathrm{MSW} = \frac{\mathrm{SSW}}{N-k}.
+$$
+
+## The F-statistic
+
+Under $H_0$, both MSB and MSW estimate $\sigma^2$, and their ratio follows an
+$F$ distribution:
+
+$$
+F = \frac{\mathrm{MSB}}{\mathrm{MSW}} \sim F_{k-1,\, N-k} \text{ under } H_0.
+$$
+
+Under $H_1$, $\mathrm{MSB}$ is inflated (it captures real group differences), so
+large $F$ values provide evidence against $H_0$.
+
+**Connection to the t-test.** For $k=2$, the $F$ statistic equals $T^2$ from the
+two-sample t-test, and $F_{1, N-2} = t_{N-2}^2$. ANOVA is a generalization of the
+t-test, not a separate tool.
+
+## Assumptions
+
+1. **Independence** of observations (by design).
+2. **Normality** of residuals (robust for large $n$ by CLT).
+3. **Homoscedasticity** (equal variances). Welch's ANOVA relaxes this.
+
+Violations of (3) can inflate Type I error. Check with Levene's test or plot group
+variances.
+
+## Post-hoc tests
+
+ANOVA's rejection of $H_0$ says some means differ; it does not say which ones.
+Post-hoc pairwise comparisons (Tukey's HSD, Bonferroni-corrected t-tests) identify
+the specific pairs, subject to a family-wise error rate.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+
+# Three groups with different means
+groups = [rng.normal(5.0, 1.5, 30),
+          rng.normal(6.2, 1.5, 30),
+          rng.normal(5.5, 1.5, 30)]
+N = sum(len(g) for g in groups)
+k = len(groups)
+
+grand_mean = np.concatenate(groups).mean()
+ssb = sum(len(g) * (g.mean() - grand_mean)**2 for g in groups)
+ssw = sum(((g - g.mean())**2).sum() for g in groups)
+msb = ssb / (k - 1)
+msw = ssw / (N - k)
+F   = msb / msw
+p   = 1 - stats.f.cdf(F, k-1, N-k)
+print(f"SSB={ssb:.2f}, SSW={ssw:.2f}")
+print(f"F({k-1}, {N-k}) = {F:.4f}, p = {p:.4f}")
+
+# Verify with scipy
+F_sp, p_sp = stats.f_oneway(*groups)
+print(f"scipy F={F_sp:.4f}, p={p_sp:.4f}")
+```
+
+The F-statistic and p-value from manual computation and `scipy.stats.f_oneway`
+agree to floating-point precision.
+
+Running many ANOVA tests or following up with many pairwise comparisons reintroduces
+the problem that ANOVA was designed to avoid; the next lesson addresses that with
+formal multiple-testing corrections.

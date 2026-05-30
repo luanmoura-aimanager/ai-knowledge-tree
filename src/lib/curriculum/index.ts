@@ -1,5 +1,6 @@
 import type { Lesson, LessonWithSub } from "@/lib/types";
 import { A_CURRICULUM } from "./A";
+import { B_CURRICULUM } from "./B";
 import { C_CURRICULUM } from "./C";
 import { D_CURRICULUM } from "./D";
 import { E_CURRICULUM } from "./E";
@@ -11,6 +12,7 @@ import { E_CURRICULUM } from "./E";
  */
 const CURRICULA: Record<string, Lesson[]> = {
   ...A_CURRICULUM,
+  ...B_CURRICULUM,
   ...C_CURRICULUM,
   ...D_CURRICULUM,
   ...E_CURRICULUM,

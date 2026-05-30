@@ -1,0 +1,114 @@
+---
+title: "Permutation tests"
+pillar: B
+subId: B3
+lessonId: permutation-tests
+order: 3
+estimatedMinutes: 18
+goal: "Compute an exact permutation p-value by permuting labels under the null; connect permutation tests to the two-sample t-test and rank tests."
+prerequisites: ["B1/hypothesis-testing"]
+---
+
+The t-test's p-value assumes the data are normally distributed. When that assumption
+is doubtful or the sample is small, a **permutation test** builds the null distribution
+directly by permuting the observed data, making no distributional assumption at all.
+For the two-sample problem, the permutation p-value is exact under exchangeability.
+
+## The setup
+
+Two groups $A$ (size $n_A$) and $B$ (size $n_B$) are observed. The null hypothesis
+is that group labels are exchangeable: every assignment of $n_A + n_B$ units to the
+two groups is equally likely under $H_0$.
+
+Under $H_0$, permuting the combined labels gives equally likely datasets.
+
+## The algorithm
+
+1. Compute the observed test statistic $t_{\mathrm{obs}}$ (e.g., difference in means:
+   $\bar X_A - \bar X_B$).
+2. Repeat $P$ times:
+   a. Randomly permute the combined labels.
+   b. Compute $t^{(p)}$ from the permuted assignment.
+3. The two-sided p-value is:
+   $$
+   \hat p = \frac{1 + \#\{p : |t^{(p)}| \ge |t_{\mathrm{obs}}|\}}{P + 1}.
+   $$
+   The $+1$ in numerator and denominator corresponds to including the observed
+   dataset itself.
+
+For $n_A + n_B \le 20$, all $\binom{n_A + n_B}{n_A}$ permutations can be enumerated
+exactly. For larger samples, $P = 10000$ random permutations gives an accurate
+approximation.
+
+## Connection to the t-test
+
+The permutation test and the two-sample t-test test the same null (exchangeability
+of labels) using the same or equivalent statistics. When the normality assumption
+holds, both have the same power. When the data are skewed or heavy-tailed, the
+permutation test has more accurate Type I error control.
+
+The permutation test is also valid for any statistic: the median difference,
+the maximum, the Kolmogorov-Smirnov statistic, a custom metric.
+
+## Rank tests and the Wilcoxon statistic
+
+The **Mann-Whitney-Wilcoxon** test is the permutation test applied to the rank
+statistic $U = \sum_{i \in A, j \in B} \mathbf{1}[X_i > X_j]$. Because ranks have
+a known null distribution, the Wilcoxon test has a closed-form p-value (from the
+Wilcoxon table) even without explicit permutation. It tests whether a randomly
+drawn observation from $A$ tends to exceed one from $B$.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+
+n_A, n_B = 30, 30
+mu_A, mu_B = 5.0, 6.0   # true difference = 1
+group_A = rng.normal(mu_A, 2.0, n_A)
+group_B = rng.normal(mu_B, 2.5, n_B)
+combined = np.concatenate([group_A, group_B])
+
+t_obs = group_A.mean() - group_B.mean()
+
+# Permutation test
+P = 10_000
+count = 0
+for _ in range(P):
+    perm = rng.permutation(combined)
+    t_perm = perm[:n_A].mean() - perm[n_A:].mean()
+    count += abs(t_perm) >= abs(t_obs)
+p_perm = (count + 1) / (P + 1)
+
+# Compare to t-test
+t_stat, p_ttest = stats.ttest_ind(group_A, group_B, equal_var=False)
+
+# Mann-Whitney-Wilcoxon
+u_stat, p_mww = stats.mannwhitneyu(group_A, group_B, alternative='two-sided')
+
+print(f"Observed diff: {t_obs:.4f}")
+print(f"Permutation p: {p_perm:.4f}")
+print(f"Welch t-test p:{p_ttest:.4f}")
+print(f"MWW test p:    {p_mww:.4f}")
+
+# Type I error check (null case: mu_A = mu_B)
+perm_type1 = 0
+for _ in range(1000):
+    a = rng.normal(5, 2, n_A)
+    b = rng.normal(5, 2, n_B)
+    c = np.concatenate([a, b])
+    obs = a.mean() - b.mean()
+    cnt = sum(abs((p := rng.permutation(c))[:n_A].mean() - p[n_A:].mean()) >= abs(obs)
+              for _ in range(199))
+    perm_type1 += (cnt + 1) / 200 < 0.05
+print(f"Permutation Type I error: {perm_type1/1000:.3f}  (target 0.05)")
+```
+
+All three tests give similar p-values under normality. The permutation test has
+exact Type I error control by construction.
+
+The next lesson turns to model evaluation: cross-validation, which uses
+leave-out resampling to estimate prediction error.

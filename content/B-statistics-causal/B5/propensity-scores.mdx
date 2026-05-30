@@ -1,0 +1,139 @@
+---
+title: "Propensity scores, matching, and IPW"
+pillar: B
+subId: B5
+lessonId: propensity-scores
+order: 6
+estimatedMinutes: 24
+goal: "Estimate propensity scores with logistic regression, balance covariates via nearest-neighbor matching, and estimate the ATE with inverse-probability weighting."
+prerequisites: ["potential-outcomes"]
+---
+
+The backdoor adjustment requires conditioning on all confounders simultaneously,
+which is difficult in high dimensions. The **propensity score** collapses the
+confounder vector into a single scalar while preserving the balancing property.
+
+## The propensity score
+
+The propensity score is the probability of receiving treatment given observed
+covariates:
+
+$$
+e(X) = P(W = 1 \mid X).
+$$
+
+**Rosenbaum-Rubin theorem (1983).** Under strong ignorability
+$(Y(0), Y(1)) \perp W \mid X$, it also holds that $(Y(0), Y(1)) \perp W \mid e(X)$.
+
+Conditioning on the propensity score is sufficient to remove confounding, even
+though $e(X)$ is a scalar rather than the full vector $X$. This is the balancing
+property: among units with the same $e(x)$, treatment assignment is as-if random.
+
+## Estimating the propensity score
+
+$e(X)$ is unknown and must be estimated, typically with logistic regression:
+
+$$
+\hat e(X) = \sigma(X^\top\hat\beta), \quad \sigma(z) = 1/(1+e^{-z}).
+$$
+
+For flexible confounders, gradient boosted trees or regularized regression are used.
+Calibration (the estimated probability is accurate) matters more than discrimination
+(the AUROC) for propensity-score methods.
+
+## Propensity-score matching
+
+Match each treated unit to one (or several) control units with similar $\hat e(X)$,
+then compare outcomes within matched pairs.
+
+**Nearest-neighbor matching:** for each treated unit $i$, find the control unit
+$j^* = \arg\min_{j: W_j=0} |\hat e(X_i) - \hat e(X_j)|$.
+
+**ATT estimator:**
+
+$$
+\hat\tau_{\mathrm{ATT}} = \frac{1}{n_1} \sum_{i: W_i=1} \left(Y_i - Y_{j^*(i)}\right).
+$$
+
+Matching reduces variance (only treated units contribute) but can lose efficiency
+if the control group is large and many controls are discarded.
+
+## Inverse-probability weighting (IPW)
+
+IPW reweights each unit so that the weighted sample looks like a randomized experiment.
+
+**Horvitz-Thompson estimator for ATE:**
+
+$$
+\hat\tau_{\mathrm{IPW}} = \frac{1}{n}\sum_{i=1}^n \frac{W_i Y_i}{\hat e(X_i)} - \frac{(1-W_i) Y_i}{1-\hat e(X_i)}.
+$$
+
+**Intuition.** A treated unit with $\hat e(X) = 0.2$ (unlikely to be treated) is
+upweighted by $1/0.2 = 5$ to represent the population of similar units in the
+counterfactual. The weighting creates pseudo-populations where treatment is
+independent of covariates.
+
+IPW is unbiased when the propensity model is correct. **Normalized IPW** divides
+by the sum of weights to reduce variance (Hajek estimator). **Doubly robust**
+estimators combine IPW with an outcome model; they are consistent if either model
+is correctly specified.
+
+## Implementation
+
+```python-static
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+
+rng = np.random.default_rng(0)
+n = 2000
+
+# Generate confounded data
+X1 = rng.normal(0, 1, n)
+X2 = rng.normal(0, 1, n)
+W  = (0.5*X1 + 0.3*X2 + rng.normal(0, 1, n) > 0).astype(int)
+Y0 = 0.5*X1 + 0.2*X2 + rng.normal(0, 1, n)
+Y1 = Y0 + 1.0              # true ATE = 1.0
+Y  = W * Y1 + (1-W) * Y0
+
+X = np.column_stack([X1, X2])
+
+# Estimate propensity score
+lr = LogisticRegression()
+lr.fit(X, W)
+e_hat = lr.predict_proba(X)[:, 1]
+
+# IPW (Hajek)
+w_treat = W / e_hat
+w_ctrl  = (1 - W) / (1 - e_hat)
+ipw_ate = (Y * w_treat / w_treat[W==1].sum() -
+           Y * w_ctrl  / w_ctrl[W==0].sum()).sum()
+
+# Nearest-neighbor matching (1:1, ATT)
+from sklearn.neighbors import NearestNeighbors
+nn = NearestNeighbors(n_neighbors=1)
+nn.fit(e_hat[W==0].reshape(-1,1))
+_, idx = nn.kneighbors(e_hat[W==1].reshape(-1,1))
+match_ates = Y[W==1] - Y[W==0][idx.flatten()]
+att_match = match_ates.mean()
+
+# Naive
+naive = Y[W==1].mean() - Y[W==0].mean()
+
+print(f"True ATE:   1.000")
+print(f"Naive:      {naive:.4f}")
+print(f"IPW ATE:    {ipw_ate:.4f}")
+print(f"Matching ATT: {att_match:.4f}")
+
+# Covariate balance before/after matching
+print(f"\nBalance check (mean X1):")
+print(f"  Treated: {X1[W==1].mean():.3f}, Control: {X1[W==0].mean():.3f} (before)")
+matched_ctrl_idx = np.where(W==0)[0][idx.flatten()]
+print(f"  Treated: {X1[W==1].mean():.3f}, Matched ctrl: {X1[matched_ctrl_idx].mean():.3f} (after)")
+```
+
+After matching, the mean of $X_1$ in the matched control group is close to the
+treated group, confirming that the propensity score successfully balanced the covariate.
+
+The next lesson addresses a setting where all confounders are unobserved but a
+valid **instrument** is available: a variable that affects treatment but has no
+direct effect on the outcome.

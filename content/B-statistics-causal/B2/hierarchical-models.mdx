@@ -1,0 +1,118 @@
+---
+title: "Hierarchical Bayesian models"
+pillar: B
+subId: B2
+lessonId: hierarchical-models
+order: 3
+estimatedMinutes: 24
+goal: "Build a two-level model with hyperpriors over group parameters and explain how partial pooling balances no-pooling and complete pooling."
+prerequisites: ["conjugate-priors"]
+---
+
+Schools differ in average test scores. Estimating each school's mean from its own
+students alone is noisy for small schools. Using the grand mean for all schools
+ignores real differences. **Hierarchical (multilevel) models** find the middle ground:
+each school has its own parameter, but those parameters are drawn from a common
+population-level distribution. This allows small groups to borrow strength from the
+rest.
+
+## Three estimators and the pooling spectrum
+
+Suppose $J$ groups, group $j$ has $n_j$ observations $Y_{ij} \sim \mathcal{N}(\theta_j, \sigma^2)$.
+
+- **No pooling:** estimate each $\theta_j$ independently as $\bar Y_j$. Unbiased but
+  high variance for small $n_j$.
+- **Complete pooling:** use the grand mean $\bar Y$ for all groups. Low variance but
+  ignores between-group differences.
+- **Partial pooling:** the hierarchical estimator shrinks $\bar Y_j$ toward the
+  grand mean, with the amount of shrinkage depending on $n_j$ and the between-group
+  variance.
+
+## The two-level model
+
+**Level 1 (observation model):**
+
+$$
+Y_{ij} \mid \theta_j \sim \mathcal{N}(\theta_j, \sigma^2), \quad i = 1, \ldots, n_j.
+$$
+
+**Level 2 (prior on group parameters):**
+
+$$
+\theta_j \mid \mu, \tau^2 \sim \mathcal{N}(\mu, \tau^2), \quad j = 1, \ldots, J.
+$$
+
+**Hyperprior (optional):** $p(\mu, \tau^2)$ over the hyperparameters.
+
+The joint distribution is:
+
+$$
+p(\{Y_{ij}\}, \{\theta_j\}, \mu, \tau^2) = p(\mu, \tau^2) \prod_j p(\theta_j \mid \mu, \tau^2) \prod_i p(Y_{ij} \mid \theta_j).
+$$
+
+## Posterior of $\theta_j$
+
+When $\mu$ and $\tau^2$ are known, the conjugate Gaussian update gives:
+
+$$
+\theta_j \mid \{Y_{ij}\}, \mu, \tau^2 \sim \mathcal{N}(\hat\theta_j, V_j),
+$$
+
+where:
+
+$$
+V_j = \left(\frac{1}{\tau^2} + \frac{n_j}{\sigma^2}\right)^{-1}, \qquad
+\hat\theta_j = V_j\left(\frac{\mu}{\tau^2} + \frac{n_j \bar Y_j}{\sigma^2}\right).
+$$
+
+Rewriting $\hat\theta_j$ as a weighted average:
+
+$$
+\hat\theta_j = (1 - \lambda_j)\,\bar Y_j + \lambda_j\,\mu,
+\quad \lambda_j = \frac{\sigma^2/n_j}{\sigma^2/n_j + \tau^2}.
+$$
+
+The shrinkage weight $\lambda_j$ is large (shrink toward $\mu$) when the group is
+small ($n_j$ small) or the between-group variance $\tau^2$ is large relative to
+within-group variance. When $n_j \to \infty$, $\lambda_j \to 0$ and the estimate
+is the group mean.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+
+J = 8
+mu_true, tau_true, sigma_true = 50.0, 10.0, 15.0
+ns = rng.integers(5, 40, J)  # unequal group sizes
+
+theta_true = rng.normal(mu_true, tau_true, J)
+data = [rng.normal(theta_true[j], sigma_true, ns[j]) for j in range(J)]
+group_means = np.array([d.mean() for d in data])
+
+# Plug-in hyperparameters (in practice estimated by EM or MCMC)
+grand_mean = np.concatenate(data).mean()
+tau2_hat   = max(group_means.var() - sigma_true**2 * np.mean(1/ns), 0.1)
+sigma2     = sigma_true**2
+
+# Partial-pooling estimates
+lam = sigma2 / ns / (sigma2 / ns + tau2_hat)
+partial = (1 - lam) * group_means + lam * grand_mean
+
+print(f"{'j':>3} {'n':>4} {'truth':>8} {'no-pool':>10} {'partial':>10}")
+for j in range(J):
+    print(f"{j:3d} {ns[j]:4d} {theta_true[j]:8.2f} {group_means[j]:10.2f} {partial[j]:10.2f}")
+
+rmse_np = np.sqrt(((group_means - theta_true)**2).mean())
+rmse_pp = np.sqrt(((partial - theta_true)**2).mean())
+print(f"\nRMSE no-pooling={rmse_np:.2f}, partial-pooling={rmse_pp:.2f}")
+```
+
+Partial pooling reduces RMSE because small groups are shrunk toward a more accurate
+estimate while large groups retain their own data.
+
+The next lesson uses the posterior over $\theta$ to make predictions about new data
+by integrating out the uncertainty in the parameters.

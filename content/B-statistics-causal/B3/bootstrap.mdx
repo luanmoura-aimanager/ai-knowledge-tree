@@ -1,0 +1,115 @@
+---
+title: "The bootstrap"
+pillar: B
+subId: B3
+lessonId: bootstrap
+order: 1
+estimatedMinutes: 20
+goal: "Estimate the sampling distribution of any statistic by resampling with replacement; construct percentile and BCa confidence intervals."
+prerequisites: ["B1/sampling-distributions", "B1/estimator-properties"]
+---
+
+The sampling distribution of the sample mean has a known formula ($\sigma/\sqrt{n}$).
+For the median, the trimmed mean, or a regression coefficient, no such formula
+exists in closed form. The **bootstrap** solves this by approximating the sampling
+distribution empirically: treat the observed data as a stand-in for the population
+and resample from it repeatedly.
+
+## The bootstrap principle
+
+Let $\hat\theta = T(X_1, \ldots, X_n)$ be any statistic. The sampling distribution
+of $\hat\theta$ is determined by the unknown population $F$. The bootstrap replaces
+$F$ with the **empirical distribution** $\hat F_n$, which places mass $1/n$ on each
+observed $X_i$.
+
+**Algorithm (nonparametric bootstrap):**
+
+1. Draw $B$ bootstrap samples $X^{*b} = (X_1^{*b}, \ldots, X_n^{*b})$ by sampling
+   with replacement from $\{X_1, \ldots, X_n\}$.
+2. Compute $\hat\theta^{*b} = T(X^{*b})$ for each bootstrap sample.
+3. The distribution of $\{\hat\theta^{*b}\}_{b=1}^B$ approximates the sampling
+   distribution of $\hat\theta$.
+
+The bootstrap standard error is $\widehat{\mathrm{SE}} = \mathrm{std}(\hat\theta^{*1}, \ldots, \hat\theta^{*B})$.
+
+## Bootstrap confidence intervals
+
+**Percentile interval.** Use the $\alpha/2$ and $1-\alpha/2$ quantiles of the
+bootstrap distribution:
+
+$$
+[Q_{\alpha/2}(\hat\theta^*), Q_{1-\alpha/2}(\hat\theta^*)].
+$$
+
+Simple but can be biased when $\hat\theta$ is biased.
+
+**Pivotal (basic) interval.** Uses the distribution of $\hat\theta^* - \hat\theta$:
+
+$$
+[2\hat\theta - Q_{1-\alpha/2}(\hat\theta^*),\; 2\hat\theta - Q_{\alpha/2}(\hat\theta^*)].
+$$
+
+**BCa (bias-corrected and accelerated).** Adjusts both the center and the acceleration
+(the rate of change of SE with the parameter). Better coverage than the percentile
+interval at the cost of computing the acceleration via a jackknife.
+
+For most purposes, the pivotal interval is a solid default with minimal overhead.
+
+## When to use which type
+
+- **Nonparametric bootstrap:** when the data distribution is unknown or non-Gaussian.
+- **Parametric bootstrap:** resample from the fitted parametric model (e.g., fit a
+  Gaussian, bootstrap from it). Better than nonparametric when the model is correct.
+- **Residual bootstrap (regression):** resample residuals, not raw observations.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 60
+data = rng.exponential(scale=2.0, size=n)  # true median = 2*log(2) ~ 1.386
+B = 5000
+
+# Bootstrap distribution of the median
+boot_medians = np.array([
+    np.median(rng.choice(data, n, replace=True))
+    for _ in range(B)
+])
+
+theta_hat = np.median(data)
+se_boot   = boot_medians.std()
+true_median = 2 * np.log(2)
+
+# Percentile CI
+lo_pct, hi_pct = np.percentile(boot_medians, [2.5, 97.5])
+
+# Pivotal CI
+lo_piv = 2*theta_hat - hi_pct
+hi_piv = 2*theta_hat - lo_pct
+
+print(f"True median:    {true_median:.4f}")
+print(f"Sample median:  {theta_hat:.4f}")
+print(f"Bootstrap SE:   {se_boot:.4f}")
+print(f"Percentile 95%: [{lo_pct:.4f}, {hi_pct:.4f}]")
+print(f"Pivotal 95%:    [{lo_piv:.4f}, {hi_piv:.4f}]")
+
+# Coverage simulation
+covers_pct = covers_piv = 0
+for _ in range(1000):
+    d = rng.exponential(2.0, n)
+    th = np.median(d)
+    bs = np.array([np.median(rng.choice(d, n, replace=True)) for _ in range(500)])
+    lo_p, hi_p = np.percentile(bs, [2.5, 97.5])
+    if lo_p <= true_median <= hi_p: covers_pct += 1
+    if 2*th-hi_p <= true_median <= 2*th-lo_p: covers_piv += 1
+print(f"\nPercentile coverage: {covers_pct/1000:.3f}")
+print(f"Pivotal coverage:    {covers_piv/1000:.3f}  (closer to 0.95)")
+```
+
+The pivotal interval has coverage closer to 0.95 than the percentile interval for
+this skewed distribution.
+
+The next lesson introduces the jackknife, which provides bias and variance estimates
+via leave-one-out resampling.

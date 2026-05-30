@@ -1,0 +1,121 @@
+---
+title: "Bias, consistency, and efficiency"
+pillar: B
+subId: B1
+lessonId: estimator-properties
+order: 3
+estimatedMinutes: 20
+goal: "Define unbiasedness, consistency, and efficiency; decompose MSE into squared bias plus variance."
+prerequisites: ["sampling-distributions"]
+---
+
+An estimator $\hat\theta = \hat\theta(X_1, \ldots, X_n)$ is a function of data.
+Different functions have different qualities. Three properties matter most for
+comparing estimators: bias, consistency, and efficiency.
+
+## Bias
+
+The **bias** of $\hat\theta$ is the systematic error:
+
+$$
+\mathrm{Bias}(\hat\theta) = E[\hat\theta] - \theta.
+$$
+
+An estimator is **unbiased** if $\mathrm{Bias}(\hat\theta) = 0$ for all $\theta$.
+
+**Sample mean:** $E[\bar{X}_n] = \mu$. Unbiased.
+
+**Sample variance (with $n$):** $E\!\left[\frac{1}{n}\sum_i(X_i - \bar X_n)^2\right] = \frac{n-1}{n}\sigma^2$. Biased by a factor $(n-1)/n$.
+
+Dividing by $n-1$ instead of $n$ corrects this:
+
+$$
+s^2 = \frac{1}{n-1}\sum_{i=1}^n (X_i - \bar X_n)^2 \implies E[s^2] = \sigma^2.
+$$
+
+The extra degree of freedom is "used up" by estimating the mean.
+
+## MSE decomposition
+
+Mean squared error combines bias and variance into a single scalar:
+
+$$
+\mathrm{MSE}(\hat\theta) = E[(\hat\theta - \theta)^2].
+$$
+
+Adding and subtracting $E[\hat\theta]$:
+
+$$
+\mathrm{MSE}(\hat\theta) = E\!\left[(\hat\theta - E[\hat\theta])^2\right] + (E[\hat\theta] - \theta)^2
+= \mathrm{Var}(\hat\theta) + \mathrm{Bias}(\hat\theta)^2.
+$$
+
+This is the **bias-variance decomposition**. An unbiased estimator with high variance
+can have worse MSE than a biased one with low variance. Regularized estimators (ridge
+regression, shrinkage) trade a little bias for large variance reduction.
+
+## Consistency
+
+An estimator is **consistent** if it converges to the truth as $n \to \infty$.
+
+**MSE consistency:** $\mathrm{MSE}(\hat\theta) \to 0$.
+
+**Consistency in probability:** for every $\varepsilon > 0$,
+$P(|\hat\theta - \theta| > \varepsilon) \to 0$.
+
+MSE consistency implies consistency in probability (Markov's inequality). The sample
+mean is consistent: $\mathrm{Var}(\bar X_n) = \sigma^2/n \to 0$ and it is unbiased,
+so $\mathrm{MSE} \to 0$.
+
+Consistency is a minimal requirement. Any reasonable estimator should be consistent;
+the interesting comparisons are among consistent estimators.
+
+## Efficiency
+
+Among all unbiased estimators, efficiency measures who has the smallest variance.
+
+The Cramér-Rao lower bound (next lesson) establishes the minimum achievable variance
+for unbiased estimators. An estimator is **efficient** if its variance equals this
+bound.
+
+For consistent asymptotically normal estimators, **asymptotic relative efficiency**
+(ARE) compares two estimators $\hat\theta_1$ and $\hat\theta_2$ by the ratio of their
+asymptotic variances:
+
+$$
+\mathrm{ARE}(\hat\theta_1, \hat\theta_2) = \frac{\mathrm{AsyVar}(\hat\theta_2)}{\mathrm{AsyVar}(\hat\theta_1)}.
+$$
+
+If $\mathrm{ARE} > 1$ then $\hat\theta_1$ is more efficient.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+mu, sigma = 2.0, 1.5
+n_values   = [10, 50, 200, 1000]
+n_reps     = 20_000
+
+for n in n_values:
+    data = rng.normal(mu, sigma, (n_reps, n))
+    means    = data.mean(axis=1)
+    var_n    = data.var(axis=1, ddof=0)    # biased: 1/n
+    var_nm1  = data.var(axis=1, ddof=1)   # unbiased: 1/(n-1)
+
+    bias_n   = var_n.mean() - sigma**2
+    bias_nm1 = var_nm1.mean() - sigma**2
+    mse_n    = ((var_n - sigma**2)**2).mean()
+    mse_nm1  = ((var_nm1 - sigma**2)**2).mean()
+
+    print(f"n={n:5d}  bias(s²_n)={bias_n:+.4f}  bias(s²)={bias_nm1:+.4f}  "
+          f"MSE(s²_n)={mse_n:.5f}  MSE(s²)={mse_nm1:.5f}")
+```
+
+For small $n$ the biased estimator $s^2_n$ has lower MSE despite the bias, because
+the variance reduction more than compensates. As $n$ grows, both converge and the
+difference vanishes.
+
+The next lesson derives the Cramér-Rao lower bound, which pins down the minimum
+possible variance for any unbiased estimator.

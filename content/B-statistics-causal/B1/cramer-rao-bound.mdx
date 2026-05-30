@@ -1,0 +1,115 @@
+---
+title: "The Cramér-Rao lower bound"
+pillar: B
+subId: B1
+lessonId: cramer-rao-bound
+order: 4
+estimatedMinutes: 22
+goal: "Prove the CRLB from the Cauchy-Schwarz inequality and use it to verify that the sample mean achieves the bound for Gaussian location families."
+prerequisites: ["estimator-properties", "A2/information-geometry"]
+---
+
+Given that any unbiased estimator has some variance, what is the smallest variance
+achievable? The **Cramér-Rao lower bound** (CRLB) answers this: no unbiased estimator
+can have variance below $1 / I(\theta)$, where $I(\theta)$ is the Fisher information.
+An estimator that achieves this bound is called **efficient**.
+
+## Fisher information (recap)
+
+For a parametric family with density $p(x;\theta)$, the **score function** is:
+
+$$
+s(x;\theta) = \frac{\partial}{\partial\theta} \log p(x;\theta).
+$$
+
+The Fisher information is the variance of the score:
+
+$$
+I(\theta) = E_\theta[s(X;\theta)^2] = -E_\theta\!\left[\frac{\partial^2}{\partial\theta^2}\log p(X;\theta)\right].
+$$
+
+For an i.i.d. sample of size $n$, the total Fisher information is $I_n(\theta) = n I(\theta)$.
+
+## Proof of the CRLB
+
+Let $\hat\theta$ be an unbiased estimator of $\theta$ and assume the regularity
+conditions that allow differentiation under the integral.
+
+**Step 1.** Since $E_\theta[\hat\theta] = \theta$, differentiating with respect to $\theta$:
+
+$$
+\frac{\partial}{\partial\theta} \int \hat\theta(x)\, p(x;\theta)\, dx = 1.
+$$
+
+**Step 2.** Rewrite the derivative of $p$ using the score:
+
+$$
+\int \hat\theta(x)\, s(x;\theta)\, p(x;\theta)\, dx = 1.
+$$
+
+**Step 3.** Since $E_\theta[s(X;\theta)] = 0$ (differentiating the normalization $\int p = 1$), the left side equals the covariance:
+
+$$
+\mathrm{Cov}_\theta(\hat\theta, s) = 1.
+$$
+
+**Step 4.** Apply the Cauchy-Schwarz inequality $\mathrm{Cov}(A, B)^2 \le \mathrm{Var}(A)\, \mathrm{Var}(B)$:
+
+$$
+1 = \mathrm{Cov}(\hat\theta, s)^2 \le \mathrm{Var}(\hat\theta)\cdot \mathrm{Var}(s) = \mathrm{Var}(\hat\theta) \cdot I(\theta).
+$$
+
+**Step 5.** Divide:
+
+$$
+\boxed{\mathrm{Var}(\hat\theta) \ge \frac{1}{I(\theta)}.}
+$$
+
+For a sample of size $n$, the bound becomes $1 / (n I(\theta))$.
+
+## Example: Gaussian location
+
+For $X_i \sim \mathcal{N}(\mu, \sigma^2)$ with $\sigma^2$ known, the log-likelihood is
+$\log p(x;\mu) = -\frac{(x-\mu)^2}{2\sigma^2} + \text{const}$. The score is
+$s(x;\mu) = (x-\mu)/\sigma^2$, so:
+
+$$
+I(\mu) = E[(X-\mu)^2/\sigma^4] = \sigma^2/\sigma^4 = 1/\sigma^2.
+$$
+
+The CRLB for $n$ samples is $\sigma^2/n$. The sample mean $\bar X_n$ has
+$\mathrm{Var}(\bar X_n) = \sigma^2/n$, which exactly equals the bound. The sample
+mean is efficient for the Gaussian location family.
+
+## Attainability
+
+The CRLB is attained if and only if $\hat\theta - \theta = c(\theta) \cdot s(x;\theta)$
+almost surely for some function $c(\theta)$. This is equivalent to the estimator being
+a function of a **sufficient statistic** for an exponential-family model. MLE generally
+achieves the CRLB asymptotically even when no finite-sample efficient estimator exists.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy.stats import norm
+
+rng = np.random.default_rng(0)
+mu, sigma = 1.0, 2.0
+ns = [10, 50, 200, 1000]
+n_reps = 50_000
+
+print(f"{'n':>6} {'Var(mean)':>12} {'CRLB':>12} {'Ratio':>8}")
+for n in ns:
+    data = rng.normal(mu, sigma, (n_reps, n))
+    sample_means = data.mean(axis=1)
+    var_empirical = sample_means.var()
+    crlb = sigma**2 / n
+    print(f"{n:6d} {var_empirical:12.6f} {crlb:12.6f} {var_empirical/crlb:8.4f}")
+```
+
+The ratio converges to 1.0, confirming that the sample mean saturates the
+Cramér-Rao bound for the Gaussian mean.
+
+With the CRLB in hand, the next lesson turns to hypothesis testing: deciding from
+data whether a parameter differs from a specified null value.

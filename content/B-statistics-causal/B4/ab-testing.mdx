@@ -1,0 +1,108 @@
+---
+title: "A/B testing and two-sample tests"
+pillar: B
+subId: B4
+lessonId: ab-testing
+order: 1
+estimatedMinutes: 22
+goal: "Design a two-sample proportion test, translate a minimum detectable effect into a sample size, and control Type I and II errors."
+prerequisites: ["B1/hypothesis-testing", "B1/multiple-testing"]
+---
+
+A product team wants to know whether a new button color increases click-through rate.
+Half the users see the old design (control), half see the new design (treatment).
+After collecting data, they need to decide: is the observed difference real, or
+plausibly noise? This is the A/B test.
+
+## The two-sample proportion test
+
+Let $p_A$ and $p_B$ be the true conversion rates for control and treatment.
+
+**Null:** $H_0: p_A = p_B$.
+
+**Alternative:** $H_1: p_A \ne p_B$ (two-sided).
+
+With $n_A$ and $n_B$ observations, the sample proportions are $\hat p_A = k_A / n_A$
+and $\hat p_B = k_B / n_B$.
+
+The test statistic uses the **pooled proportion** $\hat p = (k_A + k_B)/(n_A + n_B)$:
+
+$$
+Z = \frac{\hat p_B - \hat p_A}{\sqrt{\hat p(1-\hat p)(1/n_A + 1/n_B)}} \sim \mathcal{N}(0,1) \text{ under } H_0.
+$$
+
+Reject $H_0$ when $|Z| > z_{\alpha/2}$.
+
+## Power and sample size
+
+**Power** is the probability of detecting a true effect of size $\delta = p_B - p_A$.
+
+Under $H_1$, the test statistic is approximately $\mathcal{N}(\delta / \mathrm{SE}, 1)$.
+Power is $1 - \beta$ where $\beta$ is the Type II error rate.
+
+Inverting for the required sample size (equal groups, $n_A = n_B = n$):
+
+$$
+n = \frac{(z_{\alpha/2} + z_\beta)^2 \left[p_A(1-p_A) + p_B(1-p_B)\right]}{\delta^2}.
+$$
+
+For $\alpha = 0.05$ ($z_{\alpha/2} = 1.96$), power $= 0.80$ ($z_\beta = 0.84$), the
+factor $(z_{\alpha/2} + z_\beta)^2 \approx 7.85$.
+
+A **minimum detectable effect** (MDE) is the smallest $\delta$ the test is powered
+to detect. Choosing a smaller MDE requires a larger sample.
+
+## Multiple comparisons in A/B testing
+
+Running multiple A/B tests simultaneously, or testing multiple metrics, inflates
+the false positive rate. Solutions:
+
+- **Bonferroni correction** (conservative): divide $\alpha$ by the number of tests.
+- **FDR control** (less conservative): use BH when many metrics are tested.
+- **Pre-register primary metrics** to avoid post-hoc inflation.
+
+## Stopping early (sequential testing)
+
+Peeking at results during data collection and stopping when $p < 0.05$ inflates
+Type I error. **Sequential tests** (covered in the CUPED lesson) allow valid early
+stopping by adjusting the significance boundary.
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(0)
+
+p_A, p_B = 0.10, 0.12   # true rates
+n = 2000                 # per group
+
+# Simulate
+k_A = rng.binomial(n, p_A)
+k_B = rng.binomial(n, p_B)
+p_hat_A = k_A / n
+p_hat_B = k_B / n
+p_pool  = (k_A + k_B) / (2 * n)
+z = (p_hat_B - p_hat_A) / np.sqrt(p_pool * (1 - p_pool) * 2 / n)
+p_val = 2 * (1 - stats.norm.cdf(abs(z)))
+print(f"k_A={k_A}, k_B={k_B}")
+print(f"z={z:.4f}, p={p_val:.4f}")
+
+# Sample size calculation
+def sample_size(p_a, delta, alpha=0.05, power=0.80):
+    p_b = p_a + delta
+    z_a = stats.norm.ppf(1 - alpha/2)
+    z_b = stats.norm.ppf(power)
+    num = (z_a + z_b)**2 * (p_a*(1-p_a) + p_b*(1-p_b))
+    return int(np.ceil(num / delta**2))
+
+for delta in [0.01, 0.02, 0.05, 0.10]:
+    print(f"MDE={delta:.2f}: n_per_group = {sample_size(p_A, delta)}")
+```
+
+Detecting a 1pp lift on a 10% baseline requires tens of thousands of observations;
+detecting a 10pp lift requires only a few hundred.
+
+The next lesson formalizes the power calculation and shows how to plot power as a
+function of sample size and effect size.

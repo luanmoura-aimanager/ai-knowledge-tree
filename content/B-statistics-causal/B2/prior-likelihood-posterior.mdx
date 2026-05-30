@@ -1,0 +1,122 @@
+---
+title: "Prior, likelihood, and posterior"
+pillar: B
+subId: B2
+lessonId: prior-likelihood-posterior
+order: 1
+estimatedMinutes: 22
+goal: "Derive the posterior from Bayes' rule, compute the normalizing constant for a Beta-Binomial model, and interpret posterior concentration as data accumulates."
+prerequisites: ["A2/bayes-rule", "A2/mle"]
+---
+
+Frequentist inference asks: what does the data say about $\theta$, treating $\theta$
+as fixed and unknown? Bayesian inference asks: after seeing the data, what is the
+probability distribution over $\theta$? The prior encodes belief before seeing data;
+the likelihood encodes what the data says; the posterior combines them.
+
+## Bayes' rule for parameters
+
+Let $\theta$ be a parameter and $x$ the observed data. Bayes' rule (A2/bayes-rule) applied
+to this setting is:
+
+$$
+p(\theta \mid x) = \frac{p(x \mid \theta)\, p(\theta)}{p(x)}.
+$$
+
+- $p(\theta)$: the **prior** distribution over parameters.
+- $p(x \mid \theta)$: the **likelihood** (same object as in MLE; now read as a
+  function of $\theta$ for fixed $x$).
+- $p(\theta \mid x)$: the **posterior** distribution over parameters given the data.
+- $p(x) = \int p(x \mid \theta) p(\theta)\, d\theta$: the **marginal likelihood** or
+  **evidence**, a normalizing constant.
+
+The posterior is proportional to likelihood times prior:
+
+$$
+p(\theta \mid x) \propto p(x \mid \theta)\, p(\theta).
+$$
+
+## Beta-Binomial example
+
+**Model.** A coin has unknown bias $\theta \in [0,1]$. Observe $n$ flips and $k$ heads.
+
+**Likelihood.** The number of heads is binomial:
+
+$$
+p(k \mid \theta, n) = \binom{n}{k} \theta^k (1-\theta)^{n-k}.
+$$
+
+**Prior.** Choose a Beta distribution: $\theta \sim \mathrm{Beta}(\alpha, \beta)$,
+
+$$
+p(\theta) = \frac{1}{B(\alpha,\beta)} \theta^{\alpha-1}(1-\theta)^{\beta-1},
+$$
+
+where $B(\alpha,\beta) = \Gamma(\alpha)\Gamma(\beta)/\Gamma(\alpha+\beta)$ is the Beta function.
+
+**Posterior.** Multiplying:
+
+$$
+p(\theta \mid k) \propto \theta^k(1-\theta)^{n-k} \cdot \theta^{\alpha-1}(1-\theta)^{\beta-1}
+= \theta^{\alpha+k-1}(1-\theta)^{\beta+(n-k)-1}.
+$$
+
+This is the kernel of $\mathrm{Beta}(\alpha + k,\; \beta + n - k)$.
+
+The posterior mean is:
+
+$$
+E[\theta \mid k] = \frac{\alpha + k}{\alpha + \beta + n}.
+$$
+
+For large $n$, this converges to $k/n$ (the MLE). The prior parameters $\alpha, \beta$
+act as pseudo-counts: $\alpha$ pseudo-heads and $\beta$ pseudo-tails observed before
+the experiment.
+
+## Sequential updating
+
+Bayesian inference updates online. If a first dataset gives posterior
+$\mathrm{Beta}(\alpha', \beta')$, using that posterior as the prior for a second
+dataset gives the same result as using the original prior on all data at once.
+The order in which data arrives does not affect the final posterior.
+
+## Choosing a prior
+
+**Informative priors** encode domain knowledge ($\alpha = \beta = 10$ for a near-fair
+coin). **Weakly informative priors** regularize without strong assumptions. **Uniform
+priors** ($\alpha = \beta = 1$) assert equal probability for all $\theta$; note that
+"uniform" is parameterization-dependent (uniform in $\theta$ is not uniform in $\log\theta$).
+
+## Implementation
+
+```python-static
+import numpy as np
+from scipy.stats import beta as beta_dist
+
+rng = np.random.default_rng(0)
+theta_true = 0.3          # true bias
+alpha0, beta0 = 2.0, 2.0  # prior pseudo-counts
+ns = [5, 20, 100, 500]    # cumulative sample sizes
+
+data = rng.binomial(1, theta_true, max(ns))
+
+theta_grid = np.linspace(0, 1, 500)
+print(f"{'n':>6} {'posterior_mean':>16} {'post_std':>10} {'95%_CI':>20}")
+for n in ns:
+    k = data[:n].sum()
+    a_post = alpha0 + k
+    b_post = beta0 + n - k
+    post = beta_dist(a_post, b_post)
+    pmean = post.mean()
+    pstd  = post.std()
+    lo, hi = post.ppf(0.025), post.ppf(0.975)
+    print(f"{n:6d} {pmean:16.4f} {pstd:10.4f} [{lo:.3f}, {hi:.3f}]")
+print(f"True theta: {theta_true}")
+```
+
+The posterior mean starts near the prior mean $\alpha_0/(\alpha_0+\beta_0) = 0.5$
+and converges toward the true $\theta = 0.3$ as $n$ grows; the posterior standard
+deviation shrinks like $1/\sqrt{n}$.
+
+The next lesson shows that for many distributions a carefully chosen prior keeps the
+posterior in the same family as the prior, making the update a one-line formula.
