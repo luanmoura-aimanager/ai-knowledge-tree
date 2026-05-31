@@ -89,13 +89,16 @@ x_data = rng.normal(0, 1, (N, d_z)) @ W_true.T + rng.normal(0, 0.5, (N, d_x))
 A = rng.normal(0, 0.1, (d_z, d_x))
 b = np.zeros(d_z) - 1.0   # log_sigma
 C = rng.normal(0, 0.1, (d_x, d_z))
-lr = 1e-3
+lr = 1e-2
 S_mc = 5
 
-def compute_elbo(A, b, C, x_batch):
+# The ELBO takes eps as an argument: holding eps fixed makes the objective a
+# deterministic function of C, so the finite-difference gradient is exact
+# (common random numbers). Drawing fresh eps per evaluation instead would let
+# Monte Carlo noise swamp the perturbation and the gradient would be garbage.
+def compute_elbo(A, b, C, x_batch, eps):
     mu    = x_batch @ A.T                             # (M, d_z)
     sigma = np.exp(b)[np.newaxis]                     # (1, d_z)
-    eps   = rng.normal(0, 1, (S_mc, len(x_batch), d_z))
     z     = mu[np.newaxis] + sigma * eps              # (S, M, d_z)
     x_recon = z @ C.T                                 # (S, M, d_x)
     recon = -0.5 * ((x_batch[np.newaxis] - x_recon)**2).sum(-1).mean()
@@ -107,30 +110,28 @@ n_steps = 500
 for step in range(n_steps):
     idx     = rng.choice(N, batch_size, replace=False)
     x_batch = x_data[idx]
-    mu    = x_batch @ A.T
-    sigma = np.exp(b)[np.newaxis]
-    eps   = rng.normal(0, 1, (S_mc, batch_size, d_z))
-    z     = mu[np.newaxis] + sigma * eps
-    x_recon = z @ C.T
+    eps     = rng.normal(0, 1, (S_mc, batch_size, d_z))  # fixed within this step
 
-    # Finite-difference gradients (to avoid autograd dependency)
+    # Finite-difference gradient of the ELBO w.r.t. the decoder C
+    # (the reparameterized z flows through compute_elbo; no autograd needed)
     h = 1e-4
-    elbo_curr = compute_elbo(A, b, C, x_batch)
+    elbo_curr = compute_elbo(A, b, C, x_batch, eps)
     grad_C = np.zeros_like(C)
     for i in range(d_x):
         for j in range(d_z):
             C[i,j] += h
-            e_plus = compute_elbo(A, b, C, x_batch)
+            e_plus = compute_elbo(A, b, C, x_batch, eps)
             C[i,j] -= 2*h
-            e_minus = compute_elbo(A, b, C, x_batch)
+            e_minus = compute_elbo(A, b, C, x_batch, eps)
             C[i,j] += h
             grad_C[i,j] = (e_plus - e_minus) / (2*h)
     C += lr * grad_C
 
-if step == n_steps - 1 or step % 100 == 0:
-    print(f"Step {step:3d}  ELBO: {elbo_curr:.3f}")
+    if step == n_steps - 1 or step % 100 == 0:
+        print(f"Step {step:3d}  ELBO: {elbo_curr:.3f}")
 
-print(f"\nFinal ELBO: {compute_elbo(A, b, C, x_data):.3f}")
+eps_full = rng.normal(0, 1, (S_mc, N, d_z))
+print(f"\nFinal ELBO: {compute_elbo(A, b, C, x_data, eps_full):.3f}")
 ```
 
 The ELBO increases as the decoder learns to reconstruct the data; the KL term keeps
