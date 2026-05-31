@@ -57,7 +57,7 @@ export const F_CURRICULUM: Record<string, Lesson[]> = {
       id: "kalman-filter",
       title: "The Kalman filter for linear-Gaussian state space",
       goal: "Derive the Kalman predict-update recursion by applying Bayes' rule to a linear-Gaussian state-space model, and compute the Kalman gain in closed form.",
-      prerequisites: ["hidden-markov-models", "A1/multivariate-gaussian"],
+      prerequisites: ["hidden-markov-models"],
     },
     {
       id: "particle-filters",
@@ -94,7 +94,7 @@ export const F_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: [
         "F1/bayesian-networks",
         "B2/prior-likelihood-posterior",
-        "A2/kl-divergence",
+        "A2/kl-cross-entropy",
       ],
     },
     {
@@ -113,7 +113,7 @@ export const F_CURRICULUM: Record<string, Lesson[]> = {
       id: "normalizing-flow-posteriors",
       title: "Normalizing flows as variational posteriors",
       goal: "Apply the change-of-variables formula for flows to express the log-density of a transformed variable, incorporate a flow posterior into the ELBO, and implement a simple planar flow.",
-      prerequisites: ["amortized-vi", "A1/change-of-variables"],
+      prerequisites: ["amortized-vi", "A2/change-of-variables"],
     },
   ],
   F6: [
@@ -165,7 +165,7 @@ export const F_CURRICULUM: Record<string, Lesson[]> = {
       id: "probabilistic-pca",
       title: "Probabilistic PCA and factor analysis",
       goal: "Derive the maximum-likelihood solution for the PPCA loading matrix showing it recovers the top principal components, formulate the EM update, and explain how factor analysis generalizes PPCA with heteroscedastic noise.",
-      prerequisites: ["em-algorithm", "A1/pca", "A1/multivariate-gaussian"],
+      prerequisites: ["em-algorithm", "A1/low-rank-pca"],
     },
   ],
   F8: [
@@ -173,7 +173,7 @@ export const F_CURRICULUM: Record<string, Lesson[]> = {
       id: "vae-reparameterization",
       title: "Variational autoencoders and the reparameterization trick",
       goal: "Derive the VAE objective as an amortized ELBO, apply the reparameterization trick to pass gradients through a stochastic latent variable, and identify the KL term as a regularizer on the latent code.",
-      prerequisites: ["F5/amortized-vi", "A2/kl-divergence"],
+      prerequisites: ["F5/amortized-vi", "A2/kl-cross-entropy"],
     },
     {
       id: "mc-dropout-ensembles",

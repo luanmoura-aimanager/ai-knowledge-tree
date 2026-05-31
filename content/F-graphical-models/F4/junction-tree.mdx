@@ -97,8 +97,6 @@ m_abc_to_bcd = belief_abc.sum(axis=0)   # [b, c]
 # Divide out old message, multiply new
 old_sep = m_bcd_to_abc
 new_sep = m_abc_to_bcd
-belief_bcd *= (new_sep / (old_sep + 1e-12))[np.newaxis, :, :]  # wait, axis is b,c
-# Correct indexing: belief_bcd is [b,c,d]
 belief_bcd = belief_bcd * (new_sep / (old_sep + 1e-12))[:, :, np.newaxis]
 
 # Marginals

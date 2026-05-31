@@ -82,11 +82,12 @@ f23 = np.abs(rng.normal(1, 0.5, (k, k)))
 f34 = np.abs(rng.normal(1, 0.5, (k, k)))
 
 def variable_elimination_chain(factors):
-    """Eliminate all but the last variable in a chain of 2x2 factors."""
-    result = factors[0]
+    """Eliminate all but the last variable in a chain of pairwise factors."""
+    # Marginalize out the first variable: sum over its rows
+    result = factors[0].sum(axis=0)   # (k,k) -> (k,): sum over X1
     for f in factors[1:]:
         # result[x_prev] * f[x_prev, x_next], summed over x_prev
-        result = result @ f   # shape shrinks by 1 dimension
+        result = result @ f   # (k,) @ (k,k) -> (k,)
     return result
 
 # Compute P(X4) by eliminating X1, X2, X3

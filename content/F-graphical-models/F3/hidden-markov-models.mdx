@@ -141,13 +141,12 @@ gamma = np.exp(log_alpha + log_beta - log_px)  # P(Z_t | X)
 log_delta = log_alpha[0].copy()
 psi = np.zeros((T, K), dtype=int)
 for t in range(1, T):
+    log_delta_new = np.zeros(K)
     for j in range(K):
         scores = log_delta + np.log(A[:, j])
         psi[t, j] = np.argmax(scores)
-        log_delta_new = np.zeros(K)
-        for jj in range(K):
-            log_delta_new[jj] = np.max(log_delta + np.log(A[:, jj])) + log_emit(x[t], jj)
-        log_delta = log_delta_new
+        log_delta_new[j] = np.max(scores) + log_emit(x[t], j)
+    log_delta = log_delta_new
 
 z_viterbi = np.empty(T, dtype=int)
 z_viterbi[T-1] = np.argmax(log_delta)

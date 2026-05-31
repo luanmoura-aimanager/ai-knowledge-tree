@@ -101,19 +101,22 @@ for step in range(500):
     recon = -0.5 / 0.25 * ((x_data - mu_q)**2 + sig_q**2)
     elbo = (recon - kl).mean()
 
-    grad_a = ((x_data / 0.25) * (x_data - mu_q) / 0.25 - mu_q * x_data).mean() / N * N
-    # Simpler: use automatic differentiation approximation
     h = 1e-4
-    elbo_plus  = ((-0.5/0.25 * (x_data - (a+h)*x_data - b)**2 - 0.5*((a+h)*x_data+b)**2
-                   - 0.5*np.exp(log_c)**2 + 0.5*(1 + 2*log_c))).mean()
-    elbo_minus = ((-0.5/0.25 * (x_data - (a-h)*x_data - b)**2 - 0.5*((a-h)*x_data+b)**2
-                   - 0.5*np.exp(log_c)**2 + 0.5*(1 + 2*log_c))).mean()
-    grad_a = (elbo_plus - elbo_minus) / (2*h)
-    a += lr * grad_a
+    def elbo_fd(a_, log_c_):
+        mu_ = a_ * x_data + b
+        sig_ = np.exp(log_c_)
+        recon_ = -0.5 / 0.25 * ((x_data - mu_)**2 + sig_**2)
+        kl_    = 0.5 * (mu_**2 + sig_**2 - 1 - 2*log_c_)
+        return (recon_ - kl_).mean()
+
+    grad_a     = (elbo_fd(a + h, log_c) - elbo_fd(a - h, log_c)) / (2*h)
+    grad_log_c = (elbo_fd(a, log_c + h) - elbo_fd(a, log_c - h)) / (2*h)
+    a     += lr * grad_a
+    log_c += lr * grad_log_c
 
 # True posterior params: mu = 4/5 * x, sigma = sqrt(4/5)
-print(f"Learned encoder slope a: {a:.3f} (true 0.800)")
-print(f"Final ELBO estimate: {elbo:.3f}")
+print(f"Learned encoder slope a:     {a:.3f} (true 0.800)")
+print(f"Learned encoder sigma: {np.exp(log_c):.3f} (true {(0.8**0.5):.3f})")
 ```
 
 The encoder converges toward the true posterior slope ($4/5 = 0.8$) by maximizing

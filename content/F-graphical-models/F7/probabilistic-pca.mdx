@@ -6,7 +6,7 @@ lessonId: probabilistic-pca
 order: 3
 estimatedMinutes: 26
 goal: "Derive the maximum-likelihood solution for the PPCA loading matrix showing it recovers the top principal components, formulate the EM update, and explain how factor analysis generalizes PPCA with heteroscedastic noise."
-prerequisites: ["em-algorithm", "A1/pca", "A1/multivariate-gaussian"]
+prerequisites: ["em-algorithm", "A1/low-rank-pca"]
 ---
 
 Standard PCA is a deterministic procedure.
@@ -128,8 +128,10 @@ for it in range(100):
     Ez  = x_c @ W @ M_inv.T                   # (N, q)
     Ezz = sigma2 * M_inv + np.einsum("ni,nj->ij", Ez, Ez) / N  # (q, q)
     W_new = x_c.T @ Ez @ np.linalg.inv(N * Ezz)
-    recon = x_c - Ez @ W_new.T
-    sigma2_new = (np.sum(recon**2) / N + np.trace(Ezz @ W_new.T @ W_new)) / D
+    term1 = np.sum(x_c**2) / N
+    term2 = -2 * np.trace(Ez.T @ x_c @ W_new) / N
+    term3 = np.trace(Ezz @ W_new.T @ W_new)
+    sigma2_new = (term1 + term2 + term3) / D
     W, sigma2 = W_new, sigma2_new
 
 # Compare subspaces: canonical angles
