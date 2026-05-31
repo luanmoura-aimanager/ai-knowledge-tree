@@ -1,0 +1,107 @@
+---
+title: "PatchTST and iTransformer"
+pillar: G
+subId: G3
+lessonId: patchtst-itransformer
+order: 5
+estimatedMinutes: 24
+goal: "Patch a series into subseries tokens with channel independence (PatchTST), then invert the attention axis to treat each variate as a token (iTransformer)."
+prerequisites: ["decomposition-transformers"]
+---
+
+After a wave of increasingly elaborate forecasting transformers, two simpler
+designs took the lead by rethinking what a "token" should be. PatchTST tokenizes
+*subseries* instead of individual time steps; iTransformer tokenizes whole
+*variates* instead of time steps. Both are minimal changes with outsized effects.
+
+## What is a token in a time series?
+
+The earlier transformers treated each time step as a token and attended across
+steps. Two problems follow: a single step carries almost no information (unlike a
+word), and step-level attention scales badly with the lookback length. PatchTST and
+iTransformer each redefine the token to fix this.
+
+## PatchTST: subseries patches
+
+PatchTST borrows patching from vision transformers. The univariate series is cut
+into (optionally overlapping) **patches** of $P$ consecutive steps, and each patch
+becomes one token:
+
+$$
+\text{number of tokens} = \left\lfloor \frac{L - P}{S} \right\rfloor + 1,
+$$
+
+for lookback $L$, patch length $P$, and stride $S$. A length-512 series with
+$P = 16, S = 8$ collapses to about 64 tokens instead of 512.
+
+Two consequences:
+
+- **Local semantics.** A patch holds a short pattern (a small trend or bump), so a
+  token carries real information, like a word does.
+- **Quadratic cost drops.** Attention is now over $\sim L/S$ tokens, cutting the
+  $O(L^2)$ cost by a factor of $S^2$.
+
+PatchTST also uses **channel independence**: in a multivariate problem each variate
+(channel) is forecast by the *same* shared transformer applied independently, with
+no cross-channel attention. Counterintuitively this beats channel-mixing models,
+because it regularizes against spurious cross-series correlations and lets the
+shared weights learn universal temporal patterns.
+
+## iTransformer: invert the axes
+
+iTransformer makes a one-line change with a different philosophy. Where standard
+models embed each time step (mixing all variates at one time) and attend across
+time, iTransformer **inverts** this: it embeds each *variate's whole series* into a
+single token and attends across variates.
+
+So the token is one variate's full lookback, and the attention matrix is
+$N \times N$ over the $N$ variates rather than $L \times L$ over time. The
+feed-forward network then operates along the time dimension within each variate
+token. The payoff:
+
+- **Attention captures multivariate correlations** explicitly, since variates are
+  what attend to each other, which is what you want for related series.
+- **Cost depends on the number of variates, not the lookback**, so long lookbacks
+  are cheap.
+- **No architecture change**, just a transposed application of the same transformer
+  block, which is why it slots into existing code trivially.
+
+## The takeaway
+
+Both results carry the same message as the previous lesson's decomposition models,
+sharpened: the gains came from getting the *representation* right (what a token is)
+rather than from more complex attention. A plain transformer with the right
+tokenization outperforms the elaborate variants on standard benchmarks.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+L, P, S = 512, 16, 8
+
+# PatchTST patching: turn a length-L series into overlapping patch tokens
+x = np.sin(2*np.pi*np.arange(L)/24) + rng.normal(0, 0.1, L)
+n_patches = (L - P)//S + 1
+patches = np.stack([x[i*S : i*S + P] for i in range(n_patches)])
+print(f"series length {L} -> {patches.shape[0]} patch tokens of dim {patches.shape[1]}")
+print(f"attention cost cut by ~ S^2 = {S**2}x vs per-step tokens")
+
+# iTransformer view: multivariate series, one token per variate (attend across variates)
+N = 5
+series = rng.normal(size=(N, L))
+series[1] = 0.9*series[0] + 0.1*rng.normal(size=L)     # variate 1 correlated with 0
+tokens = series                                         # each row (whole series) is a token
+# variate-level attention starts from the cross-variate similarity (N x N)
+z = (tokens - tokens.mean(1, keepdims=True)) / tokens.std(1, keepdims=True)
+corr = z @ z.T / L
+print("cross-variate correlation matrix shape:", corr.shape)        # N x N, not L x L
+print(f"detected corr between variate 0 and 1: {corr[0,1]:.2f}  (built as ~0.9)")
+```
+
+Patching reduces a 512-step series to 64 tokens (an $S^2 = 64\times$ attention
+saving), and the inverted view yields an $N \times N$ cross-variate matrix that
+surfaces the planted correlation between variates 0 and 1, the two tokenization
+moves these models are built on.
+
+These models are still trained per dataset. The next lesson reaches the frontier:
+foundation models pretrained on huge corpora that forecast a new series zero-shot.

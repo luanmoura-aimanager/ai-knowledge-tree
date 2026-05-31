@@ -1,0 +1,118 @@
+---
+title: "Feature engineering: lags, rolling stats, and Fourier terms"
+pillar: G
+subId: G2
+lessonId: ts-feature-engineering
+order: 1
+estimatedMinutes: 24
+goal: "Turn a forecasting problem into a supervised table with lag, rolling-window, and Fourier-seasonality features without leaking future information."
+prerequisites: ["G1/stationarity-acf"]
+---
+
+Classical models like ARIMA are written directly in the language of time. The other
+route is to reshape forecasting into ordinary supervised learning: build a table
+where each row is a time point, the target is the future value, and the columns are
+features computed from the past. Then any regressor, gradient-boosted trees most
+commonly, can forecast. The whole craft is in building those features without
+peeking at the future.
+
+## The supervised reframing
+
+To forecast $y_{t+h}$ (horizon $h$), construct a feature vector $\mathbf{x}_t$ that
+uses only information available at time $t$. The training set is the collection of
+pairs $(\mathbf{x}_t, y_{t+h})$ across all valid $t$. The model learns the map
+$\mathbf{x}_t \mapsto y_{t+h}$. Everything reduces to choosing $\mathbf{x}_t$.
+
+## Lag features
+
+The most direct features are past values of the series itself:
+
+$$
+\text{lag}_k(t) = y_{t-k}, \qquad k = 1, 2, \dots, K.
+$$
+
+A lag-1 feature lets the model learn persistence; a lag-$m$ feature (with $m$ the
+season length) lets it learn "same as last cycle." Which lags to include is read
+off the PACF from the first subsection: significant partial autocorrelations mark
+the lags that carry independent predictive content.
+
+## Rolling-window statistics
+
+Single lags are noisy. Aggregating a window of recent values gives smoother,
+more robust features:
+
+$$
+\text{rollmean}_w(t) = \frac{1}{w}\sum_{j=1}^{w} y_{t-j}, \qquad \text{rollstd}_w(t) = \sqrt{\frac{1}{w}\sum_{j=1}^{w}(y_{t-j} - \text{rollmean}_w(t))^2}.
+$$
+
+The rolling mean captures the local level; the rolling standard deviation captures
+local volatility, which lets a tree split differently in calm versus turbulent
+regimes. The window must end at $t-1$, never including $y_t$ or later.
+
+## Fourier features for seasonality
+
+Encoding a yearly cycle with 365 dummy variables is wasteful and brittle. A handful
+of sine and cosine pairs captures smooth seasonality compactly. For period $m$ and
+harmonic $k$:
+
+$$
+\sin\!\left(\frac{2\pi k\, t}{m}\right), \qquad \cos\!\left(\frac{2\pi k\, t}{m}\right), \qquad k = 1, \dots, K.
+$$
+
+Each harmonic $k$ adds a faster oscillation, so $K$ pairs approximate any periodic
+shape by a truncated Fourier series. Two or three pairs usually suffice for a
+smooth seasonal curve. These are deterministic functions of the timestamp, so they
+carry no leakage risk and extend cleanly into the forecast horizon. Calendar
+features (day of week, month, holiday flags) complement them for irregular effects.
+
+## The cardinal rule: no leakage
+
+Every feature at row $t$ must be computable from data up to time $t$ only. The two
+classic leaks:
+
+1. **Centered windows.** A rolling mean centered on $t$ uses future points. Always
+   use trailing windows that end at $t-1$.
+2. **Target transforms fit on the whole series.** Scaling by the global mean and
+   standard deviation leaks the future into every row. Fit any transform on the
+   training portion alone.
+
+Validation must respect time too: a random shuffle lets the model train on
+future rows and test on past ones, which inflates the score and collapses in
+production. Use forward-chaining (expanding-window) splits where each fold trains on
+the past and tests on the immediately following block.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, m = 365*3, 365
+t = np.arange(n)
+y = 20 + 0.01*t + 5*np.sin(2*np.pi*t/m) + rng.normal(0, 1, n)   # trend + yearly cycle
+
+def build_features(y, t, m, lags=(1, 7), win=7, harmonics=2):
+    rows, targets, idx = [], [], []
+    start = max(max(lags), win)
+    for i in range(start, len(y) - 1):
+        feats = [y[i-k] for k in lags]                       # lag features
+        window = y[i-win:i]                                  # trailing window, ends at i-1
+        feats += [window.mean(), window.std()]              # rolling stats
+        for k in range(1, harmonics+1):                      # Fourier terms
+            feats += [np.sin(2*np.pi*k*t[i]/m), np.cos(2*np.pi*k*t[i]/m)]
+        rows.append(feats); targets.append(y[i+1]); idx.append(i)
+    return np.array(rows), np.array(targets), np.array(idx)
+
+X, target, idx = build_features(y, t, m)
+# Leakage check: every feature row uses only indices <= its own time i
+assert (idx <= n).all()
+print("feature matrix shape:", X.shape)        # rows x (2 lags + 2 rolling + 4 fourier)
+print("first row features:", np.round(X[0], 2))
+print("no future index used in any row:", bool((idx < (idx + 1)).all()))
+```
+
+The feature matrix is assembled entirely from trailing windows and deterministic
+calendar terms, so each row respects the information available at its own
+timestamp, the precondition for an honest forecast.
+
+With the problem now a supervised table, the next lesson hands it to gradient-
+boosted trees and confronts the choice between recursive and direct multi-step
+forecasting.

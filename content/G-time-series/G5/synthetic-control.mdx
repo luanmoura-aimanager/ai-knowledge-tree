@@ -1,0 +1,128 @@
+---
+title: "Synthetic control for time series"
+pillar: G
+subId: G5
+lessonId: synthetic-control
+order: 3
+estimatedMinutes: 24
+goal: "Construct a synthetic control as a convex combination of donor units matched on pre-treatment outcomes, and read the treatment effect as the post-period gap."
+prerequisites: ["causalimpact-bsts", "A1/least-squares"]
+---
+
+One region raises its minimum wage; you want the effect on employment. No single
+other region is a clean comparison: each differs in industry mix, demographics,
+trend. The synthetic control method builds a comparison unit by combining many
+control regions into a weighted average that matches the treated region's history.
+That **synthetic** region is the counterfactual.
+
+## The setup
+
+There is one **treated unit** that receives the intervention at time $T_0$, and
+$J$ **donor units** that never do. All are observed over a pre-period
+($t \le T_0$) and a post-period ($t > T_0$). Let $Y_{1t}$ be the treated unit's
+outcome and $Y_{jt}$ the donors' outcomes. The goal is to estimate what $Y_{1t}$
+would have been after $T_0$ without the intervention.
+
+## The synthetic control as a weighted donor average
+
+The method forms the counterfactual as a weighted combination of donors:
+
+$$
+\hat{Y}_{1t}^{N} = \sum_{j=2}^{J+1} w_j\, Y_{jt},
+$$
+
+with weights constrained to be a **convex combination**:
+
+$$
+w_j \ge 0, \qquad \sum_j w_j = 1.
+$$
+
+The weights are chosen to make the synthetic unit track the treated unit as closely
+as possible over the **pre-treatment** period:
+
+$$
+\mathbf{w}^\star = \arg\min_{\mathbf{w}} \sum_{t \le T_0} \Big(Y_{1t} - \sum_j w_j Y_{jt}\Big)^2 \quad \text{s.t. } w_j \ge 0,\; \textstyle\sum_j w_j = 1.
+$$
+
+This is a constrained least-squares problem (the least-squares lesson, with
+simplex constraints). The treatment effect is then the post-period gap between the
+treated unit and its synthetic counterpart:
+
+$$
+\hat{\phi}_t = Y_{1t} - \hat{Y}_{1t}^{N}, \qquad t > T_0.
+$$
+
+## Why the constraints matter
+
+The non-negativity and sum-to-one constraints are the heart of the method, and
+distinguish it from an ordinary regression counterfactual:
+
+- **No extrapolation.** A convex combination stays within the range of the donor
+  outcomes, so the synthetic unit is always an interpolation of real units, never
+  an extrapolation beyond observed data. Unconstrained regression can place huge
+  positive and negative weights that fit the pre-period perfectly but extrapolate
+  wildly out of sample.
+- **Sparsity and transparency.** The simplex constraint typically yields a sparse
+  solution: only a few donors get nonzero weight, so the synthetic control is a
+  named, interpretable blend ("70% region A, 30% region B").
+
+A good pre-period fit is the credential: if the synthetic unit matches the treated
+unit's pre-treatment path closely, the assumption that it continues to match
+absent treatment is plausible.
+
+## Inference by placebo
+
+With one treated unit there is no classical standard error. Inference is done by
+**placebo tests**: apply the method pretending each donor was treated, producing a
+distribution of placebo gaps from units with no real effect. If the treated unit's
+post-period gap is extreme relative to the placebo gaps, the effect is significant.
+This is a permutation test, the same logic as the resampling lessons.
+
+Synthetic control and CausalImpact answer the same counterfactual question with
+different machinery: CausalImpact fits a Bayesian regression on controls, synthetic
+control fits constrained weights on donor units. Both shine when a single unit is
+treated and a pool of comparison series exists.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, T0, J = 120, 80, 6
+
+# Donor units: each a different trend+seasonal mix.  Treated = blend of two donors + effect.
+t = np.arange(n)
+donors = np.stack([
+    10 + 0.05*t + 3*np.sin(2*np.pi*t/12) + np.cumsum(rng.normal(0,0.1,n)) for _ in range(J)
+])
+true_w = np.array([0.6, 0.4, 0, 0, 0, 0])
+effect = np.where(t >= T0, 4.0, 0.0)
+treated = true_w @ donors + effect + rng.normal(0, 0.3, n)
+
+# Solve constrained least squares on the simplex via projected gradient descent (pre-period).
+D = donors[:, :T0].T          # T0 x J
+y = treated[:T0]
+w = np.full(J, 1.0/J)
+lr = 1e-3
+for _ in range(20000):
+    grad = D.T @ (D @ w - y)
+    w -= lr * grad
+    w = np.maximum(w, 0)                          # project onto non-negative orthant
+    w /= w.sum()                                   # ... and onto the simplex
+
+synth = w @ donors
+pre_rmse = np.sqrt(((treated[:T0] - synth[:T0])**2).mean())
+post_gap = (treated[T0:] - synth[T0:]).mean()
+print("recovered weights:", np.round(w, 2), " (true [0.6,0.4,0,...])")
+print(f"pre-period fit RMSE: {pre_rmse:.2f}  (small => credible counterfactual)")
+print(f"avg post-period gap (estimated effect): {post_gap:.2f}  (true 4.0)")
+```
+
+The constrained fit concentrates weight on the two donors that actually compose the
+treated unit, matches the pre-period closely, and recovers the injected
+post-treatment effect of 4, the synthetic-control estimate from a convex blend of
+real units.
+
+This closes pillar G. Time-series forecasting spans the classical statistical
+toolkit, supervised and deep learning, anomaly detection, and causal estimation;
+the connections graph links these back to state-space models in pillar F, sequence
+models in pillar D, and causal inference in pillar B.

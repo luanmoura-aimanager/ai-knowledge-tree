@@ -1,0 +1,128 @@
+---
+title: "Unit roots: the ADF and KPSS tests"
+pillar: G
+subId: G1
+lessonId: unit-root-tests
+order: 2
+estimatedMinutes: 24
+goal: "Explain why a unit root breaks stationarity, set up the augmented Dickey-Fuller regression, and combine ADF with KPSS to classify a series."
+prerequisites: ["stationarity-acf", "B1/hypothesis-testing"]
+---
+
+A slowly decaying ACF looks like a strong AR process, but it can also be the
+signature of a series that is not stationary at all. The borderline case is the
+**unit root**, and telling the two apart matters: differencing a stationary series
+introduces problems, while modelling a unit-root series as stationary gives
+spurious results. Formal tests resolve the ambiguity.
+
+## The random walk and the unit root
+
+Consider the AR(1) process $X_t = \phi X_{t-1} + \varepsilon_t$ with white noise
+$\varepsilon_t$. The previous lesson required $|\phi| < 1$ for stationarity. At
+exactly $\phi = 1$ this becomes the **random walk** $X_t = X_{t-1} + \varepsilon_t$.
+
+Unrolling the recursion from $X_0 = 0$:
+
+$$
+X_t = \sum_{s=1}^{t} \varepsilon_s, \qquad \operatorname{Var}(X_t) = t\,\sigma^2.
+$$
+
+The variance grows linearly with $t$, so condition 2 of stationarity fails. The
+value $\phi = 1$ is the root of the characteristic equation $1 - \phi z = 0$ at
+$z = 1$, hence the name **unit root**. A series with a unit root is made
+stationary by differencing once: $\Delta X_t = X_t - X_{t-1} = \varepsilon_t$ is
+white noise. Such a series is called integrated of order one, $I(1)$.
+
+## The augmented Dickey-Fuller test
+
+The ADF test asks whether $\phi = 1$. Subtract $X_{t-1}$ from both sides of the
+AR(1):
+
+$$
+\Delta X_t = (\phi - 1) X_{t-1} + \varepsilon_t = \delta X_{t-1} + \varepsilon_t,
+\qquad \delta = \phi - 1.
+$$
+
+Now $\phi = 1$ becomes $\delta = 0$. The test regresses $\Delta X_t$ on $X_{t-1}$
+and checks whether the coefficient $\delta$ is zero.
+
+- **Null hypothesis** $H_0: \delta = 0$ (unit root present, non-stationary).
+- **Alternative** $H_1: \delta < 0$ (so $\phi < 1$, stationary).
+
+The "augmented" part adds lagged differences $\Delta X_{t-1}, \dots, \Delta X_{t-p}$
+to the regression to soak up any short-run autocorrelation in $\varepsilon_t$, so
+the residual is genuinely white:
+
+$$
+\Delta X_t = \delta X_{t-1} + \sum_{i=1}^{p} c_i \, \Delta X_{t-i} + \varepsilon_t.
+$$
+
+The test statistic is the usual $t$-ratio $\hat{\delta} / \operatorname{se}(\hat{\delta})$.
+The catch: under the null, $X_{t-1}$ is itself non-stationary, so this ratio does
+not follow a $t$ distribution. Its critical values come from the **Dickey-Fuller
+distribution**, which is more negative than the normal (the 5% critical value is
+about $-2.86$, not $-1.65$). A statistic below the critical value rejects the unit
+root.
+
+## KPSS: the complementary test
+
+The ADF and KPSS tests swap which case is the null:
+
+| Test | $H_0$ | $H_1$ |
+|---|---|---|
+| ADF | unit root (non-stationary) | stationary |
+| KPSS | stationary | unit root |
+
+KPSS models the series as a deterministic level plus a random walk plus noise,
+and tests whether the random-walk variance is zero. Running both removes the
+asymmetry of a single test, where failing to reject the null is weak evidence.
+The four outcomes:
+
+- ADF rejects, KPSS does not reject: **stationary** (both agree).
+- ADF does not reject, KPSS rejects: **unit root** (both agree).
+- Both reject: contradictory, often a sign of a different structure.
+- Neither rejects: not enough information; the data is uninformative.
+
+## Demonstration
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+n = 600
+
+# (a) random walk: has a unit root.  (b) stationary AR(1) with phi=0.5
+rw  = np.cumsum(rng.normal(0, 1, n))
+ar1 = np.zeros(n)
+for t in range(1, n):
+    ar1[t] = 0.5 * ar1[t-1] + rng.normal(0, 1)
+
+def adf_delta_tstat(x, p=1):
+    dx = np.diff(x)
+    # regressors: X_{t-1} and p lagged differences, plus intercept
+    rows = []
+    y = []
+    for t in range(p, len(dx)):
+        feats = [1.0, x[t]]                      # x[t] is X_{t-1} for dx[t]
+        feats += [dx[t-i] for i in range(1, p+1)]
+        rows.append(feats); y.append(dx[t])
+    X = np.array(rows); y = np.array(y)
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ beta
+    dof = len(y) - X.shape[1]
+    s2 = (resid @ resid) / dof
+    cov = s2 * np.linalg.inv(X.T @ X)
+    se_delta = np.sqrt(cov[1, 1])               # coefficient on X_{t-1}
+    return beta[1] / se_delta                    # the ADF t-statistic
+
+print(f"ADF stat, random walk:   {adf_delta_tstat(rw):.2f}  (near 0: do NOT reject unit root)")
+print(f"ADF stat, AR(1) phi=0.5: {adf_delta_tstat(ar1):.2f}  (very negative: reject unit root)")
+print("5% Dickey-Fuller critical value with intercept: -2.86")
+```
+
+The random walk gives a statistic close to zero (fails to reject the unit root),
+while the stationary AR(1) gives a strongly negative statistic (rejects it),
+matching the Dickey-Fuller critical value of $-2.86$.
+
+Once a series is differenced to stationarity, the AR/MA building blocks model what
+remains. The next lesson derives those two processes and their autocovariance.

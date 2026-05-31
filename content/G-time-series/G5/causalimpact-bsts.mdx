@@ -1,0 +1,115 @@
+---
+title: "CausalImpact and Bayesian structural time series"
+pillar: G
+subId: G5
+lessonId: causalimpact-bsts
+order: 2
+estimatedMinutes: 26
+goal: "Estimate an intervention effect by forecasting the counterfactual with a Bayesian structural time-series model fit on a control series."
+prerequisites: ["granger-causality", "G1/state-space-kalman", "B5/diff-in-diff"]
+---
+
+A company runs an ad campaign on a launch date and wants the causal effect on
+sales. There is no control group: the same market either saw the campaign or did
+not. CausalImpact answers by forecasting the counterfactual, what sales *would*
+have been with no campaign, and reading the effect as the gap between actual and
+counterfactual. The forecast comes from a Bayesian structural time-series model.
+
+## The counterfactual framing
+
+Split time at the intervention date into a **pre-period** and a **post-period**.
+During the pre-period the response $Y_t$ and one or more **control** series
+$X_t$ (markets or products *not* exposed to the intervention) move together. Fit a
+model that predicts $Y_t$ from $X_t$ on the pre-period, then use it to forecast the
+post-period counterfactual $\hat{Y}_t$. The pointwise causal effect is
+
+$$
+\hat{\phi}_t = Y_t - \hat{Y}_t,
+$$
+
+and the cumulative effect is the running sum of $\hat{\phi}_t$ over the post-period.
+This is the potential-outcomes contrast from the causal-inference lessons:
+$Y_t$ is the treated outcome, $\hat{Y}_t$ estimates the untreated potential outcome.
+
+## Why a control series is essential
+
+The forecast must be valid *because of* the controls. The controls track everything
+that affects $Y$ except the intervention: seasonality, market-wide shocks, trends.
+The two identifying assumptions:
+
+1. The controls were **not themselves affected** by the intervention (otherwise
+   they leak the effect into the counterfactual).
+2. The pre-period relationship between $Y$ and the controls **continues** into the
+   post-period absent the intervention.
+
+This generalizes difference-in-differences: rather than assuming parallel trends
+between two groups, it learns the $Y$-from-controls relationship flexibly and lets
+it carry the trend forward, with full uncertainty.
+
+## The Bayesian structural time series model
+
+The forecasting engine is a **BSTS** model, a state-space model (the
+state-space lesson) whose state is a sum of interpretable components:
+
+$$
+Y_t = \mu_t + \tau_t + \boldsymbol{\beta}^\top X_t + \varepsilon_t,
+$$
+
+- $\mu_t$ is a **local linear trend**: a level and slope that each evolve as random
+  walks, $\mu_t = \mu_{t-1} + \delta_{t-1} + \eta_t$, capturing smooth drift.
+- $\tau_t$ is a **seasonal** component (the seasonal-dummy state).
+- $\boldsymbol{\beta}^\top X_t$ is a **regression** on the controls, with a
+  spike-and-slab prior that selects which controls matter.
+- $\varepsilon_t$ is observation noise.
+
+Being Bayesian, the model is fit by sampling the posterior over states and
+parameters (the Kalman filter supplies the likelihood; an MCMC sampler draws the
+parameters). Forecasting the post-period under this posterior produces not a single
+counterfactual but a full posterior distribution of counterfactual paths.
+
+## Reading the result with uncertainty
+
+Because the counterfactual is a posterior, the effect $\hat{\phi}_t$ is too. The
+output is a credible interval on the pointwise and cumulative effect. The effect is
+declared significant when the cumulative-effect interval excludes zero. This is the
+advantage over a naive before/after comparison: the model knows how uncertain its
+counterfactual is, so it does not over-claim when the controls fit loosely or the
+post-period is short.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, t0 = 200, 150                 # intervention at t0
+t = np.arange(n)
+
+# Control series and a response that tracks it pre-period; effect of +5 added post.
+control = 10 + 5*np.sin(2*np.pi*t/30) + np.cumsum(rng.normal(0, 0.2, n))
+true_effect = np.where(t >= t0, 5.0, 0.0)
+y = 2.0 + 1.3*control + true_effect + rng.normal(0, 1.0, n)
+
+# Fit the counterfactual on the PRE-period only: regress y on control (+ intercept)
+pre = slice(0, t0)
+X = np.column_stack([np.ones(t0), control[:t0]])
+beta, *_ = np.linalg.lstsq(X, y[:t0], rcond=None)
+
+# Forecast the counterfactual over the whole horizon, take post-period effect
+Xall = np.column_stack([np.ones(n), control])
+y_cf = Xall @ beta
+pointwise = y - y_cf
+cum_effect = pointwise[t0:].sum()
+
+print(f"fitted controls coefficient: {beta[1]:.2f}  (true 1.3)")
+print(f"avg estimated post effect: {pointwise[t0:].mean():.2f}  (true 5.0)")
+print(f"avg pre-period residual:   {pointwise[:t0].mean():.2f}  (should be ~0)")
+print(f"cumulative post-period effect: {cum_effect:.0f}  (true {5*(n-t0)})")
+```
+
+The model learns the response-to-control relationship on the pre-period, forecasts
+a counterfactual that hugs the actual series before the intervention (near-zero
+residual), and then exposes the injected post-period lift of 5, the core
+CausalImpact estimate.
+
+CausalImpact relies on a regression of one response on its controls. The next
+lesson constructs the control itself: synthetic control builds a weighted
+combination of donor units to match the treated unit's pre-treatment path.

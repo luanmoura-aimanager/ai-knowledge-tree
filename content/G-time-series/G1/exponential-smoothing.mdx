@@ -1,0 +1,135 @@
+---
+title: "Exponential smoothing and the ETS family"
+pillar: G
+subId: G1
+lessonId: exponential-smoothing
+order: 5
+estimatedMinutes: 24
+goal: "Derive simple, Holt, and Holt-Winters smoothing as recursive weighted averages, and place them in the state-space ETS taxonomy."
+prerequisites: ["stationarity-acf"]
+---
+
+ARIMA models the autocorrelation structure explicitly. Exponential smoothing takes
+a different route: it forms the forecast as a weighted average of past values where
+the weights decay geometrically into the past, so recent data dominates. It is
+cheap, robust, and often hard to beat on short horizons.
+
+## Simple exponential smoothing
+
+For a series with no trend or season, the level estimate $\ell_t$ updates as a
+convex blend of the new observation and the previous level:
+
+$$
+\ell_t = \alpha\, x_t + (1 - \alpha)\, \ell_{t-1}, \qquad \alpha \in (0, 1).
+$$
+
+The one-step forecast is just the current level: $\hat{x}_{t+1} = \ell_t$.
+
+**Why "exponential."** Unroll the recursion:
+
+$$
+\ell_t = \alpha x_t + \alpha(1-\alpha) x_{t-1} + \alpha(1-\alpha)^2 x_{t-2} + \dots
+$$
+
+The weight on the observation $k$ steps back is $\alpha(1-\alpha)^k$, which decays
+geometrically. The weights sum to one (a geometric series with ratio $1-\alpha$),
+so the forecast is a proper weighted average. A large $\alpha$ tracks recent
+changes fast; a small $\alpha$ smooths heavily.
+
+## Holt's method: adding a trend
+
+A level alone produces a flat forecast. Holt's linear method adds a second
+recursive state, the **trend** (slope) $b_t$, with its own smoothing parameter
+$\beta$:
+
+$$
+\ell_t = \alpha\, x_t + (1-\alpha)(\ell_{t-1} + b_{t-1}),
+$$
+$$
+b_t = \beta\, (\ell_t - \ell_{t-1}) + (1-\beta)\, b_{t-1}.
+$$
+
+The level update now predicts from the previous level *plus* its slope. The trend
+update smooths the observed change in level $(\ell_t - \ell_{t-1})$ against the old
+trend. The $h$-step forecast extrapolates the line:
+
+$$
+\hat{x}_{t+h} = \ell_t + h\, b_t.
+$$
+
+## Holt-Winters: adding seasonality
+
+For a series with a cycle of period $m$, a third state, the **seasonal**
+component $s_t$, is added with parameter $\gamma$. In the additive form:
+
+$$
+\ell_t = \alpha (x_t - s_{t-m}) + (1-\alpha)(\ell_{t-1} + b_{t-1}),
+$$
+$$
+b_t = \beta(\ell_t - \ell_{t-1}) + (1-\beta) b_{t-1},
+$$
+$$
+s_t = \gamma(x_t - \ell_t) + (1-\gamma) s_{t-m}.
+$$
+
+The level is deseasonalized by subtracting last cycle's seasonal index before
+updating; the seasonal state is refreshed from the current residual $x_t - \ell_t$.
+The forecast adds the matching seasonal index back:
+
+$$
+\hat{x}_{t+h} = \ell_t + h\, b_t + s_{t-m+((h-1) \bmod m)+1}.
+$$
+
+A **multiplicative** variant replaces the subtractions with divisions, for series
+whose seasonal swings grow with the level.
+
+## The ETS taxonomy
+
+These recipes are special cases of a single state-space family, **ETS**, for
+Error, Trend, Seasonal. Each component is labelled:
+
+- Error: Additive (A) or Multiplicative (M).
+- Trend: None (N), Additive (A), or Additive-damped ($A_d$).
+- Seasonal: None (N), Additive (A), or Multiplicative (M).
+
+Simple smoothing is ETS(A, N, N); Holt is ETS(A, A, N); additive Holt-Winters is
+ETS(A, A, A). Writing each as a state-space model with one Gaussian error gives a
+likelihood, which lets AIC pick the components automatically and produces
+prediction intervals, not just point forecasts. The damped-trend option flattens
+the slope over the horizon, which is more realistic for long forecasts than a
+straight line.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(5)
+m = 12
+t = np.arange(180)
+season = 10 * np.sin(2*np.pi*t/m)
+x = 50 + 0.3*t + season + rng.normal(0, 2, t.size)   # trend + seasonal + noise
+
+alpha, beta, gamma = 0.4, 0.1, 0.3
+level = x[:m].mean()
+trend = (x[m:2*m].mean() - x[:m].mean()) / m
+seas  = list(x[:m] - level)                          # initial seasonal indices
+
+fitted = []
+for i in range(m, len(x)):
+    last_level = level
+    s_im = seas[i-m]
+    level = alpha*(x[i] - s_im) + (1-alpha)*(last_level + trend)
+    trend = beta*(level - last_level) + (1-beta)*trend
+    seas.append(gamma*(x[i] - level) + (1-gamma)*s_im)
+    fitted.append(last_level + trend + s_im)          # one-step-ahead
+
+fitted = np.array(fitted)
+rmse = np.sqrt(((fitted - x[m:])**2).mean())
+print(f"Holt-Winters one-step RMSE: {rmse:.2f}  (noise std was 2.0)")
+```
+
+The one-step error sits near the noise floor of 2.0, showing Holt-Winters has
+captured the trend and the twelve-period cycle and is left with only the
+irreducible noise.
+
+Both ARIMA and ETS have an exact state-space representation. The next lesson makes
+that representation explicit and uses the Kalman filter to evaluate the likelihood.

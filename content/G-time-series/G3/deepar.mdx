@@ -1,0 +1,131 @@
+---
+title: "DeepAR: autoregressive probabilistic RNN forecasting"
+pillar: G
+subId: G3
+lessonId: deepar
+order: 1
+estimatedMinutes: 26
+goal: "Define DeepAR as an RNN that emits the parameters of a likelihood, derive its training loss, and sample multi-step probabilistic forecasts."
+prerequisites: ["G2/ts-feature-engineering", "D3/lstm-gru", "A2/mle"]
+---
+
+Point forecasts hide what a planner actually needs: the range of plausible
+outcomes. DeepAR forecasts a full predictive distribution by having a recurrent
+network output not a number but the *parameters* of a probability distribution at
+each step. It also trains one global model across many related series at once,
+which is what lets it forecast items with short or sparse histories.
+
+## The architecture in one line
+
+At each time step $t$, an RNN (an LSTM or GRU, from the sequence-models lesson)
+consumes the previous value and covariates and updates its hidden state
+$\mathbf{h}_t$. A small output layer maps $\mathbf{h}_t$ to the parameters
+$\theta_t$ of a chosen likelihood:
+
+$$
+\mathbf{h}_t = \text{RNN}(\mathbf{h}_{t-1}, [\,z_{t-1},\, \mathbf{x}_t\,]), \qquad \theta_t = \text{Linear}(\mathbf{h}_t).
+$$
+
+Here $z_{t-1}$ is the previous observed (or sampled) value and $\mathbf{x}_t$ are
+covariates (calendar, item features). Feeding $z_{t-1}$ back in is what makes the
+model **autoregressive**.
+
+## Choosing the likelihood
+
+The likelihood family is picked to match the data. For real-valued data, a
+Gaussian $\mathcal{N}(\mu_t, \sigma_t^2)$ with
+
+$$
+\mu_t = \mathbf{w}_\mu^\top \mathbf{h}_t + b_\mu, \qquad \sigma_t = \log\!\big(1 + e^{\mathbf{w}_\sigma^\top \mathbf{h}_t + b_\sigma}\big).
+$$
+
+The softplus on $\sigma_t$ keeps the standard deviation positive. For count data
+(demand, sales) a negative binomial is used instead, with its mean and dispersion
+parameterized the same way. The output is a distribution per step, not a point.
+
+## The training loss is the negative log-likelihood
+
+During training the true values $z_{1:T}$ are known, so the network is run with
+**teacher forcing**: the real $z_{t-1}$ is fed as input at each step (no sampling).
+The loss maximizes the likelihood of the observed series under the emitted
+parameters, which by the MLE principle is the sum of per-step log-densities:
+
+$$
+\mathcal{L} = -\sum_{t=1}^{T} \log p(z_t \mid \theta_t).
+$$
+
+For the Gaussian case this is the familiar
+
+$$
+-\log p(z_t \mid \mu_t, \sigma_t) = \frac{1}{2}\log(2\pi\sigma_t^2) + \frac{(z_t - \mu_t)^2}{2\sigma_t^2}.
+$$
+
+Minimizing it trains $\mu_t$ toward the value and $\sigma_t$ toward the actual
+residual spread, so the model learns to be uncertain exactly where the data is
+noisy. Gradients flow through the RNN by backpropagation through time.
+
+## Scaling for a global model
+
+Series live on wildly different scales (one item sells 5 units a day, another sells
+5000). DeepAR divides each series by its own average $\nu_i = 1 + \frac{1}{t_0}\sum z_{i,t}$
+before the network, and multiplies the outputs back by $\nu_i$. This **mean
+scaling** lets a single global network serve all series, and it also weights the
+training sampling toward high-volume series so they are not drowned out.
+
+## Forecasting by ancestral sampling
+
+At inference the future values are unknown, so the autoregressive loop is run
+forward by sampling. Starting from the last hidden state, at each future step:
+draw $\hat{z}_t \sim p(\cdot \mid \theta_t)$, feed that sample back as the next
+input, and continue. Repeating the whole rollout many times produces a cloud of
+sample paths; their empirical quantiles give the prediction intervals. The forecast
+is a distribution of trajectories, not a single line.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# A tiny autoregressive Gaussian model trained by NLL (the DeepAR loss), in numpy.
+# True process: z_t = 0.8 z_{t-1} + noise, with noise std 1.0.
+n = 4000
+z = np.zeros(n)
+for t in range(1, n):
+    z[t] = 0.8*z[t-1] + rng.normal(0, 1.0)
+
+# Model: mu_t = a*z_{t-1} + b ; sigma constant (learn log_sigma). Fit a,b,log_sigma by
+# minimizing the Gaussian NLL with plain gradient descent (teacher forcing on true z).
+x, y = z[:-1], z[1:]
+a, b, log_s = 0.0, 0.0, 0.0
+lr = 0.05
+for step in range(4000):
+    mu = a*x + b
+    s2 = np.exp(2*log_s)
+    err = y - mu
+    # gradients of mean NLL = 0.5*log(2*pi*s2) + err^2/(2 s2)
+    ga = -(err * x / s2).mean()
+    gb = -(err / s2).mean()
+    gls = (1 - (err**2)/s2).mean()         # d/d log_s
+    a -= lr*ga; b -= lr*gb; log_s -= lr*gls
+
+print(f"learned a: {a:.3f} (true 0.8), sigma: {np.exp(log_s):.3f} (true 1.0)")
+
+# Ancestral sampling: 1000 forecast paths, 10 steps ahead from the last value
+H, paths = 10, 1000
+sims = np.zeros((paths, H))
+for p in range(paths):
+    last = z[-1]
+    for h in range(H):
+        last = rng.normal(a*last + b, np.exp(log_s))
+        sims[p, h] = last
+lo, hi = np.percentile(sims, [10, 90], axis=0)
+print("80% interval width per step:", np.round(hi - lo, 2))
+```
+
+The model recovers the autoregressive coefficient and the noise scale from the
+likelihood alone, and the sampled paths produce prediction intervals that widen
+with the horizon, which is the probabilistic forecast DeepAR is built to deliver.
+
+DeepAR conditions on its own past through a recurrent state. The next lesson takes a
+different stance: N-BEATS forecasts the whole horizon at once by projecting onto
+trend and seasonality basis functions, no recurrence at all.

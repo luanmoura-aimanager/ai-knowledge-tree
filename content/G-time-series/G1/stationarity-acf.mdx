@@ -1,0 +1,132 @@
+---
+title: "Stationarity, autocovariance, and the ACF/PACF"
+pillar: G
+subId: G1
+lessonId: stationarity-acf
+order: 1
+estimatedMinutes: 26
+goal: "Define weak stationarity, derive the autocovariance and autocorrelation functions, and read AR/MA order off the ACF and partial ACF."
+prerequisites: ["A2/expectation", "A2/variance-moments"]
+---
+
+A forecasting model has to assume that the future resembles the past in some
+stable way. If the mean drifts and the variance grows without bound, no finite
+sample tells you anything about tomorrow. **Stationarity** is the precise version
+of "the statistical structure does not move," and it is the assumption almost
+every classical time-series method rests on.
+
+## Weak stationarity
+
+A time series is a sequence of random variables $\{X_t\}$ indexed by integer time
+$t$. It is **weakly stationary** (or second-order stationary) when three things
+hold for all $t$:
+
+1. The mean is constant: $\mathbb{E}[X_t] = \mu$.
+2. The variance is finite: $\operatorname{Var}(X_t) = \sigma^2 < \infty$.
+3. The covariance between two times depends only on their gap, not on where the
+   gap sits: $\operatorname{Cov}(X_t, X_{t+h})$ depends on $h$ alone.
+
+The third condition is the substantive one. It says the relationship between a
+point and its neighbour $h$ steps away is the same in 1990 as in 2020.
+
+## The autocovariance function
+
+Define the **autocovariance function** at lag $h$:
+
+$$
+\gamma(h) = \operatorname{Cov}(X_t, X_{t+h}) = \mathbb{E}\big[(X_t - \mu)(X_{t+h} - \mu)\big].
+$$
+
+Under stationarity this is a function of $h$ only. Two properties fall straight
+out of the definition.
+
+**It is even.** Covariance is symmetric, so
+
+$$
+\gamma(-h) = \operatorname{Cov}(X_t, X_{t-h}) = \operatorname{Cov}(X_{t-h}, X_t) = \gamma(h),
+$$
+
+where the last step relabels $t-h$ as the base time and uses stationarity.
+
+**At lag zero it is the variance.** Setting $h=0$ gives $\gamma(0) = \operatorname{Var}(X_t) = \sigma^2$.
+
+## The autocorrelation function (ACF)
+
+Dividing by the variance removes the units and bounds the quantity:
+
+$$
+\rho(h) = \frac{\gamma(h)}{\gamma(0)}.
+$$
+
+This is the **autocorrelation function**. By Cauchy-Schwarz, $|\gamma(h)| \le \gamma(0)$,
+so $\rho(h) \in [-1, 1]$ with $\rho(0) = 1$. The ACF answers: how strongly is a
+value correlated with the one $h$ steps before it?
+
+## The partial autocorrelation function (PACF)
+
+The ACF at lag 2 is inflated by an indirect path: $X_t$ correlates with $X_{t-1}$,
+which correlates with $X_{t-2}$, so $X_t$ and $X_{t-2}$ share correlation routed
+through $X_{t-1}$. The **partial** autocorrelation at lag $h$ strips that out. It
+is the correlation between $X_t$ and $X_{t-h}$ after regressing both on the
+intervening values $X_{t-1}, \dots, X_{t-h+1}$:
+
+$$
+\alpha(h) = \operatorname{Corr}\big(X_t - \hat{X}_t,\; X_{t-h} - \hat{X}_{t-h}\big),
+$$
+
+where $\hat{X}_t$ is the linear projection of $X_t$ on the intervening lags. The
+PACF is the coefficient on $X_{t-h}$ in the best linear predictor of $X_t$ from
+the last $h$ lags.
+
+## Reading the order off the plots
+
+The two functions cut off in opposite ways, which is what makes them a
+diagnostic pair:
+
+- An **AR(p)** process has a PACF that is zero beyond lag $p$ (the predictor needs
+  exactly $p$ lags) and an ACF that decays gradually.
+- An **MA(q)** process has an ACF that is zero beyond lag $q$ and a PACF that
+  decays gradually.
+
+"Where does it cut off" reads the order; "which one cuts off" reads the family.
+The AR/MA lesson derives why.
+
+## Estimating from data
+
+Given a sample $x_1, \dots, x_n$, the sample autocovariance uses the single mean
+$\bar{x}$ and divides by $n$ (not $n-h$), which keeps the estimated $\hat{\gamma}$
+a valid positive-semidefinite covariance function:
+
+$$
+\hat{\gamma}(h) = \frac{1}{n} \sum_{t=1}^{n-h} (x_t - \bar{x})(x_{t+h} - \bar{x}).
+$$
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Simulate an AR(1): X_t = 0.7 X_{t-1} + e_t  (stationary since |0.7| < 1)
+n, phi = 4000, 0.7
+e = rng.normal(0, 1, n)
+x = np.zeros(n)
+for t in range(1, n):
+    x[t] = phi * x[t-1] + e[t]
+
+def acf(x, max_lag):
+    x = x - x.mean()
+    g0 = (x * x).mean()
+    return np.array([(x[:n-h] * x[h:]).mean() / g0 for h in range(max_lag + 1)])
+
+r = acf(x, 5)
+print("sample ACF:", np.round(r, 3))
+# Theory for AR(1): rho(h) = phi**h
+print("theory phi^h:", np.round(phi ** np.arange(6), 3))
+```
+
+The sample ACF tracks $\phi^h$, the geometric decay an AR(1) predicts, confirming
+both the stationarity of $\phi=0.7$ and the gradual ACF that flags an AR process.
+
+The next lesson asks the prior question: how do you test whether a series is
+stationary at all, when the prime suspect is a unit root that the ACF decay alone
+cannot rule out.

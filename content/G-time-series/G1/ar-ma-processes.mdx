@@ -1,0 +1,140 @@
+---
+title: "AR and MA processes"
+pillar: G
+subId: G1
+lessonId: ar-ma-processes
+order: 3
+estimatedMinutes: 28
+goal: "Write the AR(p) and MA(q) recursions, derive their autocovariance structure, and state the stationarity and invertibility conditions in terms of the characteristic roots."
+prerequisites: ["stationarity-acf"]
+---
+
+The ACF and PACF diagnostics from the first lesson point at two model families.
+This lesson builds them. The **autoregressive** (AR) model says today is a linear
+function of recent values; the **moving-average** (MA) model says today is a
+linear function of recent shocks. Almost every classical forecast is some
+combination of the two.
+
+## White noise: the building block
+
+A **white-noise** process $\{\varepsilon_t\}$ has mean zero, constant variance
+$\sigma^2$, and zero autocovariance at every nonzero lag: $\gamma_\varepsilon(h) = 0$
+for $h \neq 0$. It carries no predictable structure; everything below is built by
+filtering white noise.
+
+## The MA(q) process
+
+A moving-average process of order $q$ is a weighted sum of the last $q$ shocks:
+
+$$
+X_t = \varepsilon_t + \theta_1 \varepsilon_{t-1} + \dots + \theta_q \varepsilon_{t-q}.
+$$
+
+Its autocovariance is finite-range, which is the whole point.
+
+**Derivation of the MA(1) autocovariance.** Take $X_t = \varepsilon_t + \theta \varepsilon_{t-1}$.
+
+Step 1, variance:
+
+$$
+\gamma(0) = \operatorname{Var}(\varepsilon_t + \theta \varepsilon_{t-1}) = \sigma^2 + \theta^2 \sigma^2 = (1 + \theta^2)\sigma^2,
+$$
+
+using independence of the two shocks.
+
+Step 2, lag 1:
+
+$$
+\gamma(1) = \mathbb{E}[(\varepsilon_t + \theta \varepsilon_{t-1})(\varepsilon_{t-1} + \theta \varepsilon_{t-2})] = \theta \, \mathbb{E}[\varepsilon_{t-1}^2] = \theta \sigma^2,
+$$
+
+since only the $\varepsilon_{t-1}$ terms overlap.
+
+Step 3, lag 2 and beyond: $X_t$ and $X_{t-2}$ share no common shock, so
+$\gamma(h) = 0$ for $h \ge 2$. The ACF is
+
+$$
+\rho(1) = \frac{\theta}{1 + \theta^2}, \qquad \rho(h) = 0 \text{ for } h \ge 2.
+$$
+
+The ACF cuts off after lag $q$. That is the MA signature.
+
+## The AR(p) process
+
+An autoregressive process of order $p$ regresses the current value on its own past:
+
+$$
+X_t = \phi_1 X_{t-1} + \dots + \phi_p X_{t-p} + \varepsilon_t.
+$$
+
+**The Yule-Walker equations.** Multiply the AR(p) equation by $X_{t-h}$ for $h > 0$
+and take expectations. Since $\mathbb{E}[\varepsilon_t X_{t-h}] = 0$ (the future
+shock is uncorrelated with the past),
+
+$$
+\gamma(h) = \phi_1 \gamma(h-1) + \dots + \phi_p \gamma(h-p), \qquad h > 0.
+$$
+
+The autocovariance satisfies the same recursion as the process itself. Dividing by
+$\gamma(0)$ gives the ACF recursion. For AR(1) this yields $\rho(h) = \phi^h$, the
+geometric decay seen in the first lesson: the ACF tails off rather than cutting
+off, which is the AR signature.
+
+## Stationarity and invertibility through the characteristic roots
+
+Write the AR(p) with the lag operator $L$, defined by $L X_t = X_{t-1}$:
+
+$$
+\phi(L) X_t = \varepsilon_t, \qquad \phi(L) = 1 - \phi_1 L - \dots - \phi_p L^p.
+$$
+
+**Stationarity condition.** The AR is stationary when every root of the polynomial
+$\phi(z) = 0$ lies *outside* the unit circle, $|z| > 1$. For AR(1), $1 - \phi z = 0$
+gives $z = 1/\phi$, so $|1/\phi| > 1$ means $|\phi| < 1$, recovering the earlier
+condition. A root on the circle ($|z| = 1$) is the unit root of the previous
+lesson.
+
+**Invertibility condition.** Symmetrically, an MA(q) is **invertible** when the
+roots of $\theta(z) = 1 + \theta_1 z + \dots + \theta_q z^q$ lie outside the unit
+circle. Invertibility lets you rewrite the MA as an infinite AR, so the unobserved
+shocks can be recovered from observed past values. Without it, two different MA
+parameters give the identical ACF and the model is not identified.
+
+## Duality
+
+The two families are mirror images. A stationary AR(p) equals an MA($\infty$)
+(invert $\phi(L)$); an invertible MA(q) equals an AR($\infty$). This duality is why
+the ACF/PACF pair identifies them: where one cuts off, the other tails off.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+n = 200_000
+
+# AR(1), phi=0.6: ACF should tail off as phi^h
+phi = 0.6
+ar = np.zeros(n)
+for t in range(1, n):
+    ar[t] = phi * ar[t-1] + rng.normal()
+
+# MA(1), theta=0.8: ACF should cut off after lag 1
+theta = 0.8
+e = rng.normal(size=n)
+ma = e[1:] + theta * e[:-1]
+
+def acf(x, H):
+    x = x - x.mean(); g0 = (x*x).mean()
+    return np.array([(x[:len(x)-h]*x[h:]).mean()/g0 for h in range(H+1)])
+
+print("AR(1) ACF:", np.round(acf(ar, 3), 3), " theory phi^h:", np.round(phi**np.arange(4), 3))
+r = acf(ma, 3)
+print("MA(1) ACF:", np.round(r, 3), " theory rho(1)=theta/(1+theta^2):", round(theta/(1+theta**2), 3))
+```
+
+The AR(1) ACF decays as $\phi^h$ while the MA(1) ACF matches $\theta/(1+\theta^2)$
+at lag 1 and vanishes after, the exact cut-off-versus-tail-off contrast that reads
+model family off the plots.
+
+The next lesson glues these together with differencing and seasonality to form the
+ARIMA and SARIMA models used in practice.

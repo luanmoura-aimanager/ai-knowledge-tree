@@ -1,0 +1,120 @@
+---
+title: "Statistical anomaly detection: IQR, z-score, and ESD"
+pillar: G
+subId: G4
+lessonId: statistical-anomaly-detection
+order: 1
+estimatedMinutes: 22
+goal: "Flag point anomalies with the IQR rule and the robust z-score, and apply the generalized ESD test for multiple outliers under normality."
+prerequisites: ["G1/stationarity-acf", "B1/hypothesis-testing"]
+---
+
+The simplest anomaly question is point-wise: is this single value too far from the
+rest to be normal? Statistical methods answer it with an explicit model of "normal"
+and a threshold, which makes them transparent and tunable. The catch is that
+outliers corrupt the very statistics used to detect them, so the robust versions
+matter.
+
+## The z-score and its fragility
+
+The textbook detector standardizes each point and flags large deviations:
+
+$$
+z_i = \frac{x_i - \bar{x}}{s}, \qquad \text{flag if } |z_i| > k,
+$$
+
+with $\bar{x}$ the sample mean, $s$ the sample standard deviation, and $k$
+typically 3. Under a normal model, $|z| > 3$ happens about 0.27% of the time, so
+$k=3$ targets that false-positive rate.
+
+The flaw is **masking**: a single large outlier inflates both $\bar{x}$ and $s$,
+which shrinks every $z_i$, including the outlier's own. One extreme point can hide
+itself and its neighbours. The mean and standard deviation are not robust.
+
+## Robust z-score with the median and MAD
+
+Replace the non-robust statistics with robust ones. Use the median for location and
+the **median absolute deviation** (MAD) for scale:
+
+$$
+\text{MAD} = \text{median}_i\, |x_i - \text{median}(x)|, \qquad z_i^{\text{robust}} = \frac{x_i - \text{median}(x)}{1.4826 \cdot \text{MAD}}.
+$$
+
+The constant $1.4826$ rescales the MAD so that $1.4826 \cdot \text{MAD}$ estimates
+the standard deviation for Gaussian data (since for a normal, the MAD equals
+$0.6745\sigma$, and $1/0.6745 \approx 1.4826$). The median and MAD have a 50%
+breakdown point: up to half the data can be arbitrary before they break, so a few
+outliers no longer mask themselves.
+
+## The IQR rule
+
+The boxplot rule needs no distributional assumption beyond ordering. With first and
+third quartiles $Q_1, Q_3$ and interquartile range $\text{IQR} = Q_3 - Q_1$, flag
+points outside the fences:
+
+$$
+x_i < Q_1 - 1.5\,\text{IQR} \quad \text{or} \quad x_i > Q_3 + 1.5\,\text{IQR}.
+$$
+
+For a normal distribution these fences sit at about $\pm 2.7\sigma$, so the IQR rule
+behaves like a robust 2.7-sigma test. The multiplier 3.0 marks "far" outliers. Like
+the MAD, quartiles are robust, so the rule resists masking.
+
+## Generalized ESD: testing for an unknown number of outliers
+
+When the data is approximately normal and you want a principled test for **up to
+$r$** outliers, the generalized extreme studentized deviate (ESD) test iterates the
+z-score test while removing the most extreme point each round.
+
+**The procedure.** For $i = 1, \dots, r$:
+
+1. Compute $R_i = \dfrac{\max_j |x_j - \bar{x}|}{s}$ on the current data.
+2. Remove the point achieving that maximum.
+3. Recompute $\bar{x}, s$ on the reduced set and repeat.
+
+Each $R_i$ is compared to a critical value $\lambda_i$ derived from the $t$
+distribution, which accounts for testing the maximum of $n-i+1$ values:
+
+$$
+\lambda_i = \frac{(n-i)\, t_{p,\,n-i-1}}{\sqrt{(n-i-1+t_{p,\,n-i-1}^2)(n-i+1)}},
+$$
+
+with $t_{p,\nu}$ the upper-$p$ critical value of the $t$ distribution at the
+adjusted significance level. The number of outliers is the **largest** $i$ for
+which $R_i > \lambda_i$. Removing the extreme point each round defeats the masking
+problem, which is why ESD beats a single z-score pass.
+
+For time series, all of these are applied to the **residual** after removing trend
+and seasonality (the decomposition from earlier lessons), so a high but in-season
+value is not flagged as anomalous.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(10, 2, 200)
+x[37] = 30.0; x[112] = -8.0           # two injected outliers
+
+# Non-robust z-score: the outliers inflate mean/std and partially mask themselves
+z = (x - x.mean()) / x.std()
+print("non-robust z flags:", np.where(np.abs(z) > 3)[0])
+
+# Robust z-score with median + MAD
+med = np.median(x)
+mad = np.median(np.abs(x - med))
+zr = (x - med) / (1.4826 * mad)
+print("robust z flags:    ", np.where(np.abs(zr) > 3)[0])
+
+# IQR rule
+q1, q3 = np.percentile(x, [25, 75]); iqr = q3 - q1
+lo, hi = q1 - 1.5*iqr, q3 + 1.5*iqr
+print("IQR-rule flags:    ", np.where((x < lo) | (x > hi))[0])
+```
+
+The robust z-score and the IQR rule both flag the two injected indices 37 and 112
+cleanly, while the non-robust z-score is pulled toward them and detects less
+reliably, the masking effect that motivates robust statistics.
+
+These tests flag individual points against a static notion of normal. The next
+lesson handles a different anomaly: a sustained *shift* in the series, detected
+sequentially as it happens with CUSUM.

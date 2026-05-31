@@ -1,0 +1,111 @@
+---
+title: "Prophet: a decomposable additive model"
+pillar: G
+subId: G2
+lessonId: prophet
+order: 4
+estimatedMinutes: 22
+goal: "Decompose a series into piecewise-linear trend, Fourier seasonality, and holiday effects, and fit it as a regression with changepoint regularization."
+prerequisites: ["ts-feature-engineering", "C1/linear-regression-mle"]
+---
+
+Prophet was built for a specific situation: many business series, each needing a
+forecast, with analysts rather than time-series specialists turning the knobs. Its
+design choice is to model a series as a sum of interpretable components fit as a
+curve-fitting regression, not as an autoregressive process. That makes it robust to
+missing data, easy to tune in human terms, and transparent about why it forecasts
+what it does.
+
+## The decomposable model
+
+Prophet writes the series as an additive sum of three components plus noise:
+
+$$
+y(t) = g(t) + s(t) + h(t) + \varepsilon_t,
+$$
+
+where $g(t)$ is the **trend**, $s(t)$ is the **seasonality**, $h(t)$ is the
+**holiday/event** effect, and $\varepsilon_t$ is i.i.d. noise. Crucially $t$ is the
+actual timestamp, so the model is a regression on time, not on past values of $y$.
+Gaps in the data are simply rows with no observation; nothing breaks.
+
+## Piecewise-linear trend with changepoints
+
+The trend is a straight line whose slope is allowed to change at a set of
+**changepoints** $t_1, \dots, t_J$. Let $\delta_j$ be the slope adjustment at
+changepoint $j$ and $a_j(t) = \mathbb{1}[t \ge t_j]$ indicate whether it has
+occurred. The growth rate at time $t$ is the base rate $k$ plus all adjustments
+triggered so far:
+
+$$
+g(t) = \big(k + \textstyle\sum_j a_j(t)\,\delta_j\big)\, t + \big(b + \textstyle\sum_j a_j(t)\,\gamma_j\big),
+$$
+
+where the $\gamma_j$ keep the line continuous at each changepoint. Left
+unconstrained, many changepoints overfit. Prophet places a **Laplace prior**
+$\delta_j \sim \text{Laplace}(0, \tau)$ on the slope changes. This is an $L_1$
+penalty: it drives most $\delta_j$ to exactly zero, so only a few changepoints
+survive and the trend stays smooth. The scale $\tau$ is the single trend-
+flexibility knob; larger $\tau$ permits sharper bends.
+
+## Fourier seasonality
+
+Seasonality reuses the Fourier construction from the feature-engineering lesson. For
+a period $P$ (365.25 for yearly, 7 for weekly), with $N$ harmonics:
+
+$$
+s(t) = \sum_{n=1}^{N} \left[ a_n \cos\!\left(\frac{2\pi n t}{P}\right) + b_n \sin\!\left(\frac{2\pi n t}{P}\right) \right].
+$$
+
+The coefficients $a_n, b_n$ are learned. More harmonics fit a wigglier seasonal
+shape; yearly seasonality typically uses $N = 10$, weekly $N = 3$. Multiple
+seasonalities add as separate $s(t)$ terms with their own $P$.
+
+## Holidays and fitting
+
+Holiday effects are indicator regressors: each holiday (with an optional window of
+days around it) gets its own coefficient $\kappa_i$, so $h(t) = \sum_i \kappa_i\,\mathbb{1}[t \in D_i]$.
+Stacking the changepoint columns, Fourier columns, and holiday indicators into one
+design matrix $X$, the model is a linear regression $y = X\beta + \varepsilon$ with
+the Laplace prior on the trend block. Prophet fits it by MAP estimation (the
+linear-regression-by-MLE lesson, plus the prior, is the underlying objective),
+which is fast and gives the analyst direct, named parameters to inspect and
+override.
+
+The cost of this transparency: because Prophet ignores autocorrelation in the
+residual, it leaves predictable structure on the table when the series has strong
+short-run dynamics, where ARIMA or a GBDT on lags does better.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 730
+t = np.arange(n)
+
+# Truth: trend that bends at t=365, plus weekly seasonality, plus noise
+trend = 10 + 0.05*t + 0.05*np.maximum(0, t-365)     # slope doubles after a changepoint
+weekly = 3*np.sin(2*np.pi*t/7)
+y = trend + weekly + rng.normal(0, 1, n)
+
+# Design matrix: intercept, time, one hinge at 365, weekly Fourier (N=3)
+cols = [np.ones(n), t, np.maximum(0, t-365)]
+for k in range(1, 4):
+    cols += [np.cos(2*np.pi*k*t/7), np.sin(2*np.pi*k*t/7)]
+X = np.column_stack(cols)
+
+beta, *_ = np.linalg.lstsq(X, y, rcond=None)        # MAP with flat prior here, for clarity
+fit = X @ beta
+rmse = np.sqrt(((fit - y)**2).mean())
+print(f"recovered base slope: {beta[1]:.3f} (true 0.05)")
+print(f"recovered slope change at changepoint: {beta[2]:.3f} (true 0.05)")
+print(f"in-sample RMSE: {rmse:.2f}  (noise std 1.0)")
+```
+
+The regression recovers both the base slope and the slope change at the
+changepoint, and fits the weekly cycle down to the noise floor, showing how Prophet
+reads a series as a sum of named, inspectable components.
+
+Classical and tree-based methods rely on hand-built features. The next subsection
+turns to deep learning, where the model learns its own representation of the
+series, beginning with the probabilistic RNN forecaster DeepAR.

@@ -1,0 +1,124 @@
+---
+title: "Granger causality"
+pillar: G
+subId: G5
+lessonId: granger-causality
+order: 1
+estimatedMinutes: 24
+goal: "Define Granger causality as predictive improvement, test it with a restricted-versus-full VAR F-test, and state what it does and does not claim."
+prerequisites: ["G1/var-cointegration", "B5/potential-outcomes"]
+---
+
+Two series move together, but does one *drive* the other? Granger's answer is
+operational and modest: $X$ Granger-causes $Y$ if knowing the past of $X$ helps
+predict $Y$ beyond what $Y$'s own past already provides. This is a statement about
+predictability, not about mechanism, and keeping that distinction straight is the
+whole point of the lesson.
+
+## The definition
+
+$X$ **Granger-causes** $Y$ if the past values $X_{t-1}, X_{t-2}, \dots$ contain
+information that improves the forecast of $Y_t$ over and above the information in
+$Y$'s own past $Y_{t-1}, Y_{t-2}, \dots$. The logic rests on two premises: the
+cause precedes the effect in time, and the cause carries unique predictive
+information about the effect.
+
+## The test: restricted versus full model
+
+The definition becomes a hypothesis test by comparing two regressions, both drawn
+from the VAR framework of the earlier lesson.
+
+**Restricted model:** predict $Y_t$ from its own lags only.
+
+$$
+Y_t = \alpha_0 + \sum_{i=1}^{p} \alpha_i Y_{t-i} + u_t.
+$$
+
+**Full model:** add the lags of $X$.
+
+$$
+Y_t = \alpha_0 + \sum_{i=1}^{p} \alpha_i Y_{t-i} + \sum_{i=1}^{p} \beta_i X_{t-i} + e_t.
+$$
+
+The null hypothesis is that $X$'s lags add nothing:
+
+$$
+H_0: \beta_1 = \beta_2 = \dots = \beta_p = 0.
+$$
+
+If $H_0$ holds, $X$ does not Granger-cause $Y$. Test it with an **F-test** comparing
+the residual sum of squares of the two models:
+
+$$
+F = \frac{(\text{RSS}_{\text{restricted}} - \text{RSS}_{\text{full}}) / p}{\text{RSS}_{\text{full}} / (n - 2p - 1)}.
+$$
+
+The numerator is the drop in unexplained variance from adding $X$'s lags, scaled by
+the number of restrictions $p$; the denominator is the full model's residual
+variance. A large $F$ (small p-value) means $X$'s lags genuinely reduced prediction
+error, so reject $H_0$ and conclude $X$ Granger-causes $Y$. The test runs in both
+directions, and both, one, or neither may hold.
+
+## Requirements and pitfalls
+
+The test is only valid under conditions inherited from VAR estimation:
+
+- **Stationarity.** Both series must be stationary (difference them first if not),
+  or the F-test is invalid and spurious causality appears between unrelated trends.
+- **Correct lag order $p$.** Chosen by an information criterion; too few lags miss
+  the dependence, too many waste power.
+
+The crucial caveats about interpretation:
+
+- **A confounder fakes it.** If a hidden $Z$ drives both $X$ and $Y$ with $X$
+  leading, $X$ Granger-causes $Y$ with no causal link between them. Granger
+  causality does not control for unobserved common causes, which is the central
+  warning from the potential-outcomes framework.
+- **It is purely predictive.** "Granger-causes" means "helps predict," not
+  "intervening on $X$ changes $Y$." It is necessary for time-ordered causation but
+  far from sufficient.
+
+Despite the name, Granger causality is best read as **directional predictability**.
+It is a screening tool, strong evidence against causation when absent, weak evidence
+for it when present.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, p = 2000, 2
+
+# Construct X -> Y: Y depends on past X; X is autonomous.
+x = np.zeros(n); y = np.zeros(n)
+for t in range(2, n):
+    x[t] = 0.5*x[t-1] + rng.normal()
+    y[t] = 0.3*y[t-1] + 0.6*x[t-1] + rng.normal()     # X's lag drives Y
+
+def granger_F(y, x, p):
+    rows_r, rows_f, target = [], [], []
+    for t in range(p, len(y)):
+        ylags = [y[t-i] for i in range(1, p+1)]
+        xlags = [x[t-i] for i in range(1, p+1)]
+        rows_r.append([1.0] + ylags)                  # restricted: y-lags only
+        rows_f.append([1.0] + ylags + xlags)          # full: + x-lags
+        target.append(y[t])
+    Xr, Xf, yv = map(np.array, (rows_r, rows_f, target))
+    def rss(X):
+        b, *_ = np.linalg.lstsq(X, yv, rcond=None)
+        r = yv - X @ b; return r @ r
+    rss_r, rss_f = rss(Xr), rss(Xf)
+    nn = len(yv); df2 = nn - Xf.shape[1]
+    return ((rss_r - rss_f)/p) / (rss_f/df2)
+
+print(f"F(X -> Y): {granger_F(y, x, p):8.1f}  (large: X helps predict Y)")
+print(f"F(Y -> X): {granger_F(x, y, p):8.2f}  (small: Y does not help predict X)")
+print("5% F critical value (df1=2, large df2) ~ 3.0")
+```
+
+The F-statistic is large in the $X \to Y$ direction and near the critical value in
+the reverse, recovering the asymmetric dependence built into the data, exactly the
+directional predictability Granger causality measures.
+
+Granger causality detects predictive direction but cannot quantify the effect of a
+specific intervention. The next lesson does: CausalImpact estimates what would have
+happened without an intervention by forecasting the counterfactual.
