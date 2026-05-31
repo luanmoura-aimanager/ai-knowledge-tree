@@ -98,11 +98,13 @@ trend, seasonal = series_decomp(x, k=25)
 print(f"trend slope (fit): {np.polyfit(t, trend, 1)[0]:.4f}  (true 0.01)")
 print(f"seasonal mean ~0: {seasonal.mean():.3f}   seasonal std: {seasonal.std():.2f}")
 
-# Auto-correlation via FFT finds the dominant lag (should be the period, 24)
+# Auto-correlation via FFT finds the dominant lag (should be the period, 24).
+# Zero-pad to 2L so the inverse transform is the linear (not circular) ACF.
 s = seasonal - seasonal.mean()
-acf_full = np.fft.irfft(np.abs(np.fft.rfft(s))**2, n=L)        # Wiener-Khinchin
-acf_full = acf_full[:L//2] / acf_full[0]
-best_lag = 1 + np.argmax(acf_full[1:60])
+acf_full = np.fft.irfft(np.abs(np.fft.rfft(s, n=2*L))**2, n=2*L)[:L]   # Wiener-Khinchin
+acf_full = acf_full / acf_full[0]
+# Search past the lag-1 smoothness for the dominant periodicity.
+best_lag = 2 + np.argmax(acf_full[2:60])
 print(f"dominant auto-correlation lag: {best_lag}  (true period 24)")
 ```
 

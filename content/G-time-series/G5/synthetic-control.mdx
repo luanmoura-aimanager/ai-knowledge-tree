@@ -89,10 +89,12 @@ import numpy as np
 rng = np.random.default_rng(0)
 n, T0, J = 120, 80, 6
 
-# Donor units: each a different trend+seasonal mix.  Treated = blend of two donors + effect.
+# Donor units: distinct trend slopes and seasonal phases so the weights are
+# identifiable.  Treated = blend of two donors + effect.
 t = np.arange(n)
 donors = np.stack([
-    10 + 0.05*t + 3*np.sin(2*np.pi*t/12) + np.cumsum(rng.normal(0,0.1,n)) for _ in range(J)
+    (5 + 0.02*j*t) + 3*np.sin(2*np.pi*(t/12 + j/J)) + np.cumsum(rng.normal(0,0.1,n))
+    for j in range(J)
 ])
 true_w = np.array([0.6, 0.4, 0, 0, 0, 0])
 effect = np.where(t >= T0, 4.0, 0.0)
@@ -102,7 +104,7 @@ treated = true_w @ donors + effect + rng.normal(0, 0.3, n)
 D = donors[:, :T0].T          # T0 x J
 y = treated[:T0]
 w = np.full(J, 1.0/J)
-lr = 1e-3
+lr = 1.0 / np.linalg.norm(D, 2)**2            # step size from the Lipschitz constant
 for _ in range(20000):
     grad = D.T @ (D @ w - y)
     w -= lr * grad

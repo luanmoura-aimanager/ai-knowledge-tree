@@ -110,8 +110,11 @@ spread = y2 - 2*y1                       # this is beta^T x with beta=(-2,1)
 v1 = spread[:n//2].var(); v2 = spread[n//2:].var()
 print(f"spread var first half: {v1:.2f}   second half: {v2:.2f}  (stable => stationary)")
 
-# Each level series, by contrast, has variance that grows over the sample
-print(f"y1 var first half: {y1[:n//2].var():.1f}   second half: {y1[n//2:].var():.1f}  (grows => I(1))")
+# Each level is I(1): its variance grows ~ linearly in t. A single path wanders,
+# so read the growth from an ensemble of independent random walks.
+W = np.cumsum(rng.normal(0, 1, (2000, n)), axis=1)   # 2000 independent I(1) paths
+var_t = W.var(axis=0)                                 # ensemble variance at each time
+print(f"I(1) ensemble var at t={n//4}: {var_t[n//4]:.0f}   at t={n-1}: {var_t[-1]:.0f}  (grows ~ t => I(1))")
 ```
 
 The spread $y_2 - 2y_1$ has stable variance across the sample while each level
