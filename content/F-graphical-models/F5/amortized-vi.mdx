@@ -87,20 +87,6 @@ for step in range(500):
     eps   = rng.normal(0, 1, (S, N))
     z_s   = mu_q[np.newaxis] + sig_q[np.newaxis] * eps   # (S, N)
 
-    # ELBO = E[log p(x|z)] + E[log p(z)] - E[log q(z|x)]
-    log_px_z = -0.5 / 0.25 * (x_data[np.newaxis] - z_s)**2
-    log_pz   = -0.5 * z_s**2
-    log_qz   = -0.5 * ((z_s - mu_q[np.newaxis]) / sig_q[np.newaxis])**2 - np.log(sig_q[np.newaxis])
-    elbo_mc  = (log_px_z + log_pz - log_qz).mean()
-
-    # Gradients (analytic for this linear encoder)
-    # KL(N(mu,sig^2) || N(0,1)) = 0.5*(mu^2 + sig^2 - 1 - log sig^2)
-    dKL_da = (mu_q * x_data + sig_q * np.exp(log_c) * 0).mean()  # d/da of 0.5*mu^2
-    # Use analytic KL gradient
-    kl   = 0.5 * (mu_q**2 + sig_q**2 - 1 - 2*log_c)
-    recon = -0.5 / 0.25 * ((x_data - mu_q)**2 + sig_q**2)
-    elbo = (recon - kl).mean()
-
     h = 1e-4
     def elbo_fd(a_, log_c_):
         mu_ = a_ * x_data + b
@@ -114,9 +100,9 @@ for step in range(500):
     a     += lr * grad_a
     log_c += lr * grad_log_c
 
-# True posterior params: mu = 4/5 * x, sigma = sqrt(4/5)
+# True posterior: precision = 1 (prior) + 1/0.25 (lik) = 5 => mu = 4x/5, sigma = sqrt(1/5)
 print(f"Learned encoder slope a:     {a:.3f} (true 0.800)")
-print(f"Learned encoder sigma: {np.exp(log_c):.3f} (true {(0.8**0.5):.3f})")
+print(f"Learned encoder sigma: {np.exp(log_c):.3f} (true {(0.2**0.5):.3f})")
 ```
 
 The encoder converges toward the true posterior slope ($4/5 = 0.8$) by maximizing

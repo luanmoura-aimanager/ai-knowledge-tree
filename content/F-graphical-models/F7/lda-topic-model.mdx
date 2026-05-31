@@ -129,12 +129,18 @@ for it in range(n_iter):
 
 # Infer phi and theta
 phi = (n_kv + beta) / (n_kv + beta).sum(axis=1, keepdims=True)
-print("Inferred topic-word distributions:")
-for k in range(K):
-    print(f"  Topic {k}: {phi[k].round(3)}")
-print("\nTrue topic-word distributions:")
-for k in range(K):
-    print(f"  Topic {k}: {true_phi[k].round(3)}")
+
+# Align inferred topics to true topics by most-concentrated word (topics are label-permuted)
+align = np.argmax(phi, axis=1)   # dominant word index per inferred topic
+sort_idx = np.argsort(align)     # sort inferred topics by dominant word
+true_sort = np.argsort(np.argmax(true_phi, axis=1))
+
+print("Inferred topic-word distributions (sorted by dominant word):")
+for i, k in enumerate(sort_idx):
+    print(f"  Topic {i}: {phi[k].round(3)}")
+print("\nTrue topic-word distributions (sorted by dominant word):")
+for i, k in enumerate(true_sort):
+    print(f"  Topic {i}: {true_phi[k].round(3)}")
 ```
 
 Collapsed Gibbs recovers the topic structure because integrating out $\theta$ and $\phi$

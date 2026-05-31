@@ -118,8 +118,11 @@ print(f"SGLD posterior std:   {samples.std(axis=0).round(3)}")
 print(f"Exact posterior std:  {np.sqrt(np.diag(post_cov)).round(3)}")
 ```
 
-SGLD recovers the posterior mean and approximate covariance using only mini-batch gradients,
-illustrating how a small noise injection transforms gradient optimization into Bayesian sampling.
+SGLD recovers the posterior mean well; the standard deviation is typically overestimated
+by a factor related to $\varepsilon$ (Langevin discretization bias), which is the expected
+cost of skipping the MH correction step.
+The lesson is still clear: a small noise injection transforms gradient optimization
+into approximate Bayesian posterior sampling.
 
 The next subsection introduces latent variable models, starting with the EM algorithm
 that maximizes the marginal likelihood when the latent structure is not directly observed.

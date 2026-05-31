@@ -103,12 +103,9 @@ def elbo_grad(mu, log_sigma):
     f = log_p - log_q   # (log_p - log_q) = ELBO per sample
 
     # Gradients via reparameterization
+    # d/dmu of (log_p - log_q): dz/dmu = 1, d(-log_q)/dmu = 0 (eps independent of mu)
+    # d/d(log_sigma): dz/d(log_sigma) = sigma*eps; d(-log_q)/d(log_sigma) = +1
     dlog_p_dz = -(z - target_mu) / target_sigma**2
-    grad_mu       = (dlog_p_dz + 1.0/sigma * (-1.0)).mean()  # df/dmu
-    grad_log_sigma = (dlog_p_dz * sigma * eps - 1.0 + 1.0).mean()
-    # Correct: d/d(log_sigma) of (log_p - log_q)
-    # log_q = -0.5*eps^2 - log_sigma  => d/d(log_sigma) = 1
-    # log_p via z: dz/d(log_sigma) = sigma*eps
     grad_mu       = (dlog_p_dz * 1.0).mean()
     grad_log_sigma = (dlog_p_dz * sigma * eps + 1.0).mean()
     return grad_mu, grad_log_sigma
