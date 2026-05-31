@@ -74,9 +74,11 @@ $$
 
 ```python
 import numpy as np
-from scipy import stats
 
 rng = np.random.default_rng(35)
+
+def norm_pdf(x, mu=0.0, sigma=1.0):
+    return np.exp(-0.5 * ((x - mu) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
 
 # Generate GMM data
 K = 3
@@ -93,14 +95,14 @@ mu  = rng.uniform(x.min(), x.max(), (K, 1))
 sig = np.ones(K)
 
 def log_likelihood(x, pi, mu, sig):
-    liks = np.array([pi[k] * stats.norm.pdf(x[:, 0], mu[k, 0], sig[k]) for k in range(K)])
+    liks = np.array([pi[k] * norm_pdf(x[:, 0], mu[k, 0], sig[k]) for k in range(K)])
     return np.log(liks.sum(axis=0)).sum()
 
 for iteration in range(100):
     # E-step
     r = np.zeros((N, K))
     for k in range(K):
-        r[:, k] = pi[k] * stats.norm.pdf(x[:, 0], mu[k, 0], sig[k])
+        r[:, k] = pi[k] * norm_pdf(x[:, 0], mu[k, 0], sig[k])
     r /= r.sum(axis=1, keepdims=True)
 
     # M-step
