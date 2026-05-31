@@ -73,30 +73,45 @@ homogeneous sets.
 
 ```python
 import numpy as np
-from sklearn.linear_model import Ridge
 
 rng = np.random.default_rng(51)
 
 # Regression: y = 2x + sin(3x) + noise
-N = 500
+N = 1500
 x_all = rng.uniform(-3, 3, N)
 y_all = 2*x_all + np.sin(3*x_all) + rng.normal(0, 0.8, N)
 
-# Split: 300 train, 100 calibration, 100 test
+# Split: 700 train, 400 calibration, 400 test
 idx = rng.permutation(N)
-x_tr, y_tr   = x_all[idx[:300]], y_all[idx[:300]]
-x_cal, y_cal = x_all[idx[300:400]], y_all[idx[300:400]]
-x_te, y_te   = x_all[idx[400:]], y_all[idx[400:]]
+x_tr, y_tr   = x_all[idx[:700]], y_all[idx[:700]]
+x_cal, y_cal = x_all[idx[700:1100]], y_all[idx[700:1100]]
+x_te, y_te   = x_all[idx[1100:]], y_all[idx[1100:]]
 
-# Polynomial features
+# Polynomial features, standardized (raw powers on [-3,3] are badly scaled)
+def poly(x):
+    return np.column_stack([x**k for k in range(1, 5)])
+
+feat_mean, feat_std = poly(x_tr).mean(0), poly(x_tr).std(0)
 def featurize(x):
-    return np.column_stack([x**k for k in range(1, 8)])
+    return (poly(x) - feat_mean) / feat_std
 
-model = Ridge(alpha=1.0)
-model.fit(featurize(x_tr), y_tr)
+# Ridge regression via the normal equations. Carry the intercept separately
+# (it stays unpenalized) so it is fit by centering rather than a bias column.
+def ridge_fit(x, y, alpha=1.0):
+    Phi = featurize(x)
+    y_bar = y.mean()
+    d = Phi.shape[1]
+    w = np.linalg.solve(Phi.T @ Phi + alpha * np.eye(d), Phi.T @ (y - y_bar))
+    return y_bar, w
+
+def predict(coef, x):
+    y_bar, w = coef
+    return y_bar + (featurize(x) * w).sum(axis=1)
+
+coef = ridge_fit(x_tr, y_tr, alpha=1.0)
 
 # Calibration scores: absolute residuals
-cal_scores = np.abs(y_cal - model.predict(featurize(x_cal)))
+cal_scores = np.abs(y_cal - predict(coef, x_cal))
 
 # Construct interval at alpha=0.1 (target 90% coverage)
 alpha = 0.1
@@ -105,7 +120,7 @@ quantile_level = np.ceil((1 - alpha) * (n + 1)) / n
 q_hat = np.quantile(cal_scores, min(quantile_level, 1.0))
 
 # Evaluate on test set
-y_pred_te = model.predict(featurize(x_te))
+y_pred_te = predict(coef, x_te)
 lower = y_pred_te - q_hat
 upper = y_pred_te + q_hat
 coverage = np.mean((y_te >= lower) & (y_te <= upper))
