@@ -1,0 +1,131 @@
+---
+title: "Q-learning and SARSA"
+pillar: H
+subId: H1
+lessonId: q-learning-sarsa
+order: 6
+estimatedMinutes: 26
+goal: "Derive the off-policy Q-learning and on-policy SARSA control updates, contrast their targets, and understand when each converges to the optimal action-value function."
+prerequisites: ["temporal-difference"]
+---
+
+TD(0) evaluates a fixed policy by learning $V^\pi$. Control needs **action**-values
+$Q(s,a)$, so the greedy step $\arg\max_a Q(s,a)$ is model-free. Applying the TD
+idea to $Q$ gives the two workhorse tabular control algorithms, Q-learning and
+SARSA. They differ in one choice: which next action the bootstrap target uses.
+That single choice is the whole on-policy versus off-policy distinction.
+
+## SARSA: bootstrap on the action you actually take
+
+SARSA evaluates and improves the policy the agent is actually following. Its
+target comes from the Bellman *expectation* equation for $Q^\pi$, sampled along a
+real transition. The agent is in $S_t$, takes $A_t$, sees reward $r_{t+1}$ and next
+state $S_{t+1}$, then chooses the next action $A_{t+1}$ from its current
+(e.g. $\varepsilon$-greedy) policy. The update uses that very action:
+
+$$
+Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha\Big[\, r_{t+1} + \gamma\, Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t)\,\Big].
+$$
+
+The five quantities $(S_t, A_t, r_{t+1}, S_{t+1}, A_{t+1})$ give the rule its name.
+SARSA is **on-policy**: the target $Q(S_{t+1}, A_{t+1})$ is evaluated at the action
+the behavior policy chose, so SARSA learns the value of the policy it executes,
+exploration included.
+
+## Q-learning: bootstrap on the greedy action
+
+Q-learning instead targets the Bellman *optimality* equation directly. Its target
+replaces the next action with the greedy one, regardless of what the agent does
+next:
+
+$$
+Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha\Big[\, r_{t+1} + \gamma\, \max_{a'} Q(S_{t+1}, a') - Q(S_t, A_t)\,\Big].
+$$
+
+The $\max_{a'}$ is a sampled version of the optimality operator $T^*$ from the
+dynamic-programming lesson. Q-learning is **off-policy**: the target evaluates the
+greedy policy while the agent may behave by some other (exploratory) policy. It
+learns $Q^*$ even while exploring, because the target never references the
+exploratory action.
+
+Both updates assume the same $\varepsilon$-greedy behavior to ensure every
+state-action pair keeps being visited, and both converge under Robbins-Monro step
+sizes: SARSA to $Q^\pi$ for the policy in the limit (which, if $\varepsilon \to 0$,
+is $Q^*$), Q-learning to $Q^*$ outright.
+
+## The cliff: where on-policy and off-policy diverge
+
+The standard demonstration is the **cliff walk**: a grid where the agent goes from
+start to goal, an optimal path runs along the edge of a cliff, and stepping off
+the cliff gives a large negative reward and resets to start. With persistent
+$\varepsilon$-greedy exploration:
+
+- **Q-learning** learns the *optimal* path right along the cliff edge, because its
+  target assumes greedy continuation and ignores the exploratory missteps. But
+  while learning with $\varepsilon > 0$, it occasionally falls off, so its
+  online return is worse.
+- **SARSA** learns a *safer* path one row away from the cliff, because its
+  on-policy target accounts for the fact that an exploratory move near the edge can
+  plunge it off. It earns higher online return under exploration.
+
+Neither is wrong: Q-learning finds the optimal policy of the *greedy* agent; SARSA
+finds the best policy for the agent that *keeps exploring*. The difference is
+entirely the next-action choice in the target.
+
+## Worked check: Q-learning solves a deterministic gridworld
+
+Run tabular Q-learning on a small deterministic gridworld with a goal reward,
+then verify the greedy policy it extracts reaches the goal in the minimum number
+of steps, matching the shortest-path length.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(5)
+# 4x4 grid; start at (0,0), goal at (3,3). Actions: 0 up,1 down,2 left,3 right.
+H, W = 4, 4
+goal = (3, 3)
+moves = {0: (-1, 0), 1: (1, 0), 2: (0, -1), 3: (0, 1)}
+
+def step(s, a):
+    r, c = divmod(s, W)
+    dr, dc = moves[a]
+    nr, nc = min(max(r + dr, 0), H - 1), min(max(c + dc, 0), W - 1)
+    ns = nr * W + nc
+    done = (nr, nc) == goal
+    reward = 0.0 if done else -1.0          # -1 per step: encourages shortest path
+    return ns, reward, done
+
+Q = np.zeros((H * W, 4))
+alpha, gamma, eps = 0.5, 0.95, 0.2
+for ep in range(3000):
+    s = 0
+    for _ in range(100):
+        a = rng.integers(4) if rng.random() < eps else int(np.argmax(Q[s]))
+        ns, r, done = step(s, a)
+        target = r + (0.0 if done else gamma * np.max(Q[ns]))   # Q-learning target
+        Q[s, a] += alpha * (target - Q[s, a])
+        s = ns
+        if done:
+            break
+
+# Roll out the greedy policy and count steps to the goal.
+s, path = 0, [0]
+for _ in range(50):
+    s, _, done = step(s, int(np.argmax(Q[s])))
+    path.append(s)
+    if done:
+        break
+
+print("greedy path (state ids):", path)
+print("steps taken:", len(path) - 1, " shortest possible:", (H - 1) + (W - 1))
+```
+
+The greedy policy reaches the goal in exactly $(H-1)+(W-1) = 6$ steps, the
+Manhattan shortest path, confirming Q-learning converged to the optimal
+action-values from reward signal alone.
+
+Tabular Q-learning stores one number per state-action pair, which is impossible
+when states are images or continuous vectors. The next subsection replaces the
+table with a function approximator, opening deep reinforcement learning, and
+exposes the new instability that comes with it.

@@ -1,0 +1,154 @@
+---
+title: "Monte Carlo prediction and control"
+pillar: H
+subId: H1
+lessonId: monte-carlo
+order: 4
+estimatedMinutes: 26
+goal: "Estimate value functions from complete sampled episodes without a model, and turn first-visit Monte Carlo evaluation into a control algorithm via epsilon-greedy improvement."
+prerequisites: ["mdp-formulation", "A2/lln-clt"]
+---
+
+Dynamic programming needs the model $(P, R)$ to compute the expectations inside
+the Bellman operators. An agent dropped into an unknown environment does not have
+that model; all it has is experience, sampled episodes of states, actions, and
+rewards. **Monte Carlo** methods estimate value functions directly from that
+experience, using the oldest idea in statistics: to estimate an expectation,
+average samples of the thing.
+
+## Value as a sample average
+
+The value $V^\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s]$ is an expectation of the
+return. If the agent runs many episodes under $\pi$ and records the actual return
+$G$ that followed each visit to $s$, those returns are i.i.d. samples from the
+distribution whose mean is $V^\pi(s)$. The [law of large numbers](A2/lln-clt)
+guarantees their average converges to $V^\pi(s)$, and the central limit theorem
+says the error shrinks like $1/\sqrt{n}$ in the number of visits. No model, no
+bootstrapping, just averaging complete returns.
+
+This requires **episodic** tasks: the episode must terminate so the return $G_t$
+is a finite, fully observed sum.
+
+## First-visit Monte Carlo prediction
+
+Within a single episode a state can be visited several times, which complicates
+the independence argument. **First-visit Monte Carlo** sidesteps it: for each
+episode, use only the return following the *first* time $s$ is visited. Those
+per-episode first-visit returns are independent across episodes, so their average
+is an unbiased, consistent estimate of $V^\pi(s)$.
+
+The algorithm walks each episode backward to accumulate returns cheaply, using
+$G_t = r_{t+1} + \gamma G_{t+1}$:
+
+1. Generate an episode $S_0, A_0, r_1, \dots, S_{T-1}, A_{T-1}, r_T$ under $\pi$.
+2. Set $G = 0$. For $t = T-1, T-2, \dots, 0$: update $G \leftarrow r_{t+1} + \gamma G$.
+   If $S_t$ does not appear in $S_0, \dots, S_{t-1}$ (first visit), append $G$ to
+   the list of returns for $S_t$.
+3. Estimate $V(s)$ as the mean of the returns recorded for $s$.
+
+The backward pass computes every suffix return in one linear sweep instead of
+re-summing each one.
+
+## From prediction to control
+
+Prediction evaluates a fixed policy; **control** improves it. The dynamic-
+programming improvement step was greedy with respect to $V$, but that needed the
+model to turn $V$ into action choices via $R(s,a) + \gamma\sum_{s'}P V(s')$.
+Without a model, evaluate the **action**-value $Q^\pi(s,a)$ directly instead:
+average the returns following each first visit to a state-action *pair*. Then the
+greedy step is model-free, $\pi(s) = \arg\max_a Q(s,a)$.
+
+**The exploration problem.** A purely greedy policy may never try some actions,
+so their $Q$ estimates never improve and a better action can stay hidden. Monte
+Carlo control fixes this by keeping the policy **$\varepsilon$-greedy**: with
+probability $1-\varepsilon$ take the greedy action, and with probability
+$\varepsilon$ pick a uniformly random action,
+
+$$
+\pi(a \mid s) = \begin{cases} 1 - \varepsilon + \varepsilon/|\mathcal{A}| & a = \arg\max_{a'} Q(s,a'), \\ \varepsilon/|\mathcal{A}| & \text{otherwise}. \end{cases}
+$$
+
+Every action keeps a floor probability $\varepsilon/|\mathcal{A}|$, so every
+state-action pair is visited infinitely often and every $Q(s,a)$ keeps improving.
+
+**Generalized policy iteration.** Alternating "evaluate $Q$ from a batch of
+episodes" with "make $\pi$ $\varepsilon$-greedy in the new $Q$" is the model-free
+version of policy iteration. The policy-improvement theorem extends to
+$\varepsilon$-greedy policies: each improvement step yields an $\varepsilon$-greedy
+policy at least as good, so the loop climbs to the best policy of that form.
+
+## Worked check: Monte Carlo control learns to win at blackjack
+
+Use a self-contained blackjack-style task: the player sees a running total and
+decides to **hit** (draw another card) or **stick**. Going over 21 loses; sticking
+at a high total tends to win. Run $\varepsilon$-greedy Monte Carlo control and
+confirm the learned policy beats a fixed always-hit baseline, and that it learns
+the sensible rule of sticking on high totals.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+gamma = 1.0  # episodic, undiscounted
+
+def step(total):
+    # Draw a card 2..11; return new total.
+    return total + rng.integers(2, 12)
+
+def play(policy, eps=0.0):
+    # State = current total in 12..20 (below 12 always hit; >=21 terminal).
+    traj = []
+    total = rng.integers(12, 21)
+    while True:
+        s = total
+        greedy = policy[s - 12]                      # 0 = stick, 1 = hit
+        a = rng.integers(0, 2) if rng.random() < eps else greedy
+        if a == 0:                                   # stick: reward by closeness to 21
+            traj.append((s, a, 1.0 if total >= 18 else -0.2))
+            return traj
+        total = step(total)                          # hit
+        if total > 21:                               # bust
+            traj.append((s, a, -1.0))
+            return traj
+        if total == 21:                              # hit exactly 21: win, terminal
+            traj.append((s, a, 1.0))
+            return traj
+        traj.append((s, a, 0.0))                     # survived in 12..20, continue
+
+Q = np.zeros((9, 2))   # states 12..20 x {stick, hit}
+N = np.zeros((9, 2))
+policy = np.ones(9, dtype=int)  # start: always hit
+
+for ep in range(200_000):
+    traj = play(policy, eps=0.1)
+    G = 0.0
+    seen = set()
+    for s, a, r in reversed(traj):
+        G = r + gamma * G
+        key = (s, a)
+        if key not in seen:                          # first-visit
+            seen.add(key)
+            i = s - 12
+            N[i, a] += 1
+            Q[i, a] += (G - Q[i, a]) / N[i, a]       # running mean
+            policy[i] = int(np.argmax(Q[i]))
+
+def win_rate(policy, trials=100_000):
+    wins = 0
+    for _ in range(trials):
+        traj = play(policy, eps=0.0)
+        wins += traj[-1][2] > 0
+    return wins / trials
+
+always_hit = np.ones(9, dtype=int)
+print("learned policy (1=hit) for totals 12..20:", policy.tolist())
+print("win rate, learned vs always-hit: %.3f vs %.3f" % (win_rate(policy), win_rate(always_hit)))
+```
+
+The learned policy hits on low totals and switches to sticking once the total is
+high, and its win rate is well above the always-hit baseline, exactly what
+$\varepsilon$-greedy Monte Carlo control should discover from returns alone.
+
+Monte Carlo waits for an episode to finish before it can learn. The next lesson
+removes that wait: temporal-difference learning updates after every single step
+by bootstrapping off its own value estimate.

@@ -1,0 +1,128 @@
+---
+title: "Bandits: epsilon-greedy, UCB, and Thompson sampling"
+pillar: H
+subId: H4
+lessonId: bandits-exploration
+order: 1
+estimatedMinutes: 26
+goal: "Formalize the exploration-exploitation tradeoff in the multi-armed bandit, derive the UCB confidence bonus and Thompson sampling, and compare their regret."
+prerequisites: ["A2/bayes-rule", "H1/mdp-formulation"]
+---
+
+Every method so far has explored with $\varepsilon$-greedy: act randomly a fixed
+fraction of the time. That is crude. The **multi-armed bandit** strips RL down to
+exploration alone (one state, no transitions) so the question can be studied
+cleanly: with a fixed budget of pulls, how should an agent balance trying arms it
+is unsure about against pulling the arm it currently believes is best? The good
+answers here, confidence bounds and posterior sampling, carry back into full RL.
+
+## The bandit and regret
+
+A **$K$-armed bandit** has $K$ arms, each arm $a$ paying a reward drawn from an
+unknown distribution with mean $\mu_a$. At each step the agent pulls one arm and
+sees its reward. There is no state and no transition, just a [degenerate
+MDP](H1/mdp-formulation) with a single state.
+
+Performance is measured by **regret**: the reward lost by not always pulling the
+best arm $\mu^* = \max_a \mu_a$. After $T$ pulls of arms $a_1, \dots, a_T$,
+
+$$
+\text{Regret}(T) = T\mu^* - \sum_{t=1}^{T} \mu_{a_t} = \sum_{t=1}^{T} (\mu^* - \mu_{a_t}).
+$$
+
+The goal is **sublinear** regret: $\text{Regret}(T)/T \to 0$, meaning the agent's
+average reward approaches the best arm's. A strategy with linear regret never stops
+paying for its mistakes.
+
+**Why fixed $\varepsilon$-greedy fails this bar.** Pulling a uniformly random arm
+with probability $\varepsilon$ forever incurs a constant expected regret per step,
+so its total regret grows *linearly*. Good strategies must explore less and less as
+their estimates sharpen.
+
+## UCB: optimism under uncertainty
+
+The **upper confidence bound** strategy makes exploration automatic by being
+optimistic. Keep the empirical mean $\hat{\mu}_a$ and pull count $n_a$. By a
+concentration inequality (Hoeffding), the true mean lies below
+$\hat{\mu}_a + \sqrt{2\ln t / n_a}$ with high probability, where $t$ is the total
+number of pulls. UCB pulls the arm maximizing this optimistic estimate:
+
+$$
+a_t = \arg\max_a \left( \hat{\mu}_a + \sqrt{\frac{2 \ln t}{n_a}} \right).
+$$
+
+Read the two terms: $\hat{\mu}_a$ exploits, and the bonus $\sqrt{2\ln t / n_a}$
+explores, large for rarely pulled arms ($n_a$ small) and slowly growing in $t$ so
+neglected arms eventually get revisited. As an arm is pulled its bonus shrinks, so
+exploration self-extinguishes. UCB achieves regret growing like $\ln T$, which is
+sublinear and in fact optimal in its dependence on $T$.
+
+## Thompson sampling: posterior matching
+
+**Thompson sampling** is the Bayesian route. Keep a posterior over each arm's mean,
+update it by [Bayes' rule](A2/bayes-rule) as rewards arrive, and pull each arm with
+the probability that it is the best. That "probability of being best" is realized by
+a single trick: **sample** one mean from each arm's posterior and pull the arm with
+the largest sample.
+
+For Bernoulli rewards the conjugate posterior is a Beta. Start each arm at
+$\text{Beta}(1,1)$ (uniform); after $s_a$ successes and $f_a$ failures the posterior
+is $\text{Beta}(1 + s_a,\, 1 + f_a)$. Each step:
+
+$$
+\theta_a \sim \text{Beta}(1 + s_a,\, 1 + f_a), \qquad a_t = \arg\max_a \theta_a.
+$$
+
+Arms with wide posteriors (few pulls) sometimes draw a high sample and get
+explored; arms with narrow posteriors around a low mean rarely do. Exploration is
+driven by posterior uncertainty and fades as posteriors concentrate. Thompson
+sampling matches UCB's logarithmic regret and is often better in practice.
+
+## Worked check: regret growth of the three strategies
+
+Run $\varepsilon$-greedy, UCB, and Thompson sampling on a five-armed Bernoulli
+bandit, averaging regret over many independent runs. Measure regret at an early
+horizon and at one four times longer: $\varepsilon$-greedy should roughly triple
+(growing near-linearly), while UCB and Thompson grow far less (sublinearly), with
+Thompson lowest overall.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+true_p = np.array([0.1, 0.25, 0.3, 0.45, 0.8])    # arm 4 is clearly best
+K, best, T, runs = len(true_p), 0.8, 3000, 80
+
+def mean_regret(strategy):
+    tot = np.zeros(T)
+    for _ in range(runs):
+        n = np.zeros(K); s = np.zeros(K); cum = 0.0      # pulls, successes
+        for t in range(1, T + 1):
+            if strategy == "eps":                        # 10% random forever
+                a = rng.integers(K) if rng.random() < 0.1 else \
+                    int(np.argmax(np.where(n > 0, s / np.maximum(n, 1), 1.0)))
+            elif strategy == "ucb":
+                a = int(np.argmin(n)) if (n == 0).any() else \
+                    int(np.argmax(s / n + np.sqrt(2 * np.log(t) / n)))
+            else:                                        # Thompson, Beta posteriors
+                a = int(np.argmax(rng.beta(s + 1, n - s + 1)))
+            r = rng.random() < true_p[a]
+            n[a] += 1; s[a] += r
+            cum += best - true_p[a]                      # instantaneous regret
+            tot[t - 1] += cum
+    return tot / runs
+
+for strat in ["eps", "ucb", "ts"]:
+    R = mean_regret(strat)
+    print(f"{strat:>3}: regret t=750 -> {R[749]:5.1f}   t=3000 -> {R[2999]:5.1f}   growth x{R[2999]/R[749]:.2f}")
+```
+
+The $\varepsilon$-greedy regret grows about threefold over the four-times-longer
+horizon, close to the linear growth its constant exploration forces, while UCB and
+Thompson grow much more slowly and Thompson ends with the least regret by a wide
+margin, the sublinear behavior the confidence bonus and posterior sampling buy.
+
+These strategies assume every pull gives an informative reward. In a sparse-reward
+MDP the agent may wander for a long time seeing nothing, and undirected exploration
+stalls. The next lesson adds **intrinsic** rewards that turn novelty itself into a
+signal to explore.

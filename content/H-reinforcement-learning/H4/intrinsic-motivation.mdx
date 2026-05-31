@@ -1,0 +1,112 @@
+---
+title: "Intrinsic motivation and random network distillation"
+pillar: H
+subId: H4
+lessonId: intrinsic-motivation
+order: 2
+estimatedMinutes: 24
+goal: "Drive exploration in sparse-reward MDPs with intrinsic bonuses from prediction error and count-based novelty, and implement random network distillation."
+prerequisites: ["bandits-exploration", "H2/dqn"]
+---
+
+Bandit strategies assume every action returns an informative reward. Many real
+tasks are **sparse**: the agent sees reward zero for thousands of steps until it
+stumbles on the goal (Montezuma's Revenge, a robot that is rewarded only on task
+completion). Undirected $\varepsilon$-greedy exploration almost never reaches the
+first reward, so there is nothing to learn from. **Intrinsic motivation** manufactures
+a dense internal reward that pushes the agent toward novelty, so it explores
+purposefully even when the environment is silent.
+
+## Intrinsic reward
+
+Augment the environment's **extrinsic** reward $r^e$ with an **intrinsic** bonus
+$r^i$ that is large for unfamiliar states and small for familiar ones:
+
+$$
+r_t = r^e_t + \beta\, r^i_t.
+$$
+
+The agent then maximizes return as usual, but the bonus makes seeking out novel
+states intrinsically valuable. Two principled ways to define "novel":
+
+- **Count-based.** Visit a state often and it is no longer novel. The bonus
+  $r^i(s) = 1/\sqrt{N(s)}$ (with $N(s)$ the visit count) is the tabular form,
+  directly echoing the UCB confidence bonus $\sqrt{\ln t / n_a}$ from the last
+  lesson. In large or continuous state spaces exact counts are unavailable, so
+  pseudo-counts or the methods below approximate them.
+- **Prediction-error.** Train a model to predict something about the next state; the
+  bonus is the model's error. States the agent understands well are predicted
+  accurately (low bonus); novel states surprise the model (high bonus). Curiosity
+  methods use a learned forward dynamics model for this.
+
+The hazard for forward-dynamics curiosity is the **noisy-TV problem**: inherently
+unpredictable transitions (a screen of static, a random number generator) keep
+prediction error high forever, so the agent fixates on noise. The next method
+sidesteps it.
+
+## Random network distillation
+
+**Random network distillation** (RND) is a clean prediction-error bonus that avoids
+the noisy-TV trap. It uses two networks over states:
+
+- A **target** network $f^*$ with **fixed, random** weights, never trained.
+- A **predictor** network $\hat{f}$, trained by gradient descent to match the
+  target's output on the states the agent actually visits.
+
+The intrinsic bonus is the predictor's error,
+
+$$
+r^i(s) = \lVert \hat{f}(s) - f^*(s) \rVert^2.
+$$
+
+On states visited often, the predictor has been trained to reproduce $f^*$, so the
+error is near zero. On novel states the predictor has never been trained, so it
+fails to match the random target and the error is large. Because the target is a
+deterministic function of the state, environment stochasticity does not inflate the
+bonus: revisiting the same novel state repeatedly drives its error down, which is
+exactly what the noisy-TV problem broke. RND is what let agents finally explore
+Montezuma's Revenge.
+
+## Worked check: the bonus is high for novel states, near zero for visited ones
+
+Implement RND in miniature: a fixed random target as a function of the state, and a
+predictor trained to match it only on the states the agent has visited. Confirm the
+prediction-error bonus collapses to zero on visited states while staying large on
+states the predictor has never been trained on.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+# Fixed random target f*(s); a predictor f(s) distills it on visited states only.
+D = 64
+Wf = rng.normal(size=D) * 2.0
+bf = rng.uniform(0, 2*np.pi, size=D)
+def phi(s):                                   # random Fourier features of the state
+    return np.cos(Wf * (s / 5.0) + bf)
+a_star = rng.normal(size=D)                   # fixed random target weights
+def target(s): return a_star @ phi(s)
+
+states = np.arange(10)
+visited = states[:5]                          # the agent only ever sees states 0..4
+a, lr = np.zeros(D), 0.05
+for _ in range(4000):
+    s = rng.choice(visited)
+    a += lr * (target(s) - a @ phi(s)) * phi(s)    # train predictor to match target
+
+def bonus(s): return float((a @ phi(s) - target(s))**2)
+b_visited = np.mean([bonus(s) for s in states[:5]])
+b_novel   = np.mean([bonus(s) for s in states[5:]])
+print("mean bonus on visited states 0-4:", round(b_visited, 4))
+print("mean bonus on novel states 5-9:  ", round(b_novel, 4))
+print("novelty bonus is much larger on unseen states:", b_novel > 20 * b_visited)
+```
+
+The predictor drives its error to zero on the visited states while the novel states
+keep a large bonus, so an agent maximizing this intrinsic reward is pulled toward
+exactly the states it has not yet explored.
+
+This closes the exploration subsection. The next subsection broadens the problem
+itself: learning when the reward is not given at all but must be inferred from
+demonstrations, and other settings beyond the standard RL loop, beginning with
+imitation learning.
