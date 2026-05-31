@@ -1,0 +1,111 @@
+---
+title: "Offline RL: CQL and IQL"
+pillar: H
+subId: H5
+lessonId: offline-rl
+order: 3
+estimatedMinutes: 26
+goal: "Explain why standard Q-learning fails on a fixed dataset, then control the distribution shift with conservative Q-learning (CQL) and implicit Q-learning (IQL)."
+prerequisites: ["H2/ddpg-td3-sac"]
+---
+
+Online RL collects its own data: if the agent overestimates an action, it tries it,
+sees the truth, and corrects. **Offline RL** learns from a fixed, logged dataset
+with no further interaction, the realistic setting for medicine, robotics with
+expensive trials, or any domain where exploration is unsafe. Removing interaction
+breaks the self-correcting loop, and standard Q-learning fails in a specific,
+diagnosable way.
+
+## Why off-the-shelf Q-learning breaks offline
+
+The Bellman target $r + \gamma \max_{a'} Q(s', a')$ takes a max over **all** actions,
+including ones the dataset never contains. For those out-of-distribution (OOD)
+actions, $Q$ is whatever the function approximator extrapolated, often an
+overestimate, and the agent has no way to check: it cannot take the action and
+observe the real outcome. Worse, the $\max$ actively seeks the most overestimated
+action, and bootstrapping propagates that inflated value backward through the whole
+dataset. Online, this self-corrects; offline, it compounds unchecked, and the
+learned policy confidently recommends actions that look great only because they were
+never seen.
+
+The cure is to keep the learned policy close to the data: trust $Q$ where there is
+support, distrust it where there is none.
+
+## Conservative Q-learning
+
+**CQL** adds a regularizer that pushes $Q$ **down** on actions the policy would take
+and **up** on actions in the dataset, while still fitting the Bellman error on the
+data. The penalty term is
+
+$$
+\alpha\Big( \mathbb{E}_{s \sim \mathcal{D},\, a \sim \mu}\big[Q(s,a)\big] - \mathbb{E}_{(s,a) \sim \mathcal{D}}\big[Q(s,a)\big] \Big),
+$$
+
+where $\mu$ ranges over all actions (often via a softmax / log-sum-exp over $Q$) and
+$\mathcal{D}$ is the dataset. Minimizing it deflates the high $Q$ values that the
+$\max$ would chase (the OOD overestimates) and inflates the values of actions
+actually observed. The result is a **lower bound** on the true value, so the greedy
+policy can no longer be fooled by an unsupported action: conservatism by
+construction.
+
+## Implicit Q-learning
+
+**IQL** avoids querying OOD actions at all. Instead of bootstrapping with
+$\max_{a'} Q(s', a')$, which evaluates unseen actions, it learns a separate value
+$V(s)$ by **expectile regression** toward the $Q$ of actions *in the data*, biased
+to the better in-data actions. The high expectile approximates the best in-support
+action's value without ever proposing a new one, so the Bellman backup uses only
+$(s, a, r, s')$ tuples that exist in the dataset. The policy is then extracted by
+advantage-weighted regression, imitating data actions in proportion to how much
+better than average they were. IQL never evaluates $Q$ off the data, sidestepping
+the extrapolation problem rather than penalizing it.
+
+## Worked check: naive offline greedy chases a phantom, CQL stays safe
+
+Set up a logged decision where the dataset covers only actions $0\text{-}4$ (a poor
+behavior policy: in-data rewards are mildly negative, best is action $0$). Unseen
+actions $5\text{-}9$ are catastrophic but carry an optimistic default value of $0$.
+The naive greedy policy trusts that optimistic value and picks an unseen action; the
+CQL penalty deflates the unseen values so the greedy policy returns to the best
+in-data action.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+K = 10
+def true_reward(a): return -0.1 * (a + 1) if a <= 4 else -3.0   # 5..9 are a cliff
+data_actions = np.arange(5)
+A = rng.choice(data_actions, size=4000)
+R = np.array([true_reward(a) + 0.02*rng.normal() for a in A])
+
+# Naive offline: per-action mean Q on data; unseen actions keep optimistic Q = 0.
+Q, cnt = np.zeros(K), np.zeros(K)
+for a, r in zip(A, R):
+    cnt[a] += 1; Q[a] += (r - Q[a]) / cnt[a]
+a_naive = int(np.argmax(Q))                  # max trusts the optimistic unseen values
+
+# CQL: push Q down on all actions, up on data actions, while fitting data values.
+Qc, alpha, lr = np.zeros(K), 1.0, 0.05
+data_mask = np.zeros(K); data_mask[data_actions] = 1
+data_targets = np.array([R[A == a].mean() if (A == a).any() else 0.0 for a in range(K)])
+for _ in range(3000):
+    grad = np.zeros(K)
+    grad[data_actions] = 2 * (Qc[data_actions] - data_targets[data_actions])   # data fit
+    p = np.exp(Qc - Qc.max()); p /= p.sum()                                    # log-sum-exp term
+    grad += alpha * (p - data_mask / data_mask.sum())     # down on all, up on data
+    Qc -= lr * grad
+a_cql = int(np.argmax(Qc))
+
+print("naive greedy action:", a_naive, " true reward:", true_reward(a_naive))
+print("CQL greedy action:  ", a_cql, " true reward:", round(true_reward(a_cql), 2))
+print("best in-data action: 0  true reward:", round(true_reward(0), 2))
+```
+
+The naive policy walks straight off the cliff, choosing an unseen action whose value
+it had no right to trust, while CQL's conservatism keeps it on the best supported
+action. That is the entire offline-RL problem in miniature: out-of-distribution
+overestimation, controlled by staying near the data.
+
+Single-agent offline RL still assumes one decision-maker. The next lesson adds
+others: multi-agent RL, where the environment itself contains adapting agents.

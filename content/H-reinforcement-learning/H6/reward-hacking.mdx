@@ -1,0 +1,103 @@
+---
+title: "Reward hacking and overoptimization"
+pillar: H
+subId: H6
+lessonId: reward-hacking
+order: 3
+estimatedMinutes: 24
+goal: "Explain why optimizing a proxy reward eventually degrades the true objective (Goodhart), quantify it with reward-model overoptimization scaling, and mitigate it with KL control and reward ensembles."
+prerequisites: ["rl-as-llm-finetuning", "E4/reward-modeling"]
+---
+
+Every RLHF or RLVR run optimizes a **proxy** for what we actually want: a reward
+model approximating human preference, or a verifier checking a narrow notion of
+correctness. The policy optimizer does not know it is a proxy; it pushes the reward
+as high as possible. Past a point, that makes the true objective *worse*. This is
+the central safety failure of RL-tuned models, and it has a precise, measurable
+shape.
+
+## Goodhart's law
+
+"When a measure becomes a target, it ceases to be a good measure." A proxy reward
+$\hat{r}$ correlates with the true objective $r^*$ over the distribution where it was
+fit. An optimizer searches for the highest $\hat{r}$, which drives the policy off
+that distribution into regions where $\hat{r}$ and $r^*$ **decouple**: the proxy is
+high because of its errors, not because the behavior is actually good. The policy
+has found a hole in the [reward model](E4/reward-modeling). Concretely, a model
+might learn to produce confident, sycophantic, or verbose text that the reward model
+scores highly while humans do not, or code that passes the specific tests while
+being wrong.
+
+## The overoptimization curve
+
+The phenomenon is quantitative. As the policy moves away from the initial model,
+measured by $\sqrt{\mathrm{KL}}$ from initialization, the **proxy** reward keeps
+rising, but the **true** (gold) reward rises, peaks, and then falls. Empirically the
+gold reward follows a clean form,
+
+$$
+r^*_{\text{gold}}(d) = d\,(\alpha - \beta d), \qquad d = \sqrt{\mathrm{KL}(\pi \,\|\, \pi_{\text{ref}})},
+$$
+
+a concave curve peaking at $d^* = \alpha / 2\beta$ and declining after. The
+proxy reward, by contrast, increases monotonically in $d$. The gap between the two
+curves is the **overoptimization**: every step past the peak buys more proxy reward
+and less of what was wanted. Larger reward models push the peak further out (they
+have fewer exploitable holes), but the qualitative shape is universal.
+
+## Mitigations
+
+Three levers control overoptimization, all seen earlier in this subsection:
+
+- **KL control.** The $\beta\,\mathrm{KL}(\pi \,\|\, \pi_{\text{ref}})$ penalty from
+  the RLHF objective directly limits $d$, keeping the policy on the near side of the
+  peak. Tuning $\beta$, or early-stopping when KL grows, trades proxy gains for
+  staying in the trustworthy region.
+- **Reward ensembles.** Average several independently trained reward models. A hole
+  in one is unlikely to be a hole in all, so the policy cannot exploit a single
+  model's idiosyncratic error, which flattens and delays the decline.
+- **Verifiable rewards.** Where a [verifier](rlvr-reasoning) exists, it has far fewer
+  holes than a learned reward model, pushing the peak much further out (though
+  narrow verifiers can still be gamed: passing tests is not the same as being
+  correct).
+
+## Worked check: the proxy rises while the true reward peaks and falls
+
+Reproduce the Goodhart curve from the selection mechanism behind it. Each candidate
+has a true reward and a proxy equal to the true reward plus a heavy-tailed error
+(the reward model is occasionally badly wrong). Optimization pressure is the number
+of candidates from which the best **proxy** is selected, the analogue of searching
+harder / moving further in KL. The selected candidate's proxy reward should rise
+monotonically with pressure, while its true reward peaks at moderate pressure and
+then declines as selection starts chasing error outliers.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+trials = 4000
+print(" pressure n |  proxy reward | TRUE reward")
+res = []
+for n in [1, 3, 10, 30, 100, 300, 1000]:
+    proxy_sel, true_sel = [], []
+    for _ in range(trials):
+        t = rng.normal(size=n)                       # true reward of each candidate
+        err = rng.standard_t(df=2, size=n) * 1.5     # heavy-tailed reward-model error
+        i = int(np.argmax(t + err))                  # optimize the proxy: pick best proxy
+        proxy_sel.append((t + err)[i]); true_sel.append(t[i])
+    res.append((n, np.mean(proxy_sel), np.mean(true_sel)))
+    print(f"   {n:6d}   |   {np.mean(proxy_sel):7.3f}    |   {np.mean(true_sel):7.3f}")
+
+trues = [r[2] for r in res]
+peak = int(np.argmax(trues))
+print("true reward peaks at n =", res[peak][0], "then declines:", trues[-1] < trues[peak])
+```
+
+The proxy reward climbs without bound as the optimizer searches harder, while the
+true reward turns over at moderate pressure and decays toward chance, the
+overoptimization that KL penalties and reward ensembles exist to hold back.
+
+This closes pillar H. From the Bellman equation through deep, model-based, and
+multi-agent RL to the reinforcement learning that aligns and sharpens language
+models, the through-line is one idea: act to maximize long-run reward, learned from
+interaction, and guard against the ways that signal can mislead.
