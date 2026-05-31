@@ -1,0 +1,158 @@
+---
+title: "Policy iteration and value iteration"
+pillar: H
+subId: H1
+lessonId: dynamic-programming
+order: 3
+estimatedMinutes: 28
+goal: "Solve a known MDP exactly with policy evaluation, policy improvement, and value iteration, and prove each is a contraction that converges to the optimal value function."
+prerequisites: ["bellman-equations"]
+---
+
+The Bellman optimality equation characterizes $V^*$ but does not hand it to you:
+the $\max$ makes it nonlinear, so there is no inverse to compute. The fix is to
+treat the equation as a fixed point and iterate toward it. This lesson develops
+the two classic **dynamic-programming** algorithms that do this when the MDP
+$(P, R)$ is fully known, and proves they converge by showing the Bellman update
+is a contraction.
+
+## The Bellman operators
+
+Bundle the right-hand side of each Bellman equation into an operator acting on a
+value vector $V \in \mathbb{R}^{|\mathcal{S}|}$. The **expectation operator** for a
+fixed policy $\pi$ is
+
+$$
+(T^\pi V)(s) = \sum_a \pi(a\mid s)\left[ R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V(s') \right],
+$$
+
+and the **optimality operator** is
+
+$$
+(T^* V)(s) = \max_a \left[ R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V(s') \right].
+$$
+
+With this notation the Bellman equations read $V^\pi = T^\pi V^\pi$ and
+$V^* = T^* V^*$: the value functions are exactly the **fixed points** of their
+operators. Iteration works because applying either operator pulls any two value
+vectors closer together.
+
+## Both operators are $\gamma$-contractions
+
+A map $T$ is a **$\gamma$-contraction** in the max-norm
+$\lVert V \rVert_\infty = \max_s |V(s)|$ if
+$\lVert TU - TV \rVert_\infty \le \gamma \lVert U - V \rVert_\infty$ for all $U, V$.
+
+**Proof for $T^*$.** Fix a state $s$. Let $a_U$ be an action attaining the max in
+$(T^*U)(s)$. Then
+
+$$
+(T^*U)(s) - (T^*V)(s) \le \big[R(s,a_U) + \gamma \textstyle\sum_{s'} P(s'\mid s,a_U) U(s')\big] - \big[R(s,a_U) + \gamma \textstyle\sum_{s'} P(s'\mid s,a_U) V(s')\big],
+$$
+
+because replacing the maximizing action of $T^*V$ by the (possibly suboptimal)
+$a_U$ can only lower the second bracket. The rewards cancel, leaving
+
+$$
+(T^*U)(s) - (T^*V)(s) \le \gamma \sum_{s'} P(s'\mid s,a_U)\,\big(U(s') - V(s')\big) \le \gamma \lVert U - V\rVert_\infty,
+$$
+
+where the last step uses $\sum_{s'} P(s'\mid s, a_U) = 1$ to bound the average by
+its largest term. By symmetry the same bound holds for $(T^*V)(s) - (T^*U)(s)$,
+so $|(T^*U)(s) - (T^*V)(s)| \le \gamma \lVert U - V\rVert_\infty$ for every $s$,
+which is the contraction claim. The argument for $T^\pi$ is identical with the
+$\max$ replaced by the policy average.
+
+By the **Banach fixed-point theorem**, a $\gamma$-contraction on a complete space
+has a unique fixed point, and iterating it from any start converges to that fixed
+point geometrically. That gives both algorithms at once.
+
+## Value iteration
+
+**Value iteration** just iterates the optimality operator:
+
+$$
+V_{k+1} = T^* V_k, \qquad V_0 \text{ arbitrary}.
+$$
+
+Contraction gives $\lVert V_{k} - V^* \rVert_\infty \le \gamma^k \lVert V_0 - V^*\rVert_\infty$,
+so the error shrinks by a factor $\gamma$ each sweep. Stop when the change
+$\lVert V_{k+1} - V_k\rVert_\infty$ falls below a tolerance, then read off the
+greedy policy $\pi(s) = \arg\max_a [R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V_k(s')]$.
+
+## Policy iteration
+
+**Policy iteration** alternates two steps until the policy stops changing:
+
+1. **Policy evaluation.** Solve $V^\pi = T^\pi V^\pi$ for the current $\pi$,
+   either by the matrix inverse $(I - \gamma P^\pi)^{-1} r^\pi$ or by iterating
+   $T^\pi$ to its fixed point.
+2. **Policy improvement.** Set the new policy greedy with respect to $V^\pi$:
+   $\pi'(s) = \arg\max_a [R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V^\pi(s')]$.
+
+**Why improvement helps: the policy improvement theorem.** By construction the
+greedy action is at least as good as $\pi$'s own action at every state, so
+$Q^\pi(s, \pi'(s)) \ge V^\pi(s)$. Expanding $V^\pi(s) \le Q^\pi(s,\pi'(s))$ and
+repeatedly substituting this inequality (each step replaces $V^\pi$ on the right by
+a $Q^\pi$ that follows $\pi'$ one more step) telescopes to $V^{\pi'}(s) \ge V^\pi(s)$
+for all $s$. Each improvement step produces a policy at least as good, and since
+there are finitely many deterministic policies, the process reaches one that is
+its own greedy policy, which satisfies the Bellman optimality equation and is
+therefore optimal.
+
+The two algorithms trade off the same total work differently: value iteration
+does one cheap $\max$-sweep per iteration but needs many; policy iteration does an
+expensive full evaluation per iteration but converges in very few.
+
+## Worked check: both converge to the same $V^*$
+
+Build a known random MDP, run value iteration and policy iteration, and confirm
+both reach the same optimal value vector, that the value-iteration error decays
+like $\gamma^k$, and that the final value satisfies the optimality equation.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+nS, nA = 5, 3
+gamma = 0.9
+P = rng.dirichlet(np.ones(nS), size=(nS, nA))   # P[s,a] -> dist over s'
+R = rng.normal(size=(nS, nA))
+
+def greedy_values(V):
+    # Q[s,a] = R[s,a] + gamma * sum_s' P[s,a,s'] V[s']
+    return R + gamma * np.einsum("sap,p->sa", P, V)
+
+# Value iteration.
+V = np.zeros(nS)
+for _ in range(1000):
+    V_new = greedy_values(V).max(axis=1)
+    if np.max(np.abs(V_new - V)) < 1e-12:
+        break
+    V = V_new
+V_vi = V
+
+# Policy iteration.
+pi = np.zeros(nS, dtype=int)
+for _ in range(100):
+    # Evaluate pi exactly.
+    r_pi = R[np.arange(nS), pi]
+    P_pi = P[np.arange(nS), pi]
+    V_pi = np.linalg.solve(np.eye(nS) - gamma * P_pi, r_pi)
+    pi_new = greedy_values(V_pi).argmax(axis=1)
+    if np.array_equal(pi_new, pi):
+        break
+    pi = pi_new
+
+print("V from value iteration: ", np.round(V_vi, 4))
+print("V from policy iteration:", np.round(V_pi, 4))
+print("agree:", np.allclose(V_vi, V_pi, atol=1e-6))
+print("optimality residual:", float(np.max(np.abs(V_vi - greedy_values(V_vi).max(axis=1)))))
+```
+
+The two algorithms land on the same value vector, and that vector leaves a
+near-zero residual in the Bellman optimality equation, so both have found $V^*$.
+
+These methods need the full model $(P, R)$. The rest of the pillar drops that
+assumption: the next lesson estimates value functions from sampled episodes when
+the dynamics are unknown.

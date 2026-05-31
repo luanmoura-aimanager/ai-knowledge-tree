@@ -1,0 +1,97 @@
+---
+title: "Multi-agent RL and self-play"
+pillar: H
+subId: H5
+lessonId: multi-agent-rl
+order: 4
+estimatedMinutes: 24
+goal: "Extend MDPs to stochastic games, see why independent learning is nonstationary, and use centralized-training-decentralized-execution and self-play to reach equilibria."
+prerequisites: ["H2/policy-gradient"]
+---
+
+Every method so far assumes a single agent in a fixed environment. Many problems
+have several agents learning at once: competing traders, cooperating robots, players
+in a game. When other agents are also adapting, the ground shifts under each
+learner, and the single-agent guarantees break. Multi-agent RL formalizes this and
+the techniques that make it tractable.
+
+## Stochastic games
+
+The multi-agent generalization of an MDP is a **stochastic game** (Markov game):
+$N$ agents, a shared state $s$, a **joint** action $(a^1, \dots, a^N)$, a transition
+$P(s' \mid s, a^1, \dots, a^N)$ that depends on everyone's action, and a separate
+reward $R^i$ for each agent. The single-agent MDP is the $N = 1$ case; a two-player
+zero-sum game ($R^1 = -R^2$) is the competitive extreme, and identical rewards
+($R^i = R^j$) the fully cooperative one.
+
+The right notion of "solution" changes too. There is no single optimal policy;
+instead the target is an **equilibrium**, typically a **Nash equilibrium**, a joint
+policy where no agent can improve by unilaterally changing its own policy.
+
+## The nonstationarity problem
+
+The core difficulty: from one agent's point of view, the others are part of the
+environment, and they are *changing*. The transition and reward that agent $i$
+effectively experiences depend on the other agents' current policies, so as those
+policies update, agent $i$'s environment becomes **nonstationary**. This breaks the
+stationarity assumption every convergence result in this pillar relied on. Naive
+**independent learning** (each agent runs its own Q-learning, treating others as
+fixed) can oscillate or diverge, because each agent is chasing a moving target that
+moves *because* it is chasing.
+
+## Centralized training, decentralized execution
+
+The dominant fix is **CTDE**. During training, allow a **centralized critic** that
+sees the full joint state and all agents' actions, so it evaluates each agent
+against a stationary, fully-observed picture. At execution time, each agent acts
+through a **decentralized actor** that uses only its own local observation. Methods
+like MADDPG put one centralized critic per agent over the joint action and a local
+actor for each; the critic stabilizes learning (it is not fooled by the others'
+changes because it observes them), while the actors remain independently deployable.
+
+## Self-play
+
+In symmetric competitive games, **self-play** is the engine: an agent trains against
+copies of itself (current or past versions). This supplies an automatically
+matched, ever-improving opponent, a natural curriculum that scales with the agent's
+own skill. Self-play drove AlphaZero and superhuman play in Go, chess, and
+StarCraft. Maintaining a pool of past opponents prevents the cycle where two agents
+chase each other's latest weaknesses and forget how to beat older strategies.
+
+## Worked check: fictitious play converges to the Nash equilibrium
+
+A clean window on multi-agent learning is **fictitious play**: each player best-
+responds to the empirical frequency of the opponent's past actions. In a zero-sum
+game the empirical frequencies provably converge to the Nash equilibrium. For
+Rock-Paper-Scissors that equilibrium is the uniform mix $(1/3, 1/3, 1/3)$, the only
+unexploitable strategy. Run it and watch the frequencies converge there.
+
+```python
+import numpy as np
+
+# Rock-Paper-Scissors payoff for the row player (+1 if row beats column).
+M = np.array([[ 0, -1,  1],     # rock
+              [ 1,  0, -1],     # paper
+              [-1,  1,  0]])    # scissors
+
+cntA = np.zeros(3); cntB = np.zeros(3)
+cntA[0] = cntB[1] = 1.0          # arbitrary initial beliefs
+for _ in range(20000):
+    pB = cntB / cntB.sum(); pA = cntA / cntA.sum()
+    aA = int(np.argmax(M @ pB))         # row best-responds to column's empirical mix
+    aB = int(np.argmax(-(M.T @ pA)))    # column best-responds (minimizes row payoff)
+    cntA[aA] += 1; cntB[aB] += 1
+
+freqA = cntA / cntA.sum()
+print("row empirical frequencies:", np.round(freqA, 3))
+print("col empirical frequencies:", np.round(cntB / cntB.sum(), 3))
+print("converged to uniform Nash (1/3 each):", np.allclose(freqA, 1/3, atol=0.02))
+```
+
+Both players' empirical action frequencies settle on the uniform mixture, the Nash
+equilibrium of the game, reached purely by each side adapting to the other's history
+despite the nonstationarity that adaptation creates.
+
+These extensions all keep one flat policy choosing primitive actions. The last
+lesson of the subsection adds temporal structure: hierarchical RL, where high-level
+policies select among lower-level skills that run for many steps.

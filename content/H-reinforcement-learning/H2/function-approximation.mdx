@@ -1,0 +1,119 @@
+---
+title: "Value function approximation and the deadly triad"
+pillar: H
+subId: H2
+lessonId: function-approximation
+order: 1
+estimatedMinutes: 24
+goal: "Replace a value table with a parametric approximator trained by semi-gradient TD, and understand why function approximation, bootstrapping, and off-policy data together can diverge."
+prerequisites: ["H1/q-learning-sarsa", "A3/sgd"]
+---
+
+Tabular methods store one number per state. That is fine for a $4\times4$ grid and
+impossible for a chessboard, a camera image, or a continuous control vector: the
+states are too many, or there is no notion of a separate slot per state at all.
+The fix is to **approximate** the value function with a parametric model that
+generalizes across states. This is the bridge from tabular RL to deep RL, and it
+introduces a failure mode that tables never had.
+
+## Parametric value functions
+
+Replace the table $V(s)$ with a function $V_w(s)$ controlled by a weight vector
+$w$. The simplest case is **linear** in features: pick a feature map
+$\phi(s) \in \mathbb{R}^d$ and set $V_w(s) = w^\top \phi(s)$. A neural network is the
+nonlinear generalization, $V_w(s)$ being the network's output. Either way, $d$ is
+much smaller than the number of states, and updating $w$ from one state changes the
+predicted value at *all* similar states. That generalization is the entire point;
+it is also the source of the trouble below.
+
+## Semi-gradient TD
+
+To fit $V_w$, minimize the squared TD error. With target
+$y = r + \gamma V_w(S')$ and prediction $V_w(S)$, the per-step objective is
+$\tfrac12 (y - V_w(S))^2$. The honest gradient would differentiate both
+appearances of $w$, but the target $y$ is treated as a fixed regression label, not
+a function of $w$. Differentiating only the prediction gives the **semi-gradient**
+update:
+
+$$
+w \leftarrow w + \alpha\,\big(r + \gamma V_w(S') - V_w(S)\big)\,\nabla_w V_w(S).
+$$
+
+For linear features $\nabla_w V_w(S) = \phi(S)$, so the update is
+$w \leftarrow w + \alpha\,\delta\,\phi(S)$ with TD error $\delta$. "Semi" because
+the dependence of the target on $w$ is ignored; that omission is deliberate and is
+what keeps the update a [stochastic-gradient](A3/sgd)-style move toward satisfying
+the Bellman equation. The action-value version trains $Q_w(s,a)$ the same way and
+is what deep Q-learning will optimize next lesson.
+
+## The deadly triad
+
+Tabular TD always converges; semi-gradient TD with approximation does not, in
+general. Divergence requires three ingredients together, the **deadly triad**:
+
+1. **Function approximation**: $V_w$ ties states together, so an update at one
+   state moves the value at others.
+2. **Bootstrapping**: the target uses the current estimate $V_w(S')$ rather than a
+   true sampled return.
+3. **Off-policy training**: the states are updated under a distribution different
+   from the policy being evaluated.
+
+Any two of the three are safe; on-policy semi-gradient TD converges, Monte Carlo
+with approximation converges (no bootstrap), tabular off-policy TD converges (no
+approximation). All three at once can send $\lVert w \rVert$ to infinity, because
+the combined update is no longer a contraction in any norm the approximation
+respects.
+
+**A minimal divergence.** Take two states with a single scalar weight $w$,
+features $\phi(s_1) = 1$ and $\phi(s_2) = 2$, all rewards zero, and repeatedly
+apply the bootstrapped update only to the transition $s_1 \to s_2$ (off-policy:
+the real policy would also leave $s_2$, but the update never samples that):
+
+$$
+w \leftarrow w + \alpha\big(0 + \gamma\,\phi(s_2)\,w - \phi(s_1)\,w\big)\,\phi(s_1) = w\big(1 + \alpha(2\gamma - 1)\big).
+$$
+
+With $\gamma = 0.99$ the factor $2\gamma - 1 = 0.98$ is positive, so each update
+*multiplies* $w$ by a number above $1$ and the weight explodes, even though the
+true value of both states is zero. That is the triad in three lines.
+
+## Worked check: divergence under the triad, stability without it
+
+Run the two-state example and watch $w$ grow geometrically. Then break one leg of
+the triad (sample the full on-policy chain, which includes $s_2$ transitioning to
+a terminal state) and watch the same linear update stay bounded.
+
+```python
+import numpy as np
+
+gamma, alpha = 0.99, 0.1
+phi = np.array([1.0, 2.0])      # features for s1, s2
+
+# Off-policy + bootstrap + approximation: update only s1 -> s2, reward 0.
+w = 1.0
+hist = []
+for _ in range(200):
+    delta = 0.0 + gamma * phi[1] * w - phi[0] * w
+    w = w + alpha * delta * phi[0]
+    hist.append(w)
+print("triad weight after 200 steps:", round(hist[-1], 1), "(true value is 0)")
+print("growing geometrically:", hist[-1] > hist[-2] > hist[-3] > 1.0)
+
+# Break off-policy: also sample s2 -> terminal (value 0), so both states are covered.
+w = 1.0
+for _ in range(200):
+    # s1 -> s2
+    w += alpha * (gamma * phi[1] * w - phi[0] * w) * phi[0]
+    # s2 -> terminal (target = 0)
+    w += alpha * (0.0 - phi[1] * w) * phi[1]
+print("on-policy weight after 200 steps:", round(w, 4), "(stays near 0)")
+```
+
+Under the full triad the weight blows up to a large number while the true value is
+zero; restoring coverage of every transition collapses it back toward zero. The
+divergence is real and the cause is structural, not a tuning accident.
+
+The next lesson tames exactly this instability for neural networks: deep
+Q-networks add experience replay and a target network, two tricks that
+re-engineer the bootstrap target so off-policy deep value learning becomes stable
+in practice.

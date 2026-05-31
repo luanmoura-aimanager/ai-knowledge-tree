@@ -1,0 +1,161 @@
+---
+title: "The policy gradient theorem and REINFORCE"
+pillar: H
+subId: H2
+lessonId: policy-gradient
+order: 4
+estimatedMinutes: 26
+goal: "Derive the policy gradient theorem with the log-derivative trick, obtain the REINFORCE estimator, and reduce its variance with a baseline."
+prerequisites: ["H1/mdp-formulation", "A3/sgd"]
+---
+
+Value-based methods learn $Q$ and act greedily. That has two limits: the
+$\max_a Q(s,a)$ is an optimization problem when actions are continuous, and the
+greedy policy is deterministic when the optimal policy is sometimes stochastic.
+**Policy gradient** methods sidestep both by parameterizing the policy directly,
+$\pi_\theta(a \mid s)$, and doing gradient ascent on the expected return. The only
+obstacle is that the objective is an expectation over trajectories that the
+parameters themselves control, so its gradient is not obvious. The policy gradient
+theorem makes it computable.
+
+## The objective and the log-derivative trick
+
+Let a trajectory be $\tau = (s_0, a_0, s_1, a_1, \dots)$ with return $R(\tau)$, and
+let $p_\theta(\tau)$ be its probability under policy $\pi_\theta$. The objective is
+the expected return
+
+$$
+J(\theta) = \mathbb{E}_{\tau \sim p_\theta}[R(\tau)] = \sum_\tau p_\theta(\tau)\,R(\tau).
+$$
+
+Differentiating, the reward $R(\tau)$ does not depend on $\theta$, so
+
+$$
+\nabla_\theta J(\theta) = \sum_\tau \nabla_\theta p_\theta(\tau)\, R(\tau).
+$$
+
+This is not yet an expectation, because $\nabla_\theta p_\theta(\tau)$ is not a
+probability-weighted quantity. The **log-derivative trick** fixes that using the
+identity $\nabla_\theta p_\theta = p_\theta \nabla_\theta \log p_\theta$ (just the
+chain rule on $\log$):
+
+$$
+\nabla_\theta J(\theta) = \sum_\tau p_\theta(\tau)\, \nabla_\theta \log p_\theta(\tau)\, R(\tau) = \mathbb{E}_{\tau \sim p_\theta}\big[ \nabla_\theta \log p_\theta(\tau)\, R(\tau) \big].
+$$
+
+Now it is an expectation, so it can be estimated by sampling trajectories. This
+score-function estimator needs no model of the environment.
+
+## Collapsing the trajectory log-probability
+
+The trajectory probability factors into dynamics and policy terms:
+
+$$
+p_\theta(\tau) = \rho(s_0) \prod_t P(s_{t+1} \mid s_t, a_t)\, \pi_\theta(a_t \mid s_t).
+$$
+
+Taking $\log$ turns the product into a sum, and the only terms depending on
+$\theta$ are the policy factors; the start distribution $\rho$ and the transitions
+$P$ vanish under $\nabla_\theta$:
+
+$$
+\nabla_\theta \log p_\theta(\tau) = \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t).
+$$
+
+The unknown dynamics dropped out. Substituting back gives the **policy gradient
+theorem**:
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau}\Big[ \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)\, G_t \Big],
+$$
+
+where $G_t$ is the return from step $t$ (only rewards after an action can be caused
+by it, so each $\nabla_\theta \log \pi_\theta(a_t\mid s_t)$ multiplies the
+return-to-go $G_t$ rather than the full-episode return).
+
+## REINFORCE
+
+Estimating that expectation with sampled episodes and stepping uphill is the
+**REINFORCE** algorithm. For each episode, compute returns-to-go $G_t$ and update
+
+$$
+\theta \leftarrow \theta + \alpha \sum_t G_t\, \nabla_\theta \log \pi_\theta(a_t \mid s_t).
+$$
+
+The update raises the log-probability of actions that led to high return and
+lowers it for low return, weighted by $G_t$. It is a [stochastic-gradient](A3/sgd)
+ascent on $J$.
+
+## Baselines reduce variance for free
+
+REINFORCE works but its gradient estimate has high variance, because $G_t$ swings
+widely from episode to episode. Subtracting a **baseline** $b(s_t)$ from the return
+leaves the gradient unbiased while shrinking its variance:
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}\Big[ \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)\,(G_t - b(s_t)) \Big].
+$$
+
+**Why it stays unbiased.** The extra term has zero expectation, because for any
+$b(s)$ not depending on the action,
+
+$$
+\mathbb{E}_{a \sim \pi_\theta}\big[\nabla_\theta \log \pi_\theta(a \mid s)\big] = \sum_a \pi_\theta(a\mid s) \frac{\nabla_\theta \pi_\theta(a\mid s)}{\pi_\theta(a\mid s)} = \nabla_\theta \sum_a \pi_\theta(a \mid s) = \nabla_\theta 1 = 0.
+$$
+
+So $\mathbb{E}[\nabla_\theta \log \pi_\theta(a\mid s)\, b(s)] = 0$ and the baseline
+cannot bias the gradient. It does change the variance, and the variance-minimizing
+choice is close to $b(s) = V(s)$, the expected return from $s$. Centering $G_t$
+around the state's own value is the seed of actor-critic methods next lesson.
+
+## Worked check: REINFORCE finds the best arm, the baseline cuts variance
+
+Two claims to verify. First, REINFORCE on a three-armed bandit with a softmax
+policy drives almost all probability onto the best arm. Second, at a fixed
+reference policy, subtracting the expected-reward baseline lowers the gradient
+estimator's second moment while leaving its mean (the true gradient) unchanged.
+
+```python
+import numpy as np
+rng = np.random.default_rng(1)
+
+true_means = np.array([0.0, 1.0, 2.0])     # arm 2 is best
+K = 3
+def softmax(th):
+    z = th - th.max(); e = np.exp(z); return e / e.sum()
+
+# Part A: REINFORCE (one-step episodes) learns the best arm.
+th = np.zeros(K)
+for _ in range(20000):
+    p = softmax(th)
+    a = rng.choice(K, p=p)
+    r = true_means[a] + rng.normal()
+    th += 0.025 * (np.eye(K)[a] - p) * r         # softmax score times reward
+p_final = softmax(th)
+
+# Part B: gradient variance at a FIXED policy, with vs without a baseline.
+p_ref = np.array([0.2, 0.3, 0.5])
+b_opt = true_means @ p_ref                       # baseline = expected reward
+N = 200_000
+g_nb = np.zeros((N, K)); g_b = np.zeros((N, K))
+for i in range(N):
+    a = rng.choice(K, p=p_ref)
+    r = true_means[a] + rng.normal()
+    score = np.eye(K)[a] - p_ref
+    g_nb[i] = score * r
+    g_b[i]  = score * (r - b_opt)
+
+print("P(best arm) after REINFORCE:", round(p_final[2], 3))
+print("E||grad||^2 without baseline:", round(np.mean((g_nb**2).sum(1)), 3))
+print("E||grad||^2 with baseline:   ", round(np.mean((g_b**2).sum(1)), 3))
+print("gradient means agree (unbiased):", np.allclose(g_nb.mean(0), g_b.mean(0), atol=0.02))
+```
+
+REINFORCE puts essentially all mass on the best arm, and the baseline lowers the
+gradient's second moment while the two gradient means agree, confirming it reduces
+variance without introducing bias.
+
+The baseline that best reduces variance is the state value $V(s)$, which is not
+known in advance. Learning it with a second network and using it both as the
+baseline and to bootstrap the return gives the actor-critic methods of the next
+lesson.

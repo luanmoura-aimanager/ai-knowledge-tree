@@ -1,0 +1,111 @@
+---
+title: "Double, dueling, and prioritized DQN"
+pillar: H
+subId: H2
+lessonId: dqn-improvements
+order: 3
+estimatedMinutes: 24
+goal: "Fix Q-learning's maximization bias with Double DQN, separate state value from advantage with the dueling architecture, and weight replay by TD error, the pieces that compose Rainbow."
+prerequisites: ["dqn"]
+---
+
+DQN works, but three weaknesses are visible on close inspection: its targets are
+systematically too high, its single value head spends capacity learning action
+differences in states where the action barely matters, and it replays all
+transitions with equal weight even though some are far more informative. Three
+targeted fixes address each, and stacking them (with a few others) is the
+**Rainbow** agent.
+
+## Maximization bias and Double DQN
+
+The Q-learning target $r + \gamma \max_{a'} Q(s', a')$ takes a max over noisy
+estimates. The max of noisy estimates is a biased estimate of the max of the true
+values: noise that happens to push one action's estimate up is exactly what the
+$\max$ selects, so the target is **overestimated** on average. This is the same
+statistics as taking the maximum of several sample means.
+
+**Double Q-learning** removes the bias by splitting selection from evaluation. Use
+one set of weights to pick the maximizing action and a *different* set to evaluate
+its value, so the noise in selection is independent of the noise in evaluation. In
+DQN the two networks already exist, so **Double DQN** reuses them: the online
+network $w$ selects, the target network $w^-$ evaluates,
+
+$$
+y = r + \gamma\, Q_{w^-}\!\big(s', \arg\max_{a'} Q_w(s', a')\big).
+$$
+
+Compare the plain DQN target $y = r + \gamma\, Q_{w^-}(s', \arg\max_{a'} Q_{w^-}(s',a'))$,
+where the same network both selects and evaluates, so its overestimation feeds
+itself.
+
+## The dueling architecture
+
+In many states the choice of action hardly affects the return (the agent is in a
+safe corridor); in a few it matters enormously (a fork, an obstacle). A single
+$Q(s,a)$ head must relearn the state's overall value separately for every action.
+
+The **dueling** network splits the final layers into two streams from a shared
+trunk: a scalar **state value** $V(s)$ and a per-action **advantage** $A(s,a)$,
+recombined as
+
+$$
+Q(s,a) = V(s) + \Big(A(s,a) - \tfrac{1}{|\mathcal{A}|}\sum_{a'} A(s,a')\Big).
+$$
+
+Subtracting the mean advantage is an **identifiability** fix: $V$ and $A$ are only
+defined up to a constant that could shift between them ($Q$ is unchanged if you add
+$c$ to $V$ and subtract $c$ from every $A$), and forcing the advantages to have zero
+mean pins that constant down. The payoff is that $V(s)$ is learned from every
+action's experience in a state at once, so state values sharpen faster.
+
+## Prioritized experience replay
+
+Uniform replay samples a transition the agent already predicts perfectly as often
+as one it gets badly wrong. **Prioritized experience replay** samples in
+proportion to the magnitude of the TD error $|\delta|$, so surprising transitions
+are revisited more. Priorities are $p_i = |\delta_i| + \epsilon$, and a transition
+is drawn with probability $P(i) \propto p_i^{\alpha}$ ($\alpha$ interpolating
+between uniform at $0$ and greedy at $1$).
+
+Sampling non-uniformly changes the expectation the gradient estimates, so it is
+corrected with an **importance-sampling weight** $w_i = (N\,P(i))^{-\beta}$ applied
+to each update, which removes the bias introduced by the skewed sampling. The net
+effect is the same data, ordered to spend gradient steps where the error is
+largest.
+
+## Worked check: the max estimator is biased, the double estimator is not
+
+Strip the idea to its statistical core. Take several actions whose true value is
+all zero and only noisy samples of it. The single estimator (max of the per-action
+means) should come out positive, the bias Double DQN targets; the double estimator
+(select the best action on one half of the data, evaluate it on the other half)
+should come out near zero.
+
+```python
+import numpy as np
+rng = np.random.default_rng(7)
+
+K, n, trials = 8, 20, 20000     # K actions, all TRUE value 0; n noisy samples each
+single, double = [], []
+for _ in range(trials):
+    A = rng.normal(0.0, 1.0, size=(K, n))        # returns with true mean 0
+    # Single estimator: max over actions of the sample mean.
+    single.append(np.max(A.mean(axis=1)))
+    # Double estimator: pick argmax on the first half, evaluate on the second half.
+    h = n // 2
+    a_star = np.argmax(A[:, :h].mean(axis=1))
+    double.append(A[a_star, h:].mean())
+
+print("true max value: 0.0")
+print("single-estimator mean (overestimates):", round(np.mean(single), 3))
+print("double-estimator mean (unbiased):", round(np.mean(double), 3))
+```
+
+The single estimator reports a clearly positive value where the truth is zero,
+while the double estimator sits at zero, the exact overestimation that Double DQN
+removes by decoupling action selection from action evaluation.
+
+These value-based methods learn $Q$ then act greedily, which struggles with
+continuous actions (the $\max_a$ becomes an optimization) and stochastic optimal
+policies. The next lesson takes the other route: parameterize and optimize the
+policy directly, starting from the policy gradient theorem.

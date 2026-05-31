@@ -6,6 +6,7 @@ import { D_CURRICULUM } from "./D";
 import { E_CURRICULUM } from "./E";
 import { F_CURRICULUM } from "./F";
 import { G_CURRICULUM } from "./G";
+import { H_CURRICULUM } from "./H";
 
 /**
  * Lesson curriculum registry: subsection id → ordered Lesson[]. Each pillar's
@@ -20,6 +21,7 @@ const CURRICULA: Record<string, Lesson[]> = {
   ...E_CURRICULUM,
   ...F_CURRICULUM,
   ...G_CURRICULUM,
+  ...H_CURRICULUM,
 };
 
 /** Ordered lessons for a subsection (empty if none authored/planned yet). */

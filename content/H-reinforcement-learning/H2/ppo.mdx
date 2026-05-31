@@ -1,0 +1,120 @@
+---
+title: "Trust regions and proximal policy optimization"
+pillar: H
+subId: H2
+lessonId: ppo
+order: 6
+estimatedMinutes: 26
+goal: "Motivate the trust-region constraint behind TRPO, derive the PPO clipped surrogate objective, and understand why clipping keeps policy updates conservative."
+prerequisites: ["actor-critic"]
+---
+
+Actor-critic gives a low-variance gradient, but a raw gradient step has no sense of
+scale: too large a step can move the policy into a region where the advantage
+estimates, computed under the *old* policy, no longer apply, and performance
+collapses with no easy recovery (a bad supervised step is corrected by the next
+batch; a bad policy step changes the data the agent collects next). The fix is to
+limit how far each update moves the policy. **Proximal policy optimization** (PPO)
+is the simple, dominant way to do this.
+
+## The surrogate objective
+
+To reuse trajectories collected under an old policy $\pi_{\theta_{\text{old}}}$
+while optimizing a new $\pi_\theta$, weight each action's advantage by the
+**probability ratio**
+
+$$
+\rho_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)},
+$$
+
+an importance-sampling correction for the change of policy. The surrogate objective
+is
+
+$$
+L^{\text{IS}}(\theta) = \mathbb{E}_t\big[ \rho_t(\theta)\, \hat{A}_t \big],
+$$
+
+whose gradient at $\theta = \theta_{\text{old}}$ equals the policy gradient (there
+$\rho_t = 1$ and $\nabla_\theta \rho_t = \nabla_\theta \log \pi_\theta$). The
+trouble is that maximizing $L^{\text{IS}}$ without restraint drives $\rho_t$ to
+extreme values for actions with large advantage, which is exactly the destructive
+oversized step.
+
+## Trust regions: TRPO
+
+The importance-sampling surrogate only approximates the true objective near
+$\theta_{\text{old}}$; far away the approximation is worthless. **TRPO** makes this
+precise by maximizing $L^{\text{IS}}$ subject to a **trust-region** constraint that
+the new policy stay close to the old one in KL divergence:
+
+$$
+\max_\theta\; \mathbb{E}_t\big[\rho_t(\theta)\,\hat{A}_t\big] \quad \text{subject to} \quad \mathbb{E}_t\big[\mathrm{KL}(\pi_{\theta_{\text{old}}}(\cdot\mid s_t)\,\|\,\pi_\theta(\cdot\mid s_t))\big] \le \delta.
+$$
+
+This guarantees the update stays where the surrogate is trustworthy and yields
+monotonic improvement, but it requires a constrained optimization with second-order
+(natural-gradient) machinery, which is heavy to implement.
+
+## PPO: clipping instead of constraining
+
+PPO keeps the trust-region intent and throws away the constrained optimization. It
+replaces the hard KL constraint with a **clipped** surrogate that simply removes
+the incentive to move the ratio outside $[1-\epsilon, 1+\epsilon]$:
+
+$$
+L^{\text{CLIP}}(\theta) = \mathbb{E}_t\Big[ \min\big(\rho_t \hat{A}_t,\; \mathrm{clip}(\rho_t, 1-\epsilon, 1+\epsilon)\, \hat{A}_t\big) \Big].
+$$
+
+Read the $\min$ case by case on the sign of the advantage:
+
+- **$\hat{A}_t > 0$** (good action, push its probability up). The objective rises
+  with $\rho_t$ until $\rho_t = 1+\epsilon$, where the clipped branch caps it. Past
+  that point the objective is flat, so the gradient is zero and there is no
+  incentive to increase the probability further.
+- **$\hat{A}_t < 0$** (bad action, push its probability down). The objective rises
+  as $\rho_t$ falls until $\rho_t = 1-\epsilon$, then flattens. No incentive to
+  decrease the probability further.
+
+The $\min$ makes the clip one-sided in the safe direction: it caps the reward for
+moving too far but still penalizes moving the wrong way, because if a step has
+already pushed $\rho_t$ past the clip on the harmful side, the unclipped term is
+selected and the gradient pulls back. The whole thing is a first-order objective
+optimized by ordinary minibatch SGD, run for several epochs over each batch of
+trajectories. That simplicity is why PPO is the default policy-gradient algorithm,
+including for RLHF in the [LLM lessons](E4/ppo-rlhf).
+
+## Worked check: clipping flattens the objective past the trust region
+
+Evaluate $L^{\text{CLIP}}$ as a function of the ratio $\rho$ for a positive and a
+negative advantage, and confirm the objective stops changing (zero slope) once
+$\rho$ leaves $[1-\epsilon, 1+\epsilon]$ in the clipped direction, which is what
+caps the update size.
+
+```python
+import numpy as np
+
+eps = 0.2
+def L_clip(ratio, A):
+    return np.minimum(ratio * A, np.clip(ratio, 1 - eps, 1 + eps) * A)
+
+ratios = np.linspace(0.0, 2.0, 2001)
+Lpos = L_clip(ratios, +1.0)         # good action
+Lneg = L_clip(ratios, -1.0)         # bad action
+
+slope_pos_above = np.gradient(Lpos, ratios)[ratios > 1 + eps + 1e-6]
+slope_neg_below = np.gradient(Lneg, ratios)[ratios < 1 - eps - 1e-6]
+print("A>0: max |slope| above 1+eps:", round(float(np.max(np.abs(slope_pos_above))), 6))
+print("A<0: max |slope| below 1-eps:", round(float(np.max(np.abs(slope_neg_below))), 6))
+print("A>0 objective equal at ratio 1.2 and 1.8:",
+      bool(np.isclose(L_clip(np.array([1.2]), 1.0), L_clip(np.array([1.8]), 1.0))[0]))
+```
+
+The objective has exactly zero slope beyond the clip boundary in the clipped
+direction, and its value at $\rho = 1.2$ and $\rho = 1.8$ is identical, so once an
+update has moved the policy to the edge of the trust region, pushing further buys
+nothing. That flat region is how PPO keeps each step proximal.
+
+PPO handles discrete and continuous actions through a stochastic policy. When the
+optimal policy is deterministic and actions are continuous, a different family is
+more sample-efficient: the next lesson develops DDPG, TD3, and SAC for continuous
+control.
