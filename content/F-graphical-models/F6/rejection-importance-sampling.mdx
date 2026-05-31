@@ -1,0 +1,123 @@
+---
+title: "Rejection and importance sampling"
+pillar: F
+subId: F6
+lessonId: rejection-importance-sampling
+order: 1
+estimatedMinutes: 22
+goal: "Derive the acceptance probability for rejection sampling from an envelope distribution, derive the importance weights for importance sampling, and compute the effective sample size."
+prerequisites: ["A2/bayes-rule", "A2/mle"]
+---
+
+Many posteriors and integrals in probabilistic models cannot be evaluated analytically.
+**Monte Carlo** methods estimate them by drawing samples.
+The two foundational non-Markov methods are rejection sampling (which produces exact
+i.i.d. samples from the target) and importance sampling (which reweights samples
+from a proposal to estimate expectations under the target).
+
+## Rejection sampling
+
+**Setup.** Target $p(x)$ (known up to normalizing constant), proposal $q(x)$ with
+$p(x) \le M q(x)$ for all $x$ and some constant $M$.
+
+**Algorithm.**
+
+1. Draw $x \sim q(x)$.
+2. Draw $u \sim \text{Uniform}(0, M q(x))$.
+3. Accept $x$ if $u \le p(x)$; otherwise reject.
+
+**Why this works.** The accepted pairs $(x, u)$ are uniform under the curve of $p$.
+The marginal distribution of accepted $x$ is exactly $p(x)$.
+
+**Acceptance rate.** $P(\text{accept}) = 1/M$, since:
+
+$$
+P(\text{accept}) = \int q(x) \cdot \frac{p(x)}{M q(x)} dx = \frac{1}{M}.
+$$
+
+A tight envelope ($M$ close to $\int p(x)dx$) is essential; $M \gg 1$ wastes most samples.
+In high dimensions, finding a tight envelope is the core difficulty, making rejection
+sampling impractical beyond low dimensions.
+
+## Importance sampling
+
+**Idea.** To estimate $\mathbb{E}_p[f(x)]$, draw samples from a tractable proposal
+$q(x)$ and reweight by the density ratio:
+
+$$
+\mathbb{E}_p[f(x)] = \int f(x) p(x) dx = \int f(x) \frac{p(x)}{q(x)} q(x) dx
+= \mathbb{E}_q\!\left[f(x) \frac{p(x)}{q(x)}\right].
+$$
+
+When $p(x)$ is known only up to a constant $\tilde{p}(x) = Z \cdot p(x)$,
+use **self-normalized IS**:
+
+$$
+\mathbb{E}_p[f(x)] \approx \frac{\sum_{i=1}^N w_i f(x_i)}{\sum_{i=1}^N w_i},
+\quad w_i = \frac{\tilde{p}(x_i)}{q(x_i)}.
+$$
+
+This estimator is consistent but biased in finite samples.
+
+## Effective sample size
+
+The quality of an importance sample degenerates when a few particles carry most of the weight.
+The **effective sample size** (ESS) is:
+
+$$
+N_\text{eff} = \frac{\left(\sum_{i=1}^N w_i\right)^2}{\sum_{i=1}^N w_i^2}.
+$$
+
+$N_\text{eff} = N$ when all weights are equal; $N_\text{eff} \approx 1$ when one weight dominates.
+A rule of thumb: IS is informative when $N_\text{eff} \ge N/10$.
+
+## Implementation
+
+```python
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(1)
+
+# Target: mixture of two Gaussians (unnormalized)
+def log_target(x):
+    return np.log(0.4 * stats.norm.pdf(x, -2, 0.5) + 0.6 * stats.norm.pdf(x, 2, 1.0))
+
+def target_pdf(x):
+    return 0.4 * stats.norm.pdf(x, -2, 0.5) + 0.6 * stats.norm.pdf(x, 2, 1.0)
+
+# ---- Rejection sampling ----
+# Proposal: N(0, 4)
+q_sigma = 4.0
+M = 2.5   # max ratio: target(x) / q(x) <= M
+
+def accept_reject(N_trial):
+    x_prop = rng.normal(0, q_sigma, N_trial)
+    u = rng.uniform(0, M * stats.norm.pdf(x_prop, 0, q_sigma))
+    accepted = x_prop[u <= target_pdf(x_prop)]
+    return accepted
+
+samples_rs = accept_reject(50_000)
+print(f"Rejection sampling: {len(samples_rs)} accepted out of 50000 "
+      f"({100*len(samples_rs)/50000:.1f}% rate)")
+print(f"  Sample mean: {samples_rs.mean():.3f}  (true: {0.4*-2 + 0.6*2:.3f})")
+
+# ---- Importance sampling ----
+N = 5000
+x_is = rng.normal(0, q_sigma, N)
+w_unnorm = target_pdf(x_is) / stats.norm.pdf(x_is, 0, q_sigma)
+w_norm = w_unnorm / w_unnorm.sum()
+
+est_mean = (w_norm * x_is).sum()
+ess = 1.0 / (w_norm**2).sum()
+print(f"\nImportance sampling (N={N}):")
+print(f"  Estimated mean: {est_mean:.3f}")
+print(f"  ESS: {ess:.0f} / {N}  ({100*ess/N:.1f}%)")
+```
+
+The rejection sampler achieves near the theoretical $1/M$ acceptance rate;
+the IS ESS quantifies that a wide proposal captures a modest fraction of the
+effective information.
+
+The next lesson builds on these ideas to construct Markov chains whose stationary
+distribution is the target, escaping the curse of dimensionality.

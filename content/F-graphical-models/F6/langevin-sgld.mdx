@@ -1,0 +1,125 @@
+---
+title: "Langevin dynamics and SGLD"
+pillar: F
+subId: F6
+lessonId: langevin-sgld
+order: 5
+estimatedMinutes: 24
+goal: "Derive the unadjusted Langevin algorithm from overdamped Langevin diffusion, apply stochastic gradient noise to obtain SGLD, and interpret SGLD as approximate Bayesian posterior sampling."
+prerequisites: ["hamiltonian-mc"]
+---
+
+Hamiltonian MC requires running a full trajectory to propose each sample.
+**Langevin dynamics** is a simpler gradient-based approach that injects controlled
+noise into gradient ascent on $\log \pi$, turning optimization into sampling.
+
+## Overdamped Langevin diffusion
+
+The **overdamped Langevin SDE** for a target $\pi(q) \propto e^{-U(q)}$ is:
+
+$$
+dq_t = -\nabla U(q_t) \, dt + \sqrt{2} \, dW_t,
+$$
+
+where $W_t$ is standard Brownian motion.
+
+The Fokker-Planck equation shows that $\pi(q)$ is the unique stationary distribution
+of this SDE: the drift $-\nabla U$ pushes toward high-probability regions, while the
+noise $\sqrt{2} dW_t$ prevents the chain from collapsing to a mode.
+
+## Unadjusted Langevin algorithm (ULA)
+
+Discretize with step size $\varepsilon$ (Euler-Maruyama):
+
+$$
+q_{t+1} = q_t - \varepsilon \nabla U(q_t) + \sqrt{2\varepsilon} \, \xi_t,
+\quad \xi_t \sim \mathcal{N}(0, I).
+$$
+
+This is called the **unadjusted Langevin algorithm (ULA)** because no MH correction step is applied.
+The discretization introduces a bias: the stationary distribution of the discrete chain
+is not exactly $\pi(q)$ but a perturbed version with error $O(\varepsilon)$ in TV distance.
+Adding an MH correction gives the **Metropolis-adjusted Langevin algorithm (MALA)**,
+which corrects the bias at the cost of an accept/reject step.
+
+## Stochastic gradient Langevin dynamics (SGLD)
+
+For a posterior $\pi(\theta) \propto p(\theta) \prod_n p(x_n \mid \theta)$ over $N$ datapoints,
+the full gradient $\nabla \log \pi(\theta) = \nabla \log p(\theta) + \sum_n \nabla \log p(x_n \mid \theta)$
+costs $O(N)$ per step.
+
+SGLD replaces the full gradient with a mini-batch estimate and no MH correction:
+
+$$
+\theta_{t+1} = \theta_t + \frac{\varepsilon_t}{2}\!\left(\nabla \log p(\theta_t)
++ \frac{N}{M} \sum_{n \in \mathcal{B}_t} \nabla \log p(x_n \mid \theta_t)\right) + \xi_t,
+$$
+
+with $\xi_t \sim \mathcal{N}(0, \varepsilon_t I)$.
+
+As $\varepsilon_t \to 0$ at an appropriate rate ($\sum_t \varepsilon_t = \infty$, $\sum_t \varepsilon_t^2 < \infty$),
+the mini-batch noise is dominated by the injected noise and the chain converges to the posterior.
+In practice, a fixed small $\varepsilon$ is used, accepting a bias similar to ULA.
+
+## Connection to SGD
+
+With $\xi_t = 0$, the update is stochastic gradient ascent on $\log \pi(\theta)$:
+it converges to the MAP estimate.
+Adding noise of order $\sqrt{\varepsilon}$ transforms MAP optimization into posterior sampling.
+This single change turns a deep learning optimizer into a Bayesian sampler, at no additional
+gradient cost.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(31)
+
+# Bayesian linear regression with SGLD
+# Prior: w ~ N(0, I),  Likelihood: y_n ~ N(w^T x_n, sigma^2)
+N = 200
+d = 3
+true_w = np.array([1.0, -2.0, 0.5])
+sigma2 = 0.5
+X = rng.normal(0, 1, (N, d))
+y = X @ true_w + rng.normal(0, np.sqrt(sigma2), N)
+
+# Analytic posterior for comparison
+prior_prec = np.eye(d)
+post_prec  = prior_prec + X.T @ X / sigma2
+post_cov   = np.linalg.inv(post_prec)
+post_mean  = post_cov @ (X.T @ y / sigma2)
+
+# SGLD
+eps = 1e-3
+M   = 20   # mini-batch size
+n_steps = 50_000
+burnin  = 10_000
+
+w = np.zeros(d)
+samples = []
+
+for t in range(n_steps):
+    idx = rng.choice(N, M, replace=False)
+    X_b, y_b = X[idx], y[idx]
+    grad_prior = -w
+    grad_lik   = (N / M) * X_b.T @ (y_b - X_b @ w) / sigma2
+    grad_log_pi = grad_prior + grad_lik
+    noise = rng.normal(0, np.sqrt(eps), d)
+    w = w + 0.5 * eps * grad_log_pi + noise
+    if t >= burnin:
+        samples.append(w.copy())
+
+samples = np.array(samples)
+print(f"SGLD posterior mean: {samples.mean(axis=0).round(3)}")
+print(f"Exact posterior mean: {post_mean.round(3)}")
+print(f"SGLD posterior std:   {samples.std(axis=0).round(3)}")
+print(f"Exact posterior std:  {np.sqrt(np.diag(post_cov)).round(3)}")
+```
+
+SGLD recovers the posterior mean and approximate covariance using only mini-batch gradients,
+illustrating how a small noise injection transforms gradient optimization into Bayesian sampling.
+
+The next subsection introduces latent variable models, starting with the EM algorithm
+that maximizes the marginal likelihood when the latent structure is not directly observed.

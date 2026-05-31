@@ -1,0 +1,107 @@
+---
+title: "d-separation and conditional independence"
+pillar: F
+subId: F1
+lessonId: d-separation
+order: 3
+estimatedMinutes: 22
+goal: "Identify the three canonical motifs (chain, fork, collider) and apply the Bayes-ball algorithm to determine which pairs of variables are d-separated given an observation set."
+prerequisites: ["bayesian-networks"]
+---
+
+A Bayesian network encodes independence assumptions graphically.
+Reading those assumptions without computing marginals requires a
+purely graphical criterion: **d-separation**.
+Two nodes $A$ and $B$ are d-separated by a set $\mathbf{E}$ (the observed evidence)
+if every path between them is blocked by $\mathbf{E}$.
+
+## The three motifs
+
+Every undirected path between two nodes passes through intermediate nodes.
+Each intermediate node $Z$ creates one of three patterns:
+
+### Chain: $A \to Z \to B$
+
+$Z$ transmits information from $A$ to $B$.
+Conditioning on $Z$ blocks the path: $A \perp B \mid Z$.
+Without conditioning, $A$ and $B$ are dependent (information flows through $Z$).
+
+### Fork: $A \leftarrow Z \to B$
+
+$Z$ is a common cause.
+Conditioning on $Z$ blocks the path: $A \perp B \mid Z$.
+Without conditioning, $A$ and $B$ share variation through their common parent $Z$.
+
+### Collider: $A \to Z \leftarrow B$
+
+$Z$ is a common effect.
+The path is **blocked by default** (without conditioning).
+Conditioning on $Z$ (or any descendant of $Z$) **unblocks** it: $A$ and $B$ become
+dependent given $Z$, an effect called **explaining away** or Berkson's paradox.
+
+## The blocking rule
+
+A path $p$ between $A$ and $B$ is **blocked** by $\mathbf{E}$ if it contains:
+
+1. A chain $A \to Z \to B$ or fork $A \leftarrow Z \to B$ where $Z \in \mathbf{E}$, or
+2. A collider $A \to Z \leftarrow B$ where neither $Z$ nor any descendant of $Z$ is in $\mathbf{E}$.
+
+$A$ and $B$ are **d-separated** by $\mathbf{E}$ if **all** paths between them are blocked.
+D-separation implies conditional independence under any distribution that is faithful
+to $\mathcal{G}$.
+
+## The Bayes-ball algorithm
+
+The Bayes-ball algorithm checks d-separation in $O(n + e)$ (nodes + edges):
+
+1. Shade every node in $\mathbf{E}$.
+2. For each node $A$ in the query, activate it and propagate "balls" along edges.
+3. Balls traveling through chains and forks pass through unshaded nodes; shaded nodes
+   block them.
+4. Balls traveling toward a collider pass through only if the collider (or a descendant)
+   is shaded.
+5. $A$ and $B$ are d-separated by $\mathbf{E}$ if no ball reaches $B$ from $A$.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+
+# Chain: A -> Z -> B.  Check independence of A and B given Z vs not given Z.
+n = 50_000
+a = rng.normal(0, 1, n)
+z = 0.8 * a + rng.normal(0, 0.6, n)   # A -> Z
+b = 0.9 * z + rng.normal(0, 0.4, n)   # Z -> B
+
+# Without conditioning: A and B are correlated
+corr_ab = np.corrcoef(a, b)[0, 1]
+print(f"Corr(A,B) unconditional: {corr_ab:.3f}")
+
+# Partial correlation of A and B given Z (regress out Z)
+def partial_corr(x, y, z_var):
+    res_x = x - np.polyval(np.polyfit(z_var, x, 1), z_var)
+    res_y = y - np.polyval(np.polyfit(z_var, y, 1), z_var)
+    return np.corrcoef(res_x, res_y)[0, 1]
+
+corr_ab_given_z = partial_corr(a, b, z)
+print(f"Corr(A,B) | Z (chain blocked): {corr_ab_given_z:.3f}")
+
+# Collider: A -> C <- B.  Check explaining away.
+b2 = rng.normal(0, 1, n)
+c  = 0.7 * a + 0.7 * b2 + rng.normal(0, 0.3, n)
+
+corr_ab2 = np.corrcoef(a, b2)[0, 1]
+print(f"Corr(A,B2) unconditional (should be ~0): {corr_ab2:.3f}")
+
+corr_ab2_given_c = partial_corr(a, b2, c)
+print(f"Corr(A,B2) | C (collider activated): {corr_ab2_given_c:.3f}")
+```
+
+The chain example shows near-zero partial correlation once $Z$ is controlled for;
+the collider example shows that $A$ and $B_2$ are uncorrelated marginally but correlated
+once their common effect $C$ is conditioned on.
+
+D-separation in F1 governs the independence structure of directed models.
+The next lesson shifts to undirected graphical models, where independence is encoded differently.

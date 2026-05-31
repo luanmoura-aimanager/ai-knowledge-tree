@@ -1,0 +1,124 @@
+---
+title: "Amortized variational inference and encoder networks"
+pillar: F
+subId: F5
+lessonId: amortized-vi
+order: 3
+estimatedMinutes: 22
+goal: "Replace per-datapoint variational parameters with a shared encoder network, derive the amortized ELBO objective, and identify the trade-off between flexibility and amortization gap."
+prerequisites: ["stochastic-vi"]
+---
+
+Stochastic VI still maintains a separate set of variational parameters $(\mu_n, \sigma_n)$
+for each datapoint $x_n$.
+For $N$ datapoints this is $2N$ parameters, and inference at test time requires
+additional optimization per new input.
+**Amortized VI** eliminates per-datapoint parameters by training a shared **encoder network**
+(also called an inference network or recognition model) that maps inputs directly to
+variational parameters.
+
+## The amortized objective
+
+Define an encoder $q_\phi(z \mid x)$ parameterized by a neural network with weights $\phi$.
+The amortized ELBO is:
+
+$$
+\mathcal{L}(\phi, \theta) = \mathbb{E}_{p_\text{data}(x)} \mathbb{E}_{q_\phi(z \mid x)}
+\!\left[\log p_\theta(x \mid z) - \log \frac{q_\phi(z \mid x)}{p(z)}\right].
+$$
+
+The KL term penalizes the encoder for producing posteriors that deviate from the prior $p(z)$,
+and the reconstruction term rewards the decoder $p_\theta(x \mid z)$ for explaining the data.
+
+Both $\phi$ (encoder) and $\theta$ (decoder) are optimized jointly via gradient ascent on $\mathcal{L}$.
+The reparameterization trick makes this tractable: sample $z = \mu_\phi(x) + \sigma_\phi(x) \cdot \epsilon$
+with $\epsilon \sim \mathcal{N}(0,I)$.
+
+## The amortization gap
+
+Let $q^*_n(z)$ be the optimal variational distribution for datapoint $n$ (the solution
+to a per-datapoint optimization).
+The encoder $q_\phi(z \mid x_n)$ approximates all $q^*_n$ with a single function, incurring an
+**amortization gap**:
+
+$$
+\sum_n \mathrm{KL}(q^*_n \| p(z \mid x_n)) \le \sum_n \mathrm{KL}(q_\phi(\cdot \mid x_n) \| p(z \mid x_n)).
+$$
+
+The gap is zero if the encoder family is flexible enough to represent every $q^*_n$
+exactly, which requires sufficient encoder capacity.
+In practice, a well-trained encoder closes most of the gap while enabling fast
+one-pass inference at test time.
+
+## Semi-amortized VI
+
+**Semi-amortized** methods initialize with the encoder output and then run a few
+gradient steps of per-datapoint refinement.
+This combines the speed of amortization with the accuracy of local optimization,
+at the cost of extra computation at inference time.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(22)
+
+# Simulate amortized VI on a toy latent Gaussian model
+# True model: z ~ N(0,1), x | z ~ N(z, 0.25)
+# True posterior: z | x ~ N(x/(1+0.25), 1/(1+1/0.25)) = N(4x/5, 4/5)
+N = 200
+z_true = rng.normal(0, 1, N)
+x_data = z_true + rng.normal(0, 0.5, N)
+
+# Encoder as a linear map: mu_phi(x) = a*x + b, log_sigma_phi(x) = c
+# (a simple but expressive enough family for this model)
+a, b, log_c = 0.0, 0.0, 0.0
+lr = 0.02
+S  = 5   # Monte Carlo samples per point
+
+def encoder(x, a, b, log_c):
+    mu    = a * x + b
+    sigma = np.exp(log_c) * np.ones_like(x)
+    return mu, sigma
+
+for step in range(500):
+    mu_q, sig_q = encoder(x_data, a, b, log_c)
+    eps   = rng.normal(0, 1, (S, N))
+    z_s   = mu_q[np.newaxis] + sig_q[np.newaxis] * eps   # (S, N)
+
+    # ELBO = E[log p(x|z)] + E[log p(z)] - E[log q(z|x)]
+    log_px_z = -0.5 / 0.25 * (x_data[np.newaxis] - z_s)**2
+    log_pz   = -0.5 * z_s**2
+    log_qz   = -0.5 * ((z_s - mu_q[np.newaxis]) / sig_q[np.newaxis])**2 - np.log(sig_q[np.newaxis])
+    elbo_mc  = (log_px_z + log_pz - log_qz).mean()
+
+    # Gradients (analytic for this linear encoder)
+    # KL(N(mu,sig^2) || N(0,1)) = 0.5*(mu^2 + sig^2 - 1 - log sig^2)
+    dKL_da = (mu_q * x_data + sig_q * np.exp(log_c) * 0).mean()  # d/da of 0.5*mu^2
+    # Use analytic KL gradient
+    kl   = 0.5 * (mu_q**2 + sig_q**2 - 1 - 2*log_c)
+    recon = -0.5 / 0.25 * ((x_data - mu_q)**2 + sig_q**2)
+    elbo = (recon - kl).mean()
+
+    grad_a = ((x_data / 0.25) * (x_data - mu_q) / 0.25 - mu_q * x_data).mean() / N * N
+    # Simpler: use automatic differentiation approximation
+    h = 1e-4
+    elbo_plus  = ((-0.5/0.25 * (x_data - (a+h)*x_data - b)**2 - 0.5*((a+h)*x_data+b)**2
+                   - 0.5*np.exp(log_c)**2 + 0.5*(1 + 2*log_c))).mean()
+    elbo_minus = ((-0.5/0.25 * (x_data - (a-h)*x_data - b)**2 - 0.5*((a-h)*x_data+b)**2
+                   - 0.5*np.exp(log_c)**2 + 0.5*(1 + 2*log_c))).mean()
+    grad_a = (elbo_plus - elbo_minus) / (2*h)
+    a += lr * grad_a
+
+# True posterior params: mu = 4/5 * x, sigma = sqrt(4/5)
+print(f"Learned encoder slope a: {a:.3f} (true 0.800)")
+print(f"Final ELBO estimate: {elbo:.3f}")
+```
+
+The encoder converges toward the true posterior slope ($4/5 = 0.8$) by maximizing
+the ELBO, demonstrating that amortized VI can learn the posterior structure from data
+without ever running per-datapoint optimization.
+
+The next lesson replaces the Gaussian encoder with a normalizing flow to represent
+more expressive posterior families.

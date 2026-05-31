@@ -1,0 +1,129 @@
+---
+title: "Stochastic variational inference"
+pillar: F
+subId: F5
+lessonId: stochastic-vi
+order: 2
+estimatedMinutes: 24
+goal: "Derive the mini-batch ELBO estimator, apply the reparameterization trick to obtain low-variance gradient estimates, and contrast it with the score-function estimator."
+prerequisites: ["mean-field-vi"]
+---
+
+CAVI processes the full dataset at each update step: its cost scales linearly with $N$.
+**Stochastic variational inference** (SVI) makes VI practical at scale by estimating the
+ELBO gradient on random mini-batches and applying stochastic gradient ascent.
+
+## Mini-batch ELBO
+
+For an i.i.d. likelihood $P(\mathbf{X} \mid \mathbf{Z}) = \prod_n P(x_n \mid z_n, \theta)$,
+the ELBO decomposes as:
+
+$$
+\mathcal{L} = \sum_n \mathbb{E}_{q(z_n)}[\log P(x_n \mid z_n, \theta)]
+- \mathrm{KL}(q(\theta) \| P(\theta))
+- \sum_n \mathrm{KL}(q(z_n) \| P(z_n)).
+$$
+
+On a mini-batch $\mathcal{B}$ of size $M$, the likelihood terms are subsampled and rescaled:
+
+$$
+\mathcal{L}_\mathcal{B} = \frac{N}{M} \sum_{n \in \mathcal{B}} \mathbb{E}_{q(z_n)}[\log P(x_n \mid z_n, \theta)]
+- \mathrm{KL}(q(\theta) \| P(\theta))
+- \frac{N}{M} \sum_{n \in \mathcal{B}} \mathrm{KL}(q(z_n) \| P(z_n)).
+$$
+
+$\mathbb{E}[\mathcal{L}_\mathcal{B}] = \mathcal{L}$, so the mini-batch estimate is unbiased.
+
+## Reparameterization trick
+
+To backpropagate through a sample $z \sim q_\phi(z)$, rewrite the sample as a
+deterministic function of the parameters plus a noise variable:
+
+$$
+z = g_\phi(\epsilon), \quad \epsilon \sim p(\epsilon),
+$$
+
+where $p(\epsilon)$ is a fixed distribution independent of $\phi$.
+
+For $q_\phi(z) = \mathcal{N}(\mu_\phi, \sigma_\phi^2)$: set $z = \mu_\phi + \sigma_\phi \cdot \epsilon$,
+$\epsilon \sim \mathcal{N}(0,1)$.
+
+The gradient estimate then is:
+
+$$
+\nabla_\phi \mathbb{E}_{q_\phi}[f(z)]
+= \mathbb{E}_{p(\epsilon)}[\nabla_\phi f(g_\phi(\epsilon))]
+\approx \frac{1}{S} \sum_{s=1}^{S} \nabla_\phi f(g_\phi(\epsilon^{(s)})).
+$$
+
+This **pathwise estimator** has much lower variance than the score-function estimator
+because the gradient passes through $f$ directly rather than through $\log q$.
+
+## Score-function estimator (REINFORCE)
+
+An alternative is:
+
+$$
+\nabla_\phi \mathbb{E}_{q_\phi}[f(z)]
+= \mathbb{E}_{q_\phi}[f(z) \nabla_\phi \log q_\phi(z)].
+$$
+
+This holds for any $q_\phi$ (no reparameterizability required), but the variance is
+typically orders of magnitude higher than the reparameterization trick.
+Control variates (baselines) reduce variance at the cost of additional code complexity.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(18)
+
+# Simple SVI: fit q(z) = N(mu, sigma^2) to minimize KL(q || target)
+# Target: N(3.0, 0.5^2)
+target_mu    = 3.0
+target_sigma = 0.5
+
+# Variational parameters
+mu    = 0.0
+log_sigma = 0.0   # sigma = exp(log_sigma)
+lr = 0.05
+n_steps = 300
+S = 10   # samples per gradient estimate
+
+def elbo_grad(mu, log_sigma):
+    sigma = np.exp(log_sigma)
+    eps   = rng.normal(0, 1, S)
+    z     = mu + sigma * eps          # reparameterization
+
+    # log p(z) - log q(z) for N(target_mu, target_sigma^2)
+    log_p = -0.5 * ((z - target_mu) / target_sigma)**2 - np.log(target_sigma)
+    log_q = -0.5 * eps**2 - log_sigma   # N(mu, sigma^2) at z = mu + sigma*eps
+
+    f = log_p - log_q   # (log_p - log_q) = ELBO per sample
+
+    # Gradients via reparameterization
+    dlog_p_dz = -(z - target_mu) / target_sigma**2
+    grad_mu       = (dlog_p_dz + 1.0/sigma * (-1.0)).mean()  # df/dmu
+    grad_log_sigma = (dlog_p_dz * sigma * eps - 1.0 + 1.0).mean()
+    # Correct: d/d(log_sigma) of (log_p - log_q)
+    # log_q = -0.5*eps^2 - log_sigma  => d/d(log_sigma) = 1
+    # log_p via z: dz/d(log_sigma) = sigma*eps
+    grad_mu       = (dlog_p_dz * 1.0).mean()
+    grad_log_sigma = (dlog_p_dz * sigma * eps + 1.0).mean()
+    return grad_mu, grad_log_sigma
+
+for step in range(n_steps):
+    g_mu, g_ls = elbo_grad(mu, log_sigma)
+    mu        += lr * g_mu
+    log_sigma += lr * g_ls
+
+print(f"Fitted mu: {mu:.3f} (target {target_mu})")
+print(f"Fitted sigma: {np.exp(log_sigma):.3f} (target {target_sigma})")
+```
+
+The reparameterized gradient converges toward the target parameters because it provides
+low-variance, unbiased gradient estimates through the stochastic node.
+
+The next lesson replaces the per-datapoint variational parameters with a shared encoder
+network, which is the amortized VI strategy behind VAEs.

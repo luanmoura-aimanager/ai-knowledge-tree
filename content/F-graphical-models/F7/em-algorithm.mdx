@@ -1,0 +1,126 @@
+---
+title: "The EM algorithm for maximum marginal likelihood"
+pillar: F
+subId: F7
+lessonId: em-algorithm
+order: 1
+estimatedMinutes: 28
+goal: "Derive the E-step and M-step from the ELBO lower bound on the marginal log-likelihood, prove the monotone increase property, and apply EM to a Gaussian mixture model."
+prerequisites: ["F5/mean-field-vi", "A2/mle"]
+---
+
+Many models contain latent variables $\mathbf{Z}$ that explain the observations $\mathbf{X}$
+but are never directly observed.
+The **EM algorithm** maximizes the marginal log-likelihood $\log P(\mathbf{X} \mid \theta)$
+by alternating between computing the posterior over latents and updating parameters to
+maximize the expected complete-data log-likelihood.
+
+## Derivation from the ELBO
+
+For any distribution $q(\mathbf{Z})$, the ELBO (from the VI lesson) gives:
+
+$$
+\log P(\mathbf{X} \mid \theta) \ge \mathbb{E}_q[\log P(\mathbf{X}, \mathbf{Z} \mid \theta)] - \mathbb{E}_q[\log q(\mathbf{Z})].
+$$
+
+Equality holds when $q(\mathbf{Z}) = P(\mathbf{Z} \mid \mathbf{X}, \theta)$ (the true posterior),
+at which point the KL divergence is zero.
+
+**E-step.** Fix $\theta$. Set $q(\mathbf{Z}) = P(\mathbf{Z} \mid \mathbf{X}, \theta)$.
+This maximizes the ELBO with respect to $q$ and makes it tight.
+
+Compute:
+$$
+Q(\theta, \theta_\text{old}) = \mathbb{E}_{P(\mathbf{Z} \mid \mathbf{X}, \theta_\text{old})}[\log P(\mathbf{X}, \mathbf{Z} \mid \theta)].
+$$
+
+**M-step.** Fix $q$. Maximize the ELBO with respect to $\theta$:
+$$
+\theta_\text{new} = \arg\max_\theta Q(\theta, \theta_\text{old}).
+$$
+
+## Monotone increase property
+
+At each EM iteration:
+
+$$
+\log P(\mathbf{X} \mid \theta_\text{new}) \ge \log P(\mathbf{X} \mid \theta_\text{old}).
+$$
+
+**Proof.** After the E-step at $\theta_\text{old}$, the ELBO equals $\log P(\mathbf{X} \mid \theta_\text{old})$.
+The M-step can only increase the ELBO (since it maximizes over $\theta$).
+Because the ELBO is a lower bound on $\log P(\mathbf{X} \mid \theta_\text{new})$,
+the marginal likelihood is at least as large after the update.
+
+## Gaussian mixture model EM
+
+For a $K$-component GMM with parameters $\theta = \{\pi_k, \mu_k, \Sigma_k\}_{k=1}^K$:
+
+**E-step.** Compute soft assignments (responsibilities):
+
+$$
+r_{nk} = P(Z_n = k \mid x_n, \theta) = \frac{\pi_k \mathcal{N}(x_n; \mu_k, \Sigma_k)}{\sum_j \pi_j \mathcal{N}(x_n; \mu_j, \Sigma_j)}.
+$$
+
+**M-step.** Compute effective counts $N_k = \sum_n r_{nk}$ and update:
+
+$$
+\pi_k^{\text{new}} = \frac{N_k}{N}, \qquad
+\mu_k^{\text{new}} = \frac{\sum_n r_{nk} x_n}{N_k}, \qquad
+\Sigma_k^{\text{new}} = \frac{\sum_n r_{nk} (x_n - \mu_k^{\text{new}})(x_n - \mu_k^{\text{new}})^\top}{N_k}.
+$$
+
+## Implementation
+
+```python
+import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(35)
+
+# Generate GMM data
+K = 3
+N = 300
+true_pi  = np.array([0.3, 0.5, 0.2])
+true_mu  = np.array([[-2.0], [1.0], [4.0]])
+true_sig = np.array([0.7, 0.9, 0.5])
+z_true = rng.choice(K, N, p=true_pi)
+x = rng.normal(true_mu[z_true, 0], true_sig[z_true]).reshape(-1, 1)
+
+# EM initialization
+pi  = np.ones(K) / K
+mu  = rng.uniform(x.min(), x.max(), (K, 1))
+sig = np.ones(K)
+
+def log_likelihood(x, pi, mu, sig):
+    liks = np.array([pi[k] * stats.norm.pdf(x[:, 0], mu[k, 0], sig[k]) for k in range(K)])
+    return np.log(liks.sum(axis=0)).sum()
+
+for iteration in range(100):
+    # E-step
+    r = np.zeros((N, K))
+    for k in range(K):
+        r[:, k] = pi[k] * stats.norm.pdf(x[:, 0], mu[k, 0], sig[k])
+    r /= r.sum(axis=1, keepdims=True)
+
+    # M-step
+    Nk = r.sum(axis=0)
+    pi = Nk / N
+    for k in range(K):
+        mu[k]  = (r[:, k:k+1] * x).sum(axis=0) / Nk[k]
+        diff   = x - mu[k]
+        sig[k] = np.sqrt((r[:, k] * diff[:, 0]**2).sum() / Nk[k])
+
+    if (iteration + 1) % 20 == 0:
+        ll = log_likelihood(x, pi, mu, sig)
+        print(f"Iter {iteration+1:3d}  log-lik = {ll:.2f}")
+
+sort_idx = np.argsort(mu[:, 0])
+print(f"\nFitted means:  {mu[sort_idx, 0].round(3)}")
+print(f"True means:    {np.sort(true_mu[:, 0]).round(3)}")
+```
+
+The log-likelihood increases monotonically across iterations, confirming the theoretical
+guarantee.
+
+The next lesson applies EM to LDA, a latent variable model for discrete text data.

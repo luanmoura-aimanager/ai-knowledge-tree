@@ -1,0 +1,133 @@
+---
+title: "Normalizing flows as variational posteriors"
+pillar: F
+subId: F5
+lessonId: normalizing-flow-posteriors
+order: 4
+estimatedMinutes: 24
+goal: "Apply the change-of-variables formula for flows to express the log-density of a transformed variable, incorporate a flow posterior into the ELBO, and implement a simple planar flow."
+prerequisites: ["amortized-vi", "A1/change-of-variables"]
+---
+
+Mean-field VI and Gaussian encoders limit the variational family to simple, unimodal
+distributions.
+**Normalizing flows** compose a series of invertible transformations to map a simple
+base distribution into a rich, complex posterior, while keeping the log-density tractable
+via the change-of-variables formula.
+
+## Change-of-variables formula
+
+Let $z_0 \sim q_0(z_0)$ (e.g., $\mathcal{N}(0, I)$) and $z_K = f_K \circ \cdots \circ f_1(z_0)$
+where each $f_k$ is invertible and differentiable.
+
+The log-density of $z_K$ under the push-forward is:
+
+$$
+\log q_K(z_K)
+= \log q_0(z_0) - \sum_{k=1}^{K} \log \left|\det \frac{\partial f_k}{\partial z_{k-1}}\right|.
+$$
+
+Computing this requires the log-determinant of the Jacobian at each step.
+Flows are designed so that this determinant is cheap to compute.
+
+## Planar flow
+
+A **planar flow** applies a single rank-1 update:
+
+$$
+f(z) = z + u \cdot h(w^\top z + b),
+$$
+
+where $u, w \in \mathbb{R}^d$ and $b \in \mathbb{R}$ are learnable parameters,
+and $h$ is a smooth nonlinearity such as $\tanh$.
+
+The log-determinant of its Jacobian is:
+
+$$
+\log \left|\det \frac{\partial f}{\partial z}\right|
+= \log \left|1 + u^\top h'(w^\top z + b) w\right|,
+$$
+
+which is $O(d)$ to compute rather than $O(d^3)$.
+
+**Derivation.** The Jacobian is $I + u (h'(w^\top z + b) w)^\top$, a rank-1 update
+of the identity. By the matrix determinant lemma:
+$\det(I + uv^\top) = 1 + v^\top u$,
+so $|\det J| = |1 + u^\top (h'(w^\top z + b) w)|$.
+
+## ELBO with flow posterior
+
+The ELBO using a $K$-step flow as variational posterior is:
+
+$$
+\mathcal{L} = \mathbb{E}_{q_0(z_0)}\!\left[
+  \log p(\mathbf{x} \mid z_K)
+  + \log p(z_K)
+  - \log q_0(z_0)
+  + \sum_{k=1}^{K} \log \left|\det J_k\right|
+\right].
+$$
+
+All terms are differentiable with respect to the flow parameters via the reparameterization
+trick ($z_0 = \mu + \sigma \epsilon$, $\epsilon \sim \mathcal{N}(0,I)$).
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(33)
+
+def tanh(x):
+    return np.tanh(x)
+
+def dtanh(x):
+    return 1.0 - np.tanh(x)**2
+
+class PlanarFlow:
+    def __init__(self, d):
+        self.w = rng.normal(0, 0.1, d)
+        self.u = rng.normal(0, 0.1, d)
+        self.b = 0.0
+
+    def forward(self, z):
+        lin = z @ self.w + self.b           # shape (N,)
+        h   = tanh(lin)                     # (N,)
+        return z + np.outer(h, self.u), lin  # (N, d), (N,)
+
+    def log_det_jacobian(self, lin):
+        # psi = h'(w^T z + b) * w
+        psi = np.outer(dtanh(lin), self.w)  # (N, d)
+        return np.log(np.abs(1.0 + psi @ self.u))  # (N,)
+
+# Test: 2D standard normal, push through 3 planar flows
+d = 2
+N = 2000
+flows = [PlanarFlow(d) for _ in range(3)]
+
+z0 = rng.normal(0, 1, (N, d))
+log_q0 = -0.5 * (z0**2).sum(axis=1) - d/2 * np.log(2*np.pi)
+
+z = z0.copy()
+log_det_sum = np.zeros(N)
+for flow in flows:
+    z, lin = flow.forward(z)
+    log_det_sum += flow.log_det_jacobian(lin)
+
+# log q_K(z_K) = log q_0(z_0) - sum log|det J_k|
+log_qK = log_q0 - log_det_sum
+
+# Normalizing constant check: mean of exp(log q_0)/exp(log q_K) * vol should be 1
+# For qualitative check: compare empirical moments
+print(f"z_0 mean: {z0.mean(axis=0).round(3)}, std: {z0.std(axis=0).round(3)}")
+print(f"z_K mean: {z.mean(axis=0).round(3)}, std: {z.std(axis=0).round(3)}")
+print(f"Mean log|det J|: {log_det_sum.mean():.3f} (positive = volume expansion)")
+print(f"Variance of log q_K: {log_qK.var():.3f}  (0 for uniform, larger = peaked)")
+```
+
+The flow transforms the Gaussian base into a distribution with different shape and
+dispersion; the log-density at each transformed sample can be computed exactly,
+making the ELBO gradient tractable.
+
+The next subsection covers sampling methods that explore the posterior by simulation
+rather than optimization, starting with the foundational rejection and importance sampling.

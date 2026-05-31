@@ -1,0 +1,124 @@
+---
+title: "The junction tree algorithm"
+pillar: F
+subId: F4
+lessonId: junction-tree
+order: 3
+estimatedMinutes: 26
+goal: "Triangulate a graph, build its clique tree, verify the running intersection property, and perform exact inference via the calibration (collect-distribute) schedule."
+prerequisites: ["belief-propagation"]
+---
+
+Belief propagation is exact on trees but only approximate on graphs with cycles.
+The **junction tree** algorithm converts an arbitrary graph into a tree of cliques,
+runs exact BP on that tree, and recovers exact marginals for the original graph.
+
+## Step 1: moralization
+
+Given a Bayesian network (directed graph), form the **moral graph**:
+
+1. Add undirected edges between every pair of parents sharing a child (marry the parents).
+2. Drop edge directions.
+
+An MRF is already undirected; skip this step.
+
+## Step 2: triangulation (chordal completion)
+
+A graph is **chordal** (triangulated) if every cycle of length $\ge 4$ has a chord
+(an edge joining two non-adjacent cycle nodes).
+Add the minimum number of fill edges to make the graph chordal.
+
+Triangulation is NP-hard in general; good heuristics (minimum fill-in, minimum degree)
+work in practice.
+
+## Step 3: identify maximal cliques
+
+In a chordal graph, the maximal cliques can be found in linear time.
+They form the nodes of the junction tree.
+
+## Step 4: build the junction tree
+
+Connect cliques into a tree.
+**Running intersection property (RIP):** for any two cliques $C_i$ and $C_j$,
+the intersection $C_i \cap C_j$ must appear in every clique on the unique path
+between $C_i$ and $C_j$ in the tree.
+
+The RIP is what makes BP on the clique tree exact: it prevents information about
+shared variables from being inconsistently duplicated.
+
+Build the maximum-weight spanning tree of the complete clique graph,
+where edge weights equal $|C_i \cap C_j|$.
+The resulting tree satisfies the RIP.
+
+## Step 5: calibration (collect-distribute)
+
+Initialize each clique $C_i$ with the product of all original factors that have
+been assigned to it.
+Run BP on the clique tree: pass messages from leaves inward (collect phase), then
+back outward (distribute phase).
+After two passes, each clique's "belief" is the exact joint marginal over its variables.
+
+A message from clique $C_i$ to neighbor $C_j$ is obtained by marginalizing $C_i$'s
+current belief over the variables not in the **separator** $S_{ij} = C_i \cap C_j$:
+
+$$
+m_{i \to j}(S_{ij}) = \sum_{C_i \setminus S_{ij}} \text{belief}_i(C_i).
+$$
+
+## Implementation
+
+```python
+import numpy as np
+
+# Small example: triangulated graph with 3 cliques on 4 binary variables
+# Cliques: {A,B,C}, {B,C,D}  Separator: {B,C}
+rng = np.random.default_rng(17)
+k = 2
+
+# Random potentials for each clique
+phi_abc = np.abs(rng.normal(1, 0.3, (k, k, k)))   # [a, b, c]
+phi_bcd = np.abs(rng.normal(1, 0.3, (k, k, k)))   # [b, c, d]
+
+# Initialize beliefs
+belief_abc = phi_abc.copy()
+belief_bcd = phi_bcd.copy()
+
+# Collect: send message from BCD to ABC
+# Message over separator {B,C}: m_{bcd->abc}(b,c) = sum_d phi_bcd[b,c,d]
+m_bcd_to_abc = phi_bcd.sum(axis=2)   # [b, c]
+
+# Update ABC belief with incoming message
+belief_abc *= m_bcd_to_abc[np.newaxis, :, :]   # broadcast over a-axis: [a,b,c]
+
+# Distribute: send message from updated ABC to BCD
+# m_{abc->bcd}(b,c) = sum_a belief_abc[a,b,c]
+m_abc_to_bcd = belief_abc.sum(axis=0)   # [b, c]
+
+# Divide out old message, multiply new
+old_sep = m_bcd_to_abc
+new_sep = m_abc_to_bcd
+belief_bcd *= (new_sep / (old_sep + 1e-12))[np.newaxis, :, :]  # wait, axis is b,c
+# Correct indexing: belief_bcd is [b,c,d]
+belief_bcd = belief_bcd * (new_sep / (old_sep + 1e-12))[:, :, np.newaxis]
+
+# Marginals
+p_a = belief_abc.sum(axis=(1, 2));   p_a /= p_a.sum()
+p_d = belief_bcd.sum(axis=(0, 1));   p_d /= p_d.sum()
+
+# Verify against brute force joint
+joint = phi_abc[:, :, :, np.newaxis] * phi_bcd[np.newaxis, :, :, :]  # [a,b,c,d]
+joint /= joint.sum()
+p_a_brute = joint.sum(axis=(1,2,3));   p_a_brute /= p_a_brute.sum()
+p_d_brute = joint.sum(axis=(0,1,2));   p_d_brute /= p_d_brute.sum()
+
+print(f"P(A) JT:     {p_a.round(4)}")
+print(f"P(A) brute:  {p_a_brute.round(4)}")
+print(f"P(D) JT:     {p_d.round(4)}")
+print(f"P(D) brute:  {p_d_brute.round(4)}")
+```
+
+The junction tree recovers exact marginals by running BP on the clique tree rather than
+the original graph, with complexity exponential only in the clique size (the treewidth plus 1).
+
+The next subsection turns to approximate inference, which scales to problems where the
+treewidth makes exact methods infeasible.
