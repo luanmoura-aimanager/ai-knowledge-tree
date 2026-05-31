@@ -1,0 +1,113 @@
+---
+title: "ARIMA and seasonal SARIMA"
+pillar: G
+subId: G1
+lessonId: arima-sarima
+order: 4
+estimatedMinutes: 26
+goal: "Combine differencing with ARMA to model integrated series, extend to seasonal SARIMA, and choose orders by information criteria."
+prerequisites: ["ar-ma-processes", "unit-root-tests"]
+---
+
+AR and MA models assume stationarity, but real series trend and repeat with the
+calendar. ARIMA bolts a differencing step onto ARMA to remove trend; SARIMA adds a
+second differencing and ARMA layer at the seasonal lag. Together they are the
+workhorse of classical forecasting.
+
+## From ARMA to ARIMA
+
+An **ARMA(p, q)** process combines the two families:
+
+$$
+\phi(L) X_t = \theta(L) \varepsilon_t,
+$$
+
+with $\phi(L) = 1 - \phi_1 L - \dots - \phi_p L^p$ and
+$\theta(L) = 1 + \theta_1 L + \dots + \theta_q L^q$ in the lag operator $L$.
+
+When a series has a unit root it is not stationary, so ARMA does not apply
+directly. The fix is to difference first. Define the difference operator
+$\Delta = 1 - L$, so $\Delta X_t = X_t - X_{t-1}$. An **ARIMA(p, d, q)** model
+applies ARMA to the $d$-times-differenced series:
+
+$$
+\phi(L)\, (1 - L)^d X_t = \theta(L)\, \varepsilon_t.
+$$
+
+The middle index $d$ is the order of integration: the number of differences
+needed to reach stationarity, read off the ADF/KPSS tests. Most series need
+$d = 1$; strongly trending ones need $d = 2$. Over-differencing is a real cost: it
+injects an artificial MA unit root and inflates variance, so use the smallest $d$
+that passes the stationarity tests.
+
+## Seasonal differencing and SARIMA
+
+Differencing at lag 1 removes a trend but not a yearly cycle. For monthly data
+with period $s = 12$, the **seasonal difference** $\Delta_s X_t = X_t - X_{t-s}$
+subtracts the same month last year, which cancels a stable seasonal pattern.
+
+**SARIMA**$(p, d, q)(P, D, Q)_s$ stacks a seasonal ARMA, operating at multiples of
+$s$, on top of the non-seasonal one:
+
+$$
+\Phi(L^s)\, \phi(L)\, (1 - L)^d (1 - L^s)^D X_t = \Theta(L^s)\, \theta(L)\, \varepsilon_t.
+$$
+
+Here $\Phi(L^s) = 1 - \Phi_1 L^s - \dots - \Phi_P L^{sP}$ acts only at seasonal
+lags, and likewise $\Theta(L^s)$. The lowercase orders capture short-run dynamics;
+the uppercase orders capture the repeating cycle. A common airline-style model is
+$(0,1,1)(0,1,1)_{12}$.
+
+## Choosing orders with information criteria
+
+The ACF/PACF give a starting guess, but several order combinations fit comparably.
+Information criteria pick among them by trading fit against complexity. For a model
+with $k$ parameters fit to $n$ points by maximum likelihood, the **Akaike** and
+**Bayesian** information criteria are
+
+$$
+\text{AIC} = -2 \ln \hat{L} + 2k, \qquad \text{BIC} = -2 \ln \hat{L} + k \ln n,
+$$
+
+where $\hat{L}$ is the maximized likelihood. Lower is better. Both reward higher
+likelihood and penalize parameters; BIC penalizes harder for large $n$, so it
+favours sparser models. Automatic order selection (the auto-ARIMA procedure)
+searches over $(p, d, q)(P, D, Q)$ and returns the minimizer.
+
+## Forecasting
+
+Once fit, forecasts come from the recursion: replace future shocks by their
+expectation of zero and feed predicted values back in. The MA part contributes
+only out to its order $q$; beyond that the forecast is driven by the AR
+recursion and decays toward the series mean.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(11)
+
+# Build an ARIMA(0,1,1): the difference is an MA(1)
+n, theta = 500, 0.6
+e = rng.normal(0, 1, n + 1)
+dz = e[1:] + theta * e[:-1]          # MA(1) differences
+z  = np.cumsum(dz)                    # integrate once -> ARIMA(0,1,1) level
+
+# Fit the MA(1) on the differenced series by matching ACF(1) = theta/(1+theta^2)
+d = np.diff(z)
+d = d - d.mean()
+r1 = (d[:-1] * d[1:]).mean() / (d * d).mean()
+# invert rho = theta/(1+theta^2) for the invertible root (|theta|<1)
+theta_hat = (1 - np.sqrt(1 - 4*r1**2)) / (2*r1)
+print(f"true theta: {theta:.3f}   estimated theta: {theta_hat:.3f}")
+
+# One-step forecast of the difference uses the last shock; integrate to a level
+print(f"last level z[-1]: {z[-1]:.2f}  -> next-step point forecast ~ {z[-1]:.2f} (drift-free)")
+```
+
+Estimating $\theta$ from the lag-1 autocorrelation of the differenced series
+recovers the value used to generate it, confirming that one difference turns the
+$I(1)$ level into a clean MA(1).
+
+ARIMA estimates parameters by maximizing a likelihood; the next lesson shows the
+exponential-smoothing family, which reaches similar forecasts through recursive
+weighted averages rather than an explicit ARMA fit.

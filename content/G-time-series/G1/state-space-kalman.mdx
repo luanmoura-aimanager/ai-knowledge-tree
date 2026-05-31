@@ -1,0 +1,132 @@
+---
+title: "State-space form and Kalman filtering for time series"
+pillar: G
+subId: G1
+lessonId: state-space-kalman
+order: 6
+estimatedMinutes: 28
+goal: "Cast ARIMA and ETS models in state-space form and run the Kalman filter to obtain the exact Gaussian likelihood for parameter estimation."
+prerequisites: ["arima-sarima", "F3/kalman-filter"]
+---
+
+ARIMA and ETS look like different recipes, but both are instances of one object: a
+linear-Gaussian **state-space model**. Casting them this way gives a single engine,
+the Kalman filter, that evaluates the exact likelihood, handles missing data, and
+produces prediction intervals. This lesson connects the filter you derived for
+graphical models to time-series estimation.
+
+## The state-space template
+
+A linear-Gaussian state-space model has a hidden state $z_t$ that evolves linearly
+and an observation $x_t$ that reads a linear function of it, both with Gaussian
+noise:
+
+$$
+z_t = F z_{t-1} + w_t, \quad w_t \sim \mathcal{N}(0, Q),
+$$
+$$
+x_t = H z_t + v_t, \quad v_t \sim \mathcal{N}(0, R).
+$$
+
+$F$ is the transition matrix, $H$ the observation matrix, $Q$ and $R$ the process
+and measurement noise covariances. The Kalman-filter lesson derived the predict
+and update recursions for this exact template; here the task is to choose $F$, $H$,
+$Q$, $R$ so the model *is* an ARIMA or an ETS.
+
+## Putting AR(p) in state-space form
+
+Take an AR(2): $x_t = \phi_1 x_{t-1} + \phi_2 x_{t-2} + \varepsilon_t$. Stack the
+last two values into the state $z_t = (x_t,\, x_{t-1})^\top$. Then
+
+$$
+z_t = \underbrace{\begin{pmatrix} \phi_1 & \phi_2 \\ 1 & 0 \end{pmatrix}}_{F} z_{t-1} + \begin{pmatrix} \varepsilon_t \\ 0 \end{pmatrix}, \qquad x_t = \underbrace{\begin{pmatrix} 1 & 0 \end{pmatrix}}_{H} z_t.
+$$
+
+The top row of $F$ is the AR recursion; the bottom row shifts the old value down.
+The process noise enters only the first component, so
+$Q = \operatorname{diag}(\sigma^2, 0)$, and the observation is noiseless,
+$R = 0$, since $x_t$ is the first state exactly. MA terms and differencing extend
+the state vector the same way; this companion-form construction handles any ARIMA.
+
+ETS models fit the template too: the level, trend, and seasonal indices become the
+state, and their update equations become $F$. The single error per ETS equation
+maps to a one-dimensional $w_t$.
+
+## The likelihood from the filter
+
+The reason to do all this: the Kalman filter hands you the exact Gaussian
+likelihood for free. As it sweeps forward, the predict step produces a one-step
+forecast of the observation,
+
+$$
+\hat{x}_{t \mid t-1} = H F \mu_{t-1}, \qquad S_t = H \hat{\Sigma}_t H^\top + R,
+$$
+
+with $\mu_{t-1}$ the filtered state mean and $\hat{\Sigma}_t$ the predicted state
+covariance. The **innovation** is the forecast error
+$e_t = x_t - \hat{x}_{t \mid t-1}$, and under the model $e_t \sim \mathcal{N}(0, S_t)$,
+independent across $t$.
+
+**Prediction-error decomposition.** Because the innovations are independent
+Gaussians, the joint log-likelihood factorizes into a sum:
+
+$$
+\ln L(\theta) = -\frac{1}{2} \sum_{t=1}^{n} \left[ \ln(2\pi S_t) + \frac{e_t^2}{S_t} \right].
+$$
+
+This is the engine behind ARIMA and ETS fitting: run the filter for a candidate
+parameter set $\theta = (\phi, \theta, \sigma^2, \dots)$, read off $e_t$ and $S_t$,
+sum the formula, and hand the negative of it to a numerical optimizer. Missing
+observations are handled by skipping the update step on those dates, which no
+ad-hoc imputation can match for correctness.
+
+## Filtering, prediction, smoothing
+
+The same machinery answers three questions with different conditioning sets:
+
+- **Filtering** estimates $z_t$ from data up to $t$. This is the forward pass.
+- **Prediction** runs the transition without an update to forecast beyond the data.
+- **Smoothing** estimates $z_t$ from the *whole* series with a backward pass, used
+  for retrospective decomposition into level, trend, and seasonal parts.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+
+# Generate AR(2), then recover the Gaussian log-likelihood via the Kalman filter
+phi1, phi2, sig2 = 0.5, 0.3, 1.0
+n = 800
+x = np.zeros(n)
+for t in range(2, n):
+    x[t] = phi1*x[t-1] + phi2*x[t-2] + rng.normal(0, np.sqrt(sig2))
+
+def kalman_loglik(x, phi1, phi2, sig2):
+    F = np.array([[phi1, phi2], [1.0, 0.0]])
+    H = np.array([[1.0, 0.0]])
+    Q = np.array([[sig2, 0.0], [0.0, 0.0]])
+    mu = np.zeros(2); P = np.eye(2) * 10.0      # diffuse prior
+    ll = 0.0
+    for xt in x:
+        mu = F @ mu; P = F @ P @ F.T + Q         # predict
+        e  = xt - (H @ mu)[0]                     # innovation
+        S  = (H @ P @ H.T)[0, 0]                  # innovation variance
+        ll += -0.5*(np.log(2*np.pi*S) + e*e/S)
+        K  = (P @ H.T) / S                        # update
+        mu = mu + (K[:, 0] * e)
+        P  = P - K @ H @ P
+    return ll
+
+# Likelihood peaks near the true parameters
+ll_true  = kalman_loglik(x, 0.5, 0.3, 1.0)
+ll_wrong = kalman_loglik(x, 0.1, 0.1, 1.0)
+print(f"log-lik at true params:  {ll_true:.1f}")
+print(f"log-lik at wrong params: {ll_wrong:.1f}  (lower, as expected)")
+```
+
+The filter assigns a higher log-likelihood to the true coefficients than to wrong
+ones, which is exactly the signal an optimizer climbs to estimate ARIMA and ETS
+parameters.
+
+A single series can be modelled this way; the next lesson moves to several
+interacting series at once with the vector autoregression and cointegration.

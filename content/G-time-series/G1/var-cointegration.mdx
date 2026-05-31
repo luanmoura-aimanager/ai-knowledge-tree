@@ -1,0 +1,126 @@
+---
+title: "VAR, cointegration, and the VECM"
+pillar: G
+subId: G1
+lessonId: var-cointegration
+order: 7
+estimatedMinutes: 26
+goal: "Extend AR to a vector autoregression, define cointegration between integrated series, and write the error-correction (VECM) representation."
+prerequisites: ["ar-ma-processes", "A1/eigenvalues"]
+---
+
+Many series move together: short and long interest rates, a stock and its futures,
+spending and income. Modelling each alone throws away the cross-dependence. The
+**vector autoregression** generalizes AR to several series at once, and
+**cointegration** captures the case where individually wandering series are tied by
+a stable long-run relationship.
+
+## The vector autoregression
+
+Let $\mathbf{x}_t \in \mathbb{R}^k$ collect $k$ series. A **VAR(p)** regresses the
+vector on its own lagged vectors:
+
+$$
+\mathbf{x}_t = A_1 \mathbf{x}_{t-1} + \dots + A_p \mathbf{x}_{t-p} + \boldsymbol{\varepsilon}_t,
+$$
+
+where each $A_i$ is a $k \times k$ coefficient matrix and
+$\boldsymbol{\varepsilon}_t \sim \mathcal{N}(0, \Sigma)$ is vector white noise with
+contemporaneous covariance $\Sigma$. The off-diagonal entries of $A_i$ are the
+substance: they let series $j$ at lag $i$ predict series $\ell$ today. Each
+equation is an OLS regression of one series on the stacked lags of all series, so a
+VAR is fit equation by equation.
+
+**Stationarity.** Write the VAR(1) form $\mathbf{x}_t = A \mathbf{x}_{t-1} + \boldsymbol{\varepsilon}_t$
+(any VAR(p) stacks into a VAR(1) of dimension $kp$). It is stationary when every
+eigenvalue of $A$ has modulus below one, the matrix version of the scalar AR
+condition $|\phi| < 1$.
+
+## Cointegration
+
+Suppose each series is individually $I(1)$: nonstationary, with a unit root. Their
+levels wander. Yet a particular linear combination can still be stationary. That is
+**cointegration**: vectors $\mathbf{x}_t$ are cointegrated if there is a nonzero
+$\boldsymbol{\beta}$ with
+
+$$
+\boldsymbol{\beta}^\top \mathbf{x}_t \sim I(0) \quad (\text{stationary}),
+$$
+
+even though each component of $\mathbf{x}_t$ is $I(1)$. The combination
+$\boldsymbol{\beta}^\top \mathbf{x}_t$ is the long-run **equilibrium error**: it
+strays but reverts. The classic picture is two random-walk prices whose spread is
+mean-reverting; each price is a unit-root series, but the spread is stationary, the
+basis of pairs trading.
+
+Differencing each series to make it stationary and then fitting a VAR would destroy
+this information: it removes the level relationship $\boldsymbol{\beta}^\top \mathbf{x}_t$
+entirely. The error-correction form keeps it.
+
+## The vector error-correction model
+
+Subtract $\mathbf{x}_{t-1}$ from both sides of the VAR and regroup. For a VAR(1):
+
+$$
+\Delta \mathbf{x}_t = (A - I)\mathbf{x}_{t-1} + \boldsymbol{\varepsilon}_t = \Pi \mathbf{x}_{t-1} + \boldsymbol{\varepsilon}_t,
+\qquad \Pi = A - I.
+$$
+
+The matrix $\Pi$ carries the long-run information through its rank.
+
+**The rank tells the story.** Let $r = \operatorname{rank}(\Pi)$.
+
+- $r = 0$: $\Pi = 0$, no cointegration. The model is a VAR in differences.
+- $r = k$: full rank, so $\mathbf{x}_t$ is already stationary in levels.
+- $0 < r < k$: cointegration with $r$ independent equilibrium relations.
+
+In the intermediate case $\Pi$ factors as
+
+$$
+\Pi = \boldsymbol{\alpha} \boldsymbol{\beta}^\top,
+$$
+
+with $\boldsymbol{\alpha}, \boldsymbol{\beta}$ each $k \times r$. The columns of
+$\boldsymbol{\beta}$ are the cointegrating vectors (the stationary combinations);
+$\boldsymbol{\alpha}$ holds the **adjustment speeds**, how fast each series corrects
+back toward equilibrium. The full **VECM** is
+
+$$
+\Delta \mathbf{x}_t = \boldsymbol{\alpha} \boldsymbol{\beta}^\top \mathbf{x}_{t-1} + \sum_{i=1}^{p-1} \Gamma_i \Delta \mathbf{x}_{t-i} + \boldsymbol{\varepsilon}_t.
+$$
+
+The term $\boldsymbol{\beta}^\top \mathbf{x}_{t-1}$ is last period's equilibrium
+error; $\boldsymbol{\alpha}$ pulls $\Delta \mathbf{x}_t$ back in proportion to it.
+The Johansen procedure estimates $r$ and $\boldsymbol{\beta}$ from the eigenvalues
+of $\Pi$.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(8)
+n = 3000
+
+# Build two cointegrated series: a common random walk drives both, spread is stationary
+w = np.cumsum(rng.normal(0, 1, n))     # common stochastic trend (I(1))
+y1 = w + rng.normal(0, 0.5, n)          # I(1)
+y2 = 2*w + rng.normal(0, 0.5, n)        # I(1); equilibrium: y2 - 2*y1 ~ stationary
+
+spread = y2 - 2*y1                       # this is beta^T x with beta=(-2,1)
+# Stationarity check: spread variance does not grow across halves
+v1 = spread[:n//2].var(); v2 = spread[n//2:].var()
+print(f"spread var first half: {v1:.2f}   second half: {v2:.2f}  (stable => stationary)")
+
+# Each level is I(1): its variance grows ~ linearly in t. A single path wanders,
+# so read the growth from an ensemble of independent random walks.
+W = np.cumsum(rng.normal(0, 1, (2000, n)), axis=1)   # 2000 independent I(1) paths
+var_t = W.var(axis=0)                                 # ensemble variance at each time
+print(f"I(1) ensemble var at t={n//4}: {var_t[n//4]:.0f}   at t={n-1}: {var_t[-1]:.0f}  (grows ~ t => I(1))")
+```
+
+The spread $y_2 - 2y_1$ has stable variance across the sample while each level
+series' variance grows, the empirical signature that two $I(1)$ series share one
+cointegrating vector.
+
+VAR and VECM model the conditional mean across series. The next lesson turns to the
+conditional *variance* of a single series with GARCH, where the volatility itself
+is the thing that clusters and persists.

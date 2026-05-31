@@ -1,0 +1,115 @@
+---
+title: "Spectral analysis: the periodogram and wavelets"
+pillar: G
+subId: G1
+lessonId: spectral-analysis
+order: 9
+estimatedMinutes: 26
+goal: "Define the spectral density as the Fourier transform of the autocovariance, estimate it with the periodogram, and contrast Fourier with wavelet resolution."
+prerequisites: ["stationarity-acf", "A1/inner-products"]
+---
+
+The ACF describes a series by how it correlates with its own past. The frequency
+domain describes the same series by which periodic rhythms it is built from. A
+weekly cycle, a yearly cycle, and a slow trend become separate peaks on a
+frequency axis, often far clearer than in the time domain. This is spectral
+analysis.
+
+## The spectral density
+
+For a stationary series with autocovariance $\gamma(h)$, the **spectral density**
+is the discrete-time Fourier transform of the autocovariance:
+
+$$
+f(\nu) = \sum_{h=-\infty}^{\infty} \gamma(h)\, e^{-2\pi i \nu h}, \qquad \nu \in [-\tfrac{1}{2}, \tfrac{1}{2}].
+$$
+
+Here $\nu$ is frequency in cycles per time step. The transform is invertible, so
+$f(\nu)$ and $\gamma(h)$ carry the same information in two coordinate systems. Two
+facts make $f$ interpretable as a distribution of power over frequency:
+
+**It integrates to the variance.** Setting $h = 0$ in the inverse transform,
+
+$$
+\gamma(0) = \int_{-1/2}^{1/2} f(\nu)\, d\nu = \sigma^2.
+$$
+
+The total area under the spectrum is the variance. So $f(\nu)\, d\nu$ is the
+portion of variance contributed by frequencies near $\nu$.
+
+**It is real and nonnegative.** Because $\gamma(h) = \gamma(-h)$, the imaginary
+parts cancel and $f(\nu) = \gamma(0) + 2\sum_{h\ge 1}\gamma(h)\cos(2\pi\nu h)$,
+which is real; positive-semidefiniteness of $\gamma$ forces $f \ge 0$. A sharp
+peak at $\nu_0$ means a strong cycle of period $1/\nu_0$.
+
+## The periodogram
+
+From a finite sample $x_1, \dots, x_n$, estimate the spectrum directly from the
+discrete Fourier transform (DFT). The DFT coefficient at Fourier frequency
+$\nu_j = j/n$ is $d(\nu_j) = \sum_{t=1}^{n} x_t e^{-2\pi i \nu_j t}$, and the
+**periodogram** is its squared magnitude:
+
+$$
+I(\nu_j) = \frac{1}{n}\, |d(\nu_j)|^2.
+$$
+
+By Parseval's theorem the periodogram ordinates sum to the sample variance, mirror-
+ing the spectral density's integral. A large $I(\nu_j)$ flags a dominant cycle.
+
+**The catch: the periodogram is noisy.** $I(\nu_j)$ is an asymptotically unbiased
+but *inconsistent* estimator of $f(\nu_j)$: its variance does not shrink as $n$
+grows, because each new data point also adds a new frequency to estimate. The
+spikes do not settle down. The remedy is **smoothing**: average neighbouring
+periodogram ordinates (Daniell window) or taper-and-average over segments (Welch's
+method). Smoothing trades frequency resolution for reduced variance, the central
+tension of spectral estimation.
+
+## Fourier versus wavelets
+
+The Fourier basis uses sines and cosines of infinite extent. That is ideal for a
+series whose frequency content is constant over time (stationary), but it cannot
+say *when* a frequency was present. A burst of high frequency in one window smears
+across the whole spectrum.
+
+**Wavelets** use basis functions that are localized in both time and frequency. A
+wavelet $\psi$ is shifted by $b$ and scaled by $a$,
+$\psi_{a,b}(t) = a^{-1/2}\psi((t-b)/a)$, and the transform reports content at scale
+$a$ near time $b$. Small $a$ resolves fast events sharply in time; large $a$
+resolves slow components sharply in frequency. This is governed by the
+time-frequency uncertainty principle: $\Delta t \cdot \Delta\nu$ is bounded below,
+so no representation localizes perfectly in both. Wavelets are the right tool for
+**non-stationary** series whose rhythms change over time, where a single global
+spectrum is misleading.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n = 1024
+t = np.arange(n)
+
+# Two pure cycles (periods 8 and 64) plus noise
+x = np.sin(2*np.pi*t/8) + 0.5*np.sin(2*np.pi*t/64) + rng.normal(0, 0.3, n)
+
+# Periodogram via the FFT
+d = np.fft.rfft(x - x.mean())
+freqs = np.fft.rfftfreq(n)             # cycles per step
+I = (np.abs(d)**2) / n
+
+# The two strongest frequencies should correspond to periods 8 and 64
+top = np.argsort(I)[-2:]
+periods = 1.0 / freqs[top]
+print("dominant periods (steps/cycle):", np.round(np.sort(periods), 1))
+
+# Parseval: periodogram ordinates sum to the sample variance (two-sided)
+two_sided = np.concatenate([I, I[1:-1]])
+print(f"sum of periodogram / n: {two_sided.sum()/n:.3f}   sample var: {x.var():.3f}")
+```
+
+The two periodogram peaks land at periods 8 and 64, recovering the injected cycles,
+and the ordinates sum to the sample variance as Parseval requires, confirming the
+spectrum is just the variance redistributed across frequency.
+
+This closes the classical toolkit. The next subsection reframes forecasting as
+supervised learning, turning lags and these Fourier terms into features for
+gradient-boosted trees.

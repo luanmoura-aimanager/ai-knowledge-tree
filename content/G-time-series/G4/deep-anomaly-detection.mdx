@@ -1,0 +1,121 @@
+---
+title: "Deep anomaly detection with autoencoders"
+pillar: G
+subId: G4
+lessonId: deep-anomaly-detection
+order: 3
+estimatedMinutes: 24
+goal: "Score anomalies by reconstruction error from a sequence autoencoder, set a threshold from the residual distribution, and explain the LSTM-AE and transformer-AE variants."
+prerequisites: ["cusum-changepoint", "D4/autoencoders"]
+---
+
+Statistical detectors assume a known parametric shape for normal behaviour. When
+normal is a complex multivariate pattern, a daily cycle interacting with a weekly
+cycle across many sensors, no simple formula captures it. Deep anomaly detection
+learns the normal pattern directly: train a model to reconstruct normal data, and
+flag whatever it reconstructs badly.
+
+## Reconstruction error as an anomaly score
+
+An **autoencoder** (from the autoencoders lesson) compresses an input to a
+low-dimensional latent code and reconstructs it. Train it only on normal data, with
+the reconstruction loss
+
+$$
+\mathcal{L} = \| \mathbf{x} - \hat{\mathbf{x}} \|^2.
+$$
+
+The bottleneck forces the model to learn the dominant structure of normal data. At
+test time, normal inputs lie on the learned manifold and reconstruct well (low
+error); anomalous inputs are off-manifold and reconstruct poorly. The
+**reconstruction error** is the anomaly score:
+
+$$
+a(\mathbf{x}) = \| \mathbf{x} - \hat{\mathbf{x}} \|^2.
+$$
+
+This is unsupervised in anomalies: no labelled anomalies are needed, only a clean
+(or mostly clean) sample of normal behaviour, which is the realistic regime since
+anomalies are rare and varied.
+
+## Making it sequential: the LSTM-AE
+
+A plain autoencoder on a single time step ignores temporal context. The
+**LSTM autoencoder** operates on windows. An encoder LSTM reads a window
+$\mathbf{x}_{t-w+1:t}$ and compresses it to a fixed latent vector (its final hidden
+state); a decoder LSTM expands that vector back into the reconstructed window. The
+score is the reconstruction error over the window. Because the encoder must
+summarize the whole window into one vector, it learns temporal dependencies, so an
+anomaly that is a *broken pattern* (a normal value at the wrong phase) reconstructs
+poorly even though each individual value is in range.
+
+A **transformer autoencoder** replaces the LSTMs with self-attention, which handles
+long windows and multivariate cross-sensor structure better; the anomaly score is
+the same reconstruction error. A common refinement (the Anomaly Transformer)
+combines reconstruction with an attention-based discrepancy criterion, but the
+reconstruction principle is the core.
+
+## Setting the threshold
+
+A score alone needs a cut-off. Compute the score distribution on a held-out
+*normal* set and pick a threshold at a high quantile (say the 99th percentile), or
+fit a simple distribution to the normal scores and threshold at a chosen
+false-positive rate. The robust statistics from the first G4 lesson apply directly
+to the score series: a robust z-score on the reconstruction errors gives a
+principled, masking-resistant cut-off. Picking the threshold on normal-only data
+keeps the false-positive rate controlled.
+
+## A linear stand-in: PCA reconstruction
+
+The mechanism is clearest with a linear autoencoder, which reduces to PCA: project
+onto the top-$d$ principal components of normal data and reconstruct. Points whose
+variance lives in the discarded components reconstruct poorly. The numpy check below
+uses this exact idea; swapping the linear projection for an LSTM or transformer
+encoder is the deep version, with the scoring logic unchanged.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Normal data: windows lie near a low-dimensional subspace (a smooth daily pattern).
+w, d = 24, 3
+t = np.arange(w)
+basis = np.stack([np.ones(w), np.sin(2*np.pi*t/w), np.cos(2*np.pi*t/w)], axis=1)  # w x 3
+
+def make_window(noise=0.1):
+    coef = rng.normal(0, 1, d)
+    return basis @ coef + rng.normal(0, noise, w)
+
+normal = np.stack([make_window() for _ in range(2000)])
+
+# "Train" the linear autoencoder = PCA subspace of normal windows
+mean = normal.mean(0)
+U, S, Vt = np.linalg.svd(normal - mean, full_matrices=False)
+P = Vt[:d]                                   # top-d principal directions (the encoder)
+
+def recon_error(X):
+    Z = (X - mean) @ P.T                      # encode
+    Xr = Z @ P + mean                         # decode
+    return ((X - Xr)**2).sum(1)               # reconstruction error per window
+
+# Threshold from the 99th percentile of normal reconstruction errors
+thr = np.percentile(recon_error(normal), 99)
+
+# Test set: mostly normal, plus anomalies that break the temporal pattern
+test = [make_window() for _ in range(100)]
+test += [basis @ rng.normal(0,1,d) + 3*np.sign(rng.normal(size=w)) for _ in range(10)]  # square-wave anomalies
+test = np.stack(test)
+flags = recon_error(test) > thr
+print(f"threshold (99th pct of normal error): {thr:.2f}")
+print(f"anomalies among last 10 test windows flagged: {flags[-10:].sum()} / 10")
+print(f"false positives among first 100 normal windows: {flags[:100].sum()} / 100")
+```
+
+Windows that follow the learned daily pattern reconstruct within the threshold,
+while the injected square-wave windows blow past it, showing how reconstruction
+error separates off-manifold anomalies from normal behaviour with few false alarms.
+
+Detecting *that* something changed is one task; explaining *why* one series moves
+another is causal. The next subsection turns to causal time series, beginning with
+Granger causality.

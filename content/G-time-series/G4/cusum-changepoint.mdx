@@ -1,0 +1,120 @@
+---
+title: "CUSUM and change-point detection"
+pillar: G
+subId: G4
+lessonId: cusum-changepoint
+order: 2
+estimatedMinutes: 24
+goal: "Derive the CUSUM statistic as a sequential likelihood-ratio accumulator and use it to detect a shift in mean online."
+prerequisites: ["statistical-anomaly-detection"]
+---
+
+Point-anomaly tests ask whether a single value is unusual. A different and often
+more important question is whether the *process* has changed: has the mean shifted,
+has the variance jumped? A small shift may leave every individual point inside
+normal bounds while still being obvious in aggregate. CUSUM detects exactly this by
+accumulating evidence over time.
+
+## The change-point problem
+
+A change-point is a time $\tau$ where the data-generating distribution switches from
+$f_0$ to $f_1$. The goal is to detect that a change has occurred as soon as
+possible after $\tau$, while keeping false alarms rare. This is **sequential**: at
+each new observation, decide "change" or "continue," rather than analyzing a fixed
+batch.
+
+## CUSUM from the likelihood ratio
+
+The cumulative sum (CUSUM) chart comes from a sequential likelihood-ratio argument.
+For each observation $x_t$, the log-likelihood ratio between the post-change and
+pre-change models is
+
+$$
+\ell_t = \log \frac{f_1(x_t)}{f_0(x_t)}.
+$$
+
+Under the pre-change model $\ell_t$ has negative mean (the data looks more like
+$f_0$); after the change it has positive mean. Accumulating $\ell_t$ therefore
+drifts down before the change and up after it. CUSUM tracks this accumulation but
+resets at zero so it does not drift arbitrarily negative during the long quiet
+period:
+
+$$
+S_t = \max(0,\; S_{t-1} + \ell_t), \qquad S_0 = 0.
+$$
+
+An alarm is raised when $S_t > h$ for a threshold $h$. The reset $\max(0, \cdot)$ is
+what makes CUSUM sensitive: it forgets the accumulated "all normal" evidence so the
+statistic can climb quickly once the change starts.
+
+## The Gaussian mean-shift case
+
+Specialize to detecting a shift in the mean of a normal series from $\mu_0$ to
+$\mu_0 + \delta$ with known variance $\sigma^2$. Substituting the two Gaussian
+densities into $\ell_t$, the terms simplify to
+
+$$
+\ell_t = \frac{\delta}{\sigma^2}\left(x_t - \mu_0 - \frac{\delta}{2}\right).
+$$
+
+The recursion becomes the standard tabular CUSUM. Writing $k = \delta/2$ for the
+**reference value** (half the shift to detect, the slack), the upper CUSUM for a
+positive shift is
+
+$$
+S_t^{+} = \max\!\big(0,\; S_{t-1}^{+} + (x_t - \mu_0) - k\big),
+$$
+
+with a symmetric $S_t^{-}$ for negative shifts. Each step adds the deviation from
+target minus the slack $k$: while the process is on target the increment is
+negative and the chart stays near zero; once the mean shifts past $k$ the increments
+turn positive and the chart ramps to the threshold $h$.
+
+## Tuning the trade-off
+
+Two parameters set the behaviour:
+
+- The reference value $k$ fixes the smallest shift worth detecting (set
+  $k = \delta_{\min}/2$).
+- The threshold $h$ trades detection delay against false alarms, summarized by the
+  **average run length** (ARL): the expected number of steps between false alarms
+  when in control, versus the expected delay to detect a real shift. Raising $h$
+  lengthens both.
+
+Beyond CUSUM, **offline** change-point detection (when the whole series is
+available) searches for the segmentation that best fits piecewise-constant models,
+penalizing the number of segments. The PELT algorithm solves this exactly in linear
+time via dynamic programming; Bayesian online change-point detection maintains a
+posterior over the time since the last change.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, tau = 400, 250
+mu0, sigma, delta = 0.0, 1.0, 1.0        # mean shifts by +1 std at t=tau
+x = rng.normal(mu0, sigma, n)
+x[tau:] += delta                          # the change
+
+# Tabular CUSUM for a positive mean shift
+k = delta / 2                             # reference value = half the shift
+h = 8.0                                    # decision threshold
+S = np.zeros(n)
+alarm = None
+for t in range(1, n):
+    S[t] = max(0.0, S[t-1] + (x[t] - mu0) - k)
+    if alarm is None and S[t] > h:
+        alarm = t
+
+print(f"true change-point: {tau}")
+print(f"CUSUM alarm raised at: {alarm}  (delay {alarm - tau} steps)")
+print(f"max CUSUM before change: {S[:tau].max():.2f}  (stayed below h={h})")
+```
+
+The CUSUM statistic hovers near zero while the process is on target, then ramps
+past the threshold a few steps after the true change-point, detecting a one-sigma
+shift that no single-point test would catch.
+
+Statistical detectors assume a simple parametric notion of normal. The next lesson
+learns "normal" from data with a sequence autoencoder and scores anomalies by
+reconstruction error.

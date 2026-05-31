@@ -1,0 +1,119 @@
+---
+title: "Hierarchical and grouped forecasting"
+pillar: G
+subId: G2
+lessonId: hierarchical-forecasting
+order: 3
+estimatedMinutes: 26
+goal: "Define a hierarchy of series, state the coherence constraint, and reconcile base forecasts with bottom-up and the optimal MinT projection."
+prerequisites: ["gbdt-forecasting", "A1/least-squares"]
+---
+
+Sales aggregate: each store rolls up into a region, regions into a country. If you
+forecast every level independently, the store forecasts will not sum to the region
+forecast, and the numbers contradict each other. **Hierarchical forecasting** fixes
+this by producing **coherent** forecasts that respect the aggregation structure,
+and the good methods improve accuracy at the same time.
+
+## The hierarchy and the summing matrix
+
+Let $\mathbf{b}_t \in \mathbb{R}^{m}$ be the $m$ bottom-level series (the stores).
+Every aggregate is a sum of bottom series, so the full vector of all series,
+$\mathbf{y}_t$, is a linear map of the bottom level:
+
+$$
+\mathbf{y}_t = S\, \mathbf{b}_t,
+$$
+
+where $S$ is the **summing matrix**: each row picks out which bottom series enter
+that aggregate. For a two-store, one-total hierarchy,
+
+$$
+S = \begin{pmatrix} 1 & 1 \\ 1 & 0 \\ 0 & 1 \end{pmatrix}, \qquad \mathbf{y}_t = (\text{total},\, \text{store}_1,\, \text{store}_2)^\top.
+$$
+
+The top row sums both stores; the bottom rows are the identity. **Coherence** means
+the forecasts satisfy this same relation: $\hat{\mathbf{y}} = S \hat{\mathbf{b}}$
+for some bottom-level vector $\hat{\mathbf{b}}$.
+
+## Single-level approaches and their flaw
+
+- **Bottom-up:** forecast each bottom series, then sum up with $S$. Coherent by
+  construction, and it keeps fine-grained signal, but bottom series are noisy and
+  the aggregates inherit that noise.
+- **Top-down:** forecast the top series, then split it down by historical
+  proportions. Stable at the top, but it cannot capture series-specific dynamics at
+  the bottom and the proportions are themselves uncertain.
+
+Each uses information from only one level. Reconciliation uses all levels at once.
+
+## Reconciliation as a projection
+
+Start by forecasting *every* series independently, giving **base forecasts**
+$\hat{\mathbf{y}}$ that are generally incoherent. A reconciliation maps them to
+coherent forecasts through a matrix $G$ that estimates the bottom level, then sums:
+
+$$
+\tilde{\mathbf{y}} = S G\, \hat{\mathbf{y}}.
+$$
+
+Different choices of $G$ recover different methods. Bottom-up is $G = [\,0 \mid I\,]$
+(keep the base bottom forecasts, ignore the rest). The question is which $G$ is
+best.
+
+## MinT: minimum-trace reconciliation
+
+The reconciliation error is $\tilde{\mathbf{y}} - \mathbf{y}_t$. Among all $G$ that
+yield unbiased coherent forecasts, **MinT** picks the one that minimizes the total
+variance of this error (the trace of its covariance). With $W$ the covariance of
+the base-forecast errors, the optimal map is
+
+$$
+G = (S^\top W^{-1} S)^{-1} S^\top W^{-1}.
+$$
+
+This is a generalized least-squares projection of the base forecasts onto the
+coherent subspace $\{S\mathbf{b}\}$, weighting each series by the inverse of its
+forecast-error variance so noisy series get pulled toward the structure more. When
+$W = I$ it reduces to ordinary least squares (OLS reconciliation); the
+least-squares lesson is the underlying machinery. MinT uses every level's forecast
+to correct every other level, which is why it dominates bottom-up and top-down on
+accuracy while guaranteeing coherence.
+
+## Grouped versus strictly hierarchical
+
+A strict **hierarchy** has a single tree (store within region within country).
+**Grouped** structures cross attributes that do not nest, for example sales by
+{region} and independently by {product category}. The summing matrix $S$ encodes
+both groupings, and MinT applies unchanged; only the structure of $S$ differs.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+# Hierarchy: total = store1 + store2.  S maps bottom (2) to all series (3).
+S = np.array([[1., 1.], [1., 0.], [0., 1.]])
+
+# Base forecasts are incoherent: total != store1 + store2
+yhat = np.array([100.0, 55.0, 40.0])     # 55 + 40 = 95 != 100
+print("incoherent base:", yhat, " sum of stores:", yhat[1] + yhat[2])
+
+# MinT with diagonal W (forecast-error variances per series)
+W = np.diag([9.0, 4.0, 4.0])
+Wi = np.linalg.inv(W)
+G = np.linalg.inv(S.T @ Wi @ S) @ S.T @ Wi
+b_tilde = G @ yhat                         # reconciled bottom level
+y_tilde = S @ b_tilde                      # coherent full vector
+
+print("reconciled:", np.round(y_tilde, 2),
+      " sum of stores:", round(y_tilde[1] + y_tilde[2], 2))
+print("coherent:", np.isclose(y_tilde[0], y_tilde[1] + y_tilde[2]))
+```
+
+The reconciled forecast is coherent (the total equals the sum of the stores) and
+MinT has nudged all three numbers using their relative error variances, rather than
+trusting any single level outright.
+
+GBDT, hierarchical reconciliation, and the next model all live in the classical-ML
+camp. The next lesson covers Prophet, a decomposable additive model designed for
+analyst-friendly forecasting at scale.
