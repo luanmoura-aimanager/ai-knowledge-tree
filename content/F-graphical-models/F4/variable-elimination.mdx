@@ -1,0 +1,113 @@
+---
+title: "Variable elimination for exact marginals"
+pillar: F
+subId: F4
+lessonId: variable-elimination
+order: 1
+estimatedMinutes: 22
+goal: "Execute variable elimination on a small graphical model, derive the complexity in terms of elimination order, and identify the treewidth as the bottleneck."
+prerequisites: ["F2/factor-graphs"]
+---
+
+Given a joint distribution expressed as a product of factors, computing the marginal
+of a single variable requires summing out all others.
+Naively, this sum is exponential in the number of variables.
+**Variable elimination** (VE) performs that sum in the most efficient order:
+eliminate one variable at a time, each time fusing only the factors that mention it.
+
+## The elimination operation
+
+Let the joint factor over variables $\{X_1, \ldots, X_n\}$ be:
+
+$$
+P(\mathbf{X}) \propto \prod_j f_j(\mathbf{X}_j).
+$$
+
+To marginalize out $X_i$, collect all factors that mention $X_i$, multiply them,
+and sum over $X_i$:
+
+$$
+\tau(\mathbf{X}_j \setminus \{X_i\}) = \sum_{x_i} \prod_{j : X_i \in \mathbf{X}_j} f_j(\mathbf{X}_j).
+$$
+
+Replace the collected factors with the new intermediate factor $\tau$.
+The remaining product no longer involves $X_i$.
+
+## Complexity and elimination order
+
+The cost of eliminating $X_i$ is proportional to $k^{|S_i|}$, where $k$ is the
+variable cardinality and $S_i$ is the set of variables in $\tau$
+(all variables that appear in any factor containing $X_i$, minus $X_i$ itself).
+
+Different elimination orders produce different sets $S_i$.
+The optimal order minimizes the maximum $|S_i|$, and that maximum minus one is the
+**induced width** (an upper bound on the treewidth of the graph).
+
+On a tree-structured graph, the optimal width is 1: each elimination fuses at most
+two variables, giving $O(n k^2)$ total cost.
+On a grid graph, the width grows as $O(\sqrt{n})$ and exact inference becomes
+exponential in $\sqrt{n}$.
+
+## Worked example: a three-variable chain
+
+Graph: $X_1 - X_2 - X_3$, factors $f_{12}(X_1, X_2)$ and $f_{23}(X_2, X_3)$.
+Goal: compute $P(X_3)$.
+
+**Step 1.** Eliminate $X_1$: only $f_{12}$ mentions $X_1$.
+$$
+\tau_2(X_2) = \sum_{x_1} f_{12}(x_1, X_2).
+$$
+
+**Step 2.** Eliminate $X_2$: remaining factors are $\tau_2(X_2)$ and $f_{23}(X_2, X_3)$.
+$$
+\tau_3(X_3) = \sum_{x_2} \tau_2(x_2) \cdot f_{23}(x_2, X_3).
+$$
+
+**Result:** $P(X_3) \propto \tau_3(X_3)$, normalized.
+
+Both steps each require $O(k^2)$ operations; the full sum-out is $O(n k^2)$ on the chain.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(4)
+k = 3   # states per variable
+
+# Four-variable chain: X1 - X2 - X3 - X4
+# Factors f12, f23, f34
+f12 = np.abs(rng.normal(1, 0.5, (k, k)))
+f23 = np.abs(rng.normal(1, 0.5, (k, k)))
+f34 = np.abs(rng.normal(1, 0.5, (k, k)))
+
+def variable_elimination_chain(factors):
+    """Eliminate all but the last variable in a chain of pairwise factors."""
+    # Marginalize out the first variable: sum over its rows
+    result = factors[0].sum(axis=0)   # (k,k) -> (k,): sum over X1
+    for f in factors[1:]:
+        # result[x_prev] * f[x_prev, x_next], summed over x_prev
+        result = result @ f   # (k,) @ (k,k) -> (k,)
+    return result
+
+# Compute P(X4) by eliminating X1, X2, X3
+p_x4 = variable_elimination_chain([f12, f23, f34])
+p_x4 /= p_x4.sum()
+print("P(X4) via VE:", p_x4.round(4))
+
+# Verify by brute force: compute full joint and marginalize
+joint = np.einsum("ij,jk,kl->ijkl", f12, f23, f34)
+joint /= joint.sum()
+p_x4_brute = joint.sum(axis=(0, 1, 2))
+print("P(X4) brute force:", p_x4_brute.round(4))
+
+# Complexity demonstration: cost grows with state space
+for k_test in [2, 4, 8, 16]:
+    f = np.ones((k_test, k_test))
+    ops = k_test**2 * 3   # 3 eliminations each O(k^2)
+    print(f"k={k_test:2d}: ~{ops} ops for chain of 4")
+```
+
+Variable elimination is exact on any graph but becomes exponential in the treewidth.
+The next lesson reframes the same computation as message passing, revealing how
+to compute all marginals simultaneously.

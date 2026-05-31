@@ -1,0 +1,124 @@
+---
+title: "Markov random fields and the Gibbs distribution"
+pillar: F
+subId: F2
+lessonId: markov-random-fields
+order: 1
+estimatedMinutes: 24
+goal: "Represent a joint distribution as a Gibbs distribution over clique potentials, identify Markov blankets from graph structure, and state the Hammersley-Clifford theorem."
+prerequisites: ["F1/bayesian-networks", "A2/bayes-rule"]
+---
+
+Directed graphical models encode causality naturally, but some relationships are
+symmetric: pixel intensities in an image, coupled spins in a physical system, words
+in a sentence around a target word.
+**Markov random fields** (MRFs), also called undirected graphical models, handle these
+by replacing directed arrows with undirected edges and replacing conditional probability
+tables with potential functions.
+
+## Gibbs distribution
+
+Given an undirected graph $\mathcal{G}$ over variables $\mathbf{X}$, a **potential function**
+$\phi_c(\mathbf{X}_c) \ge 0$ is assigned to each **clique** $c$ (a fully connected subgraph).
+The joint distribution takes the **Gibbs form**:
+
+$$
+P(\mathbf{X}) = \frac{1}{Z} \prod_{c \in \mathcal{C}} \phi_c(\mathbf{X}_c),
+$$
+
+where $\mathcal{C}$ is the set of (maximal) cliques and
+
+$$
+Z = \sum_{\mathbf{x}} \prod_{c} \phi_c(\mathbf{x}_c)
+$$
+
+is the **partition function**, normalizing the distribution.
+$Z$ is a sum over all configurations, making exact computation intractable for large graphs.
+
+## Markov properties
+
+Three equivalent Markov properties characterize MRFs (under positivity of $P$):
+
+**Global:** $\mathbf{X}_A \perp \mathbf{X}_B \mid \mathbf{X}_S$ whenever $S$ separates $A$
+from $B$ in the graph (removing $S$ disconnects $A$ and $B$).
+
+**Local:** $X_i \perp \mathbf{X}_{\text{rest}} \mid \mathbf{X}_{N(i)}$ where $N(i)$ is
+the set of neighbors of $i$ in $\mathcal{G}$.
+The set $N(i)$ is the **Markov blanket** of $X_i$.
+
+**Pairwise:** $X_i \perp X_j \mid \mathbf{X}_{\text{rest}}$ whenever $(i,j) \notin \mathcal{G}$.
+
+## Hammersley-Clifford theorem
+
+The Hammersley-Clifford theorem establishes the equivalence:
+
+> A strictly positive distribution $P(\mathbf{X}) > 0$ satisfies the global Markov
+> property with respect to $\mathcal{G}$ if and only if it factors as a Gibbs distribution
+> over the cliques of $\mathcal{G}$.
+
+This gives a clean correspondence between the graph structure and factorization.
+The positivity requirement rules out hard constraints (zero probabilities for some
+configurations); models with hard constraints need careful treatment of the theorem's boundary.
+
+## The Ising model
+
+The Ising model is an MRF on a grid graph with binary variables $X_i \in \{-1, +1\}$.
+The joint is:
+
+$$
+P(\mathbf{X}) = \frac{1}{Z} \exp\!\left( J \sum_{(i,j) \in \mathcal{E}} X_i X_j + h \sum_i X_i \right),
+$$
+
+with coupling $J$ and external field $h$.
+Here each edge $(i,j)$ defines a clique of size 2 with log-potential $J X_i X_j$.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+
+# Small 3x3 Ising model: compute partition function by brute force
+J = 0.5   # coupling
+h = 0.0   # external field
+n = 9     # 3x3 grid, 9 spins
+
+edges = [
+    (0,1),(1,2),(3,4),(4,5),(6,7),(7,8),  # horizontal
+    (0,3),(1,4),(2,5),(3,6),(4,7),(5,8),  # vertical
+]
+
+configs = np.array([[(c >> i & 1) * 2 - 1 for i in range(n)] for c in range(2**n)])
+
+def energy(cfg):
+    coupling_term = sum(cfg[i] * cfg[j] for i, j in edges)
+    field_term    = cfg.sum()
+    return -J * coupling_term - h * field_term
+
+energies = np.array([energy(c) for c in configs])
+log_Z    = np.log(np.sum(np.exp(-energies)))
+probs    = np.exp(-energies - log_Z)
+
+print(f"log Z = {log_Z:.4f}")
+print(f"Sum of probs: {probs.sum():.6f}")
+
+# Marginal P(X_center = +1)
+center_spin = 4
+p_center_up = probs[configs[:, center_spin] == 1].sum()
+print(f"P(X_center=+1): {p_center_up:.4f}")
+
+# Demonstrate Markov blanket: P(X_center | neighbors) sufficient
+neighbor_mask = [1, 3, 5, 7]   # direct neighbors of center in 3x3 grid
+# All configs where neighbors are all +1
+mask_all_up = np.all(configs[:, neighbor_mask] == 1, axis=1)
+p_center_up_given_nb = (probs[mask_all_up & (configs[:, center_spin] == 1)].sum()
+                        / probs[mask_all_up].sum())
+print(f"P(X_center=+1 | all neighbors=+1): {p_center_up_given_nb:.4f}")
+```
+
+The partition function covers all $2^9 = 512$ configurations; at scale, exactly
+computing $Z$ is NP-hard, which motivates the approximate inference methods in F5 and F6.
+
+The next lesson introduces conditional random fields, which extend MRFs into a
+discriminative setting by conditioning the entire model on an input.

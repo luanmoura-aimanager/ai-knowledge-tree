@@ -1,0 +1,150 @@
+---
+title: "Hamiltonian Monte Carlo and NUTS"
+pillar: F
+subId: F6
+lessonId: hamiltonian-mc
+order: 4
+estimatedMinutes: 28
+goal: "Frame MCMC proposals as Hamiltonian dynamics, derive the leapfrog integrator, show that the volume-preserving property keeps acceptance high, and explain what NUTS adds."
+prerequisites: ["gibbs-sampling"]
+---
+
+Random-walk MCMC explores the target by taking small, random steps.
+In high dimensions, random walks mix slowly: they waste time near the current point
+because most random directions point away from the high-probability region.
+**Hamiltonian Monte Carlo** (HMC) uses the gradient of the log-target to propose
+large, directed moves that follow the target's geometry.
+
+## Hamiltonian dynamics
+
+Augment the position $q \in \mathbb{R}^d$ with a momentum variable $p \in \mathbb{R}^d$.
+Define the **Hamiltonian**:
+
+$$
+H(q, p) = U(q) + K(p),
+$$
+
+where $U(q) = -\log \pi(q)$ is the **potential energy** (negative log-target)
+and $K(p) = \frac{1}{2} p^\top M^{-1} p$ is the **kinetic energy** ($M$ is a mass matrix,
+often $I$).
+
+The joint distribution $e^{-H(q,p)}$ factors as $\pi(q) \cdot \mathcal{N}(p; 0, M)$.
+Marginalizing out $p$ recovers $\pi(q)$.
+
+Hamilton's equations describe continuous dynamics that preserve $H$:
+
+$$
+\frac{dq}{dt} = \frac{\partial H}{\partial p} = M^{-1} p,
+\qquad
+\frac{dp}{dt} = -\frac{\partial H}{\partial q} = -\nabla_q U(q).
+$$
+
+## Leapfrog integrator
+
+Hamilton's equations are solved numerically using the **leapfrog** (Stormer-Verlet)
+integrator with step size $\varepsilon$:
+
+**Half step for momentum:**
+$$
+p_{t + \varepsilon/2} = p_t - \frac{\varepsilon}{2} \nabla_q U(q_t).
+$$
+
+**Full step for position:**
+$$
+q_{t + \varepsilon} = q_t + \varepsilon M^{-1} p_{t + \varepsilon/2}.
+$$
+
+**Half step for momentum:**
+$$
+p_{t + \varepsilon} = p_{t + \varepsilon/2} - \frac{\varepsilon}{2} \nabla_q U(q_{t+\varepsilon}).
+$$
+
+Repeat for $L$ steps to obtain the proposal $(q^*, p^*)$.
+
+**Key properties of leapfrog:**
+- **Time-reversible:** reversing $p \to -p$ undoes the trajectory.
+- **Volume-preserving:** the Jacobian of the map $(q,p) \to (q^*, p^*)$ is 1.
+
+These properties guarantee that the MH acceptance ratio is close to 1 when $\varepsilon$
+is small: the numerical error in $H$ is $O(\varepsilon^4)$ per step, so proposals are
+accepted with high probability.
+
+## The HMC step
+
+1. Sample momentum $p \sim \mathcal{N}(0, M)$.
+2. Run $L$ leapfrog steps from $(q, p)$ to get $(q^*, p^*)$.
+3. Accept $(q^*)$ with probability $\min(1, e^{H(q,p) - H(q^*, p^*)})$.
+
+HMC mixes much faster than random-walk in high dimensions because the trajectory
+follows the target's curvature over long distances, with near-unit acceptance.
+
+## NUTS: no-U-turn sampler
+
+HMC requires tuning $\varepsilon$ and $L$.
+**NUTS** eliminates the choice of $L$ by doubling the trajectory until it starts
+to double back on itself (the "U-turn" criterion).
+NUTS is the default sampler in Stan and PyMC.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(27)
+
+# Target: correlated bivariate Gaussian
+rho = 0.9
+Sigma = np.array([[1.0, rho], [rho, 1.0]])
+Sigma_inv = np.linalg.inv(Sigma)
+
+def log_target(q):
+    return -0.5 * q @ Sigma_inv @ q
+
+def grad_U(q):
+    return Sigma_inv @ q   # -nabla log pi = Sigma_inv @ q for N(0, Sigma)
+
+def leapfrog(q, p, eps, L):
+    p = p - 0.5 * eps * grad_U(q)
+    for _ in range(L - 1):
+        q = q + eps * p
+        p = p - eps * grad_U(q)
+    q = q + eps * p
+    p = p - 0.5 * eps * grad_U(q)
+    return q, -p   # negate for time-reversibility
+
+N = 10_000
+eps, L = 0.3, 10
+samples = np.zeros((N, 2))
+samples[0] = rng.normal(0, 1, 2)
+n_accept = 0
+
+for t in range(1, N):
+    q = samples[t-1]
+    p = rng.normal(0, 1, 2)
+    H_curr = -log_target(q) + 0.5 * p @ p
+    q_prop, p_prop = leapfrog(q.copy(), p.copy(), eps, L)
+    H_prop = -log_target(q_prop) + 0.5 * p_prop @ p_prop
+    if np.log(rng.random()) < H_curr - H_prop:
+        samples[t] = q_prop
+        n_accept += 1
+    else:
+        samples[t] = q
+
+burnin = 500
+post = samples[burnin:]
+lag1 = np.corrcoef(post[:-1, 0], post[1:, 0])[0, 1]
+print(f"Acceptance rate: {n_accept/N:.3f}")
+print(f"Sample mean: {post.mean(axis=0).round(4)}  (true: [0, 0])")
+print(f"Sample Cov:\n{np.cov(post.T).round(3)}")
+print(f"Lag-1 autocorr x1: {lag1:.3f}  (compare to ~{rho:.2f} for Gibbs on rho={rho})")
+print("(negative lag-1 is fine: HMC over-rotates slightly, but ESS > N and mixing is fast)")
+```
+
+HMC's lag-1 autocorrelation is substantially lower than the Gibbs sampler at the same
+correlation $\rho$, directly demonstrating faster mixing.
+A negative lag-1 value (which can arise when the trajectory slightly over-rotates)
+is a stronger signal than zero: it means successive samples partially cancel,
+yielding an effective sample size greater than $N$.
+
+The next lesson introduces Langevin dynamics, a gradient-based method that connects
+MCMC to stochastic gradient descent.

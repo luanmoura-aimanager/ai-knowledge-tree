@@ -1,0 +1,137 @@
+---
+title: "Mean-field variational inference and the ELBO"
+pillar: F
+subId: F5
+lessonId: mean-field-vi
+order: 1
+estimatedMinutes: 28
+goal: "Derive the evidence lower bound (ELBO) via Jensen's inequality, write the mean-field factorization, and derive the coordinate ascent VI (CAVI) update for each factor."
+prerequisites: ["F1/bayesian-networks", "B2/prior-likelihood-posterior", "A2/kl-cross-entropy"]
+---
+
+Exact posterior inference is intractable when the normalizing constant $P(\mathbf{X})$
+requires integrating over a high-dimensional latent space.
+**Variational inference** (VI) turns this integration problem into an optimization:
+find the distribution $q(\mathbf{Z})$ in a tractable family that is closest to
+the true posterior $P(\mathbf{Z} \mid \mathbf{X})$ in KL divergence.
+
+## Evidence lower bound (ELBO)
+
+For any distribution $q$ over latent variables $\mathbf{Z}$, the log marginal likelihood
+$\log P(\mathbf{X})$ satisfies:
+
+$$
+\log P(\mathbf{X}) = \mathcal{L}(q) + \mathrm{KL}(q \| P(\cdot \mid \mathbf{X})),
+$$
+
+where the **ELBO** is:
+
+$$
+\mathcal{L}(q) = \mathbb{E}_q[\log P(\mathbf{X}, \mathbf{Z})] - \mathbb{E}_q[\log q(\mathbf{Z})].
+$$
+
+**Derivation.** Apply Jensen's inequality to $\log P(\mathbf{X}) = \log \int P(\mathbf{X}, \mathbf{Z}) d\mathbf{Z}$:
+
+$$
+\log P(\mathbf{X})
+= \log \mathbb{E}_q\!\left[\frac{P(\mathbf{X}, \mathbf{Z})}{q(\mathbf{Z})}\right]
+\ge \mathbb{E}_q\!\left[\log \frac{P(\mathbf{X}, \mathbf{Z})}{q(\mathbf{Z})}\right]
+= \mathcal{L}(q).
+$$
+
+Because $\mathrm{KL}(q \| P(\cdot \mid \mathbf{X})) \ge 0$, maximizing $\mathcal{L}(q)$
+minimizes the KL divergence to the true posterior.
+
+## Mean-field factorization
+
+The **mean-field** family assumes the posterior factors over a partition of the latent variables:
+
+$$
+q(\mathbf{Z}) = \prod_{j=1}^{M} q_j(Z_j).
+$$
+
+Under this factorization, the ELBO can be written as a function of a single factor $q_j$
+while holding all others fixed.
+
+## CAVI update
+
+Maximizing $\mathcal{L}$ with respect to $q_j$ while fixing the other factors gives:
+
+$$
+\log q_j^*(Z_j) = \mathbb{E}_{q_{-j}}[\log P(\mathbf{X}, \mathbf{Z})] + \text{const},
+$$
+
+where $\mathbb{E}_{q_{-j}}$ averages over all variables except $Z_j$.
+Exponentiating and normalizing gives the optimal $q_j^*$.
+
+This is the **coordinate ascent VI (CAVI)** update: cycle through factors, updating
+each with the expectation of the joint under the current approximation of the others.
+
+## Example: Bayesian linear regression
+
+Prior: $w \sim \mathcal{N}(0, \alpha^{-1} I)$.
+Likelihood: $y_n \sim \mathcal{N}(w^\top x_n, \beta^{-1})$.
+Mean-field $q(w) = \mathcal{N}(m, S)$.
+
+The CAVI update for $q(w)$ gives:
+
+$$
+S^{-1} = \alpha I + \beta X^\top X, \qquad m = \beta S X^\top y.
+$$
+
+This is exactly the posterior (no approximation for conjugate Gaussian models).
+Mean-field becomes approximate only when latent variables are not independent
+under the true posterior, which is the case for most latent variable models.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(14)
+
+# Bayesian linear regression: 1D
+N = 60
+true_w = np.array([2.5, -1.0])
+X = np.column_stack([rng.normal(0, 1, N), np.ones(N)])
+y = X @ true_w + rng.normal(0, 0.5, N)
+
+alpha = 1.0   # prior precision
+beta  = 4.0   # likelihood precision
+
+# Exact posterior (conjugate)
+S_post = np.linalg.inv(alpha * np.eye(2) + beta * X.T @ X)
+m_post = beta * S_post @ X.T @ y
+
+# CAVI = exact update for Gaussian (one step)
+S_cavi = np.linalg.inv(alpha * np.eye(2) + beta * X.T @ X)
+m_cavi = beta * S_cavi @ X.T @ y
+
+# ELBO computation
+def elbo(m, S):
+    exp_log_lik = (
+        -N / 2 * np.log(2 * np.pi / beta)
+        - beta / 2 * (
+            np.sum((y - X @ m)**2)
+            + np.trace(X @ S @ X.T)
+        )
+    )
+    exp_log_prior = (
+        -1 / 2 * (alpha * (m @ m + np.trace(S)))
+        - len(m) / 2 * np.log(2 * np.pi / alpha)
+    )
+    entropy = 0.5 * np.linalg.slogdet(2 * np.pi * np.e * S)[1]
+    return exp_log_lik + exp_log_prior + entropy
+
+print(f"True w: {true_w}")
+print(f"CAVI posterior mean: {m_cavi.round(3)}")
+print(f"Exact posterior mean: {m_post.round(3)}")
+print(f"ELBO: {elbo(m_cavi, S_cavi):.3f}")
+```
+
+For the Gaussian model, the mean-field update is exact because the true posterior
+already factorizes as a single Gaussian.
+The approximation bites in models where the posterior has correlations between latent
+groups, which the factorized family cannot represent.
+
+The next lesson scales VI to large datasets with stochastic gradient updates.

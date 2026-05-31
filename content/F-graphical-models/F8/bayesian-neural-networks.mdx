@@ -1,0 +1,135 @@
+---
+title: "Bayesian neural networks"
+pillar: F
+subId: F8
+lessonId: bayesian-neural-networks
+order: 3
+estimatedMinutes: 24
+goal: "Place a prior over network weights, derive the Laplace approximation to the posterior, and formulate the mean-field variational objective for BNNs."
+prerequisites: ["mc-dropout-ensembles", "F5/mean-field-vi"]
+---
+
+MC dropout and ensembles approximate Bayesian uncertainty without explicitly
+maintaining a distribution over weights.
+A **Bayesian neural network** (BNN) does maintain one: a prior $p(\theta)$ over
+all network parameters, updated to a posterior $p(\theta \mid \mathcal{D})$ given data.
+
+The core challenge is that the weight space has millions of dimensions, making
+exact posterior inference impossible. Two tractable approximations are the Laplace
+approximation and mean-field variational inference.
+
+## The BNN objective
+
+Prior: $p(\theta) = \mathcal{N}(0, \sigma_0^2 I)$.
+Likelihood: $p(\mathcal{D} \mid \theta) = \prod_n p(y_n \mid f_\theta(x_n))$.
+
+The posterior $p(\theta \mid \mathcal{D}) \propto p(\mathcal{D} \mid \theta) p(\theta)$
+is intractable because the normalizing constant integrates over all weight configurations.
+
+## Laplace approximation
+
+The Laplace approximation fits a Gaussian to the posterior at the MAP estimate.
+
+**Step 1.** Find the MAP: $\theta^* = \arg\max_\theta [\log p(\mathcal{D} \mid \theta) + \log p(\theta)]$.
+This is equivalent to L2-regularized training.
+
+**Step 2.** Compute the Hessian of the negative log-posterior at $\theta^*$:
+
+$$
+H = -\nabla^2_\theta \log p(\theta^* \mid \mathcal{D}).
+$$
+
+**Step 3.** Approximate $p(\theta \mid \mathcal{D}) \approx \mathcal{N}(\theta^*,\, H^{-1})$.
+
+The full Hessian is $O(d^2)$ in storage and $O(d^2)$ or $O(d^3)$ to compute for a
+network with $d$ parameters.
+**Last-layer Laplace** (LL-LA) applies the approximation only to the final linear layer,
+making it tractable at the cost of some approximation quality.
+
+## Mean-field variational BNN
+
+The mean-field ELBO for BNNs is:
+
+$$
+\mathcal{L}(\phi) = \mathbb{E}_{q_\phi(\theta)}[\log p(\mathcal{D} \mid \theta)]
+- \mathrm{KL}(q_\phi(\theta) \| p(\theta)),
+$$
+
+where $q_\phi(\theta) = \prod_j \mathcal{N}(\mu_j, \sigma_j^2)$ factorizes over all weights.
+
+**Bayes by Backprop** (Blundell et al., 2015) optimizes this ELBO using the
+reparameterization trick: $\theta_j = \mu_j + \sigma_j \epsilon_j$ with $\epsilon_j \sim \mathcal{N}(0,1)$.
+All gradients flow through the reparameterized samples.
+
+The local reparameterization trick further reduces variance by perturbing activations
+rather than weights, which is more memory-efficient for wide networks.
+
+## Predictive distribution
+
+Given the posterior approximation, the predictive distribution is:
+
+$$
+p(y^* \mid x^*, \mathcal{D}) = \int p(y^* \mid f_\theta(x^*)) q_\phi(\theta) d\theta
+\approx \frac{1}{S} \sum_{s=1}^S p(y^* \mid f_{\theta^{(s)}}(x^*)),
+$$
+
+where $\theta^{(s)} \sim q_\phi(\theta)$.
+This Monte Carlo average provides both a point estimate and a measure of predictive uncertainty.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(47)
+
+# Laplace approximation on a logistic regression (1-layer BNN)
+# Data: 2D binary classification
+N = 100
+theta_true = np.array([2.0, -1.5])
+x_data = rng.normal(0, 1, (N, 2))
+logits = x_data @ theta_true
+y_data = (rng.random(N) < 1 / (1 + np.exp(-logits))).astype(float)
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+def neg_log_posterior(theta, lam=1.0):
+    logp = -(y_data * np.log(sigmoid(x_data @ theta) + 1e-10)
+             + (1 - y_data) * np.log(1 - sigmoid(x_data @ theta) + 1e-10)).sum()
+    logp += 0.5 * lam * (theta**2).sum()   # prior N(0, 1/lam)
+    return logp
+
+# MAP via gradient descent
+theta = np.zeros(2)
+lr = 0.05
+for _ in range(500):
+    s  = sigmoid(x_data @ theta)
+    g  = x_data.T @ (s - y_data) + theta   # grad of neg log posterior
+    theta -= lr * g
+
+# Laplace: Hessian of neg log posterior
+s = sigmoid(x_data @ theta)
+H = x_data.T @ np.diag(s * (1 - s)) @ x_data + np.eye(2)   # + prior precision
+Sigma_laplace = np.linalg.inv(H)
+
+# MC predictive variance
+x_test = np.array([[1.0, 0.5], [-1.0, 1.0]])
+S = 2000
+theta_samples = rng.multivariate_normal(theta, Sigma_laplace, S)
+preds = sigmoid(x_test @ theta_samples.T)   # (n_test, S)
+pred_mean = preds.mean(axis=1)
+pred_std  = preds.std(axis=1)
+
+print(f"MAP estimate:      {theta.round(3)}  (true: {theta_true})")
+print(f"Laplace covariance:\n{Sigma_laplace.round(4)}")
+print(f"\nPredictive mean:   {pred_mean.round(3)}")
+print(f"Predictive std:    {pred_std.round(3)}")
+```
+
+The Laplace posterior gives calibrated predictive uncertainty for points near the
+decision boundary; the posterior covariance reflects both data noise and limited
+sample size.
+
+The next lesson covers conformal prediction, a distribution-free approach to
+uncertainty that provides guaranteed coverage without any model of the weights.

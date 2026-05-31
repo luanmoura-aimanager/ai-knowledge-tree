@@ -1,0 +1,129 @@
+---
+title: "MC dropout and deep ensembles"
+pillar: F
+subId: F8
+lessonId: mc-dropout-ensembles
+order: 2
+estimatedMinutes: 22
+goal: "Interpret MC dropout as approximate Bayesian inference, decompose predictive uncertainty into epistemic and aleatoric components, and contrast the diversity mechanisms in dropout vs. deep ensembles."
+prerequisites: ["vae-reparameterization"]
+---
+
+Full Bayesian inference over neural network weights is computationally expensive.
+Two practical approximations have proven effective in production settings:
+**MC dropout** treats training-time dropout as an implicit variational approximation,
+and **deep ensembles** achieve well-calibrated uncertainty by training multiple
+independent models.
+
+## MC dropout as approximate Bayes
+
+Dropout randomly zeros activations at rate $p$ during training.
+Gal and Ghahramani (2016) showed that training a network with dropout is equivalent
+to a variational Bayesian approximation over the weights, where the variational family
+consists of Bernoulli-masked Gaussian distributions.
+
+At test time, instead of turning dropout off (the standard practice), keep it active
+and run $T$ forward passes with different random masks.
+This produces $T$ slightly different predictions $\hat{y}_1, \ldots, \hat{y}_T$.
+
+**Predictive mean:**
+$$
+\mathbb{E}[y \mid x] \approx \frac{1}{T} \sum_{t=1}^T \hat{y}_t.
+$$
+
+**Predictive variance:**
+$$
+\mathrm{Var}[y \mid x] \approx \frac{1}{T}\sum_{t=1}^T \hat{y}_t^2 - \left(\frac{1}{T}\sum_t \hat{y}_t\right)^2 + \hat{\sigma}^2,
+$$
+
+where $\hat{\sigma}^2$ is the predicted noise variance if the model also outputs it
+(for regression).
+
+## Epistemic vs. aleatoric uncertainty
+
+**Epistemic uncertainty** (model uncertainty): uncertainty due to limited data or
+model capacity. It can be reduced with more data. MC dropout and ensembles capture this.
+
+**Aleatoric uncertainty** (data uncertainty): irreducible noise in the observations
+(sensor noise, label ambiguity). Captured by modeling $p(y \mid x, \theta)$ with
+a flexible output distribution rather than a point estimate.
+
+Decomposition: total uncertainty = epistemic + aleatoric. A model that only reports
+a single prediction mixes both.
+
+## Deep ensembles
+
+Train $M$ independent networks with different random seeds (different weight initializations
+and data shuffles).
+At test time, average their predictions:
+
+$$
+p(y \mid x) \approx \frac{1}{M} \sum_{m=1}^M p_{\theta_m}(y \mid x).
+$$
+
+Ensemble diversity comes from **different loss minima** found by different optimization
+trajectories, not from explicit Bayesian inference.
+
+**Practical comparison:**
+
+| Method | Calibration | Compute at test | OOD detection |
+|---|---|---|---|
+| MC dropout | Moderate | $T \times$ single forward | Moderate |
+| Deep ensembles | Strong | $M \times$ single forward | Strong |
+| Single network | Poor | $1 \times$ | Poor |
+
+Deep ensembles consistently outperform MC dropout on calibration and OOD benchmarks
+but require training $M$ models instead of one.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(43)
+
+# Simulate MC dropout for regression: toy 1D function
+# True: y = sin(x) + noise
+def true_fn(x):
+    return np.sin(x)
+
+x_train = rng.uniform(-3, 3, 40)
+y_train = true_fn(x_train) + rng.normal(0, 0.2, 40)
+
+# Simplified model: polynomial features, MC dropout via weight noise
+def predict_with_noise(x, w, dropout_rate=0.3):
+    mask = (rng.random(len(w)) > dropout_rate).astype(float)
+    w_dropped = w * mask / (1 - dropout_rate)   # inverted dropout
+    phi = np.column_stack([np.ones_like(x), x, x**2, x**3, x**4, x**5])
+    return phi @ w_dropped
+
+# Fit base weights (least squares on polynomial features)
+phi_train = np.column_stack([np.ones_like(x_train), x_train,
+                               x_train**2, x_train**3, x_train**4, x_train**5])
+w_base = np.linalg.lstsq(phi_train, y_train, rcond=None)[0]
+
+# MC dropout: T forward passes at test time
+x_test = np.linspace(-4, 4, 60)
+T = 100
+preds = np.array([predict_with_noise(x_test, w_base) for _ in range(T)])
+
+mean_pred = preds.mean(axis=0)
+std_pred  = preds.std(axis=0)   # epistemic uncertainty proxy
+
+y_true = true_fn(x_test)
+rmse = np.sqrt(((mean_pred - y_true)**2).mean())
+coverage = np.mean(np.abs(y_true - mean_pred) < 2 * std_pred)
+
+print(f"Test RMSE: {rmse:.3f}")
+print(f"2-sigma coverage: {coverage:.2f}  (target ~0.95)")
+print(f"Uncertainty near training region  (|x|<3):  "
+      f"{std_pred[np.abs(x_test) < 3].mean():.3f}")
+print(f"Uncertainty far from training region (|x|>3): "
+      f"{std_pred[np.abs(x_test) > 3].mean():.3f}")
+```
+
+Uncertainty is higher outside the training range, demonstrating that the method captures
+epistemic uncertainty: the model is uncertain where it has not seen data.
+
+The next lesson shows how to place a prior directly over network weights for a more
+principled Bayesian neural network.

@@ -1,0 +1,164 @@
+---
+title: "Hidden Markov models: forward-backward and Viterbi"
+pillar: F
+subId: F3
+lessonId: hidden-markov-models
+order: 1
+estimatedMinutes: 28
+goal: "Derive the forward-backward algorithm for marginal state posteriors and the Viterbi algorithm for the MAP sequence in an HMM."
+prerequisites: ["F1/bayesian-networks", "A2/bayes-rule"]
+---
+
+Speech recognition, genomics, and financial regime detection all share a structure:
+an underlying latent process evolves over time, and we observe noisy emissions.
+The **Hidden Markov Model** (HMM) is the simplest formal treatment of this situation.
+
+## HMM structure
+
+An HMM has three components:
+
+- **Transition matrix** $A \in \mathbb{R}^{K \times K}$: $A_{ij} = P(Z_t = j \mid Z_{t-1} = i)$.
+- **Emission distribution** $P(X_t \mid Z_t = k)$ for each state $k$.
+- **Initial state distribution** $\pi_k = P(Z_1 = k)$.
+
+The joint distribution over a sequence of length $T$ is:
+
+$$
+P(Z_{1:T}, X_{1:T}) = P(Z_1) \prod_{t=2}^{T} P(Z_t \mid Z_{t-1}) \prod_{t=1}^{T} P(X_t \mid Z_t).
+$$
+
+## The forward algorithm
+
+The **forward variable** $\alpha_t(k) = P(X_{1:t}, Z_t = k)$ collects all evidence
+up to time $t$ along with state $k$ at time $t$.
+
+**Initialization:** $\alpha_1(k) = \pi_k \cdot P(X_1 \mid Z_1 = k)$.
+
+**Recursion (Step 1 through $T-1$):**
+
+$$
+\alpha_{t+1}(j) = P(X_{t+1} \mid Z_{t+1} = j) \sum_{k=1}^{K} \alpha_t(k) A_{kj}.
+$$
+
+**Marginal likelihood:** $P(X_{1:T}) = \sum_k \alpha_T(k)$.
+
+## The backward algorithm
+
+The **backward variable** $\beta_t(k) = P(X_{t+1:T} \mid Z_t = k)$ collects all
+future evidence.
+
+**Initialization:** $\beta_T(k) = 1$ for all $k$.
+
+**Recursion (from $T-1$ down to 1):**
+
+$$
+\beta_t(k) = \sum_{j=1}^{K} A_{kj} \cdot P(X_{t+1} \mid Z_{t+1} = j) \cdot \beta_{t+1}(j).
+$$
+
+**State marginal:**
+
+$$
+P(Z_t = k \mid X_{1:T}) = \frac{\alpha_t(k) \cdot \beta_t(k)}{P(X_{1:T})}.
+$$
+
+The joint two-step marginal needed for the Baum-Welch parameter update is:
+
+$$
+P(Z_{t-1} = i, Z_t = j \mid X_{1:T})
+= \frac{\alpha_{t-1}(i) \cdot A_{ij} \cdot P(X_t \mid Z_t = j) \cdot \beta_t(j)}{P(X_{1:T})}.
+$$
+
+## Viterbi decoding
+
+The Viterbi algorithm finds the single most probable state sequence:
+
+$$
+Z^*_{1:T} = \arg\max_{Z_{1:T}} P(Z_{1:T} \mid X_{1:T}).
+$$
+
+Replace $\sum$ with $\max$ in the forward recursion and store the argmax for backtracking:
+
+$$
+\delta_t(j) = \max_k \bigl[\delta_{t-1}(k) \cdot A_{kj}\bigr] \cdot P(X_t \mid Z_t = j),
+\qquad
+\psi_t(j) = \arg\max_k \bigl[\delta_{t-1}(k) \cdot A_{kj}\bigr].
+$$
+
+Backtrack from $\arg\max_k \delta_T(k)$ using $\psi$.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+
+K = 2    # hidden states
+T = 20   # sequence length
+
+# Random but valid HMM parameters
+def row_normalize(M):
+    return M / M.sum(axis=1, keepdims=True)
+
+pi = np.array([0.6, 0.4])
+A  = row_normalize(np.abs(rng.normal(1, 0.5, (K, K))))
+# Emission: Gaussian with different means per state
+means  = np.array([0.0, 3.0])
+sigmas = np.array([1.0, 1.0])
+
+# Sample a sequence
+z_true = np.empty(T, dtype=int)
+z_true[0] = rng.choice(K, p=pi)
+for t in range(1, T):
+    z_true[t] = rng.choice(K, p=A[z_true[t-1]])
+x = rng.normal(means[z_true], sigmas[z_true])
+
+def log_emit(obs, k):
+    return -0.5 * ((obs - means[k]) / sigmas[k])**2 - np.log(sigmas[k])
+
+# Forward pass (log-space for numerical stability)
+log_alpha = np.zeros((T, K))
+log_alpha[0] = np.log(pi) + np.array([log_emit(x[0], k) for k in range(K)])
+for t in range(1, T):
+    for j in range(K):
+        log_alpha[t, j] = (np.logaddexp.reduce(log_alpha[t-1] + np.log(A[:, j]))
+                           + log_emit(x[t], j))
+
+log_px = np.logaddexp(log_alpha[T-1, 0], log_alpha[T-1, 1])
+
+# Backward pass
+log_beta = np.zeros((T, K))
+for t in range(T-2, -1, -1):
+    for i in range(K):
+        log_beta[t, i] = np.logaddexp.reduce(
+            np.log(A[i]) + np.array([log_emit(x[t+1], j) for j in range(K)])
+            + log_beta[t+1]
+        )
+
+gamma = np.exp(log_alpha + log_beta - log_px)  # P(Z_t | X)
+
+# Viterbi
+log_delta = log_alpha[0].copy()
+psi = np.zeros((T, K), dtype=int)
+for t in range(1, T):
+    log_delta_new = np.zeros(K)
+    for j in range(K):
+        scores = log_delta + np.log(A[:, j])
+        psi[t, j] = np.argmax(scores)
+        log_delta_new[j] = np.max(scores) + log_emit(x[t], j)
+    log_delta = log_delta_new
+
+z_viterbi = np.empty(T, dtype=int)
+z_viterbi[T-1] = np.argmax(log_delta)
+for t in range(T-2, -1, -1):
+    z_viterbi[t] = psi[t+1, z_viterbi[t+1]]
+
+acc = (z_viterbi == z_true).mean()
+print(f"Viterbi accuracy: {acc:.2f}")
+print(f"True states:    {z_true}")
+print(f"Viterbi states: {z_viterbi}")
+```
+
+Viterbi is often more interpretable than the marginal posteriors: it gives a single consistent sequence rather than per-step mode estimates, which can be inconsistent across time steps.
+
+The next lesson extends the HMM to continuous Gaussian states, yielding the Kalman filter.

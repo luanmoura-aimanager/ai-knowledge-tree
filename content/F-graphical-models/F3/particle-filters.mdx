@@ -1,0 +1,133 @@
+---
+title: "Particle filters and sequential Monte Carlo"
+pillar: F
+subId: F3
+lessonId: particle-filters
+order: 3
+estimatedMinutes: 24
+goal: "Implement sequential importance resampling (SIR) to approximate a non-Gaussian filtering distribution, and explain why systematic resampling controls weight degeneracy."
+prerequisites: ["kalman-filter", "F6/rejection-importance-sampling"]
+---
+
+When the state-space model is nonlinear or the noise is non-Gaussian, the Kalman filter
+fails to stay Gaussian: the true posterior $P(z_t \mid x_{1:t})$ is an arbitrary
+distribution that cannot be tracked in closed form.
+**Particle filters** (sequential Monte Carlo) approximate this distribution with a
+weighted set of samples called **particles**.
+
+## Sequential importance sampling
+
+The filtering distribution at time $t$ is approximated by $N$ particles:
+
+$$
+P(z_t \mid x_{1:t}) \approx \sum_{i=1}^{N} w_t^{(i)} \delta(z_t - z_t^{(i)}).
+$$
+
+The weights $w_t^{(i)}$ are unnormalized importance weights.
+
+**One step of sequential importance sampling (SIS):**
+
+1. Propagate: sample $z_t^{(i)} \sim q(z_t \mid z_{t-1}^{(i)}, x_t)$ from a proposal.
+2. Reweight: $\tilde{w}_t^{(i)} \propto w_{t-1}^{(i)} \cdot \frac{P(x_t \mid z_t^{(i)}) P(z_t^{(i)} \mid z_{t-1}^{(i)})}{q(z_t^{(i)} \mid z_{t-1}^{(i)}, x_t)}$.
+
+The simplest choice is the **bootstrap filter**: use the transition prior as the proposal
+$q(z_t \mid z_{t-1}) = P(z_t \mid z_{t-1})$.
+This cancels the transition term and gives:
+
+$$
+w_t^{(i)} \propto w_{t-1}^{(i)} \cdot P(x_t \mid z_t^{(i)}).
+$$
+
+## Weight degeneracy and resampling
+
+Without resampling, a few particles eventually carry almost all the weight
+(weight degeneracy), wasting most of the computation.
+The **effective sample size**
+
+$$
+N_\text{eff} = \frac{1}{\sum_i (w_t^{(i)})^2}
+$$
+
+quantifies this: $N_\text{eff} = N$ when all weights are equal; $N_\text{eff} = 1$
+when one particle has all the weight.
+
+**Resampling** draws $N$ new particles with replacement from the current weighted set,
+restoring equal weights. It should trigger when $N_\text{eff}$ drops below $N/2$.
+
+**Systematic resampling** uses a single uniform draw $u \sim \text{Uniform}(0, 1/N)$
+and selects $N$ equally spaced points $u, u + 1/N, \ldots, u + (N-1)/N$ along the
+cumulative weight distribution.
+This achieves $O(N)$ complexity and lower variance than multinomial resampling.
+
+## Sequential importance resampling (SIR)
+
+The SIR algorithm combines the propagate-reweight step with adaptive resampling:
+
+1. Propagate all $N$ particles through the transition.
+2. Reweight by the likelihood.
+3. Normalize weights; compute $N_\text{eff}$.
+4. If $N_\text{eff} < N/2$: resample systematically and reset all weights to $1/N$.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(13)
+
+# Nonlinear state-space model (classic SMC benchmark)
+# z_t = 0.5*z_{t-1} + 25*z_{t-1}/(1+z_{t-1}^2) + 8*cos(1.2*t) + N(0, 10)
+# x_t = z_t^2 / 20 + N(0, 1)
+T = 50
+N = 500   # particles
+
+def transition(z, t):
+    return 0.5*z + 25*z/(1+z**2) + 8*np.cos(1.2*t)
+
+def log_likelihood(x, z):
+    return -0.5 * (x - z**2/20)**2   # observation noise variance = 1
+
+# Simulate ground truth
+z_true = np.zeros(T+1)
+z_true[0] = rng.normal(0, np.sqrt(10))
+for t in range(1, T+1):
+    z_true[t] = transition(z_true[t-1], t) + rng.normal(0, np.sqrt(10))
+x_obs = z_true[1:]**2 / 20 + rng.normal(0, 1, T)
+
+# SIR particle filter
+particles = rng.normal(0, np.sqrt(10), N)
+log_weights = np.zeros(N)
+est = np.zeros(T)
+
+for t in range(T):
+    # Propagate
+    particles = transition(particles, t+1) + rng.normal(0, np.sqrt(10), N)
+    # Reweight
+    log_weights += log_likelihood(x_obs[t], particles)
+    log_weights -= log_weights.max()   # numerical stability
+    weights = np.exp(log_weights)
+    weights /= weights.sum()
+
+    est[t] = (weights * particles).sum()
+
+    # Effective sample size
+    neff = 1.0 / (weights**2).sum()
+    if neff < N / 2:
+        # Systematic resampling
+        cumsum = np.cumsum(weights)
+        u = rng.uniform(0, 1.0/N)
+        positions = u + np.arange(N) / N
+        indices = np.searchsorted(cumsum, positions)
+        particles = particles[indices]
+        log_weights = np.zeros(N)
+
+rmse = np.sqrt(((est - z_true[1:])**2).mean())
+print(f"Particle filter RMSE: {rmse:.3f}  (N={N} particles)")
+print(f"First 5 true states:     {z_true[1:6].round(2)}")
+print(f"First 5 PF estimates:    {est[:5].round(2)}")
+```
+
+The particle filter tracks the highly nonlinear dynamics where the Kalman filter would diverge.
+
+The next subsection turns to exact inference algorithms for general graphical models,
+starting with variable elimination.

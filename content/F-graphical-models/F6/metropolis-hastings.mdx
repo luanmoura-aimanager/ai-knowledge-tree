@@ -1,0 +1,123 @@
+---
+title: "The Metropolis-Hastings algorithm"
+pillar: F
+subId: F6
+lessonId: metropolis-hastings
+order: 2
+estimatedMinutes: 24
+goal: "Derive the detailed balance condition, construct the MH acceptance ratio, prove that the chain's stationary distribution is the target, and diagnose mixing with trace plots."
+prerequisites: ["rejection-importance-sampling"]
+---
+
+Rejection sampling requires an envelope tight enough to accept a useful fraction of proposals.
+In high dimensions, no fixed envelope is tight everywhere.
+**Markov Chain Monte Carlo** (MCMC) sidesteps the envelope by constructing a Markov chain
+whose stationary distribution is the target.
+The **Metropolis-Hastings** (MH) algorithm is the general recipe.
+
+## Detailed balance
+
+A Markov chain with transition kernel $T(x' \mid x)$ has stationary distribution $\pi(x)$
+if it satisfies **detailed balance**:
+
+$$
+\pi(x) T(x' \mid x) = \pi(x') T(x \mid x').
+$$
+
+Detailed balance is sufficient but not necessary for stationarity.
+If it holds for every pair $(x, x')$, then summing over $x$ shows $\pi$ is invariant.
+
+## Metropolis-Hastings algorithm
+
+Given the current state $x$, the MH step is:
+
+1. Propose $x' \sim q(x' \mid x)$ from a proposal distribution.
+2. Compute the acceptance ratio:
+
+$$
+\alpha(x' \mid x) = \min\!\left(1,\, \frac{\pi(x') q(x \mid x')}{\pi(x) q(x' \mid x)}\right).
+$$
+
+3. Accept $x' $ with probability $\alpha$; otherwise stay at $x$.
+
+**Why this satisfies detailed balance.** Define the transition kernel
+$T(x' \mid x) = q(x' \mid x) \alpha(x' \mid x)$ for $x' \ne x$.
+At any pair $(x, x')$ where $\alpha < 1$ (i.e., where $\pi(x') q(x \mid x') < \pi(x) q(x' \mid x)$):
+
+$$
+\pi(x) T(x' \mid x) = \pi(x) q(x' \mid x) \frac{\pi(x') q(x \mid x')}{\pi(x) q(x' \mid x)}
+= \pi(x') q(x \mid x') = \pi(x') T(x \mid x').
+$$
+
+The normalizing constant of $\pi$ cancels in the acceptance ratio, so the algorithm
+only needs the unnormalized target $\tilde{\pi}(x) \propto \pi(x)$.
+
+## Proposal choice and mixing
+
+The proposal $q(x' \mid x)$ controls the chain's mixing speed:
+
+- **Too narrow:** many proposals accepted, but the chain moves slowly (high autocorrelation).
+- **Too wide:** proposals land in low-probability regions, acceptance rate drops, chain is sticky.
+
+For a random-walk proposal $q(x' \mid x) = \mathcal{N}(x, \sigma^2 I)$ in $d$ dimensions,
+the rule of thumb is to tune $\sigma$ to achieve ~23% acceptance.
+
+## Burn-in and autocorrelation
+
+MCMC samples are correlated.
+Discard early samples (burn-in) before the chain reaches stationarity.
+Estimate the **effective sample size** by accounting for autocorrelation:
+
+$$
+N_\text{eff} \approx \frac{N}{1 + 2 \sum_{t=1}^\infty \rho_t},
+$$
+
+where $\rho_t$ is the autocorrelation at lag $t$.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(19)
+
+# Target: bivariate Gaussian with correlation
+mu_target = np.array([1.0, -2.0])
+Sigma_target = np.array([[1.0, 0.8], [0.8, 1.0]])
+L = np.linalg.cholesky(Sigma_target)
+
+def log_target(x):
+    diff = x - mu_target
+    return -0.5 * diff @ np.linalg.solve(Sigma_target, diff)
+
+# Random-walk MH
+N = 20_000
+step_size = 0.8
+samples = np.zeros((N, 2))
+samples[0] = np.zeros(2)
+n_accept = 0
+
+for t in range(1, N):
+    x_curr = samples[t-1]
+    x_prop = x_curr + rng.normal(0, step_size, 2)
+    log_alpha = log_target(x_prop) - log_target(x_curr)
+    if np.log(rng.random()) < log_alpha:
+        samples[t] = x_prop
+        n_accept += 1
+    else:
+        samples[t] = x_curr
+
+burnin = 2000
+posterior = samples[burnin:]
+print(f"Acceptance rate: {n_accept/N:.2f}  (target ~0.23 for 2D)")
+print(f"Sample mean:     {posterior.mean(axis=0).round(3)}  (true: {mu_target})")
+print(f"Sample Sigma:\n{np.cov(posterior.T).round(3)}")
+print(f"True Sigma:\n{Sigma_target}")
+```
+
+The chain recovers the true mean and covariance structure; acceptance near 0.23 is
+consistent with the asymptotically optimal rate for the random-walk proposal in
+moderate dimensions.
+
+The next lesson introduces Gibbs sampling, which eliminates the proposal entirely by
+sampling each variable from its full conditional.

@@ -1,0 +1,142 @@
+---
+title: "The Kalman filter for linear-Gaussian state space"
+pillar: F
+subId: F3
+lessonId: kalman-filter
+order: 2
+estimatedMinutes: 26
+goal: "Derive the Kalman predict-update recursion by applying Bayes' rule to a linear-Gaussian state-space model, and compute the Kalman gain in closed form."
+prerequisites: ["hidden-markov-models"]
+---
+
+The HMM handles discrete states. When the hidden state is continuous and all
+distributions are Gaussian, exact inference closes in Gaussian form at every step.
+This is the **Kalman filter**: the continuous-state analogue of the forward algorithm.
+
+## The linear-Gaussian state-space model
+
+The model has two equations:
+
+**Transition:** $z_t = F z_{t-1} + q_t$, where $q_t \sim \mathcal{N}(0, Q)$.
+
+**Emission:** $x_t = H z_t + r_t$, where $r_t \sim \mathcal{N}(0, R)$.
+
+$F$ is the state-transition matrix, $H$ is the observation matrix,
+$Q$ is process noise covariance, and $R$ is measurement noise covariance.
+The prior is $z_0 \sim \mathcal{N}(\mu_0, \Sigma_0)$.
+
+Because Gaussian times Gaussian stays Gaussian, the filtered posterior
+$P(z_t \mid x_{1:t})$ is Gaussian at every step, with mean and covariance
+computed by the predict-update recursion.
+
+## Predict step
+
+Given the filtered estimate at time $t-1$: $P(z_{t-1} \mid x_{1:t-1}) = \mathcal{N}(\mu_{t-1}, \Sigma_{t-1})$.
+
+The one-step-ahead predictive distribution is:
+
+$$
+P(z_t \mid x_{1:t-1}) = \mathcal{N}(\hat{\mu}_t, \hat{\Sigma}_t),
+$$
+
+$$
+\hat{\mu}_t = F \mu_{t-1}, \qquad \hat{\Sigma}_t = F \Sigma_{t-1} F^\top + Q.
+$$
+
+This follows from the affine transformation property of Gaussians: if $z \sim \mathcal{N}(\mu, \Sigma)$
+and $z' = Fz + q$ with $q \sim \mathcal{N}(0,Q)$ independent, then $z' \sim \mathcal{N}(F\mu, F\Sigma F^\top + Q)$.
+
+## Update step
+
+Applying Bayes' rule with the new observation $x_t$:
+
+$$
+P(z_t \mid x_{1:t}) \propto P(x_t \mid z_t) \cdot P(z_t \mid x_{1:t-1}).
+$$
+
+Both factors are Gaussian. The product of Gaussians is Gaussian, and completing the square gives:
+
+$$
+\mu_t = \hat{\mu}_t + K_t (x_t - H \hat{\mu}_t),
+$$
+$$
+\Sigma_t = (I - K_t H) \hat{\Sigma}_t.
+$$
+
+The **Kalman gain** $K_t$ is the matrix that weights the prediction error $(x_t - H\hat{\mu}_t)$:
+
+$$
+K_t = \hat{\Sigma}_t H^\top (H \hat{\Sigma}_t H^\top + R)^{-1}.
+$$
+
+**Derivation of $K_t$.**
+
+Step 1: the joint distribution of $(z_t, x_t)$ given $x_{1:t-1}$ is:
+
+$$
+\begin{pmatrix} z_t \\ x_t \end{pmatrix}
+\sim \mathcal{N}\!\left(
+\begin{pmatrix} \hat{\mu}_t \\ H\hat{\mu}_t \end{pmatrix},
+\begin{pmatrix} \hat{\Sigma}_t & \hat{\Sigma}_t H^\top \\ H \hat{\Sigma}_t & H\hat{\Sigma}_t H^\top + R \end{pmatrix}
+\right).
+$$
+
+Step 2: the conditional $P(z_t \mid x_t, x_{1:t-1})$ is the conditional of a joint Gaussian.
+The standard formula gives mean $\hat{\mu}_t + \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1}(x_t - H\hat{\mu}_t)$
+and covariance $\hat{\Sigma}_t - \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1} H\hat{\Sigma}_t$.
+
+Identifying the gain $K_t = \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1}$ recovers both formulas.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(9)
+
+# 1D tracking example: constant-velocity model
+T   = 80
+F   = np.array([[1., 1.], [0., 1.]])    # position + velocity
+H   = np.array([[1., 0.]])              # observe position only
+Q   = np.diag([0.1, 0.05])             # process noise
+R   = np.array([[2.0]])                 # measurement noise
+mu0 = np.array([0., 0.])
+S0  = np.eye(2) * 0.1
+
+# Simulate ground truth and noisy observations
+z = np.zeros((T+1, 2))
+z[0] = mu0 + rng.multivariate_normal(np.zeros(2), S0)
+for t in range(1, T+1):
+    z[t] = F @ z[t-1] + rng.multivariate_normal(np.zeros(2), Q)
+x_obs = (H @ z[1:].T).T + rng.normal(0, np.sqrt(R[0,0]), (T, 1))
+
+# Kalman filter
+mu_f    = mu0.copy()
+Sigma_f = S0.copy()
+est_pos = []
+for t in range(T):
+    # Predict
+    mu_p    = F @ mu_f
+    Sigma_p = F @ Sigma_f @ F.T + Q
+    # Update
+    S_t = H @ Sigma_p @ H.T + R
+    K   = Sigma_p @ H.T @ np.linalg.inv(S_t)
+    innov   = x_obs[t] - H @ mu_p
+    mu_f    = mu_p + (K @ innov).ravel()
+    Sigma_f = (np.eye(2) - K @ H) @ Sigma_p
+    est_pos.append(mu_f[0])
+
+est_pos  = np.array(est_pos)
+true_pos = z[1:, 0]
+obs_pos  = x_obs[:, 0]
+rmse_kf  = np.sqrt(((est_pos  - true_pos)**2).mean())
+rmse_raw = np.sqrt(((obs_pos  - true_pos)**2).mean())
+print(f"RMSE raw observations: {rmse_raw:.3f}")
+print(f"RMSE Kalman filter:    {rmse_kf:.3f}")
+```
+
+The Kalman filter reliably reduces position error below the raw observation error by
+blending the physics-based prediction with the measurement.
+
+The next lesson handles non-Gaussian and nonlinear systems where the Kalman filter's
+closed-form breaks down, using particle filters instead.
