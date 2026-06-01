@@ -1,0 +1,89 @@
+---
+title: "FinOps for AI: capacity and commitment"
+pillar: J
+subId: J6
+lessonId: finops-for-ai
+order: 4
+estimatedMinutes: 20
+goal: "Plan AI spend past per-request cost: model the break-even between on-demand and reserved capacity, and layer caching tiers to cut the bill at scale."
+prerequisites: ["J4/cost-latency-routing"]
+---
+
+[Per-request cost](I4/cost-monitoring) and [routing](J4/cost-latency-routing) optimize the cost of
+each call. **FinOps** (financial operations) zooms out to the *capacity* bill: AI runs on
+expensive GPUs, and how you buy them, on demand versus committed, plus how much work you avoid with
+caching, swings the monthly invoice as much as any per-call optimization. Two levers dominate: the
+commitment model and the caching tier.
+
+## On-demand versus reserved capacity
+
+Cloud GPUs come in (at least) two pricing modes:
+
+- **On-demand.** Pay per hour, only for the hours you actually use. Maximum flexibility, highest
+  hourly rate. Right for spiky or unpredictable load.
+- **Reserved (committed).** Commit to a term (one or three years) for a guaranteed discount, often
+  30-60% off, but you pay for the capacity *continuously* whether or not you use it. Right for
+  steady, predictable baseline load.
+
+The decision turns on **utilization**: the fraction $u$ of the time you actually need the capacity.
+For $H$ hours in a month, on-demand costs $u \cdot H \cdot p_{\text{od}}$ (you pay only for used
+hours), while reserved costs $H \cdot p_{\text{res}}$ (you pay for all of them). Reserved wins when
+
+$$
+H \, p_{\text{res}} < u \, H \, p_{\text{od}} \quad\Longleftrightarrow\quad u > \frac{p_{\text{res}}}{p_{\text{od}}}.
+$$
+
+So the **break-even utilization** is the price ratio $p_{\text{res}} / p_{\text{od}}$. If
+reserved is $60\%$ of the on-demand rate, reserve any capacity you will use more than $60\%$ of the
+time, and keep the spiky remainder on demand. The standard FinOps shape follows: cover the steady
+**baseline** with reserved capacity and absorb **bursts** on demand, getting the discount on the
+predictable part without paying 24/7 for peak.
+
+## Caching tiers
+
+The cheapest GPU-hour is the one you never buy. A **caching tier** in front of the model turns
+repeat work into near-free lookups. With a cache **hit rate** $h$ and a hit costing a small fraction
+$f$ of a full model call (just an embedding lookup and a fetch), the effective cost is
+
+$$
+\text{cost} = \text{base} \cdot \big[(1 - h) + h f\big],
+$$
+
+the $(1-h)$ misses paying full price and the $h$ hits paying only $f$. A realistic hit rate (many
+queries repeat or paraphrase, especially the [semantic cache](J4/cost-latency-routing) from earlier)
+takes a meaningful bite out of the bill before any capacity decision. Caching and commitment stack:
+caching lowers the load, which lowers the baseline you reserve for.
+
+## Worked example
+
+We compute the reserved-versus-on-demand break-even, decide for two utilization levels, then apply a
+caching tier.
+
+```python
+price_od  = 3.0       # $/GPU-hour on-demand (billed only when used)
+price_res = 1.8       # $/GPU-hour reserved (billed 24/7 for the term)
+H = 730               # hours per month
+
+breakeven_u = price_res / price_od
+print(f"break-even utilization = {breakeven_u:.0%}  (reserve above, on-demand below)")
+for u in [0.40, 0.80]:
+    od  = u * H * price_od            # pay only for hours used
+    res = H * price_res              # pay for the whole month regardless
+    cheaper = "reserved" if res < od else "on-demand"
+    print(f"  utilization {u:.0%}: on-demand ${od:,.0f}  reserved ${res:,.0f}  -> {cheaper}")
+assert breakeven_u == 0.6
+
+# Caching tier: hit rate h, a hit costs fraction f of a full call.
+base_monthly = 100_000 * 0.002       # 100k requests at $0.002 each
+h, f = 0.40, 0.05
+effective = base_monthly * ((1 - h) + h * f)
+print(f"\ncaching: ${base_monthly:.0f} -> ${effective:.0f}/mo at {h:.0%} hit rate "
+      f"({1 - effective / base_monthly:.0%} cheaper)")
+assert effective < base_monthly
+```
+
+Below $60\%$ utilization on-demand wins and above it reserving the capacity is cheaper, while a
+$40\%$ cache hit rate trims the request bill by nearly the same fraction, levers that compound. This
+closes the cloud subsection. The final subsection steps up to the architect's view, where these cost
+models become one input to whole-[system design](J7/system-design-for-ai), beginning with
+[AI governance](J7/ai-governance-compliance).
