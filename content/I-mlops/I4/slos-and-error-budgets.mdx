@@ -1,0 +1,114 @@
+---
+title: "SLIs, SLOs, and error budgets"
+pillar: I
+subId: I4
+lessonId: slos-and-error-budgets
+order: 1
+estimatedMinutes: 20
+goal: "Turn user-facing reliability into a measurable service-level indicator and objective, derive the error budget it implies, and compute the burn rate that should trigger an alert."
+prerequisites: ["I3/latency-throughput"]
+---
+
+A deployed model is a service, and "is it working?" needs a number, not a feeling.
+The reliability discipline (from Google's SRE practice) gives three: a measurable
+**indicator** of quality, a **target** for it, and the **budget** of failures the
+target permits. Together they convert "the service should be fast and available"
+into something you can monitor, alert on, and make decisions against, including the
+decision of whether you can afford to ship a risky change this week.
+
+## SLI and SLO
+
+A **service-level indicator** (SLI) is a measured ratio of good events to total
+events:
+
+$$
+\text{SLI} = \frac{\text{good events}}{\text{total events}}.
+$$
+
+"Good" is defined against a threshold the user cares about. A latency SLI counts a
+request as good if it returned within, say, $200$ ms (note this builds on
+[percentiles](I3/latency-throughput): the SLI is essentially "what fraction beat
+the target," the complement of the tail). An availability SLI counts a request as
+good if it did not error. The SLI is always in $[0, 1]$ and is measured over a
+rolling window.
+
+A **service-level objective** (SLO) is the target value for the SLI, for example
+"$99\%$ of requests under $200$ ms over $30$ days." The SLO is a deliberate choice,
+not an aspiration to $100\%$: perfect reliability is infinitely expensive and users
+cannot tell $99.99\%$ from $100\%$ anyway. Picking the SLO *below* $100\%$ is the
+move that makes the next idea possible.
+
+## The error budget
+
+If the SLO allows a $99\%$ good rate, it *permits* a $1\%$ bad rate. That permitted
+failure fraction is the **error budget**:
+
+$$
+\text{error budget} = 1 - \text{SLO}.
+$$
+
+The reframing is powerful. Failures are no longer purely bad; they are a *budget*
+you are allowed to spend. Over a window of $N$ requests, the budget is
+$(1-\text{SLO})\,N$ failures. As long as you stay under it, the service is meeting
+its promise, and the slack can be spent deliberately: on risky deploys, on
+experiments, on planned maintenance. Run *out* of budget and the policy is to stop
+shipping features and fix reliability. The error budget is what aligns the
+incentive to ship with the incentive to stay reliable, in one number.
+
+## Burn rate and alerting
+
+You should not wait until the monthly budget is exhausted to react. The **burn
+rate** measures how fast the budget is being consumed *right now*, as a multiple of
+the sustainable pace:
+
+$$
+\text{burn rate} = \frac{\text{observed bad fraction in the window}}{\text{error budget}}.
+$$
+
+A burn rate of $1$ spends the budget exactly over the SLO window (sustainable); a
+burn rate of $1$ that holds all month uses up the budget precisely at month's end.
+A burn rate of $14.4$ over an hour would, if sustained, burn a whole $30$-day budget
+in about two days, which is why fast-burn alerts fire on multiples like that. Tying
+alerts to burn rate rather than to raw error counts means you page a human when the
+*budget* is genuinely threatened, not on every transient blip, which is the cure
+for alert fatigue.
+
+## Worked example
+
+We measure a latency SLI on a healthy traffic window, check it against the SLO,
+derive the error budget, and compute burn rates for a healthy window and a slow
+incident window.
+
+```python
+import numpy as np
+rng = np.random.default_rng(3)
+
+threshold_ms = 200.0
+SLO = 0.99                         # 99% of requests must beat the threshold
+budget = 1 - SLO                   # error budget: 1% are allowed to miss it
+
+# Healthy window: SLI = fraction of requests meeting the latency target.
+healthy = rng.gamma(2.0, 25.0, size=200_000)     # latencies in ms
+sli = np.mean(healthy <= threshold_ms)
+p99 = np.percentile(healthy, 99)
+print(f"SLI = {sli:.4f}   SLO = {SLO:.2f}   p99 = {p99:.0f}ms   meets SLO: {sli >= SLO}")
+
+def burn_rate(latencies):
+    bad = np.mean(latencies > threshold_ms)       # fraction missing the target
+    return bad / budget                            # multiples of the sustainable rate
+
+incident = rng.gamma(2.0, 90.0, size=20_000)       # a slow incident window
+print(f"\nhealthy  burn rate = {burn_rate(healthy):.2f}x  (under 1: spending slowly)")
+print(f"incident burn rate = {burn_rate(incident):.1f}x")
+
+ALERT = 14.4                                        # fast-burn alert threshold
+print(f"incident pages on-call (burn > {ALERT}): {burn_rate(incident) > ALERT}")
+assert sli >= SLO and burn_rate(healthy) < 1 < burn_rate(incident)
+```
+
+The healthy window clears the SLO and burns budget at a third of the sustainable
+rate, leaving slack for risky deploys, while the incident window burns at many
+times the rate and trips the fast-burn alert. This whole machinery assumes you can
+*tell* a good event from a bad one promptly; for a model's *accuracy*, the labels
+that decide "good" often arrive late or never, which is the
+[production-drift](production-drift) problem.

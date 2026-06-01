@@ -1,0 +1,110 @@
+---
+title: "Distillation and pruning"
+pillar: I
+subId: I3
+lessonId: distillation-pruning
+order: 4
+estimatedMinutes: 22
+goal: "Shrink a model by training a student on a teacher's temperature-softened outputs and by removing low-magnitude weights, then quantify the size-quality tradeoff each makes."
+prerequisites: ["A/kl-cross-entropy", "D/regularization"]
+---
+
+[Quantization](quantization) shrinks each weight to fewer bits but keeps every
+weight and every layer. The other two compression levers change the model itself:
+**distillation** trains a *smaller* model to imitate a larger one, and **pruning**
+*removes* weights outright. Both start from a trained model and trade some quality
+for a cheaper forward pass; they differ in what they shrink and how.
+
+## Distillation: learning from soft targets
+
+A large **teacher** model is accurate but expensive. Distillation trains a small
+**student** to reproduce the teacher's behavior. The insight is that a teacher's
+output carries far more information than the single correct label. A teacher that
+classifies an image as "dog" with $82\%$ confidence but puts $11\%$ on "wolf" and
+$5\%$ on "cat" is telling the student that dogs look more like wolves than cats,
+**dark knowledge** that a hard one-hot label ("dog", everything else zero) throws
+away.
+
+To expose it, soften the teacher's output with a **temperature** $T$ in the
+softmax. For logits $z_j$, the softened probability of class $j$ is
+
+$$
+p_j(T) = \frac{\exp(z_j / T)}{\sum_k \exp(z_k / T)}.
+$$
+
+At $T=1$ this is the ordinary softmax. As $T$ grows, dividing the logits by $T$
+compresses their differences, so the distribution flattens toward uniform: its
+**entropy rises**, and the small probabilities on the runner-up classes grow into a
+usable training signal. The student is trained to match the teacher's softened
+distribution by minimizing the [cross-entropy / KL divergence](A/kl-cross-entropy)
+between the two, at the same temperature. The soft targets give a gradient on every
+class at once, not just the correct one, which is why a distilled student typically
+beats the same small model trained on hard labels alone.
+
+## Pruning: removing the weights that matter least
+
+A trained weight matrix is usually full of near-zero entries that contribute almost
+nothing to the output. **Magnitude pruning** removes them: pick a target
+**sparsity** (the fraction of weights to zero), find the magnitude threshold at
+that quantile, and set every weight below it to zero, keeping the rest. The pruned
+weights are stored as a sparse structure, saving memory and compute.
+
+Why magnitude? A layer's output is $Wx$, and zeroing a weight $W_{ij}$ perturbs the
+output by $-W_{ij}x_j$. To first order, removing *small* weights perturbs the output
+least, so for a fixed number of weights removed, magnitude pruning does less damage
+than removing weights at random. The damage is real but recoverable: a short
+**fine-tune** after pruning lets the surviving weights adjust to compensate, which
+is the [regularization](D/regularization)-flavored second half of every practical
+pruning recipe. Aggressive pruning followed by fine-tuning can remove a large
+fraction of weights for little quality loss.
+
+## Worked example
+
+We soften a teacher's logits with temperature and watch the entropy rise, then
+prune a weight matrix by magnitude and compare its output error against random
+pruning at the same sparsity.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+# --- Distillation: temperature softens the teacher's target ---
+logits = np.array([3.0, 1.0, 0.2, -1.0])      # teacher logits for one example
+def softmax_T(z, T):
+    z = (z - z.max()) / T                      # /T compresses the logit gaps
+    e = np.exp(z)
+    return e / e.sum()
+entropy = lambda p: -np.sum(p * np.log(p))
+p1, p4 = softmax_T(logits, 1.0), softmax_T(logits, 4.0)
+print("T=1:", np.round(p1, 3), " entropy", round(float(entropy(p1)), 3))
+print("T=4:", np.round(p4, 3), " entropy", round(float(entropy(p4)), 3))
+assert entropy(p4) > entropy(p1)               # higher temperature -> softer target
+
+# --- Pruning: magnitude vs random at equal sparsity ---
+W = rng.normal(size=(100, 100))
+x = rng.normal(size=100)
+sparsity = 0.5
+thresh = np.quantile(np.abs(W), sparsity)
+mask_mag = np.abs(W) >= thresh                 # keep largest-magnitude weights
+W_mag = W * mask_mag
+
+keep = int(mask_mag.sum())                     # prune the SAME count at random
+idx = rng.permutation(W.size)[:keep]
+mask_rand = np.zeros(W.size, bool); mask_rand[idx] = True
+W_rand = W * mask_rand.reshape(W.shape)
+
+ref = np.dot(W, x)
+err_mag = np.linalg.norm(ref - np.dot(W_mag, x))
+err_rand = np.linalg.norm(ref - np.dot(W_rand, x))
+print(f"\nsparsity {1 - mask_mag.mean():.0%}: "
+      f"output error magnitude={err_mag:.2f}  random={err_rand:.2f}")
+assert err_mag < err_rand                      # removing the smallest hurts least
+print("magnitude pruning beats random at equal sparsity:", True)
+```
+
+Raising the temperature lifts the target's entropy, turning the teacher's
+runner-up probabilities into a signal the student can learn from, and magnitude
+pruning at $50\%$ sparsity perturbs the output far less than random pruning of the
+same count. These techniques assume a cloud GPU as the target; the last lesson of
+the subsection asks what changes when the model must run on a phone, in
+[edge deployment](edge-deployment).

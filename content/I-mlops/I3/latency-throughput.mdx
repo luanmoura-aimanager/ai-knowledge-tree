@@ -1,0 +1,114 @@
+---
+title: "Latency, throughput, and the batching tradeoff"
+pillar: I
+subId: I3
+lessonId: latency-throughput
+order: 1
+estimatedMinutes: 22
+goal: "Summarize a latency distribution with percentiles, relate concurrency, throughput, and latency through Little's law, and see why batching raises throughput at the cost of tail latency."
+prerequisites: ["A/expectation"]
+---
+
+Serving a model is answering requests under two competing pressures: each request
+should return *fast* (low **latency**), and the system should handle *many*
+requests per second (high **throughput**). These pull in opposite directions, and
+the main knob that trades one for the other is **batching**. To reason about the
+trade you need three tools: percentiles to describe latency honestly, Little's law
+to relate the quantities, and the batching curve itself.
+
+## Latency is a distribution, so use percentiles
+
+The latency of a service is not one number; it is a distribution over requests,
+and a heavily right-skewed one (most requests are quick, a few are slow because of
+queueing, garbage collection, or a cold cache). Reporting the **mean** hides the
+slow tail, and the tail is what users feel. So latency is summarized by
+**percentiles**: the $p$-th percentile is the value below which $p\%$ of requests
+fall. **p50** (the median) is the typical experience; **p99** is the tail, the
+latency that the slowest $1\%$ exceed. On a skewed distribution $p99$ can be many
+times the mean, which is exactly why service targets are written against $p99$,
+not the average: optimizing the average can leave a miserable tail untouched.
+
+## Little's law
+
+The three quantities are tied together by **Little's law**, a result that holds
+for any stable queueing system regardless of its internals. Let $L$ be the average
+number of requests *in the system* at once (the concurrency), $\lambda$ the average
+**throughput** (requests arriving and completing per second), and $W$ the average
+**latency** (time a request spends in the system). Then
+
+$$
+L = \lambda \, W.
+$$
+
+The intuition is a flow balance: if requests leave at rate $\lambda$ and each spent
+time $W$ inside, then at any instant the ones still in the system are those that
+arrived in the last $W$ seconds, about $\lambda W$ of them. The law is the
+capacity-planning workhorse: it lets you compute the concurrency a service must
+sustain ($L = \lambda W$) from a target throughput and measured latency, or invert
+it to find what latency a fixed concurrency budget allows.
+
+## The batching tradeoff
+
+A model server can process requests one at a time or **batch** several into one
+forward pass. Batching wins on throughput because a forward pass has a fixed
+overhead (launching the computation, loading weights) that is amortized over the
+batch. Model the time to process a batch of size $b$ as
+
+$$
+T(b) = c_0 + c_1 b,
+$$
+
+a fixed cost $c_0$ plus a per-request cost $c_1$. Throughput is the batch divided
+by its time,
+
+$$
+\text{throughput}(b) = \frac{b}{T(b)} = \frac{b}{c_0 + c_1 b},
+$$
+
+which **increases** with $b$ toward the ceiling $1/c_1$ as the fixed cost is spread
+ever thinner. But a request in a batch waits for the whole batch to finish, so its
+latency is about $T(b)$, which **increases** with $b$. Bigger batches buy
+throughput and pay in latency. The serving engineer's job is to choose the largest
+batch whose $T(b)$ still fits inside the $p99$ latency target, which is precisely
+the tension that [LLM serving](llm-serving) must manage dynamically.
+
+## Worked example
+
+We summarize a skewed latency sample with percentiles, apply Little's law, and
+trace throughput and latency as the batch size grows.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+# Right-skewed latency sample (ms): mean is pulled below the p99 tail.
+lat = rng.gamma(shape=2.0, scale=20.0, size=100_000)
+p50, p95, p99 = np.percentile(lat, [50, 95, 99])
+print(f"mean={lat.mean():.1f}ms  p50={p50:.1f}ms  p95={p95:.1f}ms  p99={p99:.1f}ms")
+assert p99 > 2 * lat.mean()                      # the tail dwarfs the average
+
+# Little's law: concurrency needed to sustain a throughput at a given latency.
+lam, W = 200.0, 0.05                              # 200 req/s, 50 ms mean latency
+L = lam * W
+print(f"Little's law: {lam:.0f} req/s x {W:.3f} s = {L:.0f} concurrent requests")
+assert np.isclose(lam, L / W)                     # the law inverts consistently
+
+# Batching: throughput rises toward 1/c1, per-request latency rises with the batch.
+c0, c1 = 5.0, 1.0                                 # ms fixed overhead, ms per request
+print("\n batch   throughput(req/s)   latency(ms)")
+thru_prev, lat_prev = 0.0, 0.0
+for b in [1, 8, 32, 64]:
+    T = c0 + c1 * b                               # ms to process the batch
+    thru = b / T * 1000                           # requests per second
+    print(f" {b:5d}   {thru:14.0f}   {T:11.0f}")
+    assert thru > thru_prev and T > lat_prev      # throughput up, latency up
+    thru_prev, lat_prev = thru, T
+print("\nbatching trades latency for throughput:", True)
+```
+
+The $p99$ latency sits far above the mean (the reason targets are written against
+it), Little's law converts a throughput-and-latency target into a concurrency
+requirement, and the batch sweep shows throughput climbing toward $1/c_1$ while
+per-request latency climbs with it. Autoregressive models complicate this picture,
+because each request is not one forward pass but a *loop* of them, which the next
+lesson on [LLM serving](llm-serving) takes on.

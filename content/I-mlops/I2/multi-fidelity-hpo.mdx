@@ -1,0 +1,106 @@
+---
+title: "Multi-fidelity HPO: successive halving and Hyperband"
+pillar: I
+subId: I2
+lessonId: multi-fidelity-hpo
+order: 3
+estimatedMinutes: 22
+goal: "Spend a fixed compute budget efficiently by training many configurations briefly, then promoting only the survivors, the successive-halving rule behind Hyperband and ASHA."
+prerequisites: ["hyperparameter-search"]
+---
+
+Random search pays full price for every configuration it tries, even the hopeless
+ones. But you usually do not need a full training run to tell that a configuration
+is bad: a learning rate that diverges, or a model that is still near chance after
+a fraction of an epoch, has already announced itself. **Multi-fidelity HPO**
+exploits this. It treats training budget as a dial, evaluates many configurations
+*cheaply* first, and spends real budget only on the ones that survive. The core
+rule is **successive halving**.
+
+## Fidelity as a budget dial
+
+A **fidelity** is a cheap, partial evaluation of a configuration: train for a few
+epochs instead of all of them, on a subset of the data, at low resolution. Low
+fidelity is noisy but cheap; high fidelity is accurate but expensive. The bet is
+that **relative ranking is roughly preserved across fidelities**: a configuration
+that is clearly worse after a little training is unlikely to become the best after
+a lot. It is only roughly true, which is why you promote *several* survivors rather
+than committing to the single leader early.
+
+## Successive halving
+
+Successive halving (SHA) organizes the search into **rungs**. Pick a reduction
+factor $\eta$ (typically $3$). Start with $n$ configurations at the smallest
+budget $b$, then repeat:
+
+- **Step 1.** Evaluate every surviving configuration at the current budget.
+- **Step 2.** Keep the top $1/\eta$ of them by score; discard the rest.
+- **Step 3.** Multiply the budget by $\eta$ and go to step 1, until one
+  configuration remains.
+
+So the counts shrink as $n, n/\eta, n/\eta^2, \dots$ while the per-configuration
+budget grows as $b, b\eta, b\eta^2, \dots$. The two cancel: at every rung the total
+work spent is
+
+$$
+n_r \cdot b_r = \frac{n}{\eta^{r}} \cdot b\,\eta^{r} = n\,b,
+$$
+
+a **constant** independent of the rung $r$. The whole sweep therefore costs about
+$n b (R+1)$ for $R+1$ rungs, instead of the $n \cdot b_{\max}$ it would cost to
+train all $n$ configurations to the full budget $b_{\max} = b\,\eta^{R}$. With
+$\eta=3$ and four rungs that is a budget reduction of roughly $b_{\max}/(b(R+1)) =
+27/4$, almost $7\times$, and the saving grows with the number of rungs.
+
+The price is the assumption from above: a late-blooming configuration that looks
+mediocre early can be cut before it would have shone. **Hyperband** hedges this by
+running several SHA brackets with different starting trade-offs (many configs cut
+aggressively, vs. fewer configs given more budget each), and **ASHA** makes the
+whole thing asynchronous so idle workers promote survivors without waiting for a
+rung to finish, which is what scales it to a real cluster.
+
+## Worked example
+
+We run successive halving with $n=27$, $\eta=3$, starting budget $1$. Each
+configuration has a hidden true quality; a low-budget evaluation is a noisy proxy
+for it whose noise shrinks as the budget grows.
+
+```python
+import numpy as np
+rng = np.random.default_rng(1)
+
+n, eta, b0 = 27, 3, 1
+true_quality = rng.uniform(0, 1, size=n)        # hidden final score per config
+def evaluate(ids, budget):                       # noisy proxy; noise ~ 1/sqrt(budget)
+    noise = rng.normal(0, 0.05 / np.sqrt(budget), size=ids.size)
+    return true_quality[ids] + noise
+
+R = int(round(np.log(n) / np.log(eta)))          # number of cuts: rungs 0..R (here 3)
+alive = np.arange(n)
+total = 0
+for r in range(R + 1):
+    budget = b0 * eta ** r                       # per-config budget grows by eta
+    scores = evaluate(alive, budget)
+    total += alive.size * budget                 # work this rung = n_r * b_r (constant)
+    print(f"rung {r}: {alive.size:2d} configs @ budget {budget:2d}  "
+          f"-> rung cost {alive.size * budget}")
+    if alive.size > 1:
+        keep = max(1, alive.size // eta)
+        alive = alive[np.argsort(scores)[::-1][:keep]]   # top 1/eta survive
+
+survivor = alive[0]
+b_max = b0 * eta ** R                             # full budget = 27
+full_cost = n * b_max                             # train all n to full budget
+print(f"survivor config {survivor}, true rank "
+      f"{1 + np.sum(true_quality > true_quality[survivor])} of {n}")
+print(f"SHA total budget {total}  vs  full-budget-for-all {full_cost}")
+assert true_quality[survivor] == true_quality.max()   # found the true best
+assert total < full_cost
+print(f"speedup over training all to convergence: {full_cost / total:.2f}x")
+```
+
+Each rung costs the same $27$ units of budget, the survivor is the truly best
+configuration, and the sweep spends a small fraction of what training all $27$
+configurations to convergence would. With a single best configuration chosen, the
+remaining infrastructure question is how to train *that* model when it is too big
+for one machine, which is [data-parallel training](data-parallel-training).

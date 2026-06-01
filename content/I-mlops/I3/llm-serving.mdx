@@ -1,0 +1,116 @@
+---
+title: "Serving LLMs: KV cache and continuous batching"
+pillar: I
+subId: I3
+lessonId: llm-serving
+order: 2
+estimatedMinutes: 24
+goal: "Size the KV-cache memory that bounds autoregressive serving and explain why continuous batching keeps the GPU saturated when requests finish at different lengths."
+prerequisites: ["latency-throughput", "E/kv-cache", "E/paged-attention"]
+---
+
+A classical model takes a fixed input and returns a fixed output in one forward
+pass; serving it well is the [batching tradeoff](latency-throughput) from the last
+lesson and little else. Autoregressive LLMs break that assumption. Generation is a
+*loop*: one forward pass per output token, each pass attending to all previous
+tokens, and different requests stop at different lengths. Two facts follow, and
+together they define how every modern LLM server (vLLM, TGI, SGLang) is built: the
+**KV cache** makes memory, not compute, the binding constraint, and **continuous
+batching** is what keeps the expensive GPU busy.
+
+## The KV cache and its memory cost
+
+At each generation step the model attends over all earlier positions, whose
+attention **keys** and **values** are identical on every subsequent step. The
+[KV cache](E/kv-cache) computes them once and stores them, turning an
+$O(\text{length}^2)$ recomputation into a lookup. The cost is memory, and the
+amount is predictable. For a transformer with $L$ layers and model dimension
+$d$, storing a key and a value vector per layer per token at $s$ bytes each is
+
+$$
+\text{KV bytes per token} = 2 \cdot L \cdot d \cdot s,
+$$
+
+the factor $2$ for keys and values. A whole request of $n$ tokens costs $n$ times
+that, and $B$ concurrent requests cost $B$ times more again:
+
+$$
+\text{KV bytes} = 2 \, L \, d \, s \cdot n \cdot B.
+$$
+
+This grows linearly with both sequence length and batch size, and on a large model
+it is enormous: it is the KV cache, not the weights, that runs the GPU out of
+memory first, and it is therefore the KV cache that caps how many requests can be
+served at once. Driving that cap up by storing the cache in non-contiguous pages
+is exactly what [paged attention](E/paged-attention) does.
+
+## Continuous batching
+
+Now the loop's second consequence. Suppose you batch $B$ requests together and run
+the generation loop. They will not finish together: one needs $50$ tokens, another
+$500$. With **static batching**, the batch runs until the *longest* sequence
+finishes, and every sequence that completed earlier leaves its slot on the GPU idle
+for the rest of the run, computing nothing. The device's useful work is the total
+tokens actually generated; the work it was *capable of* is $B$ times the longest
+sequence. The ratio,
+
+$$
+\text{utilization} = \frac{\sum_k n_k}{B \cdot \max_k n_k},
+$$
+
+is well below $1$ whenever output lengths vary, and they always do.
+
+**Continuous batching** fixes this at the granularity of a single token step.
+Instead of holding the batch fixed for the whole loop, the scheduler revisits it
+*every step*: the moment a sequence emits its end token, it is evicted and a
+waiting request is admitted into the freed slot. As long as there is a backlog,
+finished sequences never leave the GPU idle, so utilization stays near $1$ and
+throughput rises accordingly, with no change to any individual result. This is the
+single biggest reason a modern LLM server out-serves a naive one.
+
+```mermaid
+graph LR
+  Q["request queue"] --> SCH["per-step scheduler"]
+  SCH -->|admit on free slot| GPU["GPU batch slots<br/>(KV cache)"]
+  GPU -->|sequence emits EOS| SCH
+  GPU --> OUT["token stream"]
+```
+
+## Worked example
+
+We size the KV cache for a $32$-layer, $d=4096$ model to find how many sequences
+fit in memory, then compare static and continuous batching utilization on requests
+with varied output lengths.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+L, d, s = 32, 4096, 2                 # layers, model dim, fp16 bytes per number
+kv_per_token = 2 * L * d * s          # bytes of K+V across all layers, per token
+print(f"KV per token: {kv_per_token/1024:.0f} KB")
+
+seq = 2048
+kv_per_seq = kv_per_token * seq
+gpu_free = 40e9                       # bytes left for KV after the weights
+max_batch = int(gpu_free // kv_per_seq)
+print(f"KV per {seq}-token sequence: {kv_per_seq/1e9:.2f} GB")
+print(f"-> at most {max_batch} concurrent sequences fit in {gpu_free/1e9:.0f} GB")
+
+# Output lengths vary across a batch of 16 requests.
+lengths = rng.integers(50, 500, size=16)
+B = lengths.size
+static_util = lengths.sum() / (B * lengths.max())   # idle slots after early finishers
+cont_util = lengths.sum() / lengths.sum()           # refilled every step -> full
+print(f"\nstatic batching utilization:     {static_util:.2f}")
+print(f"continuous batching utilization: {cont_util:.2f}")
+print(f"throughput gain: {cont_util/static_util:.1f}x")
+assert cont_util > static_util
+```
+
+The KV cache costs half a megabyte per token here, so a couple of thousand tokens
+already consume a gigabyte per request and memory caps the batch at a few dozen
+sequences; and because requests finish at different lengths, static batching wastes
+roughly half the device while continuous batching keeps it full. When even the
+cached, full-precision model is too big or too slow for the budget, the next lever
+is to shrink the numbers themselves with [quantization](quantization).
