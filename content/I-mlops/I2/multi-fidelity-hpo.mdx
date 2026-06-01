@@ -23,7 +23,7 @@ A **fidelity** is a cheap, partial evaluation of a configuration: train for a fe
 epochs instead of all of them, on a subset of the data, at low resolution. Low
 fidelity is noisy but cheap; high fidelity is accurate but expensive. The bet is
 that **relative ranking is roughly preserved across fidelities**: a configuration
-that is clearly worse after a little training is unlikely to become the best after
+that is much worse after a little training is unlikely to become the best after
 a lot. It is only roughly true, which is why you promote *several* survivors rather
 than committing to the single leader early.
 
@@ -91,16 +91,18 @@ for r in range(R + 1):
 survivor = alive[0]
 b_max = b0 * eta ** R                             # full budget = 27
 full_cost = n * b_max                             # train all n to full budget
-print(f"survivor config {survivor}, true rank "
-      f"{1 + np.sum(true_quality > true_quality[survivor])} of {n}")
+survivor_rank = 1 + int(np.sum(true_quality > true_quality[survivor]))
+print(f"survivor config {survivor}, true rank {survivor_rank} of {n}")
 print(f"SHA total budget {total}  vs  full-budget-for-all {full_cost}")
-assert true_quality[survivor] == true_quality.max()   # found the true best
+assert survivor_rank <= 3        # lands among the very best (not guaranteed THE best)
 assert total < full_cost
 print(f"speedup over training all to convergence: {full_cost / total:.2f}x")
 ```
 
-Each rung costs the same $27$ units of budget, the survivor is the truly best
-configuration, and the sweep spends a small fraction of what training all $27$
-configurations to convergence would. With a single best configuration chosen, the
-remaining infrastructure question is how to train *that* model when it is too big
-for one machine, which is [data-parallel training](data-parallel-training).
+Each rung costs the same $27$ units of budget, the survivor lands among the very
+best configurations (here, the top-ranked one, though that is not guaranteed, which
+is exactly why several survivors are promoted per rung), and the sweep spends a
+small fraction of what training all $27$ configurations to convergence would. With a
+strong configuration chosen, the remaining infrastructure question is how to train
+*that* model when it is too big for one machine, which is
+[data-parallel training](data-parallel-training).
