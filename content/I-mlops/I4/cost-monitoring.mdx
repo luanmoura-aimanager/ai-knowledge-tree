@@ -1,0 +1,110 @@
+---
+title: "Cost monitoring and token economics"
+pillar: I
+subId: I4
+lessonId: cost-monitoring
+order: 5
+estimatedMinutes: 20
+goal: "Build a per-request cost model for an LLM service from token counts and hardware utilization, and see how batching and caching change the unit economics."
+prerequisites: ["I3/llm-serving", "slos-and-error-budgets"]
+---
+
+For a classical service, compute cost is a background concern. For an LLM service it
+is a first-class operational metric, often the metric that decides whether a feature
+ships. A single large model can cost dollars per hour per GPU, and a product can
+make millions of calls a day, so a tenth of a cent per request is the difference
+between a viable product and an unsustainable one. **Cost monitoring** treats cost
+per request like an [SLI](slos-and-error-budgets): measured, tracked, and budgeted.
+The unit that makes it tractable is the **token**.
+
+## From hardware cost to cost per token
+
+You rent hardware by time (a GPU at some dollars per hour) but you serve work in
+tokens. The bridge is throughput. If a GPU costs $C_{\text{hr}}$ per hour, its cost
+per second is $C_{\text{hr}}/3600$, and if it sustains a throughput of $r$ tokens
+per second, then the cost of one token is
+
+$$
+\text{cost per token} = \frac{C_{\text{hr}} / 3600}{r}.
+$$
+
+Cost per token is inversely proportional to throughput: every token of throughput
+you win directly lowers unit cost. This is the economic restatement of the
+[serving](I3/llm-serving) lesson. Continuous batching and a well-sized KV cache
+raise $r$, and through this formula a higher $r$ shows up immediately as a cheaper
+token. Batching is not only a latency-throughput tradeoff; it is the main lever on
+the bill.
+
+## Cost per request
+
+A request consumes **input tokens** (the prompt it reads) and **output tokens** (the
+text it generates). To first order its cost is the total token count times the cost
+per token:
+
+$$
+\text{cost per request} = (n_{\text{in}} + n_{\text{out}}) \cdot \text{cost per token}.
+$$
+
+(In practice output tokens are pricier than input tokens, because generating each
+one is a full forward pass while input tokens are processed in a single parallel
+prefill; the model extends cleanly to two separate rates.) Multiply by request
+volume and you have the service's compute bill, and dividing the monthly budget by
+the per-request cost gives the request ceiling the budget allows, the same
+budget-against-a-target discipline as error budgets.
+
+## Caching changes the arithmetic
+
+Many requests share a long, identical prefix: a fixed system prompt, a few-shot
+preamble, a retrieved document reused across turns. **Prompt caching** stores the
+KV-cache state for that prefix so it is computed once and reused, and a cached input
+token is billed at a small fraction of a fresh one (often around $10\%$). The
+effective input token count becomes
+
+$$
+n_{\text{in}}^{\text{eff}} = n_{\text{uncached}} + \rho \cdot n_{\text{cached}},
+$$
+
+with $\rho$ the cache discount. When most of a long prompt is a cached prefix, this
+can cut the per-request cost substantially with no change to the output. Caching is
+to cost what continuous batching is to throughput: the highest-leverage knob, and
+the first thing to check when a bill is too high.
+
+## Worked example
+
+We convert a GPU hourly rate into cost per token at two throughputs, price a typical
+request, then apply prompt caching to a mostly-cached prompt.
+
+```python
+import numpy as np
+
+gpu_hourly = 2.0                                   # $ per GPU-hour
+gpu_per_sec = gpu_hourly / 3600
+
+print("cost per 1M tokens vs throughput:")
+for r in [800, 3000]:                              # small batch vs continuous batching
+    print(f"  {r:5d} tok/s -> ${gpu_per_sec / r * 1e6:.3f} / 1M tokens")
+small, big = gpu_per_sec/800*1e6, gpu_per_sec/3000*1e6
+print(f"  batching is {small/big:.1f}x cheaper per token")
+
+r = 3000
+cost_per_tok = gpu_per_sec / r
+n_in, n_out = 1000, 300
+req_cost = (n_in + n_out) * cost_per_tok
+print(f"\nper request ({n_in} in + {n_out} out): ${req_cost:.6f}")
+
+# Prompt caching: 800 of the 1000 input tokens are a cached prefix at 10% cost.
+n_cached, rho = 800, 0.1
+eff_in = (n_in - n_cached) + rho * n_cached
+cached_cost = (eff_in + n_out) * cost_per_tok
+print(f"with prompt caching:                  ${cached_cost:.6f}  "
+      f"({1 - cached_cost / req_cost:.0%} cheaper)")
+assert big < small and cached_cost < req_cost
+```
+
+Raising throughput from $800$ to $3000$ tokens per second cuts the cost per token
+almost fourfold, and caching a mostly-static prompt roughly halves the per-request
+cost, with the output untouched. That closes the monitoring-and-governance
+subsection and pillar I: a model trained on versioned data, tuned and trained on
+shared infrastructure, served under a latency budget, and now watched for drift,
+safety, and cost in production. The applied glue that ties these systems into a
+shipped product is the subject of pillar J, AI Engineering.

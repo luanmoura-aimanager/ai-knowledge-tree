@@ -1,0 +1,93 @@
+---
+title: "Hyperparameter search: grid vs random"
+pillar: I
+subId: I2
+lessonId: hyperparameter-search
+order: 2
+estimatedMinutes: 20
+goal: "Frame hyperparameter tuning as black-box optimization over a search space, and see why random search dominates grid search when only a few dimensions actually matter."
+prerequisites: ["A/bayesian-optimization"]
+---
+
+Hyperparameters (learning rate, weight decay, layer width, dropout) are the knobs
+you set *before* training, and a model's quality can swing wildly with them.
+Tuning them is **black-box optimization**: you cannot differentiate "final
+validation accuracy" with respect to the learning rate, you can only pick a
+configuration, pay for a full training run, and read off the score. With each
+evaluation this expensive, the question is how to spend a fixed budget of $N$ runs
+to find a good configuration. The surprising answer is that the obvious method,
+grid search, is usually the wrong one.
+
+## Grid search and its blind spot
+
+**Grid search** picks a finite set of values per hyperparameter and evaluates
+every combination. With $d$ hyperparameters and $k$ values each, that is $k^d$
+runs: the budget explodes with the number of knobs (the **curse of
+dimensionality**), so in practice $k$ is forced small, often $3$ or $4$.
+
+The blind spot is what a grid does *per axis*. Lay out a $3 \times 3$ grid over
+two hyperparameters and project onto either axis: the nine points only ever use
+**three** distinct values of each hyperparameter, because the other axis's
+variation is wasted from that hyperparameter's point of view. So a budget of nine
+runs explores each knob at a resolution of three. If one knob barely affects the
+score and the other is decisive, grid search has spent most of its nine runs
+re-checking the decisive knob at the *same* three settings while varying the knob
+that does not matter.
+
+## Why random search wins
+
+Real hyperparameter landscapes have **low effective dimensionality**: out of many
+knobs, only a few strongly move the score. Bergstra and Bengio's 2012 result
+follows directly. **Random search** draws each of the $N$ configurations
+independently and uniformly from the search space. Project those $N$ points onto
+any single axis and you get $N$ *distinct* values of that hyperparameter, not
+$\sqrt{N}$ as a square grid gives, not $N^{1/d}$ as a $d$-dimensional grid gives.
+
+So for the few hyperparameters that actually matter, random search tries $N$
+different settings while a grid tries only $N^{1/d}$. The same budget buys far
+finer coverage of the dimensions that count, because random search never wastes
+resolution coordinating values across axes. The more irrelevant knobs there are,
+the bigger the gap, which is why random search is the standard baseline and the
+starting point for the smarter [Bayesian methods](A/bayesian-optimization) that
+spend the budget adaptively.
+
+## Worked example
+
+The objective depends almost entirely on one hyperparameter and ignores the other.
+With a budget of nine evaluations, we compare a $3 \times 3$ grid against random
+search, averaged over many random draws.
+
+```python
+import numpy as np
+
+# Score depends on dim 0 (peak at 0.3); dim 1 is nearly irrelevant.
+def score(x0, x1):
+    return -(x0 - 0.3) ** 2 - 0.01 * (x1 - 0.7) ** 2
+
+budget = 9
+
+# Grid search: 3x3 -> only 3 distinct values of the important hyperparameter x0.
+g = np.linspace(0.05, 0.95, 3)
+grid_best = max(score(a, b) for a in g for b in g)
+grid_distinct_x0 = len(set(np.round(a, 6) for a in g for b in g))
+
+# Random search: 9 draws -> 9 distinct x0 values. Average over many random seeds.
+rng = np.random.default_rng(0)
+rand_bests, rand_distinct = [], []
+for _ in range(2000):
+    xs = rng.uniform(0, 1, size=(budget, 2))
+    rand_bests.append(max(score(a, b) for a, b in xs))
+    rand_distinct.append(len({round(a, 6) for a, _ in xs}))
+
+print(f"grid:   {grid_distinct_x0} distinct x0 values, best score {grid_best:.4f}")
+print(f"random: {np.mean(rand_distinct):.0f} distinct x0 values, "
+      f"mean best score {np.mean(rand_bests):.4f}")
+assert np.mean(rand_bests) > grid_best        # random wins on the same budget
+print("random search beats grid on the same budget:", True)
+```
+
+With nine runs the grid pins the important hyperparameter to three coarse values
+and never gets close to the peak at $0.3$, while random search, sampling nine
+distinct values of it, lands nearer on average. The next lesson stops paying for
+*full* runs at all: [multi-fidelity HPO](multi-fidelity-hpo) kills bad
+configurations early and reallocates their budget to the survivors.

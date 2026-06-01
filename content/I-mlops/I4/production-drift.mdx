@@ -1,0 +1,103 @@
+---
+title: "Concept drift vs data drift under label delay"
+pillar: I
+subId: I4
+lessonId: production-drift
+order: 2
+estimatedMinutes: 22
+goal: "Separate a shift in the inputs P(x) from a shift in the labelling rule P(y|x), and monitor each in production when ground-truth labels arrive late or never."
+prerequisites: ["I1/drift-detection"]
+---
+
+A model trained once is deployed into a world that keeps changing. Two very
+different things can change, and they call for different monitoring. The inputs can
+shift, or the relationship between inputs and outputs can shift. The reason this
+distinction is not academic is **label delay**: in production you see every input
+immediately, but the true label that tells you whether the model was *right* often
+arrives days later (a loan's default), or after a manual review, or never. One kind
+of drift you can catch from inputs alone; the other is invisible until the labels
+come back.
+
+## Two decompositions of the same joint
+
+The data is a joint distribution $P(x, y)$ over inputs $x$ and labels $y$. Factor
+it as $P(x, y) = P(x)\,P(y \mid x)$. The two factors can drift independently:
+
+- **Data drift** (covariate shift): $P(x)$ changes while $P(y \mid x)$ stays fixed.
+  The inputs move into new regions, but the rule mapping inputs to outputs is the
+  same. A spam filter sees a new wave of message styles; what makes a message spam
+  has not changed.
+- **Concept drift**: $P(y \mid x)$ changes, often with $P(x)$ unchanged. The same
+  inputs now map to different outputs because the world's rule moved. Spammers
+  change tactics so that messages which used to be benign are now attacks; the
+  input distribution can look identical.
+
+The model was fit to the *training* $P(x)$ and $P(y \mid x)$. Either drift can
+degrade it, but they announce themselves through completely different channels.
+
+## Which drift you can see without labels
+
+This is the crux. Detecting **data drift needs only inputs**: compare the live
+$P(x)$ against the training reference with the [drift statistics](I1/drift-detection)
+(KS, PSI) from the data-engineering subsection. Because inputs arrive immediately,
+data drift is a *leading* indicator, catchable in real time before a single label
+comes back. It is a warning, not proof of harm: the model may still be accurate in
+the shifted region, but it is now extrapolating and deserves a look.
+
+Detecting **concept drift is fundamentally harder**, because $P(y \mid x)$ involves
+$y$. If the input distribution is unchanged, input monitoring sees *nothing* while
+accuracy quietly collapses. You can only confirm concept drift once labels arrive,
+by watching the model's accuracy (or loss) on freshly labelled data, which is
+exactly what label delay holds up. The practical responses are to obtain labels
+faster (sample and manually label a slice), or to track a *proxy* available without
+labels (a drop in the model's confidence, or drift in its output distribution),
+accepting that a proxy is a hint rather than a measurement. The honest summary:
+input drift is cheap to monitor and concept drift is the dangerous one precisely
+because it hides from the cheap monitor.
+
+## Worked example
+
+A fixed threshold classifier faces a data-drift scenario (inputs shift, rule fixed)
+and a concept-drift scenario (inputs fixed, rule changes). We measure input PSI
+(needs no labels) and accuracy (needs labels) in each.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+N = 50_000
+
+def model(x):                                  # deployed model: fixed threshold 0.5
+    return (x > 0.5).astype(int)
+
+def psi(ref, new, edges, eps=1e-6):            # input drift, labels not required
+    p = np.histogram(ref, edges)[0] / ref.size
+    q = np.histogram(new, edges)[0] / new.size
+    p, q = np.maximum(p, eps), np.maximum(q, eps)
+    return float(np.sum((q - p) * np.log(q / p)))
+
+ref_x = rng.uniform(0, 1, N)                   # training-time inputs
+edges = np.quantile(ref_x, np.linspace(0, 1, 11))
+edges[0], edges[-1] = -np.inf, np.inf
+
+# Data drift: P(x) shifts right; the rule y = (x > 0.5) is unchanged.
+dd_x = rng.uniform(0.4, 1.4, N)
+dd_y = (dd_x > 0.5).astype(int)
+psi_dd, acc_dd = psi(ref_x, dd_x, edges), np.mean(model(dd_x) == dd_y)
+
+# Concept drift: P(x) unchanged; the rule moves to y = (x > 0.7).
+cd_x = rng.uniform(0, 1, N)
+cd_y = (cd_x > 0.7).astype(int)
+psi_cd, acc_cd = psi(ref_x, cd_x, edges), np.mean(model(cd_x) == cd_y)
+
+print(f"data drift:     input PSI {psi_dd:5.2f}   accuracy {acc_dd:.2f}")
+print(f"concept drift:  input PSI {psi_cd:5.2f}   accuracy {acc_cd:.2f}")
+assert psi_dd > 0.25 and psi_cd < 0.1          # only data drift shows in the inputs
+assert acc_cd < 0.9 <= acc_dd                  # only concept drift hurt accuracy
+print("data drift is seen without labels; concept drift hides until labels arrive:", True)
+```
+
+Data drift lights up the input PSI while accuracy holds, so input monitoring flags
+it the moment it starts; concept drift leaves the input PSI at zero while accuracy
+falls to $0.80$, so nothing short of labels reveals it. Monitoring a model's
+*predictions* is one thing; judging the *quality* of a generative model's outputs is
+another, which the next lesson takes up as [LLM evaluation](llm-evaluation).

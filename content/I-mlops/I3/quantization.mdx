@@ -1,0 +1,117 @@
+---
+title: "Quantization: affine integer arithmetic"
+pillar: I
+subId: I3
+lessonId: quantization
+order: 3
+estimatedMinutes: 22
+goal: "Map floating-point weights to low-bit integers with an affine scale and zero-point, dequantize back, and bound the rounding error that buys memory and bandwidth."
+prerequisites: ["A/floating-point", "E/quantization"]
+---
+
+A trained model's weights are [floating-point](A/floating-point) numbers, usually
+$16$ or $32$ bits each. **Quantization** stores them in fewer bits, typically $8$
+or even $4$ integer bits, and that is not just a storage trick. For the
+memory-bound decoding that dominates LLM serving, the bottleneck is moving weights
+from memory to the compute units, so halving or quartering the bytes per weight is
+close to a direct latency win. The price is precision: integers cannot represent
+the original values exactly, and the engineering question is how to map floats to
+integers so the error stays small and controlled. The standard answer is **affine
+quantization**.
+
+## The affine map
+
+Take a tensor of weights spanning the range $[\beta_{\min}, \beta_{\max}]$, and a
+budget of $b$ bits, giving integer codes $q \in \{0, 1, \dots, 2^b - 1\}$. An
+affine (linear) map sends a float $x$ to an integer and back. It is fixed by two
+numbers:
+
+- the **scale** $s$, the size of one quantization step, chosen so the float range
+  spans the whole integer range:
+  $$
+  s = \frac{\beta_{\max} - \beta_{\min}}{(2^b - 1) - 0} = \frac{\beta_{\max} - \beta_{\min}}{2^b - 1},
+  $$
+- the **zero-point** $z$, the integer code that represents the float $0$, chosen so
+  that $x = \beta_{\min}$ lands on code $0$:
+  $$
+  z = -\operatorname{round}\!\big(\beta_{\min} / s\big).
+  $$
+
+**Quantize** by dividing out the scale, rounding to the nearest integer, shifting
+by the zero-point, and clamping into range:
+
+$$
+q = \operatorname{clip}\!\Big(\operatorname{round}\!\big(x / s\big) + z,\; 0,\; 2^b - 1\Big).
+$$
+
+**Dequantize** by inverting the affine map (the clip and round are not invertible,
+which is where the error lives):
+
+$$
+\hat{x} = s \,(q - z).
+$$
+
+The zero-point matters because real weight distributions are not symmetric about
+$0$; an asymmetric range like $[-0.2, 0.8]$ would waste codes if forced to be
+symmetric. The affine form spends every code inside the actual range.
+
+## The error is bounded by half a step
+
+How wrong can $\hat{x}$ be? The only lossy operation is the rounding (ignoring
+clamped outliers, which sit at the range ends by construction). Rounding $x/s$ to
+the nearest integer changes it by at most $\tfrac{1}{2}$:
+
+$$
+\big| x/s - \operatorname{round}(x/s) \big| \le \tfrac{1}{2}.
+$$
+
+Multiply through by $s$. Since dequantization multiplies the rounded code back by
+$s$ and the zero-point cancels (it is added in quantize, subtracted in dequantize),
+the reconstruction error is exactly $s$ times the rounding error:
+
+$$
+|x - \hat{x}| \le \frac{s}{2}.
+$$
+
+So **the worst-case error is half a quantization step**, and the step $s$ shrinks
+as the bit budget $b$ grows (more codes across the same range) or as the range
+$[\beta_{\min}, \beta_{\max}]$ tightens. This is why **outliers hurt**: one extreme
+weight stretches the range, inflating $s$ and therefore the error on *every* weight,
+which is the problem the LLM-specific [quantization](E/quantization) schemes
+(per-channel scales, outlier handling) are built to solve.
+
+## Worked example
+
+We quantize a tensor of weights to $8$-bit integers with the affine map,
+dequantize, and confirm both the half-step error bound and the $4\times$ memory
+saving over fp32.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+w = rng.normal(0, 0.1, size=10_000).astype(np.float32)   # fp32 weights
+bits = 8
+qmin, qmax = 0, 2**bits - 1
+beta_min, beta_max = float(w.min()), float(w.max())
+
+scale = (beta_max - beta_min) / (qmax - qmin)            # size of one step
+zero_point = qmin - round(beta_min / scale)              # integer code for 0.0
+
+# Quantize: scale down, round, shift by zero-point, clamp into [0, 255].
+q = np.clip(np.round(w / scale) + zero_point, qmin, qmax).astype(np.uint8)
+# Dequantize: invert the affine map (round + clip are where the error entered).
+deq = (q.astype(np.float32) - zero_point) * scale
+
+err = np.abs(w - deq)
+print(f"scale (one step) = {scale:.2e}")
+print(f"max error        = {err.max():.2e}   bound s/2 = {scale/2:.2e}")
+print(f"mean error       = {err.mean():.2e}")
+assert err.max() <= scale / 2 + 1e-9                     # half-step bound holds
+print(f"memory: fp32 {w.nbytes} B -> int8 {q.nbytes} B  ({w.nbytes // q.nbytes}x smaller)")
+```
+
+Every reconstructed weight lands within half a step of the original, exactly the
+bound, and the tensor shrinks fourfold from fp32 to int8. Quantization shrinks each
+weight; the next lesson shrinks the *number* of weights and the model's depth, with
+[distillation and pruning](distillation-pruning).

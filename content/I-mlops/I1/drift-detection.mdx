@@ -1,0 +1,122 @@
+---
+title: "Detecting data drift: KS statistic and PSI"
+pillar: I
+subId: I1
+lessonId: drift-detection
+order: 5
+estimatedMinutes: 24
+goal: "Quantify how far an incoming data batch has moved from a reference distribution with the Kolmogorov-Smirnov statistic for continuous features and the population stability index for binned ones."
+prerequisites: ["B/hypothesis-testing", "A/kl-cross-entropy"]
+---
+
+A model is trained on one distribution of inputs and then, in production, fed
+whatever the world sends. When the incoming data starts to look different from the
+training data, the model is extrapolating, and its accuracy is no longer
+guaranteed. Catching that *at the input* (before labels arrive, which may take
+weeks) is the job of **data drift detection**: a test that compares a fresh batch
+of feature values against a fixed **reference** sample from training time and
+raises a number when they have moved apart. Two statistics cover most features:
+the Kolmogorov-Smirnov statistic for continuous values and the population
+stability index for binned ones.
+
+## The Kolmogorov-Smirnov statistic
+
+For a continuous feature, the most information you have about a sample is its
+**empirical cumulative distribution function** (ECDF). For a sample
+$x_1, \dots, x_n$, the ECDF at a point $v$ is the fraction of the sample at or
+below $v$:
+
+$$
+F_n(v) = \frac{1}{n}\sum_{i=1}^{n} \mathbf{1}[x_i \le v],
+$$
+
+where $\mathbf{1}[\cdot]$ is $1$ when the condition holds and $0$ otherwise. It is
+a staircase that rises from $0$ to $1$. Two samples that come from the same
+distribution have ECDFs that nearly coincide; two that differ have ECDFs that
+separate.
+
+The **Kolmogorov-Smirnov (KS) statistic** turns that into one number: the largest
+vertical gap between the reference ECDF $F$ and the new-batch ECDF $G$,
+
+$$
+D = \sup_v \big| F(v) - G(v) \big|,
+$$
+
+where $\sup_v$ is the largest value over all thresholds $v$. $D$ lies in
+$[0, 1]$; $0$ means the ECDFs match exactly and larger $D$ means a bigger
+distributional shift. Because both ECDFs only change at observed data points, the
+supremum is attained at one of the pooled sample values, so you evaluate the gap
+there and take the max, no calculus needed. This is exactly the
+[two-sample test statistic](B/hypothesis-testing) from statistics, reused here as
+a monitoring signal: a common production rule is to flag the feature when $D$
+crosses a fixed threshold.
+
+## The population stability index
+
+For a binned or categorical feature, the natural comparison is between two
+**histograms**: the reference proportions $p_i$ in each bin $i$ and the new-batch
+proportions $q_i$. The **population stability index** (PSI) measures their
+divergence:
+
+$$
+\text{PSI} = \sum_{i} (q_i - p_i)\,\ln\!\frac{q_i}{p_i}.
+$$
+
+Each term scores one bin: $(q_i - p_i)$ is how much the bin's mass changed and
+$\ln(q_i/p_i)$ is the log-ratio of the two proportions, so a bin contributes only
+when its share actually moved, and contributes more when it moved by a large
+relative amount. PSI is symmetric in $p$ and $q$ (swapping them leaves each term
+unchanged) and it is exactly the **symmetrized [KL divergence](A/kl-cross-entropy)**
+between the two histograms, which is why it reads as a distance between
+distributions. The industry rules of thumb are stable: $\text{PSI} < 0.1$ is no
+meaningful shift, $0.1 \le \text{PSI} < 0.25$ is moderate drift worth watching,
+and $\text{PSI} \ge 0.25$ is major drift that usually warrants retraining. Bins are
+floored at a tiny $\varepsilon$ so an empty bin never makes the log blow up.
+
+## Worked example
+
+We compute the KS statistic between a reference sample and two batches (one
+in-distribution, one shifted), then the PSI on the same data binned with the
+reference edges.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+ref      = rng.normal(0.0, 1.0, size=5000)   # training-time reference
+same     = rng.normal(0.0, 1.0, size=5000)   # in-distribution new batch
+shifted  = rng.normal(0.6, 1.0, size=5000)   # mean shifted right by 0.6
+
+def ks_stat(a, b):
+    # Largest vertical gap between the two ECDFs, evaluated at the pooled points.
+    grid = np.sort(np.concatenate([a, b]))
+    Fa = np.searchsorted(np.sort(a), grid, side="right") / a.size
+    Fb = np.searchsorted(np.sort(b), grid, side="right") / b.size
+    return np.max(np.abs(Fa - Fb))
+
+def psi(a, b, edges, eps=1e-6):
+    # Bin both samples on fixed reference edges, then symmetrized KL on the shares.
+    p = np.histogram(a, edges)[0] / a.size
+    q = np.histogram(b, edges)[0] / b.size
+    p, q = np.maximum(p, eps), np.maximum(q, eps)
+    return np.sum((q - p) * np.log(q / p))
+
+print(f"KS  same    = {ks_stat(ref, same):.3f}")
+print(f"KS  shifted = {ks_stat(ref, shifted):.3f}")
+
+edges = np.quantile(ref, np.linspace(0, 1, 11))   # 10 equal-mass reference bins
+edges[0], edges[-1] = -np.inf, np.inf             # catch the tails of new batches
+print(f"PSI same    = {psi(ref, same, edges):.3f}")
+print(f"PSI shifted = {psi(ref, shifted, edges):.3f}")
+
+assert ks_stat(ref, shifted) > ks_stat(ref, same)
+assert psi(ref, shifted, edges) > 0.25 > psi(ref, same, edges)
+print("both statistics flag the shifted batch:", True)
+```
+
+Both statistics stay near zero for the in-distribution batch and jump for the
+shifted one, with PSI clearing the $0.25$ "retrain" threshold while the matched
+batch stays well under $0.1$. These are the same comparisons we will run *over
+time* on a live model in [production drift monitoring](I4/production-drift);
+first, the next subsection turns to the infrastructure that *trains* the models
+whose inputs we are now watching.

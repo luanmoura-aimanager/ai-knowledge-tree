@@ -1,0 +1,94 @@
+---
+title: "Experiment tracking, lineage, and reproducibility"
+pillar: I
+subId: I2
+lessonId: experiment-tracking
+order: 1
+estimatedMinutes: 20
+goal: "Log the inputs (code, data, config, seed) and outputs (metrics, artifacts) of every run so results are comparable and reproducible, and see why fixing the seed alone is not enough."
+prerequisites: ["I1/data-versioning", "A/sgd"]
+---
+
+Training a model is an experiment, and an experiment that cannot be reproduced is
+not a result. A month after a promising run you will want to ask: what data was
+this trained on, what hyperparameters, what code, and can I get the same number
+again? **Experiment tracking** (Weights & Biases, MLflow) answers those questions
+by recording, for every run, the full set of *inputs* and *outputs*. The discipline
+behind it is **lineage**: a run's metric is reproducible only if everything that
+fed into it was captured.
+
+## What a run is a function of
+
+Treat a training run as a function. Its output (a metric, a checkpoint) is
+determined by a set of inputs:
+
+- **Code.** The exact version of the training program, pinned by a Git commit
+  hash.
+- **Data.** The exact dataset version, pinned by the [content hash](I1/data-versioning)
+  of its snapshot, not just a file path that may have changed underneath you.
+- **Config.** Every hyperparameter: learning rate, batch size, architecture,
+  number of steps.
+- **Seed.** The seed for the random number generator that drives weight
+  initialization, data shuffling, and any stochastic layer.
+- **Environment.** Library versions and hardware, which can change numerics.
+
+A tracker logs all of these alongside the outputs (metrics over time, the final
+checkpoint, sample predictions). Two runs are **comparable** only when they differ
+in exactly the input you are studying and agree on everything else, which is why
+logging all the inputs, not just the one you are sweeping, is the whole point.
+
+## Why the seed is not enough
+
+A common mistake is to believe that fixing the random seed makes a run
+reproducible. It makes the run reproducible *given that every other input is held
+fixed*. The seed determines the *sequence of random numbers*, but the metric is a
+function of that sequence **and** the data it is applied to and the config that
+shapes the update. Change the data version while keeping the seed, and the same
+random draws act on different data, producing a different result. The seed is one
+input among several; reproducibility requires pinning the whole tuple. This is
+precisely the lineage record, and it is what lets a tracker say "rerun this exact
+experiment" and mean it.
+
+## Worked example
+
+A toy "training" run consumes seeded random draws to perturb a dataset and returns
+a final metric. We show that the same `(seed, data)` reproduces exactly, the same
+seed on a *new data version* does not, and only the full lineage tuple identifies a
+reproducible result.
+
+```python
+import numpy as np, hashlib
+
+def train(seed, data):
+    # Deterministic given (seed, data): seeded noise added to the data's signal.
+    rng = np.random.default_rng(seed)
+    updates = rng.normal(0, 0.1, size=data.size)   # seed drives the "stochastic" part
+    return float(np.mean(data + updates))          # metric depends on BOTH inputs
+
+def data_hash(d):
+    return hashlib.sha256(d.tobytes()).hexdigest()[:8]
+
+data_v1 = np.arange(100, dtype=np.float64)
+data_v2 = data_v1.copy(); data_v2[0] = 999.0       # a new data version: one row changed
+
+# Same seed AND same data -> bit-identical metric (true reproduction).
+assert train(42, data_v1) == train(42, data_v1)
+
+# Same seed, DIFFERENT data version -> different metric. Seed alone did not pin it.
+m_v1 = train(42, data_v1)
+m_v2 = train(42, data_v2)
+print(f"seed=42 on data {data_hash(data_v1)}: metric={m_v1:.4f}")
+print(f"seed=42 on data {data_hash(data_v2)}: metric={m_v2:.4f}")
+assert m_v1 != m_v2
+
+# The reproducible identity of a run is the full lineage tuple, not the seed.
+lineage = {"code": "a1b2c3d", "data": data_hash(data_v1), "seed": 42, "lr": 0.01}
+print("run lineage:", lineage)
+print("metric reproducible from full lineage:", train(42, data_v1) == m_v1)
+```
+
+The two runs share a seed yet land on different metrics because they ran on
+different data versions, which is exactly why a tracker logs the data hash beside
+the seed. With runs now individually reproducible, the next question is how to
+*choose* the config in the first place, the [hyperparameter search](hyperparameter-search)
+problem.
