@@ -19,22 +19,22 @@ export const J_CURRICULUM: Record<string, Lesson[]> = {
       title: "RAG from scratch: chunk, embed, retrieve",
       goal: "Build the retrieval-augmented generation loop end to end: split documents into chunks, embed them, and retrieve the top-k most similar chunks by cosine similarity to ground a model's answer.",
       prerequisites: [
-        "E/rag-fundamentals",
-        "E/dense-retrieval",
-        "A/inner-products",
+        "E6/rag-fundamentals",
+        "E6/dense-retrieval",
+        "A1/inner-products",
       ],
     },
     {
       id: "tool-use",
       title: "Native tool use and schema injection",
       goal: "Give a model the ability to call functions by injecting tool schemas, parsing the structured call it emits, dispatching to real code, and feeding the result back.",
-      prerequisites: ["E/function-calling"],
+      prerequisites: ["E6/function-calling"],
     },
     {
       id: "react-loop",
       title: "The ReAct loop by hand",
       goal: "Implement the reason-act-observe loop that turns a single tool call into multi-step agency, alternating model thoughts with tool actions until it reaches an answer.",
-      prerequisites: ["tool-use", "E/react-agents"],
+      prerequisites: ["tool-use", "E6/react-agents"],
     },
     {
       id: "agent-frameworks",
@@ -70,13 +70,13 @@ export const J_CURRICULUM: Record<string, Lesson[]> = {
       id: "llm-as-judge",
       title: "Evaluation with LLM-as-judge",
       goal: "Score open-ended outputs with a model judge, measure whether the judge agrees with humans using Cohen's kappa, and build a regression suite that catches quality drops before release.",
-      prerequisites: ["I4/llm-evaluation", "B/ab-testing"],
+      prerequisites: ["I4/llm-evaluation", "B4/ab-testing"],
     },
     {
       id: "production-rag",
       title: "Production RAG: chunking and reranking",
       goal: "Move past naive RAG with deliberate chunking and a two-stage retrieve-then-rerank pipeline, and quantify the ranking-quality gain a reranker buys with nDCG.",
-      prerequisites: ["J1/rag-from-scratch", "E/advanced-rag"],
+      prerequisites: ["J1/rag-from-scratch", "E6/advanced-rag"],
     },
     {
       id: "lakehouse-architecture",
@@ -134,14 +134,14 @@ export const J_CURRICULUM: Record<string, Lesson[]> = {
       id: "when-not-to-finetune",
       title: "When not to fine-tune",
       goal: "Reach for prompting, RAG, and long context before fine-tuning, and recognize the narrow conditions (stable task, latency or format constraints, enough data) where fine-tuning actually pays.",
-      prerequisites: ["J2/production-rag", "E/sft"],
+      prerequisites: ["J2/production-rag", "E4/sft"],
       codeExempt: true,
     },
     {
       id: "lora-qlora",
       title: "LoRA and QLoRA: the parameter budget",
       goal: "Count exactly how few parameters a low-rank adapter trains, and see how QLoRA's quantized base weights make fine-tuning a large model fit on one GPU.",
-      prerequisites: ["E/lora", "I3/quantization"],
+      prerequisites: ["E4/lora", "I3/quantization"],
     },
     {
       id: "dspy-context-engineering",
@@ -154,7 +154,7 @@ export const J_CURRICULUM: Record<string, Lesson[]> = {
       id: "multi-agent-orchestration",
       title: "Multi-agent orchestration",
       goal: "Decompose a hard task across a supervisor and specialized workers with explicit handoffs and shared memory, and weigh that against the simpler single-agent baseline.",
-      prerequisites: ["J1/langgraph-state-machines", "E/multi-agent"],
+      prerequisites: ["J1/langgraph-state-machines", "E6/multi-agent"],
       codeExempt: true,
     },
     {
@@ -182,7 +182,7 @@ export const J_CURRICULUM: Record<string, Lesson[]> = {
       id: "vector-infra-ann",
       title: "Vector infrastructure: approximate nearest neighbors",
       goal: "Scale retrieval past brute-force search with an approximate nearest-neighbor index, and measure the recall-versus-speed tradeoff that every vector database is built around.",
-      prerequisites: ["E/dense-retrieval", "A/probabilistic-structures"],
+      prerequisites: ["E6/dense-retrieval", "A5/probabilistic-structures"],
     },
     {
       id: "hybrid-search-rrf",
