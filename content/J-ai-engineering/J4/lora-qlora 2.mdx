@@ -1,0 +1,92 @@
+---
+title: "LoRA and QLoRA: the parameter budget"
+pillar: J
+subId: J4
+lessonId: lora-qlora
+order: 2
+estimatedMinutes: 22
+goal: "Count exactly how few parameters a low-rank adapter trains, and see how QLoRA's quantized base weights make fine-tuning a large model fit on one GPU."
+prerequisites: ["E4/lora", "I3/quantization"]
+---
+
+Once you have [decided to fine-tune](when-not-to-finetune), the next obstacle is cost.
+Full fine-tuning updates every weight, which means storing gradients and optimizer state
+for *all* of them, the [$16$ bytes-per-parameter](I2/memory-and-sharding) bill that puts
+a large model out of reach on modest hardware. **LoRA** (low-rank adaptation) and its
+quantized cousin **QLoRA** sidestep this by training a tiny fraction of the parameters.
+The [method](E/lora) was introduced on the NLP side; here we count the budget, because
+the numbers are what make the technique worth using.
+
+## The parameter count
+
+Fine-tuning adapts a weight matrix $W$ of shape $d \times d$ by learning an update
+$\Delta W$. Full fine-tuning lets $\Delta W$ be an arbitrary $d \times d$ matrix, $d^2$
+trainable parameters. LoRA's bet is that the *useful* update is **low-rank**: it can be
+written as a product of two thin matrices,
+
+$$
+\Delta W = A B, \qquad A \in \mathbb{R}^{d \times r}, \quad B \in \mathbb{R}^{r \times d},
+$$
+
+with the **rank** $r$ chosen small (often $8$ or $16$). Any product $AB$ has rank at most
+$r$, so this restricts the update to a low-rank subspace, the assumption being that
+adapting a pretrained model to a task does not need the full $d^2$ degrees of freedom.
+The trainable parameter count drops from $d^2$ to
+
+$$
+2 d r \quad\text{(the entries of } A \text{ and } B\text{)},
+$$
+
+a ratio of $2dr / d^2 = 2r/d$. For $d = 4096$ and $r = 8$ that is $2 \cdot 8 / 4096
+\approx 0.4\%$. The frozen base weights $W$ are untouched; at inference you compute $Wx +
+A(Bx)$, and the adapter is a tiny file you can swap per task. Training under $1\%$ of the
+parameters means under $1\%$ of the gradient and optimizer-state memory, which is the
+whole point.
+
+## QLoRA: quantize the frozen base
+
+LoRA shrinks the *trainable* memory, but the frozen base weights $W$ still have to sit in
+memory to compute the forward pass, and for a large model that alone can exceed a single
+GPU. **QLoRA** removes that obstacle by storing the frozen base in **4-bit**
+[quantized](I3/quantization) form instead of 16-bit. Since $W$ is never updated, the
+precision loss from quantizing it is tolerable, and the memory for the base drops
+fourfold ($16$ bits to $4$). The small LoRA adapters stay in full precision (they *are*
+trained), and gradients flow through the quantized base to update them. The combination,
+4-bit frozen base plus tiny full-precision adapters, is what lets a model that would need
+multiple GPUs for full fine-tuning be tuned on a single one.
+
+## Worked example
+
+We count the trainable parameters for one weight matrix under full versus LoRA fine-
+tuning, confirm the update is low-rank, and compute QLoRA's base-weight memory saving.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+d, r = 4096, 8
+full_ft = d * d                  # full fine-tuning trains every entry of W
+lora_ft = 2 * d * r              # LoRA trains only A (d x r) and B (r x d)
+print(f"full fine-tune: {full_ft:,} params")
+print(f"LoRA (r={r}):   {lora_ft:,} params  ({lora_ft / full_ft:.2%} of full)")
+assert lora_ft / full_ft < 0.005
+
+# The update dW = A @ B has rank at most r (shown on a small matrix for speed).
+A = rng.normal(size=(64, r)); B = rng.normal(size=(r, 64))
+dW = np.dot(A, B)
+print(f"\ndW shape {dW.shape}, rank {np.linalg.matrix_rank(dW)} (<= r = {r})")
+assert np.linalg.matrix_rank(dW) <= r
+
+# QLoRA: store the frozen base weights in 4-bit instead of 16-bit.
+mem16 = full_ft * 2              # bytes at fp16 (2 bytes/param)
+mem4 = full_ft * 0.5            # bytes at 4-bit (0.5 bytes/param)
+print(f"\nbase weights: {mem16 / 1e6:.1f} MB at 16-bit -> {mem4 / 1e6:.1f} MB at 4-bit "
+      f"({mem16 / mem4:.0f}x less)")
+assert mem16 / mem4 == 4
+```
+
+LoRA trains $0.39\%$ of the parameters of a full fine-tune, the update really is rank
+$r$, and QLoRA's 4-bit base cuts the frozen-weight memory fourfold, the three numbers
+that together put fine-tuning a large model within reach of one GPU. Adapting the weights
+is one lever on quality; optimizing the *prompt* programmatically is another, which is
+[DSPy](dspy-context-engineering).

@@ -1,0 +1,95 @@
+---
+title: "Hybrid search and reciprocal rank fusion"
+pillar: J
+subId: J5
+lessonId: hybrid-search-rrf
+order: 4
+estimatedMinutes: 22
+goal: "Combine dense (semantic) and sparse (keyword) retrieval with reciprocal rank fusion, and show why fusing two rankings beats either one on queries where they disagree."
+prerequisites: ["J2/production-rag", "vector-infra-ann"]
+---
+
+Dense [vector retrieval](vector-infra-ann) is powerful but has a blind spot: because it
+matches on *meaning*, it can miss an exact term the user actually typed, a product code, a
+function name, a rare proper noun, that carries no semantic neighborhood. Classic keyword
+search (BM25) has the opposite profile: it nails exact terms but is blind to synonyms and
+paraphrase. **Hybrid search** runs both and fuses their results, and the elegant way to fuse
+them is **reciprocal rank fusion** (RRF), which combines rankings without needing their
+scores to be comparable.
+
+## Two retrievers, opposite strengths
+
+The two retrieval families fail in complementary ways:
+
+- **Dense (semantic).** Embeds query and documents and ranks by [similarity](vector-infra-ann).
+  Strong on meaning and paraphrase ("car" matches "automobile"); weak on exact, rare tokens
+  it never learned a good embedding for.
+- **Sparse (lexical, BM25).** Ranks by weighted term overlap. Strong on exact matches and
+  rare keywords; blind to synonyms and to meaning.
+
+Neither dominates. On any given query one may be right and the other wrong, so the goal is a
+combiner that takes the best of both rather than betting on one.
+
+## Why fuse ranks, not scores
+
+The obvious idea, add the two retrievers' scores, fails: a cosine similarity (roughly
+$[-1,1]$) and a BM25 score (unbounded, corpus-dependent) live on **incomparable scales**, so
+summing them lets whichever has the larger numbers dominate arbitrarily. **Reciprocal rank
+fusion** sidesteps this by throwing away the scores and keeping only the **ranks**, which are
+always $1, 2, 3, \dots$ for every retriever. For a document $d$, RRF sums a reciprocal of its
+rank in each retriever's list:
+
+$$
+\text{RRF}(d) = \sum_{r \in \text{retrievers}} \frac{1}{K + \text{rank}_r(d)},
+$$
+
+where $\text{rank}_r(d)$ is $d$'s position in retriever $r$ (or effectively infinite if $d$ is
+absent), and $K$ is a constant (commonly $60$) that damps the influence of the very top
+ranks so a single first-place finish cannot dominate. The final ranking sorts documents by
+$\text{RRF}(d)$ descending.
+
+The reason fusion *wins* is statistical: the two retrievers are largely **independent** error
+sources, so a relevant document is unlikely to rank poorly in *both*. A document that lands
+high on either list gets a meaningful reciprocal contribution, and one that lands high on
+both rises decisively. Fusing two noisy-but-independent rankings concentrates the relevant
+documents at the top, exactly the variance-reduction logic of averaging independent signals.
+
+## Worked example
+
+Two independent retrievers each rank a relevant document with a noisy signal. We compare the
+mean reciprocal rank (MRR) of the relevant document under each retriever alone against RRF.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+M, Q, K = 20, 3000, 60        # docs per query, queries, RRF constant
+
+def ranks_from_scores(scores):                 # rank 1 = highest score
+    order = np.argsort(scores)[::-1]
+    r = np.empty(scores.size, int)
+    r[order] = np.arange(1, scores.size + 1)
+    return r
+
+gold = 0                                        # document 0 is the relevant one
+dense_rr, sparse_rr, rrf_rr = [], [], []
+for _ in range(Q):
+    ds = rng.normal(0, 1, M); ds[gold] += 1.2   # dense: noisy positive signal on gold
+    ss = rng.normal(0, 1, M); ss[gold] += 1.2   # sparse: an INDEPENDENT noisy signal
+    rd, rs = ranks_from_scores(ds), ranks_from_scores(ss)
+    rrf_score = 1/(K + rd) + 1/(K + rs)          # fuse by reciprocal ranks
+    rrf_rank = ranks_from_scores(rrf_score)
+    dense_rr.append(1/rd[gold])                  # reciprocal rank of the relevant doc
+    sparse_rr.append(1/rs[gold])
+    rrf_rr.append(1/rrf_rank[gold])
+
+print(f"MRR dense  = {np.mean(dense_rr):.3f}")
+print(f"MRR sparse = {np.mean(sparse_rr):.3f}")
+print(f"MRR fused  = {np.mean(rrf_rr):.3f}")
+assert np.mean(rrf_rr) > max(np.mean(dense_rr), np.mean(sparse_rr))
+print("RRF beats either retriever alone:", True)
+```
+
+Each retriever alone lands the relevant document at an MRR around $0.46$; fusing their ranks
+lifts it to $0.59$, because the document rarely ranks badly in *both* independent lists. The
+index has to stay fresh as documents and embedding models change, which is the
+[streaming and embedding-lifecycle](streaming-embeddings) problem that closes the subsection.

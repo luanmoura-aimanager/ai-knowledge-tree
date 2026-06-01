@@ -1,0 +1,95 @@
+---
+title: "Capacity and cost modeling"
+pillar: J
+subId: J7
+lessonId: capacity-cost-modeling
+order: 5
+estimatedMinutes: 22
+goal: "Size an AI system from first principles: turn a traffic estimate into a token rate, a GPU count, and a monthly bill, the back-of-the-envelope model an architect defends a design with."
+prerequisites: ["I3/llm-serving", "I4/cost-monitoring"]
+---
+
+[System design](system-design-for-ai) named scale, latency, and cost as the requirements that drive
+the architecture. This final lesson makes them quantitative. An architect must be able to take a
+traffic estimate and, in a few lines of arithmetic, produce the hardware count and the monthly bill,
+the **capacity model** that turns "it needs to be fast and cheap" into defensible numbers. It chains
+the [serving throughput](I3/llm-serving) and [per-token cost](I4/cost-monitoring) from MLOps into one
+back-of-the-envelope estimate, the kind you defend a design with in a review.
+
+## The chain: traffic to dollars
+
+The model is a short chain of multiplications and one division, each link a quantity you can estimate:
+
+- **Traffic to token rate.** Peak requests per second times tokens per request gives the **token
+  throughput** the system must sustain at peak:
+  $$
+  R_{\text{tok}} = \text{QPS}_{\text{peak}} \times \text{tokens per request}.
+  $$
+  Size for the **peak**, not the average, or the system falls over exactly when it is busiest.
+- **Token rate to GPU count.** Divide the required token rate by what one GPU delivers, the
+  [serving throughput](I3/llm-serving) $r$, but derate it by a **utilization target** below $100\%$ so
+  there is headroom for bursts and no GPU runs pinned. Round up, since you cannot buy a fraction of a
+  GPU:
+  $$
+  N_{\text{GPU}} = \left\lceil \frac{R_{\text{tok}}}{r \cdot u} \right\rceil.
+  $$
+- **GPU count to cost.** Multiply by the hours in a month and the GPU hourly price:
+  $$
+  \text{monthly} = N_{\text{GPU}} \times H \times p_{\text{GPU-hr}}.
+  $$
+
+Every link is an estimate, so the output is an estimate, but a *structured* one: you can see which
+assumption each number rests on, and stress-test it. That is the whole value, not false precision but a
+defensible chain from a business number (traffic) to an engineering one (GPUs) to a financial one
+(dollars).
+
+## Reading the model
+
+A capacity model earns its keep in the questions it answers instantly. **Sensitivity:** because the chain
+is roughly linear, doubling traffic roughly doubles the GPU count and the bill, so you can quote the cost
+of growth on the spot. **Where the cost lives:** the levers are visible, a higher per-GPU throughput $r$
+(from [continuous batching](I3/llm-serving) or [quantization](I3/quantization)) cuts the GPU count
+proportionally, and a [cascade or cache](J4/cost-latency-routing) that lowers the effective token rate
+does the same upstream. **Build-vs-buy and commitment:** the monthly number is the input to the
+[reserved-versus-on-demand](J6/finops-for-ai) decision. The model is where every optimization in pillars
+I and J shows up as a number on the bill.
+
+## Worked example
+
+We size a service from a peak-traffic estimate to a GPU count and a monthly cost, read off the implied
+per-request cost, and check the sensitivity to a traffic doubling.
+
+```python
+import numpy as np
+
+peak_qps       = 50       # requests/sec at peak
+tokens_per_req = 800      # input + output tokens per request
+gpu_throughput = 2500     # tokens/sec sustained per GPU
+util_target    = 0.70     # headroom: don't provision for 100% utilization
+price_gpu_hr   = 3.0      # $/GPU-hour
+H = 730                   # hours per month
+
+def plan(qps):
+    tok_s = qps * tokens_per_req                          # required token throughput
+    gpus = int(np.ceil(tok_s / (gpu_throughput * util_target)))   # round up
+    monthly = gpus * H * price_gpu_hr
+    return tok_s, gpus, monthly
+
+tok_s, gpus, monthly = plan(peak_qps)
+print(f"peak load: {peak_qps} qps x {tokens_per_req} tok = {tok_s:,} tok/s")
+print(f"GPUs needed (at {util_target:.0%} target util): {gpus}")
+print(f"monthly capacity cost: ${monthly:,.0f}")
+
+cost_per_tok = price_gpu_hr / (gpu_throughput * 3600)     # cross-check vs per-request cost
+print(f"implied cost/request: ${cost_per_tok * tokens_per_req:.5f}")
+
+_, gpus2, monthly2 = plan(2 * peak_qps)                   # sensitivity: double the traffic
+print(f"at 2x traffic: {gpus2} GPUs, ${monthly2:,.0f}/mo")
+assert gpus2 >= 2 * gpus - 1                              # scales ~linearly with load
+```
+
+Fifty peak queries per second of $800$-token requests need $23$ GPUs and about $\$50{,}000$ a month, an
+implied $\$0.00027$ per request, and doubling the traffic roughly doubles both, the numbers an architect
+puts on the table to justify a design. With this, the pillar, and the tree, is complete: from the linear
+algebra of pillar A to the capacity model that prices a production AI system, every layer from the math to
+the monthly bill.
