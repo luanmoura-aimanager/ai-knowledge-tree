@@ -1,0 +1,110 @@
+---
+title: "Vector infrastructure: approximate nearest neighbors"
+pillar: J
+subId: J5
+lessonId: vector-infra-ann
+order: 3
+estimatedMinutes: 24
+goal: "Scale retrieval past brute-force search with an approximate nearest-neighbor index, and measure the recall-versus-speed tradeoff that every vector database is built around."
+prerequisites: ["E/dense-retrieval", "A/probabilistic-structures"]
+---
+
+[RAG retrieval](J1/rag-from-scratch) ranks chunks by [similarity](E/dense-retrieval) to the
+query. Done exactly, that means comparing the query against *every* vector in the index, an
+$O(N)$ brute-force scan. With a few thousand vectors that is instant; with a hundred million
+it is hopeless at interactive latency. Every vector database (pgvector, Pinecone, Weaviate,
+FAISS) is built around the same escape: give up *exactly* the right neighbors for *almost*
+the right neighbors, computed far faster. This is **approximate nearest neighbor** (ANN)
+search, and the central object is the recall-versus-speed tradeoff it exposes.
+
+## Why exact search does not scale
+
+Exact k-nearest-neighbor search has no shortcut in high dimensions: to be *sure* of the top
+$k$, you must score all $N$ candidates, because any unscored vector could be the closest.
+The cost grows linearly with the corpus, and at scale the query latency budget is blown long
+before you finish. ANN indexes break the $O(N)$ barrier by **not looking at most of the
+vectors**, accepting that they will occasionally miss a true neighbor.
+
+## The inverted-file idea
+
+One simple, widely-used ANN scheme is the **inverted file** (IVF). Build the index in two
+steps: pick $C$ representative **centroids** (cluster centers), and assign every vector to
+its nearest centroid, partitioning the corpus into $C$ buckets. At query time, instead of
+scanning all $N$ vectors:
+
+```mermaid
+graph LR
+  Q["query"] --> CEN["score C centroids"]
+  CEN --> PR["pick the n_probe<br/>nearest buckets"]
+  PR --> SC["scan only those<br/>buckets' members"]
+  SC --> TOP["top-k"]
+```
+
+- Score the query against the $C$ centroids (cheap, $C \ll N$).
+- Pick the `n_probe` nearest buckets.
+- Scan only the vectors in those buckets for the top $k$.
+
+The comparison count drops from $N$ to roughly $C + N \cdot (\texttt{n\_probe} / C)$: the
+centroid scan plus the members of a few buckets. The approximation: a true neighbor sitting
+in a bucket you did not probe is *missed*. (Production indexes like HNSW use a navigable
+graph rather than buckets, but the same tradeoff governs them; the idea here is the
+[probabilistic-structure](A/probabilistic-structures) instinct of trading exactness for
+speed.)
+
+## Recall versus speed
+
+The quality of an ANN search is its **recall@k**: of the true top-$k$ neighbors (what exact
+search would return), what fraction did the approximate search actually find?
+
+$$
+\text{recall@}k = \frac{|\text{approx top-}k \,\cap\, \text{exact top-}k|}{k}.
+$$
+
+`n_probe` is the dial. Probe more buckets and recall rises toward $1$ but you scan more
+vectors (slower); probe fewer and you go faster but miss more. **There is no free lunch**:
+every vector database exposes this knob, and tuning it to the application's tolerance for
+misses against its latency budget is the core operational decision of running one.
+
+## Worked example
+
+We build an IVF index over $6000$ vectors and sweep `n_probe`, measuring recall@10 and the
+comparison count against exact brute-force search.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+N, d, C = 6000, 16, 64
+
+centers = rng.normal(0, 1.6, size=(C, d))            # cluster centers
+labels = rng.integers(0, C, size=N)
+data = centers[labels] + rng.normal(0, 1.0, size=(N, d))
+
+def sqdist(q, pts):
+    return ((pts - q) ** 2).sum(axis=-1)
+
+# Build the IVF index: assign each vector to its nearest centroid (its bucket).
+assign = np.stack([sqdist(c, data) for c in centers]).argmin(axis=0)
+
+k = 10
+queries = rng.normal(0, 1.6, size=(200, d)) + rng.normal(0, 1.0, size=(200, d))
+exact_sets = [set(np.argsort(sqdist(q, data))[:k]) for q in queries]   # ground truth
+
+print(f"{'n_probe':>7} {'recall@10':>10} {'comparisons':>12}")
+for n_probe in [1, 4, 16]:
+    recalls, comps = [], []
+    for q, exact in zip(queries, exact_sets):
+        probes = np.argsort(sqdist(q, centers))[:n_probe]     # nearest buckets
+        cand = np.where(np.isin(assign, probes))[0]           # only their members
+        approx = set(cand[np.argsort(sqdist(q, data[cand]))[:k]])
+        recalls.append(len(exact & approx) / k)
+        comps.append(C + cand.size)
+    print(f"{n_probe:>7} {np.mean(recalls):>10.3f} {np.mean(comps):>12.0f}")
+
+print(f"exact search: {N} comparisons per query (recall 1.000 by definition)")
+```
+
+Probing one bucket finds under half the true neighbors but scans only $\sim 160$ of $6000$
+vectors; probing sixteen recovers $99\%$ of them while still scanning a quarter of the
+corpus. That curve, recall climbing with comparisons, *is* the vector-database tuning knob.
+A single index answers one query type; combining a vector index with keyword search is
+[hybrid search](hybrid-search-rrf).
