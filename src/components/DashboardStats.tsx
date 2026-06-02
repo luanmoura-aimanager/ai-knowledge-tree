@@ -1,29 +1,34 @@
 import { globalStats } from "@/lib/dag";
-import { lessonCount } from "@/lib/curriculum";
+import { allLessons, lessonCount, lessonKey } from "@/lib/curriculum";
 import type { ProgressMap } from "@/lib/progress";
 
 /**
- * Big-number cards. Anonymous: the domain map (topics, coverage, connections).
- * Signed-in: the user's own study state: subsections studied / in-progress /
- * remaining: alongside the fixed domain totals.
+ * Big-number cards. Anonymous: lesson-centric map of the curriculum (lessons,
+ * authored, pillars, connections). Signed-in: the user's own study state
+ * (studied / in progress / remaining) counted over real lessons.
  */
 export function DashboardStats({
   signedIn,
   progress,
+  availableLessons = 0,
 }: {
   signedIn?: boolean;
   progress?: ProgressMap;
+  availableLessons?: number;
 }) {
   const s = globalStats();
+  const total = lessonCount();
 
   if (signedIn && progress) {
-    const studied = [...progress.values()].filter(
-      (v) => v === "studied",
-    ).length;
-    const inProgress = [...progress.values()].filter(
-      (v) => v === "in-progress",
-    ).length;
-    const total = lessonCount();
+    // Count over real lessons only, so this matches the per-pillar badges
+    // (raw map values could include keys for removed/renamed lessons).
+    let studied = 0;
+    let inProgress = 0;
+    for (const l of allLessons()) {
+      const st = progress.get(lessonKey(l.subId, l.id));
+      if (st === "studied") studied++;
+      else if (st === "in-progress") inProgress++;
+    }
     const remaining = Math.max(0, total - studied - inProgress);
     const pct = total > 0 ? Math.round((studied / total) * 100) : 0;
     return (
@@ -58,33 +63,23 @@ export function DashboardStats({
     );
   }
 
-  const pctOverall = Math.round(((s.cov + s.par * 0.5) / s.total) * 100);
+  const pctAvail = total > 0 ? Math.round((availableLessons / total) * 100) : 0;
   return (
     <Wrap>
       <BigStat
-        n={s.total}
-        label="Topics"
+        n={total}
+        label="Lessons"
         sub={`${s.nPillars} pillars · ${s.nSubsections} subsections`}
       />
       <BigStat
-        n={s.cov}
-        label="✓ Covered"
-        sub={`${pctOverall}% of the map`}
+        n={availableLessons}
+        label="✓ Available"
+        sub={`${pctAvail}% authored`}
         color="var(--good)"
       />
-      <BigStat
-        n={s.par}
-        label="◐ Partial"
-        sub="mentioned"
-        color="var(--partial)"
-      />
-      <BigStat n={s.gap} label="○ Gaps" sub="to expand" color="var(--gap)" />
-      <BigStat
-        n={s.hot}
-        label="★ Hot"
-        sub={`${s.hotGap} hot gaps`}
-        color="var(--hot)"
-      />
+      <BigStat n={s.nPillars} label="Pillars" sub="subject areas" />
+      <BigStat n={s.nSubsections} label="Disciplines" sub="subsections" />
+      <BigStat n={s.total} label="Topics" sub="in the domain" />
       <BigStat
         n={s.nConnections}
         label="🔗 Connections"

@@ -17,13 +17,22 @@ export function StudyProgressControls({
   initial: ProgressStatus | null;
 }) {
   const [status, setLocal] = useState<ProgressStatus | null>(initial);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const apply = (next: ProgressStatus | null) => {
+    const prev = status;
     setLocal(next);
+    setFailed(false);
     startTransition(async () => {
-      if (next === null) await clearStatus(itemKey);
-      else await setStatus(itemKey, next);
+      const res =
+        next === null
+          ? await clearStatus(itemKey)
+          : await setStatus(itemKey, next);
+      if (!res.ok) {
+        setLocal(prev); // revert optimistic update so the UI never lies
+        setFailed(true);
+      }
     });
   };
 
@@ -43,6 +52,11 @@ export function StudyProgressControls({
       >
         ◐ In progress
       </button>
+      {failed && (
+        <span className="text-xs text-[var(--hot)]">
+          Couldn&apos;t save: please try again.
+        </span>
+      )}
     </div>
   );
 }

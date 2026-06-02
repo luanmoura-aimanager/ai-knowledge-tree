@@ -29,6 +29,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Foundations",
     tagline: "Math, prob, opt, numerical, DSA",
     color: "#e0af68",
+    intro:
+      "Foundations is the mathematical and computational bedrock the rest of the tree stands on. Every model you will meet later is, underneath, linear algebra applied to data, a probability model fit by optimization, and an algorithm that has to run in finite time and memory. This pillar builds those four pieces from first principles so that nothing downstream has to be taken on faith.\n\nYou will start with linear algebra (vector spaces, eigenstructure, the SVD, and the matrix factorizations that power least squares and PCA), then probability and information theory (distributions, Bayes' rule, entropy and KL divergence, the language of all modeling under uncertainty). From there you turn to optimization theory (gradient methods, convexity, the KKT conditions, and the Adam family that trains real networks), then to numerical methods (floating point, conditioning, and stability, the difference between math that works on paper and code that works at scale). The pillar closes with the data structures and algorithms you need to make any of it tractable.\n\nTreat this as the reference you will return to. You do not need to master every lesson before moving on, but the more fluent you are here, the less the later pillars will feel like magic.",
+    prerequisites: [
+      "Single-variable calculus: derivatives, the chain rule, and integrals.",
+      "Comfort reading and writing basic Python (loops, functions, arrays).",
+      "High-school algebra and trigonometry; familiarity with vectors and matrices helps but is rebuilt from scratch in A1.",
+    ],
     subs: [
       {
         id: "A1",
