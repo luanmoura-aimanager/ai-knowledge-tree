@@ -14,7 +14,11 @@ set -eu
 
 root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
-# -print before -delete so the run is auditable in CI / logs.
+# Use `-prune ... -exec rm` rather than `-delete`: GNU find makes `-delete`
+# auto-enable `-depth`, which is a FATAL error when combined with `-prune`
+# (it deploys fine on macOS BSD find but breaks Linux/Vercel builds). The
+# `-exec rm {} +` form is portable, skips .git/node_modules, prints each file
+# for auditability, and is a no-op (never invokes rm) when nothing matches.
 find "$root" \
   \( -name node_modules -o -name .git \) -prune -o \
-  -type f -name '* [0-9].*' -print -delete
+  -type f -name '* [0-9].*' -print -exec rm -f {} +
