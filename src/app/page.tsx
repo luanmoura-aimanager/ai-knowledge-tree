@@ -21,10 +21,12 @@ export default async function HomePage() {
   const progress = signedIn ? await getProgressMap() : new Map();
   const resume = signedIn ? await getResume() : null;
 
-  // Authored-lesson count for the anonymous big-stats.
-  const availableLessons = allLessons().filter(
-    (l) => lessonContentStatus(l.subId, l.id) === "available",
-  ).length;
+  // Authored-lesson count for the anonymous big-stats (only shown when signed out).
+  const availableLessons = signedIn
+    ? 0
+    : allLessons().filter(
+        (l) => lessonContentStatus(l.subId, l.id) === "available",
+      ).length;
 
   // resume.key is "subId/lessonId"; resolve to a deep link + label.
   let resumeHref: string | null = null;

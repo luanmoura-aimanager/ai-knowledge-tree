@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { setStatus, clearStatus } from "@/app/actions/progress";
 import type { ProgressStatus } from "@/lib/progress";
 
@@ -19,9 +19,11 @@ export function StudyProgressControls({
   const [status, setLocal] = useState<ProgressStatus | null>(initial);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Last status the server actually accepted; the baseline to revert to on
+  // failure (so overlapping toggles never revert to a stale optimistic value).
+  const confirmed = useRef<ProgressStatus | null>(initial);
 
   const apply = (next: ProgressStatus | null) => {
-    const prev = status;
     setLocal(next);
     setFailed(false);
     startTransition(async () => {
@@ -29,8 +31,10 @@ export function StudyProgressControls({
         next === null
           ? await clearStatus(itemKey)
           : await setStatus(itemKey, next);
-      if (!res.ok) {
-        setLocal(prev); // revert optimistic update so the UI never lies
+      if (res.ok) {
+        confirmed.current = next;
+      } else {
+        setLocal(confirmed.current); // revert so the UI never lies
         setFailed(true);
       }
     });
