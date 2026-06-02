@@ -39,9 +39,10 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
     document.querySelectorAll<HTMLElement>(".pillar").forEach((p) => {
       const v = p.querySelectorAll(".subsection:not(.hidden)").length;
       p.classList.toggle("opacity-25", v === 0);
-      // Pillars are collapsed by default; while actively filtering, open the
-      // ones that have matches (and collapse the rest) so results stay visible.
-      if (filtering) p.classList.toggle("body-collapsed", v === 0);
+      // Pillars are collapsed by default. While filtering, open the ones with
+      // matches (and collapse the rest) so results stay visible; when the
+      // filter clears, snap every pillar back to the collapsed default.
+      p.classList.toggle("body-collapsed", filtering ? v === 0 : true);
     });
   }, [filter, query]);
 
@@ -62,6 +63,13 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
     document
       .querySelectorAll<HTMLElement>(".pillar")
       .forEach((p) => p.classList.toggle("body-collapsed", collapsed));
+    // Expanding a pillar should reveal everything inside it, so also clear any
+    // per-subsection collapse left over from manual h4 toggles.
+    if (!collapsed) {
+      document
+        .querySelectorAll<HTMLElement>(".subsection")
+        .forEach((s) => s.classList.remove("collapsed"));
+    }
   };
 
   return (
