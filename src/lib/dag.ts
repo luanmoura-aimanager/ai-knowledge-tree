@@ -1348,6 +1348,18 @@ export const PATHS: Path[] = [
     color: "var(--pj)",
   },
   {
+    name: "🤖 AI Agent Engineer",
+    desc: "Agentic AI: RAG, tool use, MCP, multi-agent orchestration, and eval design. The fastest-growing 2026 role family.",
+    pillars: ["E6", "J1", "J2", "J4", "C10", "E8"],
+    color: "var(--ph)",
+  },
+  {
+    name: "🛡️ Responsible AI & Governance",
+    desc: "Alignment, evaluation, validation, monitoring, and governance for safe, compliant AI (EU AI Act, NIST AI RMF).",
+    pillars: ["E8", "C10", "B3", "I4", "J7"],
+    color: "var(--pa)",
+  },
+  {
     name: "📈 Causal & Experimental DS",
     desc: "Rigorous statistics + causal inference for product decisions.",
     pillars: ["A2", "B1", "B2", "B4", "B5", "G5"],
@@ -1367,8 +1379,8 @@ export const PATHS: Path[] = [
   },
   {
     name: "👁️ Computer Vision",
-    desc: "From CNNs to SAM/NeRF, with crossings to SSL and multimodal.",
-    pillars: ["D2", "D5", "E7"],
+    desc: "From DL core to CNNs and SAM/NeRF, with crossings to SSL and multimodal.",
+    pillars: ["D1", "D2", "D5", "E7"],
     color: "var(--pd)",
   },
 ];

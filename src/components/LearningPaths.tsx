@@ -1,11 +1,15 @@
-import { PATHS, PILLARS } from "@/lib/dag";
+import { PATHS } from "@/lib/dag";
 import type { Path } from "@/lib/types";
+import { pillarProgress } from "@/lib/curriculum";
+import type { ProgressMap } from "@/lib/progress";
 
 /**
  * Curated reading sequences (PATHS) rendered as cards: name, description, the
- * ordered subsection chips, and a coverage mini-bar over the path's topics.
+ * ordered subsection chips, and a mini-bar showing how many lessons across the
+ * path the signed-in user has studied (anonymous visitors see 0 / total).
  */
-export function LearningPaths() {
+export function LearningPaths({ progress }: { progress?: ProgressMap }) {
+  const prog = progress ?? new Map();
   return (
     <div className="max-w-[1280px] mx-auto px-6 py-12">
       <h2 className="text-2xl font-bold mb-1.5">Suggested paths</h2>
@@ -15,24 +19,19 @@ export function LearningPaths() {
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {PATHS.map((path) => (
-          <PathCard key={path.name} path={path} />
+          <PathCard key={path.name} path={path} progress={prog} />
         ))}
       </div>
     </div>
   );
 }
 
-function PathCard({ path }: { path: Path }) {
-  const subs = PILLARS.flatMap((p) =>
-    p.subs.filter((s) => path.pillars.includes(s.id)),
-  );
-  const all = subs.flatMap((s) => s.topics);
-  const total = all.length || 1;
-  const cov = all.filter((t) => t.status === "covered").length;
-  const par = all.filter((t) => t.status === "partial").length;
-  const pctCov = (cov / total) * 100;
-  const pctPar = (par / total) * 100;
-  const pctGap = 100 - pctCov - pctPar;
+function PathCard({ path, progress }: { path: Path; progress: ProgressMap }) {
+  const pp = pillarProgress(path.pillars, progress);
+  const total = pp.total || 1;
+  const pctStudied = (pp.studied / total) * 100;
+  const pctProgress = (pp.inProgress / total) * 100;
+  const pctGap = 100 - pctStudied - pctProgress;
 
   return (
     <div
@@ -55,11 +54,11 @@ function PathCard({ path }: { path: Path }) {
       </div>
       <div className="mt-auto">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
-          {cov}/{total} covered
+          {pp.studied}/{pp.total} studied
         </div>
         <div className="statbar">
-          <div className="seg cov" style={{ width: `${pctCov}%` }} />
-          <div className="seg par" style={{ width: `${pctPar}%` }} />
+          <div className="seg cov" style={{ width: `${pctStudied}%` }} />
+          <div className="seg par" style={{ width: `${pctProgress}%` }} />
           <div className="seg gap" style={{ width: `${pctGap}%` }} />
         </div>
       </div>
