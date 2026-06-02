@@ -1,11 +1,7 @@
 import Link from "next/link";
 import type { Pillar } from "@/lib/types";
 import { CONNECTIONS } from "@/lib/dag";
-import {
-  pillarProgress,
-  subProgress,
-  type ProgressState,
-} from "@/lib/curriculum";
+import { pillarProgress, type ProgressState } from "@/lib/curriculum";
 import type { ProgressMap } from "@/lib/progress";
 import { TopicChip } from "./TopicChip";
 
@@ -113,7 +109,7 @@ export function PillarCard({
       <div className="subsections grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-7">
         {pillar.subs.map((sub) => {
           const n = connCount(sub.id);
-          const sp = subProgress(sub.id, prog);
+          const sp = pp.subs[sub.id];
           const stateColor = STATE_COLOR[sp.state];
           return (
             <div key={sub.id} id={`sub-${sub.id}`} className="subsection">
