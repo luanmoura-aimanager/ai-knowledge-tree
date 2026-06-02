@@ -112,12 +112,12 @@ def rlhf_step(policy, ref_model, reward_model, value_model, prompts, optimizer, 
         old_logps  = policy.log_probs(prompts, responses)
 
     # 2. Compute per-token rewards with KL penalty
-    policy_logps = policy.log_probs(prompts, responses)  # (B, T) — with grad
+    policy_logps = policy.log_probs(prompts, responses)  # (B, T), with grad
     kl_per_token = policy_logps - ref_logps              # (B, T)
     r_dense      = -beta * kl_per_token                  # (B, T)
     r_dense[:, -1] += rewards                            # terminal reward at last step
 
-    # 3. Compute advantages (simplified -- use GAE in practice)
+    # 3. Compute advantages (simplified: use GAE in practice)
     advantages = r_dense - values
 
     # 4. PPO objective uses old_logps from the rollout snapshot
