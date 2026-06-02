@@ -1,9 +1,25 @@
 import Link from "next/link";
 import type { Pillar } from "@/lib/types";
-import { pillarStats, CONNECTIONS } from "@/lib/dag";
-import { getCurriculum, lessonKey } from "@/lib/curriculum";
+import { CONNECTIONS } from "@/lib/dag";
+import {
+  pillarProgress,
+  subProgress,
+  type ProgressState,
+} from "@/lib/curriculum";
 import type { ProgressMap } from "@/lib/progress";
 import { TopicChip } from "./TopicChip";
+
+/** Visual mapping for a rolled-up study state (matches the .statbar palette). */
+const STATE_COLOR: Record<ProgressState, string> = {
+  done: "var(--good)",
+  "in-progress": "var(--partial)",
+  untouched: "var(--fg-mute)",
+};
+const STATE_GLYPH: Record<ProgressState, string> = {
+  done: "✓",
+  "in-progress": "◐",
+  untouched: "○",
+};
 
 /**
  * One pillar rendered as a full-width card: header with letter + coverage stat
@@ -16,37 +32,22 @@ import { TopicChip } from "./TopicChip";
 export function PillarCard({
   pillar,
   progress,
+  signedIn,
 }: {
   pillar: Pillar;
   progress?: ProgressMap;
+  signedIn?: boolean;
 }) {
-  const s = pillarStats(pillar);
+  // Personal study overlay: statbar + header + subsection coloring track the
+  // user's per-lesson progress. Anonymous (no map) → everything untouched/gray.
+  const prog = progress ?? new Map();
+  const pp = pillarProgress(
+    pillar.subs.map((sub) => sub.id),
+    prog,
+  );
 
   const connCount = (subId: string) =>
     CONNECTIONS.filter((c) => c.from === subId || c.to === subId).length;
-
-  // Per-subsection lesson progress: studied / total lessons in its curriculum.
-  const progressBadge = (subId: string) => {
-    if (!progress) return null;
-    const lessons = getCurriculum(subId);
-    if (lessons.length === 0) return null;
-    const studied = lessons.filter(
-      (l) => progress.get(lessonKey(subId, l.id)) === "studied",
-    ).length;
-    const inProg = lessons.filter(
-      (l) => progress.get(lessonKey(subId, l.id)) === "in-progress",
-    ).length;
-    if (studied === 0 && inProg === 0) return null;
-    const done = studied === lessons.length;
-    return (
-      <span
-        className="ml-2"
-        style={{ color: done ? "var(--good)" : "var(--partial)" }}
-      >
-        {done ? "✓" : "◐"} {studied}/{lessons.length}
-      </span>
-    );
-  };
 
   return (
     <section
@@ -82,19 +83,29 @@ export function PillarCard({
               className="text-2xl font-extrabold leading-none"
               style={{ color: pillar.color }}
             >
-              {s.pctOverall}%
+              {pp.pct}%
             </span>
             <span className="pillar-chev" aria-hidden>
               ▾
             </span>
           </div>
           <div className="text-xs text-[var(--fg-mute)] mt-1 mb-2">
-            {s.cov}/{s.total} covered · {s.par} partial · {s.hot} hot
+            {pp.studied}/{pp.total} studied · {pp.inProgress} in progress ·{" "}
+            {pp.untouched} to go
           </div>
           <div className="statbar">
-            <div className="seg cov" style={{ width: `${s.pctCov}%` }} />
-            <div className="seg par" style={{ width: `${s.pctPar}%` }} />
-            <div className="seg gap" style={{ width: `${s.pctGap}%` }} />
+            <div
+              className="seg cov"
+              style={{ width: pct(pp.studied, pp.total) }}
+            />
+            <div
+              className="seg par"
+              style={{ width: pct(pp.inProgress, pp.total) }}
+            />
+            <div
+              className="seg gap"
+              style={{ width: pct(pp.untouched, pp.total) }}
+            />
           </div>
         </div>
       </header>
@@ -102,13 +113,18 @@ export function PillarCard({
       <div className="subsections grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-7">
         {pillar.subs.map((sub) => {
           const n = connCount(sub.id);
+          const sp = subProgress(sub.id, prog);
+          const stateColor = STATE_COLOR[sp.state];
           return (
             <div key={sub.id} id={`sub-${sub.id}`} className="subsection">
               <h4 className="m-0 mb-2.5 pb-1.5 border-b border-[var(--border)] text-xs uppercase tracking-wider font-semibold text-[var(--fg-dim)]">
                 <span className="chevron">▾</span>
+                <span className="mr-1.5" style={{ color: stateColor }}>
+                  {STATE_GLYPH[sp.state]}
+                </span>
                 <span
                   className="font-extrabold mr-1.5"
-                  style={{ color: pillar.color }}
+                  style={{ color: stateColor }}
                 >
                   {sub.id}
                 </span>
@@ -119,7 +135,11 @@ export function PillarCard({
                   {sub.name}
                 </Link>
                 {n > 0 && <span className="conn-count has ml-2">🔗 {n}</span>}
-                {progressBadge(sub.id)}
+                {signedIn && sp.total > 0 && (
+                  <span className="ml-2" style={{ color: stateColor }}>
+                    {sp.studied}/{sp.total}
+                  </span>
+                )}
               </h4>
               <div className="topics flex flex-col gap-0.5">
                 {sub.topics.map((t) => (
@@ -132,4 +152,9 @@ export function PillarCard({
       </div>
     </section>
   );
+}
+
+/** A statbar segment width as a percentage string (0% when the pillar is empty). */
+function pct(n: number, total: number): string {
+  return total > 0 ? `${(n / total) * 100}%` : "0%";
 }

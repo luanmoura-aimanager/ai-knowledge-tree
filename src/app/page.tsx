@@ -56,7 +56,12 @@ export default async function HomePage() {
 
       <div className="max-w-[1280px] mx-auto px-6 pt-4 pb-4">
         {PILLARS.map((p) => (
-          <PillarCard key={p.letter} pillar={p} progress={progress} />
+          <PillarCard
+            key={p.letter}
+            pillar={p}
+            progress={progress}
+            signedIn={signedIn}
+          />
         ))}
       </div>
 
@@ -77,6 +82,12 @@ export default async function HomePage() {
           <span>◐ partial</span>
           <span>○ gap</span>
           <span className="text-[var(--hot)]">★ hot (2023–2025)</span>
+        </div>
+        <div className="flex gap-5 flex-wrap mt-2 text-xs text-[var(--fg-mute)]">
+          <span>Your progress:</span>
+          <span className="text-[var(--good)]">✓ studied</span>
+          <span className="text-[var(--partial)]">◐ in progress</span>
+          <span>○ not started</span>
         </div>
       </footer>
     </>
