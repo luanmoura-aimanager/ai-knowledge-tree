@@ -2,15 +2,22 @@
 
 import { useEffect, useState } from "react";
 
-type Filter = "all" | "covered" | "partial" | "gap" | "hot" | "hot-gap";
+type Filter =
+  | "all"
+  | "studied"
+  | "in-progress"
+  | "unstudied"
+  | "available"
+  | "coming-soon";
 
 /**
- * Sticky filter bar. Mutates the DOM directly (toggles a `hidden` class on
- * `.topic` elements based on their data-* attributes) instead of re-rendering
- * React. This keeps the heavy server-rendered topic grid intact and the
- * interaction snappy.
+ * Sticky filter bar over the lesson grid. Mutates the DOM directly (toggles a
+ * `hidden` class on `.topic` lesson rows based on their `data-status` /
+ * `data-name`) instead of re-rendering React, keeping the server-rendered grid
+ * intact and interactions snappy. Signed-in users filter by study state;
+ * anonymous visitors by lesson availability.
  */
-export function FilterBar() {
+export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -18,27 +25,9 @@ export function FilterBar() {
     const q = query.toLowerCase().trim();
     const topics = document.querySelectorAll<HTMLElement>(".topic");
     topics.forEach((el) => {
-      const status = el.dataset.status as "covered" | "partial" | "gap";
-      const hot = el.dataset.hot === "true";
+      const status = el.dataset.status ?? "";
       const name = el.dataset.name ?? "";
-      let show = true;
-      switch (filter) {
-        case "covered":
-          show = status === "covered";
-          break;
-        case "partial":
-          show = status === "partial";
-          break;
-        case "gap":
-          show = status === "gap";
-          break;
-        case "hot":
-          show = hot;
-          break;
-        case "hot-gap":
-          show = hot && status === "gap";
-          break;
-      }
+      let show = filter === "all" || status === filter;
       if (show && q && !name.includes(q)) show = false;
       el.classList.toggle("hidden", !show);
     });
@@ -52,14 +41,18 @@ export function FilterBar() {
     });
   }, [filter, query]);
 
-  const filters: { id: Filter; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "covered", label: "✓ Covered" },
-    { id: "partial", label: "◐ Partial" },
-    { id: "gap", label: "○ Gaps" },
-    { id: "hot", label: "★ Hot" },
-    { id: "hot-gap", label: "🎯 Hot gaps" },
-  ];
+  const filters: { id: Filter; label: string }[] = signedIn
+    ? [
+        { id: "all", label: "All" },
+        { id: "studied", label: "✓ Studied" },
+        { id: "in-progress", label: "◐ In progress" },
+        { id: "unstudied", label: "○ Not started" },
+      ]
+    : [
+        { id: "all", label: "All" },
+        { id: "available", label: "Available" },
+        { id: "coming-soon", label: "Coming soon" },
+      ];
 
   const setAllCollapsed = (collapsed: boolean) => {
     document
@@ -74,7 +67,7 @@ export function FilterBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔍 Search topic (e.g. diffusion, kalman, RAG)..."
+          placeholder="🔍 Search lessons (e.g. diffusion, kalman, RAG)..."
           className="flex-1 min-w-[200px] bg-[var(--card)] border border-[var(--border)] rounded-lg px-3.5 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--accent)]"
         />
         <div className="flex gap-1.5 flex-wrap">

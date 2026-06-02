@@ -35,6 +35,13 @@ export interface Pillar {
   tagline: string;
   /** CSS color (hex) used to tint cards and graph nodes. */
   color: string;
+  /**
+   * Short prose overview shown on the pillar overview page: what this pillar
+   * teaches and why it matters. Plain paragraphs separated by blank lines.
+   */
+  intro?: string;
+  /** What a reader should already know before starting this pillar. */
+  prerequisites?: string[];
   subs: Subsection[];
 }
 

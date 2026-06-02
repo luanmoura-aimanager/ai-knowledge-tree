@@ -1,9 +1,14 @@
 import Link from "next/link";
 import type { Pillar } from "@/lib/types";
 import { CONNECTIONS } from "@/lib/dag";
-import { pillarProgress, type ProgressState } from "@/lib/curriculum";
+import {
+  getCurriculum,
+  lessonKey,
+  pillarProgress,
+  type ProgressState,
+} from "@/lib/curriculum";
+import { lessonContentStatus } from "@/lib/content";
 import type { ProgressMap } from "@/lib/progress";
-import { TopicChip } from "./TopicChip";
 
 /** Visual mapping for a rolled-up study state (matches the .statbar palette). */
 const STATE_COLOR: Record<ProgressState, string> = {
@@ -138,9 +143,60 @@ export function PillarCard({
                 )}
               </h4>
               <div className="topics flex flex-col gap-0.5">
-                {sub.topics.map((t) => (
-                  <TopicChip key={t.name} topic={t} />
-                ))}
+                {(() => {
+                  const lessons = getCurriculum(sub.id);
+                  if (lessons.length === 0)
+                    return (
+                      <div className="topic text-[var(--fg-mute)] text-xs italic">
+                        curriculum coming soon
+                      </div>
+                    );
+                  return lessons.map((lesson) => {
+                    const available =
+                      lessonContentStatus(sub.id, lesson.id) === "available";
+                    const st = signedIn
+                      ? prog.get(lessonKey(sub.id, lesson.id))
+                      : undefined;
+                    // Signed-in rows filter by study state; anonymous by availability.
+                    const dataStatus = signedIn
+                      ? (st ?? "unstudied")
+                      : available
+                        ? "available"
+                        : "coming-soon";
+                    const glyph =
+                      st === "studied" ? "✓" : st === "in-progress" ? "◐" : "○";
+                    const glyphColor =
+                      st === "studied"
+                        ? "var(--good)"
+                        : st === "in-progress"
+                          ? "var(--partial)"
+                          : "var(--fg-mute)";
+                    return (
+                      <div
+                        key={lesson.id}
+                        className="topic"
+                        data-status={dataStatus}
+                        data-name={lesson.title.toLowerCase()}
+                      >
+                        <span className="ic" style={{ color: glyphColor }}>
+                          {glyph}
+                        </span>
+                        {available ? (
+                          <Link
+                            href={`/pillar/${pillar.letter}/${sub.id}/${lesson.id}`}
+                            className="name no-underline hover:text-[var(--fg)]"
+                          >
+                            {lesson.title}
+                          </Link>
+                        ) : (
+                          <span className="name opacity-50">
+                            {lesson.title}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           );

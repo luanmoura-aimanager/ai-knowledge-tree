@@ -64,13 +64,11 @@ export default async function DisciplineOverviewPage({
                     {lesson.goal}
                   </span>
                 </span>
-                <span className="text-xs shrink-0">
-                  {available ? (
-                    <span className="text-[var(--good)]">available</span>
-                  ) : (
-                    <span className="text-[var(--fg-mute)]">coming soon</span>
-                  )}
-                </span>
+                {!available && (
+                  <span className="text-xs shrink-0 text-[var(--fg-mute)]">
+                    coming soon
+                  </span>
+                )}
               </>
             );
             const cls = "card p-4 flex items-start gap-3 no-underline";

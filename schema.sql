@@ -45,13 +45,20 @@ CREATE TABLE IF NOT EXISTS verification_token (
 );
 
 -- ---- Per-user study progress ---------------------------------------------
--- status: 'in-progress' | 'studied'. Absence of a row = 'unstudied'.
+-- Progress is tracked PER LESSON. `sub_id` stores the composite lesson key
+-- "<subId>/<lessonId>" (e.g. "A1/vector-spaces-subspaces"), so it must be a
+-- wide text column, not VARCHAR(8). status: 'in-progress' | 'studied';
+-- absence of a row = 'unstudied'.
 CREATE TABLE IF NOT EXISTS progress (
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  sub_id     VARCHAR(8) NOT NULL,
+  sub_id     TEXT NOT NULL,
   status     VARCHAR(16) NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, sub_id)
 );
 
 CREATE INDEX IF NOT EXISTS progress_user_idx ON progress(user_id);
+
+-- Migration for an existing database created with the old VARCHAR(8) column
+-- (run once; safe and non-destructive):
+--   ALTER TABLE progress ALTER COLUMN sub_id TYPE TEXT;

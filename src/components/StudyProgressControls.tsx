@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { setStatus, clearStatus } from "@/app/actions/progress";
 import type { ProgressStatus } from "@/lib/progress";
 
@@ -17,13 +17,26 @@ export function StudyProgressControls({
   initial: ProgressStatus | null;
 }) {
   const [status, setLocal] = useState<ProgressStatus | null>(initial);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Last status the server actually accepted; the baseline to revert to on
+  // failure (so overlapping toggles never revert to a stale optimistic value).
+  const confirmed = useRef<ProgressStatus | null>(initial);
 
   const apply = (next: ProgressStatus | null) => {
     setLocal(next);
+    setFailed(false);
     startTransition(async () => {
-      if (next === null) await clearStatus(itemKey);
-      else await setStatus(itemKey, next);
+      const res =
+        next === null
+          ? await clearStatus(itemKey)
+          : await setStatus(itemKey, next);
+      if (res.ok) {
+        confirmed.current = next;
+      } else {
+        setLocal(confirmed.current); // revert so the UI never lies
+        setFailed(true);
+      }
     });
   };
 
@@ -43,6 +56,11 @@ export function StudyProgressControls({
       >
         ◐ In progress
       </button>
+      {failed && (
+        <span className="text-xs text-[var(--hot)]">
+          Couldn&apos;t save: please try again.
+        </span>
+      )}
     </div>
   );
 }

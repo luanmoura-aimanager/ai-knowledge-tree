@@ -29,6 +29,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Foundations",
     tagline: "Math, prob, opt, numerical, DSA",
     color: "#e0af68",
+    intro:
+      "Foundations is the mathematical and computational bedrock the rest of the tree stands on. Every model you will meet later is, underneath, linear algebra applied to data, a probability model fit by optimization, and an algorithm that has to run in finite time and memory. This pillar builds those four pieces from first principles so that nothing downstream has to be taken on faith.\n\nYou will start with linear algebra (vector spaces, eigenstructure, the SVD, and the matrix factorizations that power least squares and PCA), then probability and information theory (distributions, Bayes' rule, entropy and KL divergence, the language of all modeling under uncertainty). From there you turn to optimization theory (gradient methods, convexity, the KKT conditions, and the Adam family that trains real networks), then to numerical methods (floating point, conditioning, and stability, the difference between math that works on paper and code that works at scale). The pillar closes with the data structures and algorithms you need to make any of it tractable.\n\nTreat this as the reference you will return to. You do not need to master every lesson before moving on, but the more fluent you are here, the less the later pillars will feel like magic.",
+    prerequisites: [
+      "Single-variable calculus: derivatives, the chain rule, and integrals.",
+      "Comfort reading and writing basic Python (loops, functions, arrays).",
+      "High-school algebra and trigonometry; familiarity with vectors and matrices helps but is rebuilt from scratch in A1.",
+    ],
     subs: [
       {
         id: "A1",
@@ -104,6 +111,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Stats & Causal",
     tagline: "Frequentist, Bayesian, causal, experimental design",
     color: "#f7768e",
+    intro:
+      "Statistics is how you reason from a finite sample back to the world that produced it, and causal inference is how you go from 'these two things move together' to 'this one causes that one.' This pillar is the inferential backbone behind every honest model evaluation and every experiment you will run.\n\nYou will study frequentist inference (estimators, sampling distributions, confidence intervals, and hypothesis tests), then Bayesian inference (priors, likelihoods, posteriors, and credible intervals), then the resampling and validation machinery (bootstrap, permutation tests, cross-validation) that your metrics actually rest on. From there you turn to experimental design (randomization, A/B tests, statistical power) and finally causal inference (potential outcomes, confounding, backdoor adjustment, and instrumental variables), where the central lesson is that prediction and intervention are not the same question.\n\nThis is the pillar that keeps the rest of the tree honest: it tells you when a number means something and when it is noise.",
+    prerequisites: [
+      "A2 Probability and information theory: distributions, expectation, and Bayes' rule.",
+      "Single-variable calculus and basic linear algebra (A1).",
+      "Comfort running numerical experiments in Python and numpy.",
+    ],
     subs: [
       {
         id: "B1",
@@ -171,6 +185,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Classical ML",
     tagline: "Linear, kernel, tree, clustering, rec sys, ANN",
     color: "#ff9e64",
+    intro:
+      "Classical machine learning is everything that turns features into predictions without a deep network, and for most tabular problems it is still the right tool: strong theory, modest data requirements, and models you can actually explain. Long before transformers, these algorithms were the field, and gradient-boosted trees remain the quiet winner of a large share of real-world prediction tasks.\n\nYou will cover linear models and GLMs, margin and kernel methods (support vector machines), tree-based methods and gradient boosting, instance-based and probabilistic classifiers, and unsupervised learning (clustering and dimensionality reduction). On top of that sit anomaly detection, ensembles, recommendation systems, and approximate nearest neighbor search with vector databases, the retrieval substrate that modern LLM applications also lean on. The pillar closes with how to evaluate and select among all of these without fooling yourself.\n\nMaster this pillar and you will reach for a 200-line scikit-learn pipeline before a GPU, and be right to.",
+    prerequisites: [
+      "A1 Linear algebra and A3 optimization (gradient descent, convexity).",
+      "A2 Probability; B3 resampling and validation makes the evaluation lessons land harder.",
+      "Working Python with numpy; scikit-learn familiarity helps.",
+    ],
     subs: [
       {
         id: "C1",
@@ -290,6 +311,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Deep Learning",
     tagline: "MLPs, CV, sequence, generative, SSL, GNN, training systems",
     color: "#7aa2f7",
+    intro:
+      "Deep learning is what happens when you stack differentiable building blocks and let optimization do the feature engineering for you. Instead of hand-crafting what matters in the data, you define an architecture, a loss, and a gradient, and the representations emerge from training. This pillar builds the core mechanics first, then branches into the major application tracks.\n\nYou will start with the core building blocks (layers, activations, backpropagation, normalization, and regularization), then work through computer vision (CNNs from LeNet to ConvNeXt, detection, and neural rendering), sequence modeling (recurrent networks, attention, and state space models like Mamba), and generative modeling (autoencoders, GANs, and the diffusion models behind modern image generation). The track widens further into self-supervised learning and graph neural networks, and closes with the training systems (mixed precision, distributed training, and compilation) that make billion-parameter models trainable at all.\n\nThis is the hinge of the whole tree: NLP, modern RL, and most of AI engineering downstream assume you are fluent here.",
+    prerequisites: [
+      "A1 Linear algebra, A2 probability, and A3 optimization (backprop is just the chain rule plus gradient descent).",
+      "C Classical ML for the modeling mindset (loss functions, over/underfitting, evaluation).",
+      "Python with numpy; PyTorch familiarity helps for the systems lessons.",
+    ],
     subs: [
       {
         id: "D1",
@@ -431,6 +459,13 @@ export const PILLARS: Pillar[] = [
     tagline:
       "Tokenization, LLMs, alignment, agents: the backbone of AI ML Theory",
     color: "#bb9af7",
+    intro:
+      "This pillar traces the path from counting words to models that write code, hold conversations, and reason through multi-step problems. It is the densest frontier track in the tree, and the one moving fastest, so the emphasis is on the durable ideas underneath the headline models.\n\nYou will begin with classical NLP (tokenization, n-gram language models, and parsing), then pre-Transformer neural NLP (word embeddings and recurrent encoders), before reaching the Transformer and modern language models (attention, positional encoding, and mixture-of-experts). From there the pillar covers training LLMs (scaling laws, pretraining, alignment, and parameter-efficient fine-tuning), inference and serving (KV caching, batching, and engines like vLLM), and LLM agents and retrieval (RAG, tool use, and test-time compute). It closes with multimodal models and with interpretability and alignment science, the study of what these systems are actually doing and how to keep them steerable.\n\nIf pillar D taught you how to train a network, this pillar is where that skill meets the models reshaping the field.",
+    prerequisites: [
+      "D Deep learning, especially D3 sequence modeling and D7 training systems.",
+      "A2 Probability and information theory (cross-entropy, KL divergence).",
+      "Comfortable Python; access to an LLM API or a small local model for the applied lessons.",
+    ],
     subs: [
       {
         id: "E1",
@@ -569,6 +604,13 @@ export const PILLARS: Pillar[] = [
     shortName: "PGMs",
     tagline: "Bayes nets, MRFs, HMM, VI, MCMC, latent variable models",
     color: "#7dcfff",
+    intro:
+      "Probabilistic graphical models are the grammar of probability over many variables. They let you draw a joint distribution as a picture of conditional independencies, read off what depends on what, and then compute with it efficiently. Where pillar B reasons about a few quantities, this pillar gives you the language for hundreds of interacting random variables.\n\nYou will study directed models (Bayesian networks), undirected models (Markov random fields and CRFs), and temporal graphical models (hidden Markov models and Kalman filters). Then come the inference engines: exact inference (variable elimination and belief propagation), approximate inference (the variational methods that scale), and sampling (MCMC, Gibbs, and Hamiltonian Monte Carlo). The pillar finishes with latent variable models (EM and mixtures) and modern Bayesian deep learning, which is where this classical machinery reconnects with the VAEs and uncertainty estimates of pillar D.\n\nThis is the most mathematically demanding pillar, and the one that most changes how you think about every other model as a distribution you could have written down.",
+    prerequisites: [
+      "A2 Probability and information theory: this pillar leans on it heavily.",
+      "B2 Bayesian inference (priors, posteriors, marginalization).",
+      "A1 Linear algebra and A3 optimization; D Deep learning for the F8 lessons.",
+    ],
     subs: [
       {
         id: "F1",
@@ -655,6 +697,13 @@ export const PILLARS: Pillar[] = [
     shortName: "Time Series",
     tagline: "ARIMA, state-space, DL forecasting, TS foundation models",
     color: "#73daca",
+    intro:
+      "Time series is data with memory. Order matters, each observation correlates with its own past, and the thing you actually want, the future, is the one value you never get to see during training. That single twist breaks the usual i.i.d. assumptions and demands its own toolkit, which this pillar builds from classical statistics up to foundation models.\n\nYou will start with classical statistical time series (ARIMA, exponential smoothing, and state-space models), then ML for time series (turning lags, rolling windows, and Fourier features into a supervised problem for gradient boosting). From there the pillar covers deep learning for time series (sequence models and the new time-series foundation models like Chronos), then anomaly and change-point detection, and finally causal time series, where forecasting meets the intervention questions of pillar B.\n\nThe recurring discipline here is honest backtesting: respecting time when you split, validate, and report, so that a model that looks brilliant in a notebook does not collapse the moment it meets tomorrow.",
+    prerequisites: [
+      "A2 Probability and B1 frequentist inference (autocorrelation, stationarity, intervals).",
+      "C3 Tree-based methods and gradient boosting for the ML track.",
+      "D3 Sequence modeling helps for the deep-learning lessons; Python with numpy and pandas.",
+    ],
     subs: [
       {
         id: "G1",
@@ -724,6 +773,13 @@ export const PILLARS: Pillar[] = [
     shortName: "RL",
     tagline: "MDPs, deep RL, model-based, RLHF",
     color: "#ff7eb6",
+    intro:
+      "Reinforcement learning is decision-making under uncertainty. An agent acts, the world responds with a new state and a reward, and over many such steps it learns a policy that maximizes long-run return. Unlike supervised learning, there are no labels, only consequences, often delayed, which makes credit assignment the central difficulty.\n\nYou will build from RL foundations (Markov decision processes, value functions, dynamic programming, and temporal-difference learning), then deep RL (DQN, policy gradients, actor-critic, and PPO), then model-based RL (learning a world model and planning inside it). From there the pillar covers exploration (how an agent decides what to try), topics beyond standard RL (offline, multi-agent, and inverse RL), and the RL-LLM connection (RLHF and verifier-guided RLVR), which is how the reasoning models of pillar E are actually trained.\n\nExpect this pillar to feel different from the others: the data is something your own policy generates, so training is a moving target, and stability is as much of an achievement as accuracy.",
+    prerequisites: [
+      "A2 Probability and A3 optimization (expectations, gradients, stochastic approximation).",
+      "D1 Deep learning core building blocks for the function approximators in deep RL.",
+      "Python with numpy; E NLP/LLMs helps for the H6 RL-and-LLMs lessons.",
+    ],
     subs: [
       {
         id: "H1",
@@ -799,6 +855,13 @@ export const PILLARS: Pillar[] = [
     shortName: "MLOps",
     tagline: "Data, training infra, deployment, monitoring",
     color: "#9ece6a",
+    intro:
+      "A model that works in a notebook is not a product. MLOps is the engineering discipline that gets models into production and keeps them healthy once real traffic and real data start hitting them. This pillar is deliberately conceptual and infrastructure-focused rather than mathematical: the hard parts here are systems, reliability, and process, not derivations.\n\nYou will cover data engineering (ingestion, ETL and ELT pipelines, and feature stores), training infrastructure (experiment tracking, orchestration, and scaling jobs across hardware), deployment and serving (containers, model servers, autoscaling, and latency budgets), and monitoring and governance (data and concept drift, observability, lineage, and the compliance trail). The throughline is the lifecycle: a deployed model is never finished, only maintained.\n\nThis is where the rest of the tree meets reality, the difference between a clever result and a system other people can depend on.",
+    prerequisites: [
+      "A trained model from any modeling pillar (C through H) that you want to ship.",
+      "Comfort with Python, the command line, and basic version control.",
+      "Familiarity with containers (Docker) and a cloud provider helps; no heavy math required.",
+    ],
     subs: [
       {
         id: "I1",
@@ -860,6 +923,13 @@ export const PILLARS: Pillar[] = [
     tagline:
       "RAG, agents, MCP, production, Cloud AI: the AI Eng Journey roadmap",
     color: "#c0caf5",
+    intro:
+      "AI engineering is building real applications on top of foundation models. You are not training the model here; you are composing it, grounding it in your own data, wrapping it in tools, and shipping it as something users and businesses can rely on. This pillar is the applied capstone of the tree, and the one closest to the work most practitioners actually do day to day.\n\nYou will begin with the fundamentals (retrieval-augmented generation, tool use, agents, and the LangChain and LangGraph frameworks), then systems thinking (the Model Context Protocol, evaluation harnesses, and production-grade RAG). From there the pillar covers production and enterprise integration (API design, governance, deployment, observability, and security against prompt injection), advanced patterns (when not to fine-tune, LoRA, DSPy, multi-agent systems, and cost and latency engineering), the data platform for AI (vector infrastructure at scale, hybrid search, and event-driven pipelines), and cloud AI (Bedrock end to end, identity and security, and FinOps). It closes with architect-level skills: red teaming and system design for AI.\n\nThe mindset shift here is from accuracy to systems: latency, cost, reliability, and security matter as much as whether the model is right.",
+    prerequisites: [
+      "E NLP and LLMs (especially RAG, agents, and inference) is the conceptual backbone.",
+      "Solid Python plus web and API basics (HTTP, JSON, async); FastAPI familiarity helps.",
+      "I MLOps is complementary; basic cloud and Docker for the deployment lessons.",
+    ],
     subs: [
       {
         id: "J1",

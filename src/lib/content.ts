@@ -7,6 +7,7 @@
  * subsections, and src/lib/curriculum for the ordered lesson list.
  */
 import "server-only";
+import { cache } from "react";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -22,17 +23,20 @@ function lessonPath(pillar: Pillar, subId: string, lessonId: string): string {
   return path.join(CONTENT_DIR, pillar.slug, subId, `${lessonId}.mdx`);
 }
 
-/** True when an authored MDX file exists for this lesson. */
-export function lessonContentStatus(
-  subId: string,
-  lessonId: string,
-): ContentStatus {
-  const sub = getSubsectionById(subId);
-  if (!sub) return "coming-soon";
-  return fs.existsSync(lessonPath(sub.pillar, subId, lessonId))
-    ? "available"
-    : "coming-soon";
-}
+/**
+ * True when an authored MDX file exists for this lesson. Memoized per request
+ * (React `cache`) because the dashboard checks availability for every lesson
+ * across the whole tree, which would otherwise be hundreds of sync stat calls.
+ */
+export const lessonContentStatus = cache(
+  (subId: string, lessonId: string): ContentStatus => {
+    const sub = getSubsectionById(subId);
+    if (!sub) return "coming-soon";
+    return fs.existsSync(lessonPath(sub.pillar, subId, lessonId))
+      ? "available"
+      : "coming-soon";
+  },
+);
 
 /** Number of authored (available) lessons in a subsection. */
 export function availableLessonCount(subId: string): number {

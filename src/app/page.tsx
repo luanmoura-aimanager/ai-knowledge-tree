@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PILLARS, getSubsectionById } from "@/lib/dag";
-import { getLesson } from "@/lib/curriculum";
+import { allLessons, getLesson } from "@/lib/curriculum";
+import { lessonContentStatus } from "@/lib/content";
 import { Hero } from "@/components/Hero";
 import { DashboardStats } from "@/components/DashboardStats";
 import { FilterBar } from "@/components/FilterBar";
@@ -19,6 +20,13 @@ export default async function HomePage() {
   const signedIn = await isSignedIn();
   const progress = signedIn ? await getProgressMap() : new Map();
   const resume = signedIn ? await getResume() : null;
+
+  // Authored-lesson count for the anonymous big-stats (only shown when signed out).
+  const availableLessons = signedIn
+    ? 0
+    : allLessons().filter(
+        (l) => lessonContentStatus(l.subId, l.id) === "available",
+      ).length;
 
   // resume.key is "subId/lessonId"; resolve to a deep link + label.
   let resumeHref: string | null = null;
@@ -49,9 +57,13 @@ export default async function HomePage() {
         </div>
       )}
 
-      <DashboardStats signedIn={signedIn} progress={progress} />
+      <DashboardStats
+        signedIn={signedIn}
+        progress={progress}
+        availableLessons={availableLessons}
+      />
 
-      <FilterBar />
+      <FilterBar signedIn={signedIn} />
       <CollapseController />
 
       <div className="max-w-[1280px] mx-auto px-6 pt-4 pb-4">
