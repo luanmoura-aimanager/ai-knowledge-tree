@@ -53,7 +53,7 @@ export function PillarCard({
   return (
     <section
       id={pillar.letter}
-      className="pillar card mb-7 overflow-hidden scroll-mt-20"
+      className="pillar card mb-7 overflow-hidden scroll-mt-20 body-collapsed"
       data-pillar={pillar.letter}
       style={{ ["--pillar" as never]: pillar.color }}
     >

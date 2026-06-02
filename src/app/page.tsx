@@ -86,20 +86,23 @@ export default async function HomePage() {
         <ConnectionsGraph />
       </section>
 
-      <LearningPaths />
+      <LearningPaths progress={progress} />
 
       <footer className="max-w-[1280px] mx-auto px-6 py-10 border-t border-[var(--border)] text-sm text-[var(--fg-dim)]">
-        <div className="flex gap-5 flex-wrap">
-          <span>✓ covered</span>
-          <span>◐ partial</span>
-          <span>○ gap</span>
-          <span className="text-[var(--hot)]">★ hot (2023–2025)</span>
-        </div>
-        <div className="flex gap-5 flex-wrap mt-2 text-xs text-[var(--fg-mute)]">
+        <div className="flex gap-5 flex-wrap text-xs text-[var(--fg-mute)]">
           <span>Your progress:</span>
           <span className="text-[var(--good)]">✓ studied</span>
           <span className="text-[var(--partial)]">◐ in progress</span>
           <span>○ not started</span>
+        </div>
+        <div className="mt-4 text-sm">
+          Any feedback, suggestions, or want to contribute? Get in touch:{" "}
+          <a
+            href="mailto:luanmisaelmoura@gmail.com"
+            className="text-[var(--accent)] hover:underline"
+          >
+            luanmisaelmoura@gmail.com
+          </a>
         </div>
       </footer>
     </>
