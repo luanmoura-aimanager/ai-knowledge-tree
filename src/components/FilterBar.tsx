@@ -73,7 +73,7 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
   };
 
   return (
-    <div className="sticky top-14 z-10 bg-[var(--bg)] border-b border-[var(--border)] py-3 shadow-[0_8px_16px_-12px_rgba(0,0,0,0.6)]">
+    <div className="bg-[var(--bg)] border-b border-[var(--border)] py-3">
       <div className="max-w-[1280px] mx-auto px-6 flex gap-3 items-center flex-wrap">
         <input
           type="text"
