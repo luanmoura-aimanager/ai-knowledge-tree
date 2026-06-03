@@ -21,6 +21,10 @@ export default async function DisciplineOverviewPage({
   if (!pillar || !sub || sub.pillar.letter !== pillar.letter) notFound();
 
   const lessons = getCurriculum(subId);
+  const introParas = sub.intro?.split("\n\n").filter(Boolean) ?? [];
+  const firstAvailable = lessons.find(
+    (l) => lessonContentStatus(subId, l.id) === "available",
+  );
 
   return (
     <article>
@@ -39,13 +43,47 @@ export default async function DisciplineOverviewPage({
         {sub.name}
       </h1>
       <p className="text-[var(--fg-dim)] mb-6">
-        {lessons.length} lessons. Study in order; each one assumes the previous.
+        {lessons.length > 0
+          ? `${lessons.length} lessons. Study in order; each one assumes the previous.`
+          : "The curriculum for this discipline is still being defined."}
       </p>
 
-      {lessons.length === 0 ? (
-        <div className="card p-6 text-[var(--fg-dim)]">
-          The curriculum for this discipline is still being defined.
-        </div>
+      {introParas.length > 0 ? (
+        <>
+          <div className="max-w-2xl mb-8 flex flex-col gap-4">
+            {introParas.map((para, i) => (
+              <p key={i} className="text-[var(--fg)] leading-relaxed">
+                {para}
+              </p>
+            ))}
+          </div>
+
+          {sub.prerequisites && sub.prerequisites.length > 0 && (
+            <div
+              className="card p-5 mb-8 max-w-2xl border-l-2"
+              style={{ borderColor: pillar.color }}
+            >
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--fg-dim)] mb-2">
+                Before you start
+              </h2>
+              <ul className="list-disc pl-5 flex flex-col gap-1.5 text-sm text-[var(--fg-dim)]">
+                {sub.prerequisites.map((req, i) => (
+                  <li key={i}>{req}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {firstAvailable && (
+            <Link
+              href={`/pillar/${pillar.letter}/${subId}/${firstAvailable.id}`}
+              className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold no-underline text-[var(--bg)] transition-transform hover:-translate-y-0.5"
+              style={{ backgroundColor: pillar.color }}
+            >
+              Start with lesson 1: {firstAvailable.title} →
+            </Link>
+          )}
+        </>
       ) : (
         <ol className="flex flex-col gap-2 list-none p-0 m-0">
           {lessons.map((lesson, i) => {

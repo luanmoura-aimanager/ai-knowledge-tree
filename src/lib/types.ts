@@ -23,6 +23,14 @@ export interface Subsection {
   /** Stable ID like "A1", "J3". Used in routes and connection edges. */
   id: string;
   name: string;
+  /**
+   * Short prose overview shown on the discipline overview page: what this
+   * discipline teaches, what the reader will be able to do afterward, and why
+   * it matters. Plain paragraphs separated by blank lines.
+   */
+  intro?: string;
+  /** What a reader should already know before starting this discipline. */
+  prerequisites?: string[];
   topics: Topic[];
 }
 
