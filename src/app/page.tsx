@@ -57,14 +57,14 @@ export default async function HomePage() {
         </div>
       )}
 
+      <FilterBar signedIn={signedIn} />
+      <CollapseController />
+
       <DashboardStats
         signedIn={signedIn}
         progress={progress}
         availableLessons={availableLessons}
       />
-
-      <FilterBar signedIn={signedIn} />
-      <CollapseController />
 
       <div className="max-w-[1280px] mx-auto px-6 pt-4 pb-4">
         {PILLARS.map((p) => (
