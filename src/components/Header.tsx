@@ -7,7 +7,7 @@ export async function Header() {
   const session = dbEnabled() ? await auth() : null;
 
   return (
-    <header className="border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-md sticky top-0 z-20">
+    <header className="border-b border-[var(--border)] bg-[var(--bg)] sticky top-0 z-20">
       <div className="max-w-[1280px] mx-auto px-6 h-14 flex items-center justify-between">
         <Link
           href="/"
