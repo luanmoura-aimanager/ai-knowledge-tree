@@ -1,4 +1,5 @@
-import { PATHS } from "@/lib/dag";
+import Link from "next/link";
+import { PATHS, getSubsectionById } from "@/lib/dag";
 import type { Path } from "@/lib/types";
 import { pillarProgress } from "@/lib/curriculum";
 import type { ProgressMap } from "@/lib/progress";
@@ -43,14 +44,20 @@ function PathCard({ path, progress }: { path: Path; progress: ProgressMap }) {
         {path.desc}
       </p>
       <div className="flex gap-1 flex-wrap">
-        {path.pillars.map((id) => (
-          <span
-            key={id}
-            className="font-mono text-xs px-1.5 py-0.5 rounded bg-[var(--card-2)] text-[var(--fg-dim)]"
-          >
-            {id}
-          </span>
-        ))}
+        {path.pillars.map((id) => {
+          const sub = getSubsectionById(id);
+          if (!sub) return null;
+          return (
+            <Link
+              key={id}
+              href={`/pillar/${sub.pillar.letter}/${id}`}
+              title={`${id} · ${sub.name}`}
+              className="font-mono text-xs px-1.5 py-0.5 rounded no-underline bg-[var(--card-2)] text-[var(--fg-dim)] hover:text-[var(--fg)] transition-colors"
+            >
+              {id}
+            </Link>
+          );
+        })}
       </div>
       <div className="mt-auto">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
