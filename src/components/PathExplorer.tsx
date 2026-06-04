@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathHighlight } from "@/components/PathHighlightProvider";
 
 /** Per-pillar chip in a path: an ordered subsection with its rolled-up state. */
 export interface PathChip {
@@ -31,8 +32,16 @@ export interface PathView {
  * detail card (description, pillar squares, progress bar) below the grid.
  */
 export function PathExplorer({ paths }: { paths: PathView[] }) {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(-1);
+  const highlight = usePathHighlight();
   const active = selected >= 0 ? paths[selected] : null;
+
+  // Select a path (or -1 to clear) and mirror its subsection ids into the shared
+  // highlight context so the connections graph can light up the same nodes.
+  const select = (i: number) => {
+    setSelected(i);
+    highlight?.setActiveIds(i >= 0 ? paths[i].chips.map((c) => c.id) : []);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +52,7 @@ export function PathExplorer({ paths }: { paths: PathView[] }) {
             <button
               key={path.name}
               type="button"
-              onClick={() => setSelected(isActive ? -1 : i)}
+              onClick={() => select(isActive ? -1 : i)}
               aria-pressed={isActive}
               className={`card p-4 text-left flex items-center min-h-[64px] transition-all cursor-pointer ${
                 isActive ? "" : "hover:-translate-y-0.5"
@@ -68,7 +77,7 @@ export function PathExplorer({ paths }: { paths: PathView[] }) {
         })}
       </div>
 
-      {active && <PathDetail path={active} onClose={() => setSelected(-1)} />}
+      {active && <PathDetail path={active} onClose={() => select(-1)} />}
     </div>
   );
 }
