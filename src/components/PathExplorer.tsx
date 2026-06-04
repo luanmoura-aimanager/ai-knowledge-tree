@@ -36,11 +36,16 @@ export function PathExplorer({ paths }: { paths: PathView[] }) {
   const highlight = usePathHighlight();
   const active = selected >= 0 ? paths[selected] : null;
 
-  // Select a path (or -1 to clear) and mirror its subsection ids into the shared
-  // highlight context so the connections graph can light up the same nodes.
+  // Select a path (or -1 to clear) and mirror its subsection ids + color into the
+  // shared highlight context so the connections graph can light up the same nodes
+  // and draw the route between them.
   const select = (i: number) => {
     setSelected(i);
-    highlight?.setActiveIds(i >= 0 ? paths[i].chips.map((c) => c.id) : []);
+    highlight?.setActive(
+      i >= 0
+        ? { ids: paths[i].chips.map((c) => c.id), color: paths[i].color }
+        : null,
+    );
   };
 
   return (

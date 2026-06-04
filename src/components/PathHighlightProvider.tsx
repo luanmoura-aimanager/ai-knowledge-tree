@@ -5,25 +5,33 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 /**
  * Shares the "currently highlighted path" between the suggested-paths section
  * (PathExplorer, the publisher) and the connections graph (ConnectionsGraph,
- * the subscriber), which are otherwise independent client islands. `activeIds`
- * is the ordered list of subsection ids belonging to the selected path, or an
- * empty array when no path is selected.
+ * the subscriber), which are otherwise independent client islands. `active`
+ * holds the ordered subsection ids of the selected path plus its color (used to
+ * tint the route overlay drawn between consecutive nodes), or null when no path
+ * is selected.
  *
  * The context is optional: components call `usePathHighlight()` and tolerate a
  * null result, so ConnectionsGraph still works standalone (e.g. /connections)
  * outside any provider.
  */
+export interface ActivePath {
+  /** Ordered subsection ids the path traverses. */
+  ids: string[];
+  /** CSS color used to tint the highlighted nodes' route. */
+  color: string;
+}
+
 interface PathHighlightValue {
-  activeIds: string[];
-  setActiveIds: (ids: string[]) => void;
+  active: ActivePath | null;
+  setActive: (active: ActivePath | null) => void;
 }
 
 const PathHighlightContext = createContext<PathHighlightValue | null>(null);
 
 export function PathHighlightProvider({ children }: { children: ReactNode }) {
-  const [activeIds, setActiveIds] = useState<string[]>([]);
+  const [active, setActive] = useState<ActivePath | null>(null);
   return (
-    <PathHighlightContext.Provider value={{ activeIds, setActiveIds }}>
+    <PathHighlightContext.Provider value={{ active, setActive }}>
       {children}
     </PathHighlightContext.Provider>
   );

@@ -148,6 +148,20 @@ body {
 .conn-graph .link.kind-generalizes    { stroke: var(--good);     }
 
 .conn-graph .node.active circle { stroke: var(--fg); stroke-width: 3; }
+
+/* Route overlay connecting a selected suggested path's nodes in order. Color is
+   set inline (the path's color); a flowing dash hints at sequence direction. */
+.conn-graph .path-link {
+  stroke-width: 3;
+  stroke-opacity: 0.95;
+  stroke-linecap: round;
+  stroke-dasharray: 2 9;
+  pointer-events: none;
+  animation: path-flow 0.9s linear infinite;
+}
+@keyframes path-flow {
+  to { stroke-dashoffset: -11; }
+}
 .conn-graph .pillar-label-group { pointer-events: none; }
 .conn-graph .pillar-label {
   font-size: 12px;
