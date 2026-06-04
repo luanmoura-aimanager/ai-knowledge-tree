@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import * as d3 from "d3";
 import { PILLARS, CONNECTIONS, getSubsectionById } from "@/lib/dag";
@@ -38,9 +38,24 @@ export function ConnectionsGraph() {
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // Subsection ids of the suggested path the user picked (empty when none).
-  // Stable across renders unless changed, so it is safe in the effect deps.
-  const pathIds = usePathHighlight()?.activeIds;
+  // The suggested path the user picked (null when none). Its ids light up the
+  // matching nodes and its consecutive pairs are drawn as a route overlay.
+  const activePath = usePathHighlight()?.active ?? null;
+  const pathIds = activePath?.ids;
+  const pathColor = activePath?.color;
+
+  // Consecutive (a, b) pairs along the path order — the route to draw. A path is
+  // an ordered sequence, so these edges may not exist in the base graph links.
+  const pathPairs = useMemo<[string, string][]>(() => {
+    if (!pathIds || pathIds.length < 2) return [];
+    return pathIds.slice(0, -1).map((id, i) => [id, pathIds[i + 1]]);
+  }, [pathIds]);
+
+  // Refs let the once-on-mount tick handler redraw the route as nodes move,
+  // without rebuilding the simulation when the active path changes.
+  const pathPairsRef = useRef<[string, string][]>([]);
+  const pathColorRef = useRef<string | undefined>(undefined);
+  const drawPathRef = useRef<() => void>(() => {});
 
   // Build the highlight set: active node + its direct neighbors (cross + within)
   const highlightSet = useCallback((active: string | null) => {
@@ -191,6 +206,41 @@ export function ConnectionsGraph() {
           `link ${d.kind === "within" ? "within" : "cross"} kind-${d.kind}`,
       );
 
+    // Route overlay for a selected suggested path: drawn above the base links
+    // but below the nodes, so node circles sit on top of the route.
+    const pathLayer = root
+      .append("g")
+      .attr("class", "path-links")
+      .attr("fill", "none");
+
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+    // Redraw the route between the active path's consecutive nodes from their
+    // current positions. Called on every tick (so it follows drag/settle) and
+    // imperatively when the active path changes while the sim is at rest.
+    const drawPathLinks = () => {
+      const sel = pathLayer
+        .selectAll<SVGPathElement, [string, string]>("path")
+        .data(pathPairsRef.current, (d) => `${d[0]}-${d[1]}`);
+      sel.exit().remove();
+      sel
+        .enter()
+        .append("path")
+        .attr("class", "path-link")
+        .merge(sel)
+        .attr("stroke", pathColorRef.current ?? "var(--accent)")
+        .attr("d", ([a, b]) => {
+          const s = nodeById.get(a);
+          const t = nodeById.get(b);
+          if (!s || s.x == null || t == null || t.x == null) return null;
+          const dx = (t.x ?? 0) - (s.x ?? 0);
+          const dy = (t.y ?? 0) - (s.y ?? 0);
+          const dr = Math.sqrt(dx * dx + dy * dy) * 1.2;
+          return `M${s.x},${s.y}A${dr},${dr} 0 0,1 ${t.x},${t.y}`;
+        });
+    };
+    drawPathRef.current = drawPathLinks;
+
     // Nodes
     const nodeSel = root
       .append("g")
@@ -261,6 +311,7 @@ export function ConnectionsGraph() {
         return `M${s.x},${s.y}A${dr},${dr} 0 0,1 ${t.x},${t.y}`;
       });
       nodeSel.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
+      drawPathLinks();
     });
 
     // Drag
@@ -296,10 +347,17 @@ export function ConnectionsGraph() {
     const linkEnd = (e: string | number | Node) => (e as Node).id ?? e;
 
     const active = hovered ?? selected;
-    // The set of nodes to keep lit. For a node it is the node + neighbors; for a
-    // path it is the path's subsections. Empty set = nothing highlighted.
+    // A hovered/clicked node wins over a selected path. Node mode lights the node
+    // + neighbors and highlights their edges; path mode lights the path's
+    // subsections and draws an explicit route overlay between them instead.
+    const pathMode = !active && pathPairs.length > 0;
     const set = active ? highlightSet(active) : new Set(pathIds ?? []);
     const anyHighlight = set.size > 0;
+
+    // Feed the route overlay (drawn imperatively by the d3 layer, not React).
+    pathPairsRef.current = pathMode ? pathPairs : [];
+    pathColorRef.current = pathColor;
+    drawPathRef.current();
 
     svg
       .selectAll<SVGGElement, Node>(".node")
@@ -309,22 +367,21 @@ export function ConnectionsGraph() {
     svg
       .selectAll<SVGPathElement, Link>(".link")
       .classed("highlight", (d) => {
-        if (!anyHighlight) return false;
+        // Only single-node mode highlights base edges; path mode uses the route.
+        if (!active) return false;
         const s = linkEnd(d.source);
         const t = linkEnd(d.target);
-        // Single-node mode: edges touching the node. Path mode: edges fully
-        // inside the path (both endpoints highlighted).
-        return active ? s === active || t === active : set.has(s) && set.has(t);
+        return s === active || t === active;
       })
       .classed("dim", (d) => {
         if (!anyHighlight) return false;
+        // In path mode every base link is dimmed in favor of the route overlay.
+        if (pathMode) return true;
         const s = linkEnd(d.source);
         const t = linkEnd(d.target);
-        return active
-          ? s !== active && t !== active
-          : !(set.has(s) && set.has(t));
+        return s !== active && t !== active;
       });
-  }, [hovered, selected, highlightSet, pathIds]);
+  }, [hovered, selected, highlightSet, pathIds, pathPairs, pathColor]);
 
   const selectedSub = selected ? getSubsectionById(selected) : null;
 
