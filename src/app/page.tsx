@@ -77,6 +77,8 @@ export default async function HomePage() {
         ))}
       </div>
 
+      <LearningPaths progress={progress} />
+
       <section className="max-w-[1280px] mx-auto px-6 py-8">
         <h2 className="text-2xl font-bold mb-1.5">Cross-pillar connections</h2>
         <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
@@ -85,8 +87,6 @@ export default async function HomePage() {
         </p>
         <ConnectionsGraph />
       </section>
-
-      <LearningPaths progress={progress} />
 
       <footer className="max-w-[1280px] mx-auto px-6 py-10 border-t border-[var(--border)] text-sm text-[var(--fg-dim)]">
         <div className="flex gap-5 flex-wrap text-xs text-[var(--fg-mute)]">
