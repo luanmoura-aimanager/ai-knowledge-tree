@@ -9,6 +9,7 @@ import { CollapseController } from "@/components/CollapseController";
 import { PillarCard } from "@/components/PillarCard";
 import { ConnectionsGraph } from "@/components/ConnectionsGraph";
 import { LearningPaths } from "@/components/LearningPaths";
+import { PathHighlightProvider } from "@/components/PathHighlightProvider";
 import { getProgressMap, getResume, isSignedIn } from "@/lib/progress";
 
 /**
@@ -77,16 +78,21 @@ export default async function HomePage() {
         ))}
       </div>
 
-      <LearningPaths progress={progress} />
+      <PathHighlightProvider>
+        <LearningPaths progress={progress} />
 
-      <section className="max-w-[1280px] mx-auto px-6 py-8">
-        <h2 className="text-2xl font-bold mb-1.5">Cross-pillar connections</h2>
-        <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
-          Force-directed graph of subsections. Drag nodes, scroll to zoom, and
-          click to pin a subsection and see its connections.
-        </p>
-        <ConnectionsGraph />
-      </section>
+        <section className="max-w-[1280px] mx-auto px-6 py-8">
+          <h2 className="text-2xl font-bold mb-1.5">
+            Cross-pillar connections
+          </h2>
+          <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
+            Force-directed graph of subsections. Drag nodes, scroll to zoom, and
+            click to pin a subsection and see its connections. Selecting a
+            suggested path above lights up its subsections here.
+          </p>
+          <ConnectionsGraph />
+        </section>
+      </PathHighlightProvider>
 
       <footer className="max-w-[1280px] mx-auto px-6 py-10 border-t border-[var(--border)] text-sm text-[var(--fg-dim)]">
         <div className="flex gap-5 flex-wrap text-xs text-[var(--fg-mute)]">

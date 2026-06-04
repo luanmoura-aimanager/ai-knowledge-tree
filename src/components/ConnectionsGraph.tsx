@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as d3 from "d3";
 import { PILLARS, CONNECTIONS, getSubsectionById } from "@/lib/dag";
 import type { Pillar, Connection } from "@/lib/types";
+import { usePathHighlight } from "@/components/PathHighlightProvider";
 
 /**
  * ConnectionsGraph: D3 force-directed view of the whole DAG.
@@ -36,6 +37,10 @@ export function ConnectionsGraph() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+
+  // Subsection ids of the suggested path the user picked (empty when none).
+  // Stable across renders unless changed, so it is safe in the effect deps.
+  const pathIds = usePathHighlight()?.activeIds;
 
   // Build the highlight set: active node + its direct neighbors (cross + within)
   const highlightSet = useCallback((active: string | null) => {
@@ -282,31 +287,44 @@ export function ConnectionsGraph() {
     };
   }, []);
 
-  // React to hover/select by toggling CSS classes on existing DOM nodes
+  // React to hover/select (or a picked suggested path) by toggling CSS classes
+  // on existing DOM nodes. A hovered/clicked node always wins; otherwise, if a
+  // suggested path is active, light up exactly its subsections.
   useEffect(() => {
     if (!svgRef.current) return;
-    const active = hovered ?? selected;
-    const set = highlightSet(active);
     const svg = d3.select(svgRef.current);
+    const linkEnd = (e: string | number | Node) => (e as Node).id ?? e;
+
+    const active = hovered ?? selected;
+    // The set of nodes to keep lit. For a node it is the node + neighbors; for a
+    // path it is the path's subsections. Empty set = nothing highlighted.
+    const set = active ? highlightSet(active) : new Set(pathIds ?? []);
+    const anyHighlight = set.size > 0;
+
     svg
       .selectAll<SVGGElement, Node>(".node")
-      .classed("dim", (d) => !!active && !set.has(d.id))
-      .classed("active", (d) => d.id === active);
+      .classed("dim", (d) => anyHighlight && !set.has(d.id))
+      .classed("active", (d) => (active ? d.id === active : set.has(d.id)));
+
     svg
       .selectAll<SVGPathElement, Link>(".link")
       .classed("highlight", (d) => {
-        if (!active) return false;
-        const s = (d.source as Node).id ?? d.source;
-        const t = (d.target as Node).id ?? d.target;
-        return s === active || t === active;
+        if (!anyHighlight) return false;
+        const s = linkEnd(d.source);
+        const t = linkEnd(d.target);
+        // Single-node mode: edges touching the node. Path mode: edges fully
+        // inside the path (both endpoints highlighted).
+        return active ? s === active || t === active : set.has(s) && set.has(t);
       })
       .classed("dim", (d) => {
-        if (!active) return false;
-        const s = (d.source as Node).id ?? d.source;
-        const t = (d.target as Node).id ?? d.target;
-        return s !== active && t !== active;
+        if (!anyHighlight) return false;
+        const s = linkEnd(d.source);
+        const t = linkEnd(d.target);
+        return active
+          ? s !== active && t !== active
+          : !(set.has(s) && set.has(t));
       });
-  }, [hovered, selected, highlightSet]);
+  }, [hovered, selected, highlightSet, pathIds]);
 
   const selectedSub = selected ? getSubsectionById(selected) : null;
 
