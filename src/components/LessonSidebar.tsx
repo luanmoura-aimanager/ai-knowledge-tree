@@ -146,7 +146,7 @@ export function LessonSidebar({
           {pillar.name}
         </div>
 
-        <nav className="flex flex-col gap-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto -mr-1.5 pr-1.5">
+        <nav className="lesson-scroll flex flex-col gap-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto -mr-1.5 pr-1.5">
           {lessons.map((lesson, i) => {
             const href = `/pillar/${pillar.letter}/${subId}/${lesson.id}`;
             const active = pathname === href;
