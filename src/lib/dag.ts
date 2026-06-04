@@ -1854,6 +1854,12 @@ export const PATHS: Path[] = [
     pillars: ["D1", "D2", "D5", "E7"],
     color: "var(--pd)",
   },
+  {
+    name: "📊 Classical ML / Data Scientist",
+    desc: "The canonical starting roadmap: stats foundations → supervised learners (linear, trees, kernels) → unsupervised → ensembles → rigorous evaluation.",
+    pillars: ["A2", "B1", "C1", "C3", "C2", "C4", "C5", "C7", "C10"],
+    color: "var(--pc)",
+  },
 ];
 
 // -------------------------------------------------------------------------
