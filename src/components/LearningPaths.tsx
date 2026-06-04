@@ -47,12 +47,31 @@ function PathCard({ path, progress }: { path: Path; progress: ProgressMap }) {
         {path.pillars.map((id) => {
           const sub = getSubsectionById(id);
           if (!sub) return null;
+          const state = pp.subs[id]?.state;
+          const color = sub.pillar.color;
+          const base =
+            "font-mono text-xs px-1.5 py-0.5 rounded no-underline transition-colors";
           return (
             <Link
               key={id}
               href={`/pillar/${sub.pillar.letter}/${id}`}
               title={`${id} · ${sub.name}`}
-              className="font-mono text-xs px-1.5 py-0.5 rounded no-underline bg-[var(--card-2)] text-[var(--fg-dim)] hover:text-[var(--fg)] transition-colors"
+              className={
+                state === "done"
+                  ? `${base} font-semibold hover:opacity-85`
+                  : state === "in-progress"
+                    ? `${base} text-[var(--fg)] hover:opacity-85`
+                    : `${base} bg-[var(--card-2)] text-[var(--fg-dim)] hover:text-[var(--fg)]`
+              }
+              style={
+                state === "done"
+                  ? { background: color, color: "var(--bg)" }
+                  : state === "in-progress"
+                    ? {
+                        background: `color-mix(in srgb, ${color} 22%, transparent)`,
+                      }
+                    : undefined
+              }
             >
               {id}
             </Link>
