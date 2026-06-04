@@ -113,8 +113,8 @@ export function LessonSidebar({
 
   return (
     <aside className="w-full lg:w-[280px] lg:flex-shrink-0">
-      <div className="lg:sticky lg:top-20 rounded-xl bg-[#161e47] border border-[#2b3566] p-4">
-        <div className="flex items-start gap-2 mb-1">
+      <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:flex lg:flex-col rounded-xl bg-[#161e47] border border-[#2b3566] p-4">
+        <div className="flex items-start gap-2 mb-1 flex-shrink-0">
           <Link
             href={`/pillar/${pillar.letter}/${subId}`}
             className="no-underline flex-1 min-w-0"
@@ -142,11 +142,11 @@ export function LessonSidebar({
             <CollapseIcon />
           </button>
         </div>
-        <div className="text-xs text-[var(--fg-mute)] mb-4 ml-12">
+        <div className="text-xs text-[var(--fg-mute)] mb-4 ml-12 flex-shrink-0">
           {pillar.name}
         </div>
 
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-0.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto -mr-1.5 pr-1.5">
           {lessons.map((lesson, i) => {
             const href = `/pillar/${pillar.letter}/${subId}/${lesson.id}`;
             const active = pathname === href;
@@ -183,7 +183,7 @@ export function LessonSidebar({
           )}
         </nav>
 
-        <div className="mt-5 pt-4 border-t border-[var(--border)] text-xs text-[var(--fg-dim)] flex flex-col gap-1">
+        <div className="mt-5 pt-4 border-t border-[var(--border)] text-xs text-[var(--fg-dim)] flex flex-col gap-1 flex-shrink-0">
           <Link
             href={`/pillar/${pillar.letter}`}
             className="hover:text-[var(--fg)] no-underline"

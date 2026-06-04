@@ -1,4 +1,5 @@
-import { PATHS } from "@/lib/dag";
+import Link from "next/link";
+import { PATHS, getSubsectionById } from "@/lib/dag";
 import type { Path } from "@/lib/types";
 import { pillarProgress } from "@/lib/curriculum";
 import type { ProgressMap } from "@/lib/progress";
@@ -43,14 +44,39 @@ function PathCard({ path, progress }: { path: Path; progress: ProgressMap }) {
         {path.desc}
       </p>
       <div className="flex gap-1 flex-wrap">
-        {path.pillars.map((id) => (
-          <span
-            key={id}
-            className="font-mono text-xs px-1.5 py-0.5 rounded bg-[var(--card-2)] text-[var(--fg-dim)]"
-          >
-            {id}
-          </span>
-        ))}
+        {path.pillars.map((id) => {
+          const sub = getSubsectionById(id);
+          if (!sub) return null;
+          const state = pp.subs[id]?.state;
+          const color = sub.pillar.color;
+          const base =
+            "font-mono text-xs px-1.5 py-0.5 rounded no-underline transition-colors";
+          return (
+            <Link
+              key={id}
+              href={`/pillar/${sub.pillar.letter}/${id}`}
+              title={`${id} · ${sub.name}`}
+              className={
+                state === "done"
+                  ? `${base} font-semibold hover:opacity-85`
+                  : state === "in-progress"
+                    ? `${base} text-[var(--fg)] hover:opacity-85`
+                    : `${base} bg-[var(--card-2)] text-[var(--fg-dim)] hover:text-[var(--fg)]`
+              }
+              style={
+                state === "done"
+                  ? { background: color, color: "var(--bg)" }
+                  : state === "in-progress"
+                    ? {
+                        background: `color-mix(in srgb, ${color} 22%, transparent)`,
+                      }
+                    : undefined
+              }
+            >
+              {id}
+            </Link>
+          );
+        })}
       </div>
       <div className="mt-auto">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
