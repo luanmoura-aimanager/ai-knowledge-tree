@@ -1840,7 +1840,7 @@ export const CONNECTIONS: Connection[] = [
 
 export const PATHS: Path[] = [
   {
-    name: "📐 ai-math-theory mirror",
+    name: "📐 LLM Theory",
     desc: "Follows the ai-math-theory course end to end (Ch0 → Ch12), lesson by lesson, mapped onto the pages this site already has: math foundations → linear models & the perceptron → MLPs & backprop → optimization → CNN bridge → sequence modeling → attention & the Transformer → training LLMs → modern architectures → alignment → inference & decoding → interpretability → a capstone tiny-GPT build. Each step's note marks the ai-math-theory lesson(s) it mirrors.",
     color: "var(--pe)",
     pillars: [
