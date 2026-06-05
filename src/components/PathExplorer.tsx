@@ -13,6 +13,18 @@ export interface PathChip {
   state: "done" | "in-progress" | "untouched";
 }
 
+/** One resolved lesson stop in a lesson-stepped path (e.g. the amt mirror). */
+export interface PathStepView {
+  subId: string;
+  lessonId: string;
+  letter: string;
+  color: string;
+  title: string;
+  note?: string;
+  available: boolean;
+  state: "done" | "in-progress" | "untouched";
+}
+
 /** A fully-computed path view-model handed down from the server component. */
 export interface PathView {
   name: string;
@@ -24,6 +36,29 @@ export interface PathView {
   pctProgress: number;
   pctGap: number;
   chips: PathChip[];
+  steps?: PathStepView[];
+}
+
+/** amt chapter labels, keyed by the chapter number parsed from a step's note. */
+const AMT_CHAPTERS: Record<string, string> = {
+  "0": "Ch0 · Math foundations",
+  "1": "Ch1 · Linear models & the perceptron",
+  "2": "Ch2 · MLPs & backprop",
+  "3": "Ch3 · Optimization & regularization",
+  "4": "Ch4 · CNN bridge",
+  "5": "Ch5 · Sequence modeling & embeddings",
+  "6": "Ch6 · Attention & the Transformer",
+  "7": "Ch7 · Training language models",
+  "8": "Ch8 · Modern LLM architectures",
+  "9": "Ch9 · Alignment",
+  "10": "Ch10 · Inference & decoding",
+  "11": "Ch11 · Interpretability & the frontier",
+  "12": "Ch12 · Capstone: build a tiny GPT",
+};
+
+function chapterOf(note?: string): string {
+  const m = note?.match(/\d+/);
+  return m ? m[0] : "";
 }
 
 /**
@@ -118,7 +153,7 @@ function PathDetail({
 
         <div>
           <h4 className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-2 font-semibold">
-            Subsections ({path.chips.length})
+            Disciplines ({path.chips.length})
           </h4>
           <div className="flex gap-1.5 flex-wrap">
             {path.chips.map((chip) => {
@@ -154,6 +189,8 @@ function PathDetail({
         </div>
       </div>
 
+      {path.steps && path.steps.length > 0 && <PathSteps steps={path.steps} />}
+
       <div className="mt-6">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
           {path.studied}/{path.total} studied
@@ -164,6 +201,76 @@ function PathDetail({
           <div className="seg gap" style={{ width: `${path.pctGap}%` }} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The ordered lesson sequence, grouped by amt chapter, with per-step links. */
+function PathSteps({ steps }: { steps: PathStepView[] }) {
+  return (
+    <div className="mt-6">
+      <h4 className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-2 font-semibold">
+        Course sequence ({steps.length} steps)
+      </h4>
+      <ol className="m-0 p-0 list-none max-h-[440px] overflow-y-auto pr-1 flex flex-col gap-0.5">
+        {steps.map((step, i) => {
+          const chapter = chapterOf(step.note);
+          const showHeader =
+            i === 0 || chapterOf(steps[i - 1].note) !== chapter;
+          return (
+            <li key={`${step.subId}/${step.lessonId}/${i}`}>
+              {showHeader && (
+                <div className="text-[11px] font-semibold text-[var(--fg-dim)] mt-3 mb-1 sticky top-0 bg-[var(--card)] py-0.5">
+                  {AMT_CHAPTERS[chapter] ?? chapter}
+                </div>
+              )}
+              <Link
+                href={`/pillar/${step.letter}/${step.subId}/${step.lessonId}`}
+                className="flex items-center gap-2 px-2 py-1 rounded no-underline hover:bg-[var(--card-2)] transition-colors group"
+                title={`${step.subId}/${step.lessonId}`}
+              >
+                <span
+                  className="font-mono text-[10px] w-4 text-right shrink-0"
+                  style={{ color: step.color }}
+                >
+                  {i + 1}
+                </span>
+                <span
+                  className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
+                  style={{
+                    background: `color-mix(in srgb, ${step.color} 18%, transparent)`,
+                    color: step.color,
+                  }}
+                >
+                  {step.subId}
+                </span>
+                <span
+                  className={`text-sm truncate ${
+                    step.state === "done"
+                      ? "text-[var(--fg)] font-medium"
+                      : step.available
+                        ? "text-[var(--fg)]"
+                        : "text-[var(--fg-dim)] italic"
+                  } group-hover:text-[var(--fg)]`}
+                >
+                  {step.state === "done" && "✓ "}
+                  {step.title}
+                </span>
+                {step.note && (
+                  <span className="ml-auto font-mono text-[10px] text-[var(--fg-mute)] shrink-0">
+                    {step.note}
+                  </span>
+                )}
+                {!step.available && (
+                  <span className="font-mono text-[9px] text-[var(--fg-mute)] border border-[var(--border)] rounded px-1 shrink-0">
+                    soon
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

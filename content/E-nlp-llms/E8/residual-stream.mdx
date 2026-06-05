@@ -1,0 +1,73 @@
+---
+title: "The residual stream"
+pillar: E
+subId: E8
+lessonId: residual-stream
+order: 2
+estimatedMinutes: 16
+goal: "View a transformer as a residual stream that every attention head and MLP reads from and writes to additively, and use this linear-superposition picture as the substrate for circuit analysis."
+prerequisites: ["probing", "transformer-block"]
+codeExempt: true
+---
+
+To analyze what a transformer computes, the most useful reframing is to stop thinking of
+it as a stack of layers and start thinking of it as a single shared communication channel
+that every component reads from and writes to. That channel is the residual stream. This
+picture, from the *A Mathematical Framework for Transformer Circuits* work, is the
+foundation for everything in mechanistic interpretability.
+
+## 1. The stream as a running sum
+
+In a pre-norm decoder, each block updates the representation $x$ at a given token position
+by *adding* to it:
+
+$$
+x_{\ell+1} = x_\ell + \text{Attn}_\ell(\,\text{LN}(x_\ell)\,) + \text{MLP}_\ell(\,\text{LN}(x_\ell)\,).
+$$
+
+Nothing overwrites $x$; every block contributes an additive term. Unrolling from the token
+embedding $x_0$ to the final layer $L$ gives
+
+$$
+x_L = x_0 + \sum_{\ell=1}^{L} \text{Attn}_\ell(\cdot) + \sum_{\ell=1}^{L} \text{MLP}_\ell(\cdot).
+$$
+
+The representation read by the unembedding is a sum of the embedding plus the output of
+every attention head and every MLP in the network. The residual stream is the vector
+$x_\ell \in \mathbb{R}^{d}$ at each position, and it is the only thing components ever see.
+
+## 2. Reading and writing subspaces
+
+Each component interacts with the stream through linear maps. An attention head reads
+through its query, key, and value projections and writes through its output projection; an
+MLP reads through its input matrix and writes through its output matrix. Because these are
+linear, a component effectively *reads from* a subspace of the $d$ dimensions and *writes
+to* a subspace. Two components communicate when the write subspace of the earlier one
+overlaps the read subspace of the later one.
+
+This yields the notion of composition. A later head's query can read what an earlier head
+wrote (Q-composition), likewise for keys (K-composition) and values (V-composition). A
+circuit is a path of such reads and writes that, together, implement an identifiable
+behavior. The [induction-head](induction-heads) circuit is the canonical two-head example.
+
+## 3. The logit lens and direct contributions
+
+Because the unembedding is linear and the stream is additive, the logit for a token is a
+sum of contributions, one per component, each obtained by pushing that component's write
+through the unembedding. Applying the unembedding to an *intermediate* $x_\ell$ (the
+"logit lens") shows the model's running guess at each depth. A single component's direct
+effect on a logit can be read off as its write projected onto the relevant unembedding
+direction, which is what makes attribution tractable.
+
+## 4. Bandwidth and superposition
+
+The stream has a fixed width $d$, shared by every component across all layers. The number
+of distinct features the model represents far exceeds $d$. The pressure this creates,
+storing more features than dimensions by packing them into near-orthogonal directions, is
+[superposition](superposition), and it is the reason individual neurons are usually
+polysemantic. Sparse autoencoders, two lessons ahead, are the tool for pulling those
+overlapping directions back apart.
+
+With the stream as the substrate, the next lesson reads concrete
+[circuits](circuits) off of it: specific heads whose reads and writes compose into an
+algorithm.

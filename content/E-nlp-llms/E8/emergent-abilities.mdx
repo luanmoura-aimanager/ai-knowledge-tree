@@ -1,0 +1,67 @@
+---
+title: "Emergent abilities, debated"
+pillar: E
+subId: E8
+lessonId: emergent-abilities
+order: 9
+estimatedMinutes: 15
+goal: "State the claim that some capabilities appear abruptly with scale, weigh the counterargument that emergence is partly a metric artifact, and separate what scales smoothly from what does not."
+prerequisites: ["scaling-laws"]
+codeExempt: true
+---
+
+A widely cited claim about large language models is that certain abilities are *emergent*:
+absent in smaller models, present in larger ones, and appearing abruptly rather than
+improving gradually. This lesson states the claim precisely, presents the main rebuttal,
+and settles on what the evidence actually supports.
+
+## 1. The claim
+
+Wei et al. (2022) defined an emergent ability as one that is "not present in smaller models
+but is present in larger models," such that its performance curve against scale is flat
+near chance until a threshold, then rises sharply. Reported examples included multi-step
+arithmetic, word unscrambling, and certain multiple-choice benchmarks, measured by
+exact-match accuracy. On a log-scale x-axis of training compute, these look like sudden
+phase transitions.
+
+If taken at face value, emergence is unsettling for safety: it implies new capabilities
+can appear without warning as models scale, so a benchmark that looks safe at one size
+gives no guarantee at the next.
+
+## 2. The metric-artifact rebuttal
+
+Schaeffer et al. (2023) argued that much apparent emergence is an artifact of the *metric*,
+not of the model. The argument has two parts.
+
+First, the underlying per-token quantity that scaling laws govern, cross-entropy loss,
+improves smoothly and predictably with scale. There is no discontinuity in the loss.
+
+Second, the benchmark metrics that show sharp jumps are *nonlinear and discontinuous*
+functions of that smooth loss. Exact-match on a $k$-step problem requires all $k$ tokens
+correct, so accuracy scales roughly like $p^k$ where $p$ is per-token correctness;
+multiplying a smoothly rising $p$ through a steep power and a hard threshold manufactures a
+sharp-looking curve. Swap to a smooth metric (token edit distance, per-token log-likelihood,
+or a partial-credit score) and the same runs show continuous improvement.
+
+The testable prediction follows: choosing a continuous metric should dissolve the
+discontinuity, and across many of the original tasks it does.
+
+## 3. What this does and does not settle
+
+The rebuttal does not say capabilities never change qualitatively. It says that *abrupt
+benchmark jumps are weak evidence* for a phase transition, because a discontinuous metric
+over a smooth loss produces them for free. Three honest takeaways:
+
+- Pretraining loss scales smoothly; predict capability through metrics that track it
+  rather than through brittle exact-match thresholds.
+- Some phenomena do look like genuine internal phase changes. The formation of
+  [induction heads](induction-heads) during training is a sharp, mechanistically
+  identified transition in a smooth quantity, not a metric artifact.
+- "Emergence" is therefore better treated as a statement about measurement and about
+  in-distribution extrapolation than as a law of nature.
+
+The practical posture is the same one [scaling laws](/pillar/E/E4/scaling-laws) recommend: forecast with
+smooth predictors, and treat surprising benchmark jumps as a prompt to check the metric
+before concluding the model crossed a threshold. The final lesson surveys
+[where the frontier is now](frontier-now), including the reasoning models that complicate
+this picture further.

@@ -1,0 +1,109 @@
+---
+title: "nanoGPT setup and the training loop"
+pillar: E
+subId: E9
+lessonId: nanogpt-setup
+order: 1
+estimatedMinutes: 18
+goal: "Stand up the minimal training scaffold: character-level tokenization of TinyShakespeare, batched next-token targets, and the train/estimate-loss loop the rest of the capstone reuses."
+prerequisites: ["decoder-only", "dl-optimizers"]
+---
+
+This capstone builds a working decoder-only language model from scratch, following
+Karpathy's nanoGPT. It introduces no new theory; it turns the abstractions from pillars D
+and E into code that trains on a laptop. This first lesson builds the scaffold every later
+lesson reuses: tokenizer, data batching, and the training loop. The model itself is a
+black box here and gets filled in next.
+
+## 1. Character-level tokenization
+
+The smallest tokenizer that works is a character vocabulary: map each distinct character to
+an integer. It produces long sequences and a tiny vocabulary, which is the right tradeoff
+for a teaching model on TinyShakespeare (a 1 MB text file of Shakespeare).
+
+```python-static
+with open("input.txt", "r", encoding="utf-8") as f:
+    text = f.read()
+
+chars = sorted(set(text))
+vocab_size = len(chars)                      # ~65 for TinyShakespeare
+stoi = {c: i for i, c in enumerate(chars)}
+itos = {i: c for i, c in enumerate(chars)}
+encode = lambda s: [stoi[c] for c in s]
+decode = lambda ids: "".join(itos[i] for i in ids)
+```
+
+## 2. Data as next-token targets
+
+Language modeling is next-token prediction, so a training example is a context block `x`
+and the same block shifted left by one as targets `y`. Encode the corpus once, hold out the
+last 10% for validation, and sample random offsets to form a batch.
+
+```python-static
+import torch
+
+data = torch.tensor(encode(text), dtype=torch.long)
+n = int(0.9 * len(data))
+train_data, val_data = data[:n], data[n:]
+
+batch_size = 64       # independent sequences per step
+block_size = 256      # context length in tokens
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def get_batch(split):
+    d = train_data if split == "train" else val_data
+    ix = torch.randint(len(d) - block_size, (batch_size,))
+    x = torch.stack([d[i : i + block_size] for i in ix])
+    y = torch.stack([d[i + 1 : i + block_size + 1] for i in ix])
+    return x.to(device), y.to(device)
+```
+
+Each row of `y` is `x` advanced by one position, so predicting `y[:, t]` from `x[:, :t+1]`
+is exactly the autoregressive objective.
+
+## 3. The estimate-loss helper
+
+Training loss on a single batch is noisy. Average over several batches, under
+`torch.no_grad()` and `model.eval()`, to get a stable read on train and validation loss.
+
+```python-static
+@torch.no_grad()
+def estimate_loss(model, eval_iters=200):
+    out = {}
+    model.eval()
+    for split in ("train", "val"):
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            xb, yb = get_batch(split)
+            _, loss = model(xb, yb)
+            losses[k] = loss.item()
+        out[split] = losses.mean().item()
+    model.train()
+    return out
+```
+
+## 4. The training loop
+
+The loop is the standard one from [optimizers for deep learning](/pillar/D/D1/dl-optimizers):
+sample a batch, forward to a loss, backprop, step AdamW. The model returns `(logits, loss)`,
+a contract the next lesson implements.
+
+```python-static
+def train(model, max_iters=5000, eval_interval=500, lr=3e-4):
+    opt = torch.optim.AdamW(model.parameters(), lr=lr)
+    for it in range(max_iters):
+        if it % eval_interval == 0:
+            m = estimate_loss(model)
+            print(f"step {it}: train {m['train']:.3f}, val {m['val']:.3f}")
+        xb, yb = get_batch("train")
+        _, loss = model(xb, yb)
+        opt.zero_grad(set_to_none=True)
+        loss.backward()
+        opt.step()
+    return model
+```
+
+A useful sanity check before any real architecture: a model that ignores context and
+predicts a uniform distribution has loss $\ln(\text{vocab\_size})$, about $4.17$ for a
+65-character vocabulary. Any working model must beat that. The next lesson builds the model
+that does, [the transformer block from scratch](transformer-block-from-scratch).
