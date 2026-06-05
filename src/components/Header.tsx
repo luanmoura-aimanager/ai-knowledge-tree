@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Session } from "next-auth";
 import { auth, signIn, signOut } from "@/auth";
 import { dbEnabled } from "@/lib/db";
@@ -11,9 +12,17 @@ export async function Header() {
       <div className="max-w-[1280px] mx-auto px-6 h-14 flex items-center justify-between">
         <Link
           href="/"
-          className="font-bold text-[var(--fg)] tracking-tight no-underline hover:text-[var(--accent)]"
+          className="flex items-center gap-2 font-bold text-[var(--fg)] tracking-tight no-underline hover:text-[var(--accent)]"
         >
-          🌳 AI Knowledge Tree
+          <Image
+            src="/logo.png"
+            alt=""
+            width={24}
+            height={24}
+            priority
+            className="shrink-0"
+          />
+          AI Knowledge Tree
         </Link>
         <nav className="flex gap-1 text-sm items-center">
           <NavLink href="/">Dashboard</NavLink>

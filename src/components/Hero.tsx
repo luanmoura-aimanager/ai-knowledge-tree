@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { PILLARS } from "@/lib/dag";
 
 /**
@@ -7,8 +8,18 @@ import { PILLARS } from "@/lib/dag";
 export function Hero() {
   return (
     <div className="max-w-[1280px] mx-auto px-6 pt-12 pb-2">
-      <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3 bg-gradient-to-r from-[#7aa2f7] via-[#bb9af7] to-[#f7768e] bg-clip-text text-transparent">
-        🌳 AI Knowledge Tree
+      <h1 className="flex items-center gap-3 text-4xl md:text-5xl font-bold tracking-tight mb-3">
+        <Image
+          src="/logo.png"
+          alt=""
+          width={48}
+          height={48}
+          priority
+          className="shrink-0 w-10 h-10 md:w-12 md:h-12"
+        />
+        <span className="bg-gradient-to-r from-[#7aa2f7] via-[#bb9af7] to-[#f7768e] bg-clip-text text-transparent">
+          AI Knowledge Tree
+        </span>
       </h1>
       <p className="text-[var(--fg-dim)] max-w-3xl leading-relaxed">
         Interactive map of the full DAG of Data Science, Machine Learning, Deep
