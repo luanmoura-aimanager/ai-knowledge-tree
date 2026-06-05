@@ -1,0 +1,112 @@
+---
+title: "Reimplement the transformer block"
+pillar: E
+subId: E9
+lessonId: transformer-block-from-scratch
+order: 2
+estimatedMinutes: 22
+goal: "Write causal multi-head self-attention, the MLP, residual connections, and LayerNorm as PyTorch modules from scratch, and assemble them into the decoder-only block this capstone trains."
+prerequisites: ["nanogpt-setup", "E3/transformer-block"]
+---
+
+This lesson implements the [transformer block](/pillar/E/E3/transformer-block) as runnable
+PyTorch, one component at a time, then assembles them. The math was derived in E3; here the
+goal is a correct module whose shapes line up with the batching from the
+[setup lesson](nanogpt-setup).
+
+## 1. One attention head
+
+A single causal self-attention head projects the input to queries, keys, and values, scores
+each query against all keys, masks out future positions, softmaxes, and reads a weighted sum
+of values. For input of shape `(B, T, C)` (batch, time, channels):
+
+```python-static
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
+
+class Head(nn.Module):
+    def __init__(self, n_embd, head_size, block_size, dropout=0.2):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        # a lower-triangular mask, registered as a non-parameter buffer
+        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        k, q, v = self.key(x), self.query(x), self.value(x)
+        wei = q @ k.transpose(-2, -1) * k.shape[-1] ** -0.5      # (B,T,T), scaled
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
+        wei = F.softmax(wei, dim=-1)
+        wei = self.dropout(wei)
+        return wei @ v                                          # (B,T,head_size)
+```
+
+The `1/sqrt(head_size)` scaling and the `-inf` causal mask are exactly the choices derived
+in E3; here they are two lines.
+
+## 2. Multi-head attention and the MLP
+
+Multiple heads run in parallel and concatenate, followed by an output projection. The
+position-wise MLP is the gated-or-plain FFN; the plain version is used here.
+
+```python-static
+class MultiHeadAttention(nn.Module):
+    def __init__(self, n_head, n_embd, block_size, dropout=0.2):
+        super().__init__()
+        head_size = n_embd // n_head
+        self.heads = nn.ModuleList(
+            [Head(n_embd, head_size, block_size, dropout) for _ in range(n_head)]
+        )
+        self.proj = nn.Linear(n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        return self.dropout(self.proj(out))
+
+class FeedForward(nn.Module):
+    def __init__(self, n_embd, dropout=0.2):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_embd, 4 * n_embd),
+            nn.ReLU(),
+            nn.Linear(4 * n_embd, n_embd),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+```
+
+## 3. The block: pre-norm residuals
+
+The block wires attention and the MLP as residual branches, each preceded by a LayerNorm.
+Pre-norm (normalize the branch input, add the branch output to the stream) is the
+arrangement that trains stably at depth, and it is the additive
+[residual stream](/pillar/E/E8/residual-stream) the interpretability track analyzes.
+
+```python-static
+class Block(nn.Module):
+    def __init__(self, n_embd, n_head, block_size, dropout=0.2):
+        super().__init__()
+        self.sa = MultiHeadAttention(n_head, n_embd, block_size, dropout)
+        self.ffwd = FeedForward(n_embd, dropout)
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
+
+    def forward(self, x):
+        x = x + self.sa(self.ln1(x))     # residual branch 1: attention
+        x = x + self.ffwd(self.ln2(x))   # residual branch 2: MLP
+        return x
+```
+
+Each `forward` returns the input plus a branch output, never an overwrite, which is the
+property that lets gradients flow through deep stacks and lets later analysis read each
+block's additive contribution.
+
+With one block correct, the [next lesson](train-tinyshakespeare) stacks several into a full
+model, adds the embedding and unembedding, and trains it.

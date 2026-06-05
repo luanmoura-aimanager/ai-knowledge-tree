@@ -1,0 +1,53 @@
+---
+title: "Attention Is All You Need, revisited"
+pillar: E
+subId: E9
+lessonId: aiayn-revisited
+order: 6
+estimatedMinutes: 14
+goal: "Re-read the original Transformer paper with a working implementation in hand, mapping every component in the paper to the code written across this capstone."
+prerequisites: ["rope-rmsnorm"]
+codeExempt: true
+---
+
+The capstone began with abstractions and ended with a trained, aligned model. The best way
+to consolidate it is to re-read Vaswani et al. (2017), *Attention Is All You Need*, now that
+every component in the paper corresponds to code you have written. This lesson is a guided
+re-read: each paper element mapped to its implementation and to the lesson that derived it.
+
+## 1. The component map
+
+| Paper (2017) | This capstone | Derived in |
+|---|---|---|
+| Scaled dot-product attention | `Head.forward`, the `q @ k.T / sqrt(d_k)` score | [self-attention](/pillar/E/E3/self-attention) |
+| Multi-head attention | `MultiHeadAttention`, parallel heads then a projection | [multi-head-attention](/pillar/E/E3/multi-head-attention) |
+| Position-wise FFN | `FeedForward`, the two-layer MLP | [transformer-block](/pillar/E/E3/transformer-block) |
+| Residual + normalization | the two residual branches in `Block` | [residual stream](/pillar/E/E8/residual-stream) |
+| Positional encoding | the position embedding, later RoPE | [positional encodings](/pillar/E/E3/positional-encodings) |
+| Encoder-decoder, cross-attention | omitted: this is decoder-only | [decoder-only](/pillar/E/E3/decoder-only) |
+
+## 2. What the paper has that the capstone dropped
+
+The 2017 model was an encoder-decoder for translation, with cross-attention linking the two
+stacks. The capstone is decoder-only, the design that GPT established for language modeling,
+so the encoder and cross-attention are absent. The paper's sinusoidal positional encoding
+was replaced first by a learned table and then by RoPE. Post-norm in the paper became
+pre-norm, the arrangement that trains stably at depth.
+
+## 3. What the capstone has that the paper did not
+
+The pieces added after 2017 are the ones that define a current LLM: a subword or
+character tokenizer and the autoregressive objective on a large corpus
+([pretraining](/pillar/E/E4/pretraining-data)), RMSNorm and gated FFNs as architectural
+refinements, the KV cache for efficient decoding, and a preference-tuning stage
+([DPO](mini-rlhf-dpo)) that turns a next-token predictor into an instruction follower. The
+attention mechanism at the center is unchanged; almost everything around it is new.
+
+## 4. Where to go next
+
+Reading the paper now should feel like reading documentation for code you own. The natural
+continuations are the parts the capstone simplified: the
+[inference and serving](/pillar/E/E5/decoding) stack that makes decoding fast, the
+[modern architectures](/pillar/E/E3/decoder-only) that scale the block, and the
+[interpretability](/pillar/E/E8/probing) tools that open the trained model back up. Each is
+now grounded in a model you built end to end.

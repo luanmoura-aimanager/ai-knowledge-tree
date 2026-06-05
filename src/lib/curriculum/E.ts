@@ -139,6 +139,18 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       goal: "Reduce KV-cache memory with grouped-query and multi-query attention; then sparsify depth with mixture-of-experts routing (top-k gating).",
       prerequisites: ["decoder-only"],
     },
+    {
+      id: "swiglu-geglu",
+      title: "Gated FFNs: SwiGLU and GeGLU",
+      goal: "Replace the transformer block's ReLU MLP with a gated linear unit (GLU) variant, derive the SwiGLU and GeGLU forms, and see why the 2/3 width rule keeps the parameter count fixed.",
+      prerequisites: ["transformer-block"],
+    },
+    {
+      id: "mla",
+      title: "Multi-head latent attention (MLA)",
+      goal: "Compress the KV cache by projecting keys and values through a shared low-rank latent, derive DeepSeek-V2's MLA, and contrast its memory and quality with GQA.",
+      prerequisites: ["gqa-moe"],
+    },
   ],
 
   E4: [
@@ -347,6 +359,12 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: ["E3/encoder-only"],
     },
     {
+      id: "residual-stream",
+      title: "The residual stream",
+      goal: "View a transformer as a residual stream that every attention head and MLP reads from and writes to additively, and use this linear-superposition picture as the substrate for circuit analysis.",
+      prerequisites: ["probing", "E3/transformer-block"],
+    },
+    {
       id: "circuits",
       title: "Mechanistic interpretability and circuits",
       goal: "Decompose a transformer into a graph of attention heads and MLP neurons that implement algorithmic sub-tasks; reproduce the indirect object identification circuit on a small model.",
@@ -381,6 +399,60 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       title: "Scalable oversight and weak-to-strong generalization",
       goal: "Survey scalable oversight: debate, amplification, and recursive reward modeling; then study the weak-to-strong experiment as an empirical proxy for aligning a model smarter than its supervisor.",
       prerequisites: ["E4/rlaif"],
+      codeExempt: true,
+    },
+    {
+      id: "emergent-abilities",
+      title: "Emergent abilities, debated",
+      goal: "State the claim that some capabilities appear abruptly with scale, then weigh the counterargument that emergence is partly an artifact of discontinuous metrics; separate what scales smoothly from what does not.",
+      prerequisites: ["E4/scaling-laws"],
+      codeExempt: true,
+    },
+    {
+      id: "frontier-now",
+      title: "Where the frontier is now",
+      goal: "Map the open problems the previous lessons lead into: reasoning models, long-context interpretability, automated circuit discovery, and the alignment questions that scale with capability.",
+      prerequisites: ["circuits", "emergent-abilities"],
+      codeExempt: true,
+    },
+  ],
+
+  E9: [
+    {
+      id: "nanogpt-setup",
+      title: "nanoGPT setup and the training loop",
+      goal: "Stand up the minimal training scaffold: character-level tokenization of TinyShakespeare, batched (x, y) next-token targets, and the train/estimate-loss loop that every later capstone lesson reuses.",
+      prerequisites: ["E3/decoder-only", "D1/dl-optimizers"],
+    },
+    {
+      id: "transformer-block-from-scratch",
+      title: "Reimplement the transformer block",
+      goal: "Write causal multi-head self-attention, the MLP, residual connections, and LayerNorm as PyTorch modules from scratch, and assemble them into the decoder-only block trained in this capstone.",
+      prerequisites: ["nanogpt-setup", "E3/transformer-block"],
+    },
+    {
+      id: "train-tinyshakespeare",
+      title: "Train on TinyShakespeare",
+      goal: "Run the full training of the tiny GPT, watch train/val loss separate, and sample text autoregressively to see the model move from noise to Shakespeare-shaped output.",
+      prerequisites: ["transformer-block-from-scratch"],
+    },
+    {
+      id: "rope-rmsnorm",
+      title: "Modernize: RoPE and RMSNorm",
+      goal: "Swap learned positional embeddings for rotary embeddings and LayerNorm for RMSNorm, the two changes that bring the toy model in line with current LLM architectures.",
+      prerequisites: ["train-tinyshakespeare", "E3/positional-encodings"],
+    },
+    {
+      id: "mini-rlhf-dpo",
+      title: "A minimal preference-tuning pass (DPO)",
+      goal: "Take the pretrained tiny GPT, build a small preference dataset, and run one DPO step to shift its outputs, a scaled-down version of the alignment pipeline from E4.",
+      prerequisites: ["train-tinyshakespeare", "E4/dpo"],
+    },
+    {
+      id: "aiayn-revisited",
+      title: "Attention Is All You Need, revisited",
+      goal: "Re-read the original Transformer paper with a working implementation in hand, mapping every component in the paper to the code written across this capstone.",
+      prerequisites: ["rope-rmsnorm"],
       codeExempt: true,
     },
   ],

@@ -68,12 +68,30 @@ export interface Connection {
   kind: ConnectionKind;
 }
 
+/**
+ * One lesson-level stop in a path's ordered sequence. Used by paths that thread
+ * individual lessons (across many subsections, possibly revisiting one) rather
+ * than whole disciplines. `note` carries the external origin label, e.g. the
+ * ai-math-theory lesson id "6.2" the step mirrors.
+ */
+export interface PathStep {
+  subId: string;
+  lessonId: string;
+  note?: string;
+}
+
 /** A curated reading sequence across the DAG, rendered in the learning-paths grid. */
 export interface Path {
   name: string;
   desc: string;
-  /** Ordered subsection IDs the path traverses. */
+  /** Ordered subsection IDs the path traverses (drives the graph highlight). */
   pillars: string[];
+  /**
+   * Optional lesson-level sequence. When present, the path detail renders these
+   * ordered lesson links instead of (or alongside) the subsection chips. Paths
+   * without `steps` render unchanged from `pillars`.
+   */
+  steps?: PathStep[];
   /** CSS color (a `var(--p?)` token or hex) used to tint the path card. */
   color: string;
 }
