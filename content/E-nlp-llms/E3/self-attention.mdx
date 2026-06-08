@@ -47,6 +47,8 @@ largest score. This pushes the attention into a nearly-argmax regime where gradi
 tiny (the softmax is saturated). Dividing by $\sqrt{d_k}$ keeps the inputs to softmax
 at unit variance, maintaining informative gradients.
 
+![Scaled dot-product attention: the token-by-token weight matrix softmax(QKᵀ/√dₖ) (left), and why scaling matters — with large dₖ the unscaled scores saturate the softmax onto a single key, while the 1/√dₖ factor keeps the distribution soft (right).](/figures/E3/self-attention.svg)
+
 ## Self-attention
 
 When $Q$, $K$, $V$ are all derived from the same sequence $X \in \mathbb{R}^{T \times d}$
