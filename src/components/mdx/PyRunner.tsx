@@ -44,7 +44,7 @@ function getPyodide(): Promise<Pyodide> {
  * Runnable Python block. Loads Pyodide (numpy preloaded) lazily on the first
  * "Run" so the dashboard and unopened pages pay no WASM cost.
  */
-export function PyRunner({ code }: { code: string }) {
+export function PyRunner({ code, html }: { code: string; html?: string }) {
   const [output, setOutput] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "running">("idle");
   const bufRef = useRef("");
@@ -90,9 +90,16 @@ export function PyRunner({ code }: { code: string }) {
               : "▶ Run"}
         </button>
       </div>
-      <pre className="m-0 p-4 text-sm overflow-x-auto bg-[var(--card)] text-[var(--fg)]">
-        <code>{code}</code>
-      </pre>
+      {html ? (
+        <div
+          className="text-sm [&_pre]:m-0 [&_pre]:p-4 [&_pre]:overflow-x-auto"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <pre className="m-0 p-4 text-sm overflow-x-auto bg-[var(--card)] text-[var(--fg)]">
+          <code>{code}</code>
+        </pre>
+      )}
       {output !== null && (
         <div className="border-t border-[var(--border)]">
           <div className="px-3 py-1 text-xs uppercase tracking-wider text-[var(--fg-mute)] bg-[var(--card-2)]">
