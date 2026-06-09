@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GRID, HOT, apply_style, color, save
+from _style import ACCENT, FG_MUTE, HOT, apply_style, color, save
 
 SUB = "I3"
 C = color(SUB)  # pillar-I accent (green)
@@ -17,16 +17,17 @@ def distillation_pruning() -> None:
     import matplotlib.pyplot as plt
 
     sparsity = np.linspace(0, 0.95, 100)
-    acc = 0.92 - 0.02 * sparsity - 0.5 * np.clip(sparsity - 0.8, 0, None) ** 2 / 0.0225 * 0.04
+    # nearly flat until the knee, then a sharp drop in accuracy
+    acc = 0.918 - 0.004 * sparsity - 1.3 * np.clip(sparsity - 0.8, 0, None) ** 1.6
 
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
     ax.plot(sparsity * 100, acc * 100, color=C, lw=2.6)
     knee = 80
     ax.axvline(knee, color=HOT, ls="--", lw=1.6, label="knee: best size/accuracy")
-    ax.fill_between(sparsity * 100, acc * 100, 80, where=sparsity < 0.8, color=C, alpha=0.1)
+    ax.fill_between(sparsity * 100, acc * 100, 84, where=sparsity < 0.8, color=C, alpha=0.1)
     ax.set_title("Pruning: accuracy vs sparsity")
     ax.set_xlabel("weights pruned (%)"); ax.set_ylabel("accuracy (%)")
-    ax.set_ylim(80, 93)
+    ax.set_ylim(84, 93)
     ax.legend(loc="lower left", fontsize=9)
     fig.tight_layout()
     save(fig, SUB, "distillation-pruning")
