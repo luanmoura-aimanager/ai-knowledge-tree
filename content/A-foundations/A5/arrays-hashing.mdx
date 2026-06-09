@@ -74,6 +74,13 @@ The custom-hash trap: if you override `__hash__` on an object, a careless
 implementation (always returning 0, or ignoring fields used in equality) destroys
 $O(1)$ lookup. The invariant is that equal objects must hash to the same value.
 
+```mermaid
+graph LR
+  K["key"] -->|hash function| H["h(key)"]
+  H -->|mod m| B["bucket index"]
+  B --> C["collision:<br/>chain in a list"]
+```
+
 ## Check it on arrays
 
 ```python

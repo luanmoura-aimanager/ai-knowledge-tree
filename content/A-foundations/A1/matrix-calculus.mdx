@@ -164,6 +164,18 @@ step above (or, for the weights, an outer product with the saved input). Chainin
 them from the output backward is backpropagation, and the intermediates saved on
 the forward pass ($x$, $h$, $a$) are precisely what each step consumes.
 
+```mermaid
+graph LR
+  x["x"] --> h["h = W1 x"]
+  h --> a["a = sigma of h"]
+  a --> z["z = W2 a"]
+  z --> L["loss L"]
+  L -.->|backprop| z
+  z -.->|chain rule| a
+  a -.-> h
+  h -.->|gradients dL/dW| x
+```
+
 ## Check it on arrays
 
 ```python

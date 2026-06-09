@@ -65,6 +65,15 @@ gradient is recovered exactly modulo rounding. **Dynamic loss scaling** monitors
 gradient overflow (any inf or NaN) and halves $S$ when it occurs, doubles $S$ after a
 clean run of steps: an automatic search for the largest safe scale.
 
+```mermaid
+graph TD
+  F["forward + backward<br/>in fp16"] --> Sc["scale loss by S"]
+  Sc --> G["fp16 gradients"]
+  G --> U["unscale: divide by S"]
+  U --> M["update fp32<br/>master weights"]
+  M --> F
+```
+
 ## Check it on arrays
 
 ```python

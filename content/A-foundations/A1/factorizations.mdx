@@ -94,6 +94,16 @@ A negative value under the square root means $A$ is not PD.
 unnecessary: solve $Ly = b$ (forward substitution) then $L^\top x = y$ (backward
 substitution).
 
+```mermaid
+graph LR
+  A["matrix A"] -->|square, has pivots| LU["LU<br/>lower x upper"]
+  A -->|any shape| QR["QR<br/>orthogonal x upper"]
+  A -->|symmetric, PD| CH["Cholesky<br/>L times L transpose"]
+  A -->|any shape| SVD["SVD<br/>U S V transpose"]
+  SVD --> U["rank, PCA,<br/>pseudo-inverse"]
+  QR --> U2["least squares"]
+```
+
 ## Check it on arrays
 
 ```python

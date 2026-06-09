@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, CYCLE, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import (ACCENT, CYCLE, FG_MUTE, GOOD, GRID, HOT, LEGEND_BG,
+                    apply_style, color, save)
 
 SUB = "A3"
 C = color(SUB)  # pillar-A accent
@@ -275,6 +276,252 @@ def adaptive_methods() -> None:
     save(fig, SUB, "adaptive-methods")
 
 
+def bayesian_optimization() -> None:
+    """Bayesian optimization fits a surrogate (a GP) to the evaluated points, then
+    maximizes an acquisition function (expected improvement) to choose where to
+    sample next — balancing exploitation and exploration."""
+    import matplotlib.pyplot as plt
+    from scipy.stats import norm
+
+    def f(x):
+        return np.sin(x) + 0.3 * (x - 4) ** 2 / 4
+
+    xt = np.array([1.0, 3.5, 6.0, 9.0])[:, None]
+    yt = f(xt).ravel()
+    xs = np.linspace(0, 10, 300)[:, None]
+    ell, sf, sn = 1.2, 1.0, 1e-3
+
+    def k(a, b):
+        return sf**2 * np.exp(-0.5 * (a - b.T) ** 2 / ell**2)
+
+    K = k(xt, xt) + sn * np.eye(len(xt))
+    L = np.linalg.cholesky(K)
+    alpha = np.linalg.solve(L.T, np.linalg.solve(L, yt))
+    mu = (k(xs, xt) @ alpha)
+    v = np.linalg.solve(L, k(xs, xt).T)
+    sd = np.sqrt(np.clip(np.diag(k(xs, xs)) - np.sum(v**2, axis=0), 1e-9, None))
+    best = yt.min()
+    imp = best - mu
+    z = imp / sd
+    ei = imp * norm.cdf(z) + sd * norm.pdf(z)
+    nxt = xs[np.argmax(ei), 0]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6.8, 5.0), sharex=True,
+                                   gridspec_kw={"height_ratios": [2, 1]})
+    ax1.fill_between(xs.ravel(), mu - 1.96 * sd, mu + 1.96 * sd, color=C, alpha=0.2)
+    ax1.plot(xs, f(xs.ravel()), color=FG_MUTE, ls="--", lw=1.4, label="true f")
+    ax1.plot(xs, mu, color=C, lw=2.0, label="GP mean")
+    ax1.scatter(xt.ravel(), yt, color=HOT, s=40, zorder=5, label="evaluations")
+    ax1.set_title("Bayesian optimization")
+    ax1.set_ylabel("f(x)")
+    ax1.legend(loc="upper center", fontsize=8, ncol=2)
+    ax2.fill_between(xs.ravel(), ei, color=ACCENT, alpha=0.4)
+    ax2.axvline(nxt, color=HOT, lw=1.8, label=f"next sample x={nxt:.1f}")
+    ax2.set_ylabel("EI")
+    ax2.set_xlabel("x")
+    ax2.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "bayesian-optimization")
+
+
+def constrained_optimization() -> None:
+    """Minimizing x²+y² subject to x+y=1: the solution is where an objective
+    contour just touches the constraint line — the gradients are parallel there."""
+    import matplotlib.pyplot as plt
+
+    g = np.linspace(-1, 2, 300)
+    gx, gy = np.meshgrid(g, g)
+    Z = gx**2 + gy**2
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    ax.contour(gx, gy, Z, levels=12, colors=GRID, linewidths=0.8)
+    ax.plot(g, 1 - g, color=ACCENT, lw=2.2, label="constraint x+y=1")
+    ax.plot(0.5, 0.5, "*", color=HOT, ms=16, label="optimum (0.5, 0.5)")
+    ax.set_aspect("equal"); ax.set_xlim(-1, 2); ax.set_ylim(-1, 2)
+    ax.set_title("Constrained optimum")
+    ax.set_xlabel("x"); ax.set_ylabel("y")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "constrained-optimization")
+
+
+def convex_sets() -> None:
+    """A set is convex if the segment between any two of its points stays inside.
+    The disk passes; the crescent fails — a chord leaves the set."""
+    import matplotlib.pyplot as plt
+
+    t = np.linspace(0, 2 * np.pi, 200)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.2, 4.2))
+    ax1.fill(np.cos(t), np.sin(t), color=C, alpha=0.3)
+    ax1.plot([-0.7, 0.6], [0.3, -0.5], "-o", color=ACCENT, lw=2)
+    ax1.set_title("Convex: chord stays inside")
+
+    from matplotlib.patches import Annulus
+
+    ax2.add_patch(Annulus((0, 0), 1.3, 0.75, facecolor=C, alpha=0.3, edgecolor="none"))
+    ax2.plot([-1.0, 1.0], [0.0, 0.0], "-o", color=HOT, lw=2)  # chord through the hole
+    ax2.set_xlim(-1.5, 1.5); ax2.set_ylim(-1.5, 1.5)
+    ax2.set_title("Non-convex: chord exits (annulus)")
+    for ax in (ax1, ax2):
+        ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([]); ax.grid(False)
+    fig.tight_layout()
+    save(fig, SUB, "convex-sets")
+
+
+def kkt() -> None:
+    """At a constrained optimum the objective gradient is a non-negative combination
+    of the active constraint gradients (stationarity), so −∇f points out of the
+    feasible region along ∇g."""
+    import matplotlib.pyplot as plt
+
+    g = np.linspace(-0.5, 2.5, 300)
+    gx, gy = np.meshgrid(g, g)
+    Z = gx**2 + gy**2
+    a = np.array([1.0, 2.0]) / np.sqrt(5)
+    xopt = a / (a @ a)  # min ||x||^2 s.t. a^T x = 1
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    ax.contour(gx, gy, Z, levels=12, colors=GRID, linewidths=0.8)
+    ax.fill_between(g, (1 / a[1]) - (a[0] / a[1]) * g, 3, color=ACCENT, alpha=0.12)
+    ax.plot(g, (1 - a[0] * g) / a[1], color=ACCENT, lw=2.0, label="a·x = 1 (boundary)")
+    ax.plot(*xopt, "*", color=HOT, ms=16, label="optimum")
+    ax.annotate("", xy=xopt + 0.5 * a, xytext=xopt,
+                arrowprops=dict(arrowstyle="-|>", color=HOT, lw=2.2))
+    ax.text(*(xopt + 0.55 * a), "∇f ∥ ∇g", color=HOT, fontsize=10)
+    ax.set_aspect("equal"); ax.set_xlim(-0.5, 2.5); ax.set_ylim(-0.5, 2.5)
+    ax.set_title("KKT stationarity at the optimum")
+    ax.legend(loc="lower left", fontsize=8, frameon=True, facecolor=LEGEND_BG,
+              edgecolor=GRID, framealpha=0.92)
+    fig.tight_layout()
+    save(fig, SUB, "kkt")
+
+
+def optimization_landscape() -> None:
+    """The Hessian's eigenvalues classify a critical point: all positive gives a
+    bowl (minimum), mixed signs give a saddle. Left: x²+3y² (bowl); right: x²−y²
+    (saddle)."""
+    import matplotlib.pyplot as plt
+
+    g = np.linspace(-2, 2, 200)
+    gx, gy = np.meshgrid(g, g)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 3.9))
+    for ax, Z, ttl in [(ax1, gx**2 + 3 * gy**2, "minimum (bowl)"),
+                       (ax2, gx**2 - gy**2, "saddle")]:
+        cf = ax.contourf(gx, gy, Z, levels=20, cmap="viridis")
+        ax.contour(gx, gy, Z, levels=10, colors=GRID, linewidths=0.4)
+        ax.plot(0, 0, "o", color=HOT, ms=8)
+        ax.set_title(ttl); ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+    fig.tight_layout()
+    save(fig, SUB, "optimization-landscape")
+
+
+def proximal_methods() -> None:
+    """The proximal operator of the L1 norm is soft-thresholding: it shrinks every
+    coordinate toward zero by λ and clamps the small ones exactly to zero — the
+    source of sparsity."""
+    import matplotlib.pyplot as plt
+
+    v = np.linspace(-3, 3, 400)
+    lam = 1.0
+    prox = np.sign(v) * np.maximum(np.abs(v) - lam, 0)
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    ax.plot(v, v, color=FG_MUTE, ls="--", lw=1.4, label="identity")
+    ax.plot(v, prox, color=C, lw=2.6, label="soft-threshold (λ=1)")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_title("Proximal operator of the L1 norm")
+    ax.set_xlabel("input v")
+    ax.set_ylabel("prox(v)")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "proximal-methods")
+
+
+def quasi_newton() -> None:
+    """BFGS builds a curvature estimate from successive gradients, achieving
+    near-Newton (superlinear) convergence using only gradients — far faster than
+    gradient descent on an ill-conditioned quadratic (κ=50)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 20
+    d = np.linspace(1, 50, n)
+    Q = np.linalg.qr(rng.normal(size=(n, n)))[0]
+    A = Q @ np.diag(d) @ Q.T
+    grad = lambda x: A @ x
+    f = lambda x: 0.5 * x @ A @ x
+    x0 = np.ones(n)
+    f0 = f(x0)
+
+    x = x0.copy(); gd = [1.0]
+    eta = 1.0 / 50
+    for _ in range(60):
+        x = x - eta * grad(x); gd.append(f(x) / f0)
+
+    x = x0.copy(); H = np.eye(n); g = grad(x); bf = [1.0]
+    for _ in range(60):
+        gap = f(x) / f0
+        if gap < 1e-15:                      # converged; stop before s,y → 0
+            bf.append(gap)
+            continue
+        p = -H @ g
+        al = -(g @ p) / (p @ A @ p)          # exact line search for a quadratic
+        xn = x + al * p; gn = grad(xn)
+        s = xn - x; yv = gn - g
+        rho = 1.0 / (yv @ s)
+        I = np.eye(n)
+        H = (I - rho * np.outer(s, yv)) @ H @ (I - rho * np.outer(yv, s)) + rho * np.outer(s, s)
+        x, g = xn, gn
+        bf.append(f(x) / f0)
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    ax.semilogy(np.clip(gd, 1e-16, None), color=FG_MUTE, lw=2.0, label="gradient descent")
+    ax.semilogy(np.clip(bf, 1e-16, None), color=C, lw=2.4, label="BFGS (quasi-Newton)")
+    ax.set_title("Quasi-Newton converges superlinearly")
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("gap to optimum (relative)")
+    ax.set_ylim(1e-16, 2)
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "quasi-newton")
+
+
+def sgd() -> None:
+    """Stochastic gradient descent follows noisy mini-batch gradients: with a
+    constant step it descends fast but rattles around a noise floor, where
+    full-batch GD converges smoothly. Decaying the step removes the floor."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n, dim = 400, 2
+    A = rng.normal(size=(n, dim))
+    xstar = np.array([1.0, -1.0])
+    b = A @ xstar + 0.1 * rng.normal(size=n)
+    full_grad = lambda x: A.T @ (A @ x - b) / n
+
+    def run(stochastic, steps=200, lr=0.02):
+        x = np.array([-1.5, 1.5]); path = [x.copy()]
+        for t in range(steps):
+            if stochastic:
+                i = rng.integers(n, size=16)
+                grd = A[i].T @ (A[i] @ x - b[i]) / 16
+            else:
+                grd = full_grad(x)
+            x = x - lr * grd; path.append(x.copy())
+        return np.array(path)
+
+    gd, sg = run(False), run(True)
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    gx, gy = np.meshgrid(np.linspace(-2, 2, 120), np.linspace(-2, 2, 120))
+    Z = np.array([[((A @ [a, c] - b) ** 2).mean() for a in gx[0]] for c in gy[:, 0]])
+    ax.contour(gx, gy, Z, levels=15, colors=GRID, linewidths=0.5)
+    ax.plot(sg[:, 0], sg[:, 1], color=HOT, lw=1.0, alpha=0.8, label="SGD (noisy)")
+    ax.plot(gd[:, 0], gd[:, 1], color=C, lw=2.0, label="full-batch GD")
+    ax.plot(*xstar, "*", color=ACCENT, ms=14)
+    ax.set_title("SGD jitters; GD is smooth")
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "sgd")
+
+
 def main() -> None:
     apply_style()
     gradient_descent()
@@ -283,6 +530,14 @@ def main() -> None:
     newton_method()
     convex_functions()
     adaptive_methods()
+    bayesian_optimization()
+    constrained_optimization()
+    convex_sets()
+    kkt()
+    optimization_landscape()
+    proximal_methods()
+    quasi_newton()
+    sgd()
 
 
 if __name__ == "__main__":

@@ -179,12 +179,217 @@ def quadratic_forms() -> None:
     save(fig, SUB, "quadratic-forms")
 
 
+def _arrow(ax, vec, color, label=None, origin=(0, 0), ls="-"):
+    ax.annotate("", xy=vec, xytext=origin,
+                arrowprops=dict(arrowstyle="-|>", color=color, lw=2.2, ls=ls))
+    if label:
+        ax.text(vec[0] * 1.06, vec[1] * 1.06, label, color=color, fontsize=11)
+
+
+def basis_dimension() -> None:
+    """A basis is a minimal spanning set: two independent vectors tile the plane
+    with a lattice of integer combinations (left), but a dependent pair spans only
+    a line (right)."""
+    import matplotlib.pyplot as plt
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 4.0))
+    b1, b2 = np.array([1.0, 0.3]), np.array([0.4, 1.0])
+    for i in range(-3, 4):
+        for j in range(-3, 4):
+            p = i * b1 + j * b2
+            ax1.plot(*p, "o", color=FG_MUTE, ms=2.5)
+    _arrow(ax1, b1, C, "$b_1$"); _arrow(ax1, b2, ACCENT, "$b_2$")
+    ax1.set_title("Independent basis spans the plane")
+
+    d1, d2 = np.array([1.0, 0.5]), np.array([2.0, 1.0])  # d2 = 2 d1
+    ts = np.linspace(-3, 3, 50)
+    ax2.plot([t * d1[0] for t in ts], [t * d1[1] for t in ts], color=FG_MUTE, lw=1.0)
+    _arrow(ax2, d1, C, "$d_1$"); _arrow(ax2, d2, HOT, "$d_2=2d_1$")
+    ax2.set_title("Dependent pair spans only a line")
+    for ax in (ax1, ax2):
+        ax.set_aspect("equal"); ax.set_xlim(-3, 3); ax.set_ylim(-3, 3)
+        ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    fig.tight_layout()
+    save(fig, SUB, "basis-dimension")
+
+
+def determinants() -> None:
+    """The determinant is the signed area-scaling factor: the unit square maps to a
+    parallelogram whose area equals |det A|."""
+    import matplotlib.pyplot as plt
+
+    A = np.array([[2.0, 1.0], [0.5, 1.5]])
+    det = np.linalg.det(A)
+    sq = np.array([[0, 1, 1, 0, 0], [0, 0, 1, 1, 0]])
+    img = A @ sq
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    ax.fill(sq[0], sq[1], color=FG_MUTE, alpha=0.3, label="unit square (area 1)")
+    ax.fill(img[0], img[1], color=C, alpha=0.4, label=f"A·square (area {det:.1f})")
+    _arrow(ax, A[:, 0], ACCENT, "$Ae_1$"); _arrow(ax, A[:, 1], HOT, "$Ae_2$")
+    ax.set_aspect("equal")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_title(f"det A = {det:.1f} = area scaling")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "determinants")
+
+
+def gram_schmidt() -> None:
+    """Gram–Schmidt orthogonalizes a basis: subtract from a₂ its projection onto
+    a₁, leaving the perpendicular component that becomes q₂."""
+    import matplotlib.pyplot as plt
+
+    a1 = np.array([2.0, 0.5])
+    a2 = np.array([1.0, 2.0])
+    proj = (a2 @ a1) / (a1 @ a1) * a1
+    q2 = a2 - proj
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    _arrow(ax, a1, C, "$a_1$")
+    _arrow(ax, a2, ACCENT, "$a_2$")
+    _arrow(ax, proj, FG_MUTE, "proj")
+    _arrow(ax, q2, HOT, "$q_2 \\perp a_1$")
+    ax.plot([proj[0], a2[0]], [proj[1], a2[1]], color=HOT, ls=":", lw=1.4)
+    ax.set_aspect("equal")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_xlim(-0.5, 2.5); ax.set_ylim(-0.5, 2.5)
+    ax.set_title("Gram–Schmidt: subtract the projection")
+    fig.tight_layout()
+    save(fig, SUB, "gram-schmidt")
+
+
+def inner_products() -> None:
+    """The inner product measures alignment: u·v = |u||v|cos θ, recovered as the
+    length of v's projection onto u times |u|."""
+    import matplotlib.pyplot as plt
+
+    u = np.array([3.0, 0.5])
+    v = np.array([1.5, 2.0])
+    proj = (u @ v) / (u @ u) * u
+    cos = (u @ v) / (np.linalg.norm(u) * np.linalg.norm(v))
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    _arrow(ax, u, C, "$u$")
+    _arrow(ax, v, ACCENT, "$v$")
+    _arrow(ax, proj, HOT, "proj of v on u")
+    ax.plot([v[0], proj[0]], [v[1], proj[1]], color=FG_MUTE, ls=":", lw=1.4)
+    ax.set_aspect("equal")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_xlim(-0.5, 3.5); ax.set_ylim(-0.5, 2.5)
+    ax.set_title(f"Inner product: cos θ = {cos:.2f}")
+    fig.tight_layout()
+    save(fig, SUB, "inner-products")
+
+
+def least_squares() -> None:
+    """Least squares projects the target b onto the column space; the residual is
+    orthogonal to that space, which is exactly the normal equations."""
+    import matplotlib.pyplot as plt
+
+    a = np.array([3.0, 1.0])          # column space = span(a), a line
+    b = np.array([2.0, 3.0])
+    p = (a @ b) / (a @ a) * a          # projection of b onto span(a)
+    ts = np.linspace(-0.3, 1.2, 50)
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.0))
+    ax.plot([t * a[0] for t in ts], [t * a[1] for t in ts], color=FG_MUTE, lw=1.4,
+            label="column space")
+    _arrow(ax, b, ACCENT, "$b$")
+    _arrow(ax, p, C, "$\\hat b = Ax$")
+    ax.plot([p[0], b[0]], [p[1], b[1]], color=HOT, lw=2.0, label="residual $\\perp$ space")
+    ax.set_aspect("equal")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_title("Least squares = orthogonal projection")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "least-squares")
+
+
+def linear_maps_matrices() -> None:
+    """A matrix is a linear map: it sends the square grid to a sheared/rotated grid,
+    moving every point by the same linear rule."""
+    import matplotlib.pyplot as plt
+
+    A = np.array([[1.0, 0.6], [-0.4, 1.1]])
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 4.2))
+    lines = np.arange(-3, 4)
+    t = np.linspace(-3, 3, 30)
+    for ax, M, ttl in [(ax1, np.eye(2), "before"), (ax2, A, "after A")]:
+        for k in lines:
+            v1 = M @ np.vstack([np.full_like(t, k), t])
+            v2 = M @ np.vstack([t, np.full_like(t, k)])
+            ax.plot(v1[0], v1[1], color=GRID, lw=0.8)
+            ax.plot(v2[0], v2[1], color=GRID, lw=0.8)
+        sq = M @ np.array([[0, 1, 1, 0, 0], [0, 0, 1, 1, 0]])
+        ax.fill(sq[0], sq[1], color=C, alpha=0.4)
+        ax.set_aspect("equal"); ax.set_xlim(-3.5, 3.5); ax.set_ylim(-3.5, 3.5)
+        ax.set_title(ttl)
+    fig.suptitle("A linear map deforms the grid uniformly", y=1.0)
+    fig.tight_layout()
+    save(fig, SUB, "linear-maps-matrices")
+
+
+def norms() -> None:
+    """Different norms have different unit balls: the L1 ball is a diamond, L2 a
+    circle, L∞ a square — the same vector has a different 'length' under each."""
+    import matplotlib.pyplot as plt
+
+    t = np.linspace(0, 2 * np.pi, 400)
+    fig, ax = plt.subplots(figsize=(5.6, 5.2))
+    ax.plot([1, 0, -1, 0, 1], [0, 1, 0, -1, 0], color=HOT, lw=2.2, label="$L_1$ (diamond)")
+    ax.plot(np.cos(t), np.sin(t), color=C, lw=2.2, label="$L_2$ (circle)")
+    ax.plot([1, 1, -1, -1, 1], [1, -1, -1, 1, 1], color=ACCENT, lw=2.2, label="$L_\\infty$ (square)")
+    ax.set_aspect("equal")
+    ax.axhline(0, color=GRID, lw=0.8); ax.axvline(0, color=GRID, lw=0.8)
+    ax.set_title("Unit balls of the L1, L2, L∞ norms")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "norms")
+
+
+def svd() -> None:
+    """SVD factors any matrix as rotate–scale–rotate: it maps the unit circle to an
+    ellipse whose semi-axis lengths are the singular values σ₁ ≥ σ₂. The spectrum
+    (right) ranks each direction's importance."""
+    import matplotlib.pyplot as plt
+
+    A = np.array([[3.0, 1.2], [0.5, 2.0]])
+    U, s, Vt = np.linalg.svd(A)
+    circle = _unit_circle()
+    ell = A @ circle
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 3.9))
+    ax1.plot(circle[0], circle[1], color=GRID, lw=1.4, label="unit circle")
+    ax1.plot(ell[0], ell[1], color=C, lw=2.2, label="A·circle")
+    for i in range(2):
+        _arrow(ax1, s[i] * U[:, i], [ACCENT, HOT][i], f"$\\sigma_{i+1}$")
+    ax1.set_aspect("equal")
+    ax1.set_title("Rotate–scale–rotate")
+    ax1.legend(loc="lower right", fontsize=8)
+
+    ax2.bar([1, 2], s, color=C, width=0.5)
+    ax2.set_xticks([1, 2]); ax2.set_xticklabels(["$\\sigma_1$", "$\\sigma_2$"])
+    ax2.set_title("Singular-value spectrum")
+    ax2.set_ylabel("singular value")
+    fig.tight_layout()
+    save(fig, SUB, "svd")
+
+
 def main() -> None:
     apply_style()
     low_rank_pca()
     eigenvalues()
     spectral_theorem()
     quadratic_forms()
+    basis_dimension()
+    determinants()
+    gram_schmidt()
+    inner_products()
+    least_squares()
+    linear_maps_matrices()
+    norms()
+    svd()
 
 
 if __name__ == "__main__":
