@@ -189,10 +189,27 @@ Fenced blocks are dispatched by language:
 
 - **Structural diagrams** (flow, architecture, pipelines): ```mermaid blocks.
 - **Equations**: KaTeX (always).
-- **Quantitative plots** (loss curves, heatmaps, distributions): generate with a
-  committed matplotlib script under `figures/gen/<sub>.py` that writes
-  `public/figures/<sub>/<name>.svg`, then `![alt](/figures/<sub>/<name>.svg)`.
-  Plots are reproducible from the script; do not hand-commit opaque binaries.
+- **Quantitative plots** (loss curves, heatmaps, distributions): a committed
+  matplotlib script `figures/gen/<sub>.py` writes `public/figures/<sub>/<name>.svg`,
+  embedded with `![caption](/figures/<sub>/<name>.svg)`. Plots are reproducible
+  from the script; the SVGs are committed (do not hand-commit opaque binaries).
+
+  **Pipeline (live).** One script per subsection. Each imports
+  `figures/gen/_style.py` and calls `apply_style()` (dark-native theme matching
+  `globals.css`: transparent bg, light text, pillar accents via `color(sub)`),
+  builds figures, and writes them with `save(fig, sub, name)`. Keep generation
+  deterministic (`np.random.default_rng(0)`) so re-runs give byte-identical SVGs.
+  Seed plot data from the lesson's existing `python` block where one exists.
+
+  ```bash
+  python3 -m venv figures/.venv                                  # once
+  figures/.venv/bin/pip install -r figures/requirements.txt      # once
+  npm run figures      # runs scripts/build-figures.sh → all figures/gen/<sub>.py
+  ```
+
+  Figures are **not** built in CI/Vercel (no Python there) — the committed SVGs
+  are served as-is. `MdxContent.tsx` renders `![alt](src)` as a captioned
+  `<figure>` (alt = caption); `.mdx-body img` styles it as a card.
 
 ### Code-exempt topics
 
