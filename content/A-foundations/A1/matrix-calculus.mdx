@@ -95,20 +95,74 @@ produces a Jacobian transpose times the upstream gradient.
 
 ## Backprop as repeated chain rule
 
-For a two-layer network $z = W_2 \sigma(W_1 x)$ with loss $L(z)$:
+Training a network means nudging its weights to lower the loss, and gradient
+descent needs the gradient of the loss with respect to every weight matrix.
+Backpropagation is the procedure that produces all of those gradients in a single
+backward sweep. Instead of re-differentiating the whole network once per weight,
+it applies the chain rule from the previous section one operation at a time,
+reusing work as it goes.
 
-**Forward pass:** $h = W_1 x$, $a = \sigma(h)$ (elementwise), $z = W_2 a$, then $L(z)$.
+Take a two-layer network $z = W_2 \sigma(W_1 x)$ with a scalar loss $L(z)$, where
+$\sigma$ is a nonlinearity (such as $\tanh$) applied to each entry. The forward
+pass computes the output and stores the intermediate quantities; the backward pass
+walks the same operations in reverse, carrying one gradient backward through each.
 
-**Backward pass:**
+**Forward pass.** Computed left to right, saving each intermediate for the
+backward pass:
 
-- $\delta_z = \nabla_z L$ (upstream gradient, given).
-- $\delta_a = W_2^\top \delta_z$ (chain rule through linear layer).
-- $\delta_h = \delta_a \odot \sigma'(h)$ (chain rule through elementwise nonlinearity;
-  $\odot$ is elementwise multiplication).
-- $\nabla_{W_1} L = \delta_h x^\top$ (outer product: gradient of linear layer w.r.t. weights).
+$$
+h = W_1 x, \quad a = \sigma(h)\ \text{(elementwise)}, \quad z = W_2 a, \quad L = L(z).
+$$
 
-Each step is a Jacobian transpose times the upstream gradient. Chaining them
-across all layers produces backpropagation.
+With $x \in \mathbb{R}^n$, $W_1 \in \mathbb{R}^{m \times n}$, and
+$W_2 \in \mathbb{R}^{k \times m}$, the shapes are $h, a \in \mathbb{R}^m$ and
+$z \in \mathbb{R}^k$.
+
+**Backward pass.** Write $\delta_u = \nabla_u L$ for the gradient of the loss with
+respect to an intermediate $u$. Read $\delta_u$ as the *upstream gradient* at $u$:
+how much the loss changes per unit change in $u$, with everything earlier in the
+forward pass held fixed. Each step takes the $\delta$ of one quantity and pushes
+it one operation backward, using a rule already derived above.
+
+*Step 1, start at the output.* $\delta_z = \nabla_z L$ comes from differentiating
+the loss directly. For a squared error $L = \tfrac12 \lVert z - y \rVert^2$, for
+example, $\delta_z = z - y$. Nothing is upstream of the output yet, so this is the
+seed of the whole sweep.
+
+*Step 2, through the linear layer $z = W_2 a$.* This is the affine map whose
+Jacobian is $W_2$. The chain-rule result $\nabla_a L = (\partial z / \partial a)^\top \delta_z$
+gives
+
+$$
+\delta_a = W_2^\top \delta_z \in \mathbb{R}^m.
+$$
+
+*Step 3, through the nonlinearity $a = \sigma(h)$.* Because $\sigma$ acts
+entrywise, $a_i$ depends only on $h_i$, so the Jacobian $\partial a / \partial h$
+is diagonal with entries $\sigma'(h_i)$. Multiplying a vector by a diagonal matrix
+is the same as scaling it entrywise, which gives
+
+$$
+\delta_h = \delta_a \odot \sigma'(h) \in \mathbb{R}^m,
+$$
+
+where $\odot$ is the elementwise (Hadamard) product and $\sigma'(h)$ means
+$\sigma'$ applied to each entry of $h$.
+
+*Step 4, into the weights $h = W_1 x$.* Here the target is the gradient with
+respect to $W_1$ itself, not its input. Since $h_i = \sum_j (W_1)_{ij}\, x_j$, the
+weight $(W_1)_{ij}$ enters only through $h_i$ with coefficient $x_j$, so
+$\partial L / \partial (W_1)_{ij} = \delta_{h,i}\, x_j$. Collecting all entries
+$(i,j)$ is exactly an outer product:
+
+$$
+\nabla_{W_1} L = \delta_h\, x^\top \in \mathbb{R}^{m \times n}.
+$$
+
+Every step is a Jacobian transpose acting on the gradient handed down from the
+step above (or, for the weights, an outer product with the saved input). Chaining
+them from the output backward is backpropagation, and the intermediates saved on
+the forward pass ($x$, $h$, $a$) are precisely what each step consumes.
 
 ## Check it on arrays
 
@@ -141,8 +195,39 @@ f_ls = lambda x: np.sum((A @ x - b)**2)
 grad_ls_analytic = 2 * A.T @ (A @ x - b)
 grad_ls_fd = finite_diff(f_ls, x)
 print("least-squares gradient error:", np.max(np.abs(grad_ls_analytic - grad_ls_fd)))  # ~1e-9
+
+# Backprop: two-layer net z = W2 @ tanh(W1 @ x), squared-error loss L = 0.5 * ||z - y||^2
+rng = np.random.default_rng(0)
+W1 = rng.standard_normal((4, 3))   # m x n
+W2 = rng.standard_normal((2, 4))   # k x m
+y = np.array([0.5, -0.5])
+
+def loss(W1, W2):
+    z = W2 @ np.tanh(W1 @ x)
+    return 0.5 * np.sum((z - y)**2)
+
+# forward pass, saving intermediates
+h = W1 @ x
+a = np.tanh(h)
+z = W2 @ a
+
+# backward pass (the four steps above)
+delta_z = z - y                 # step 1: dL/dz for squared error
+delta_a = W2.T @ delta_z         # step 2: through the linear layer
+delta_h = delta_a * (1 - a**2)   # step 3: tanh'(h) = 1 - tanh(h)^2, applied entrywise
+grad_W1 = np.outer(delta_h, x)   # step 4: outer product into the weights
+
+# finite-difference check on every entry of W1
+grad_W1_fd = np.zeros_like(W1)
+for i in range(W1.shape[0]):
+    for j in range(W1.shape[1]):
+        Wp = W1.copy(); Wp[i, j] += 1e-5
+        Wm = W1.copy(); Wm[i, j] -= 1e-5
+        grad_W1_fd[i, j] = (loss(Wp, W2) - loss(Wm, W2)) / (2e-5)
+print("backprop dW1 error:", np.max(np.abs(grad_W1 - grad_W1_fd)))  # ~1e-9
 ```
 
-Finite differences confirm the analytic gradients to near-float precision.
+Finite differences confirm the analytic gradients, including the backpropagated
+$\nabla_{W_1} L$, to near-float precision.
 The final lesson generalizes this calculus to higher-order arrays (tensors) and
 the Einstein summation notation that batch computations in deep learning rely on.
