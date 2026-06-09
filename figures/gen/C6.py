@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, HOT, apply_style, color, save
+from _style import ACCENT, FG_MUTE, HOT, LEGEND_BG, apply_style, color, save
 
 SUB = "C6"
 C = color(SUB)  # pillar-C accent
@@ -42,7 +42,7 @@ def statistical_ad() -> None:
     ax.set_title("Statistical outlier thresholds")
     ax.set_xlabel("sample index")
     ax.set_ylabel("value")
-    ax.legend(loc="upper left", fontsize=9, frameon=True, facecolor="#161c3a",
+    ax.legend(loc="upper left", fontsize=9, frameon=True, facecolor=LEGEND_BG,
               edgecolor=FG_MUTE, framealpha=0.92)
     fig.tight_layout()
     save(fig, SUB, "statistical-ad")

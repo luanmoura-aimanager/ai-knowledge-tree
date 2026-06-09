@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import (ACCENT, FG_MUTE, GOOD, GRID, HOT, LEGEND_BG, apply_style,
+                    color, save)
 
 SUB = "C2"
 C = color(SUB)  # pillar-C accent
@@ -42,7 +43,7 @@ def hard_margin_svm() -> None:
     ax.set_title("Hard-margin SVM: the widest separating band")
     ax.set_xlabel("$x_1$")
     ax.set_ylabel("$x_2$")
-    ax.legend(loc="lower right", frameon=True, facecolor="#161c3a",
+    ax.legend(loc="lower right", frameon=True, facecolor=LEGEND_BG,
               edgecolor=GRID, framealpha=0.92)
     fig.tight_layout()
     save(fig, SUB, "hard-margin-svm")
@@ -112,8 +113,8 @@ def kernel_trick() -> None:
 
 
 def gaussian_processes() -> None:
-    """A GP posterior: the mean interpolates the data and the credible band widens
-    away from observations. Lesson's f(x)=sin(2x)+0.3cos(7x), n=12, ℓ=0.5,
+    """A GP posterior: the mean passes near the noisy data and the credible band
+    widens away from observations. Lesson's f(x)=sin(2x)+0.3cos(7x), n=12, ℓ=0.5,
     σ_f=1, σ_n=0.1, rng(0)."""
     import matplotlib.pyplot as plt
 
@@ -154,7 +155,7 @@ def gaussian_processes() -> None:
     ax.set_title("Gaussian-process posterior")
     ax.set_xlabel("$x$")
     ax.set_ylabel("$f(x)$")
-    ax.legend(loc="upper right", fontsize=9, frameon=True, facecolor="#161c3a",
+    ax.legend(loc="upper right", fontsize=9, frameon=True, facecolor=LEGEND_BG,
               edgecolor=GRID, framealpha=0.92)
     fig.tight_layout()
     save(fig, SUB, "gaussian-processes")

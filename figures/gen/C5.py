@@ -9,7 +9,7 @@ from _style import ACCENT, CYCLE, FG_MUTE, GOOD, GRID, HOT, apply_style, color, 
 SUB = "C5"
 C = color(SUB)  # pillar-C accent
 
-CLUSTER_COLS = [ACCENT, HOT, GOOD, "#bb9af7", "#e0af68"]
+CLUSTER_COLS = [ACCENT, HOT, GOOD, CYCLE[4], CYCLE[3]]
 
 
 def _three_blobs(rng, n_per=100, scale=0.5):

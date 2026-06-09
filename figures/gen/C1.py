@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, CYCLE, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import (ACCENT, CYCLE, FG_MUTE, GOOD, GRID, HOT, LEGEND_BG,
+                    apply_style, color, save)
 
 SUB = "C1"
 C = color(SUB)  # pillar-C accent
@@ -48,7 +49,7 @@ def bias_variance() -> None:
     ax.plot(degrees, bias2, "-o", color=GOOD, ms=4, label="bias$^2$")
     ax.plot(degrees, variance, "-o", color=HOT, ms=4, label="variance")
     ax.plot(degrees, total, "-o", color=C, ms=4, lw=2.4, label="total error")
-    ax.axhline(sigma**2, color="#6c7596", ls="--", lw=1.2, label=f"noise floor $\\sigma^2$={sigma**2:.2f}")
+    ax.axhline(sigma**2, color=FG_MUTE, ls="--", lw=1.2, label=f"noise floor $\\sigma^2$={sigma**2:.2f}")
 
     best = degrees[int(np.argmin(total))]
     ax.axvline(best, color=C, ls=":", lw=1.2, alpha=0.7)
@@ -262,7 +263,7 @@ def linear_regression_ols() -> None:
     ax.set_title("OLS minimizes the squared residuals")
     ax.set_xlabel("$x$")
     ax.set_ylabel("$y$")
-    ax.legend(loc="upper left", frameon=True, facecolor="#161c3a",
+    ax.legend(loc="upper left", frameon=True, facecolor=LEGEND_BG,
               edgecolor=GRID, framealpha=0.92)
     fig.tight_layout()
     save(fig, SUB, "linear-regression-ols")

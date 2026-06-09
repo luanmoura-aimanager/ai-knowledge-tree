@@ -52,6 +52,9 @@ PARTIAL = PILLAR["A"]  # = pillar A gold
 # A small ordered cycle for multi-series plots (distinct, palette-consistent).
 CYCLE = ["#7aa2f7", "#f7768e", "#9ece6a", "#e0af68", "#bb9af7", "#7dcfff", "#ff9e64"]
 
+# Background for framed legends placed over data (a touch lighter than --card).
+LEGEND_BG = "#161c3a"
+
 # Repo root = two levels up from this file (figures/gen/_style.py).
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _OUT = os.path.join(_ROOT, "public", "figures")
