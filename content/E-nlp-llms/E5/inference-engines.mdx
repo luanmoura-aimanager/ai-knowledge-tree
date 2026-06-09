@@ -97,6 +97,13 @@ highly optimized CUDA kernels for NVIDIA GPUs.
 | OpenAI-compatible API | Yes | Yes | Yes |
 | Primary use case | General serving | HF ecosystem | Structured programs |
 
+```mermaid
+graph LR
+  R["incoming requests"] --> S["scheduler:<br/>continuous batching"]
+  S --> E["model execution<br/>+ KV cache"]
+  E --> ST["stream tokens back"]
+```
+
 ## Choosing a framework
 
 **vLLM:** best default for most use cases. Well-maintained, wide model support, active community.

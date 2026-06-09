@@ -92,6 +92,14 @@ These are rough; exact ratios are closely guarded. Code-heavy mixes improve reas
 LLaMA-3's "annealing" phase in the last ~10% of tokens upweights high-quality sources
 (GitHub, scientific papers) and runs at a very low learning rate.
 
+```mermaid
+graph LR
+  W["web crawl"] --> F["quality filter"]
+  F --> D["deduplicate"]
+  D --> M["mix sources<br/>and set weights"]
+  M --> T["training tokens"]
+```
+
 ## Tokenization and sequence packing
 
 After filtering, documents are tokenized and packed into fixed-length windows (e.g.,

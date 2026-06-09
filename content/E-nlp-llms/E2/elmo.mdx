@@ -103,6 +103,15 @@ class BiLM(nn.Module):
         return fwd_logits, bwd_logits, elmo_reps
 ```
 
+```mermaid
+graph LR
+  T["tokens"] --> F["forward LSTM"]
+  T --> B["backward LSTM"]
+  F --> Cc["concatenate per layer"]
+  B --> Cc
+  Cc --> E["contextual embeddings"]
+```
+
 ## The path to BERT
 
 ELMo showed that pretraining deep bidirectional LMs on large corpora produces transferable

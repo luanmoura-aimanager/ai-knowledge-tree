@@ -43,6 +43,15 @@ refinements, the KV cache for efficient decoding, and a preference-tuning stage
 ([DPO](mini-rlhf-dpo)) that turns a next-token predictor into an instruction follower. The
 attention mechanism at the center is unchanged; almost everything around it is new.
 
+```mermaid
+graph LR
+  S["source"] --> EN["encoder stack"]
+  T["target so far"] --> DE["decoder stack"]
+  EN --> CA["cross-attention"]
+  DE --> CA
+  CA --> O["next-token logits"]
+```
+
 ## 4. Where to go next
 
 Reading the paper now should feel like reading documentation for code you own. The natural

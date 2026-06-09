@@ -140,6 +140,13 @@ def rlhf_step(policy, ref_model, reward_model, value_model, prompts, optimizer, 
     return total_loss.item()
 ```
 
+```mermaid
+graph LR
+  SFT["SFT model"] --> RM["reward model<br/>from preferences"]
+  RM --> PPO["PPO: maximize reward<br/>minus KL to SFT"]
+  PPO --> P["aligned policy"]
+```
+
 ## Limitations of PPO-RLHF
 
 - **Complexity:** requires four model instances simultaneously, substantial GPU memory.

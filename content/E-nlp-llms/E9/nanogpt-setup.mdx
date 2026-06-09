@@ -82,6 +82,15 @@ def estimate_loss(model, eval_iters=200):
     return out
 ```
 
+```mermaid
+graph LR
+  D["text data"] --> TOK["tokenize"]
+  TOK --> B["batches of<br/>context and next token"]
+  B --> M["GPT model"]
+  M --> L["cross-entropy loss<br/>+ AdamW"]
+  L -->|repeat| M
+```
+
 ## 4. The training loop
 
 The loop is the standard one from [optimizers for deep learning](/pillar/D/D1/dl-optimizers):

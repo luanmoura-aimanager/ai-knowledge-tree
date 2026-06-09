@@ -134,6 +134,16 @@ the correct passage appears in the top-$k$ results.
 lists. BM25 excels at exact keyword matches; dense retrieval excels at semantic similarity.
 Reciprocal rank fusion combines scores without needing calibrated magnitudes.
 
+```mermaid
+graph LR
+  Q["query"] --> QE["query encoder"]
+  D["document"] --> DE["document encoder"]
+  QE --> VQ["query vector"]
+  DE --> VD["doc vectors, indexed"]
+  VQ --> S["nearest neighbors<br/>by similarity"]
+  VD --> S
+```
+
 ## Bi-encoders vs cross-encoders
 
 A **cross-encoder** processes query and document jointly through a single transformer:

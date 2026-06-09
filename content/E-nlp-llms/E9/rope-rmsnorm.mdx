@@ -78,6 +78,8 @@ In the attention head, apply `apply_rope` to the query and key after their proje
 before the score, and delete the `position_embedding` table from the model. Position now
 enters through the rotation, not through an additive vector.
 
+![RoPE rotates each embedding pair by an angle proportional to position, across a spectrum of frequencies: low dimensions rotate fast (local order), high dimensions slow (long-range position).](/figures/E9/rope-rmsnorm.svg)
+
 ## 3. Why these are simplifications
 
 Both changes remove parameters and operations. RMSNorm drops the mean subtraction and the

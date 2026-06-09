@@ -157,6 +157,14 @@ where $\text{seg}(s)$ is the set of all segmentations of sentence $s$ and $p(x_i
 is the unigram probability of piece $x_i$. The sum-over-segmentations is computed with
 the forward algorithm.
 
+```mermaid
+graph LR
+  C["characters"] --> P["count adjacent pairs"]
+  P --> M["merge the most<br/>frequent pair"]
+  M -->|repeat| P
+  M --> V["subword vocabulary"]
+```
+
 ## Vocabulary sizes in practice
 
 | Model | Tokenizer | Vocab size |

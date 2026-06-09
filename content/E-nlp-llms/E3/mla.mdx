@@ -75,6 +75,14 @@ $$
 
 The cache then holds $c_s$ plus the small $k^R_s$, still far below the multi-head baseline.
 
+```mermaid
+graph LR
+  X["token"] --> KV["project to a small<br/>latent KV vector"]
+  KV --> CA["cache the latent (tiny)"]
+  CA --> UP["expand to K and V<br/>per head at use time"]
+  UP --> A["attention"]
+```
+
 ## 4. Memory comparison
 
 The block below computes the per-token cache for plain MHA, GQA, and MLA at a typical

@@ -80,6 +80,13 @@ Mitigations:
 - Use low learning rates (1e-5 to 5e-5).
 - LoRA fine-tuning (next lesson) avoids forgetting by keeping most pretrained weights frozen.
 
+```mermaid
+graph LR
+  P["pretrained base"] --> D["instruction + response<br/>demonstrations"]
+  D --> FT["supervised fine-tune:<br/>imitate responses"]
+  FT --> M["instruction-following model"]
+```
+
 ## SFT vs prompting
 
 An alternative to SFT is **few-shot prompting**: include examples of (instruction, response)
