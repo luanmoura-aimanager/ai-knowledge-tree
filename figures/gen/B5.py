@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GRID, HOT, apply_style, color, save
+from _style import ACCENT, GOOD, HOT, apply_style, color, save
 
 SUB = "B5"
 C = color(SUB)  # pillar-B accent
@@ -30,7 +30,7 @@ def potential_outcomes() -> None:
     ax.scatter(Y0[W == 1], Y1[W == 1], s=12, color=HOT, alpha=0.5, edgecolor="none",
                label="treated (W=1)")
     lo, hi = Y0.min(), Y0.max()
-    ax.plot([lo, hi], [lo + 1, hi + 1], color=C, lw=2.2, label="Y(1) = Y(0) + 1")
+    ax.plot([lo, hi], [lo + 1, hi + 1], color=GOOD, lw=2.2, label="Y(1) = Y(0) + 1")
     ax.set_title("Potential outcomes (constant effect, but selection in X)")
     ax.set_xlabel("$Y(0)$")
     ax.set_ylabel("$Y(1)$")
@@ -72,10 +72,10 @@ def iv_estimation() -> None:
     import matplotlib.pyplot as plt
 
     rng = np.random.default_rng(0)
-    n = 5000
+    n = 8000
     Z = rng.binomial(1, 0.5, n).astype(float)
     U = rng.normal(0, 1, n)
-    W = (0.5 * Z + 0.8 * U + rng.normal(0, 1, n) > 0).astype(float)
+    W = (2.0 * Z + 0.4 * U + rng.normal(0, 1, n) > 0).astype(float)  # strong instrument
     Y0 = 1.0 * U + rng.normal(0, 0.5, n)
     Y = W * (Y0 + 2.0) + (1 - W) * Y0
 

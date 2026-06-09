@@ -97,7 +97,7 @@ def power_analysis() -> None:
     zc = norm.ppf(1 - 0.025)  # two-sided α=0.05
 
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    for d, col in zip([0.2, 0.5, 0.8, 1.0], [FG_MUTE, ACCENT, C, HOT]):
+    for d, col in zip([0.2, 0.5, 0.8, 1.0], [FG_MUTE, ACCENT, GOOD, HOT]):
         power = 1 - norm.cdf(zc - d * np.sqrt(n / 2))
         ax.plot(n, power, color=col, lw=2.2, label=f"d = {d}")
     ax.axhline(0.8, color=GOOD, ls="--", lw=1.4, label="80% power")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import ACCENT, FG_MUTE, GOOD, HOT, apply_style, color, save
 
 SUB = "B1"
 C = color(SUB)  # pillar-B accent
@@ -87,8 +87,8 @@ def estimator_properties() -> None:
 
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
     ax.loglog(ns, bias_n**2, "-o", color=GOOD, ms=4, label="bias$^2$ (÷n)")
-    ax.loglog(ns, var_n, "-o", color=HOT, ms=4, label="variance (÷n)")
-    ax.loglog(ns, mse_n, "-o", color=C, ms=4, lw=2.4, label="MSE (÷n)")
+    ax.loglog(ns, var_n, "-o", color=ACCENT, ms=4, label="variance (÷n)")
+    ax.loglog(ns, mse_n, "-o", color=HOT, ms=4, lw=2.4, label="MSE (÷n)")
     ax.loglog(ns, mse_n1, "-o", color=FG_MUTE, ms=4, label="MSE (÷n−1, unbiased)")
     ax.set_title("MSE = bias² + variance")
     ax.set_xlabel("sample size $n$")
