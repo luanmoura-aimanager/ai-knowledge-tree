@@ -71,6 +71,16 @@ where nearby $z$ values decode to similar outputs.
 Too large a weight on KL relative to reconstruction leads to **posterior collapse**:
 the encoder ignores $x$ and outputs the prior, and the decoder degenerates.
 
+```mermaid
+graph LR
+  X["x"] --> EN["encoder"]
+  EN --> MU["mean mu"]
+  EN --> SD["std sigma"]
+  EPS["noise epsilon"] --> Z["z = mu + sigma times epsilon"]
+  MU --> Z
+  SD --> Z
+```
+
 ## Implementation
 
 ```python
