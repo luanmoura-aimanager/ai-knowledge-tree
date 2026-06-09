@@ -20,11 +20,14 @@ def low_rank_pca() -> None:
 
     rng = np.random.default_rng(42)
     d, n, k_true = 10, 200, 3
-    V_true = np.linalg.qr(rng.normal(size=(d, k_true)))[0]
-    scores = rng.normal(scale=[5, 3, 1], size=(n, k_true))
-    X = scores @ V_true.T + 0.2 * rng.normal(size=(n, d))
-    X_c = X - X.mean(axis=0)
-    s = np.linalg.svd(X_c, full_matrices=False)[1]
+    # NumPy 2.0's SIMD matmul can raise spurious FP-flag warnings on these
+    # benign products; the values are finite and the figure is correct.
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        V_true = np.linalg.qr(rng.normal(size=(d, k_true)))[0]
+        scores = rng.normal(scale=[5, 3, 1], size=(n, k_true))
+        X = scores @ V_true.T + 0.2 * rng.normal(size=(n, d))
+        X_c = X - X.mean(axis=0)
+        s = np.linalg.svd(X_c, full_matrices=False)[1]
 
     energy = s**2
     frac = energy / energy.sum()

@@ -91,7 +91,7 @@ def lln_clt() -> None:
 
     # LLN — a few sample paths + the limit
     N = 5000
-    for i, col in enumerate([C, ACCENT, FG_MUTE]):
+    for col in (C, ACCENT, FG_MUTE):
         draws = rng.integers(1, 7, size=N).astype(float)
         running = np.cumsum(draws) / np.arange(1, N + 1)
         ax1.plot(running, color=col, lw=1.0, alpha=0.9)
@@ -122,25 +122,24 @@ def lln_clt() -> None:
 
 def information_geometry() -> None:
     """Fisher information = curvature of the expected log-likelihood. For
-    N(θ, 1) the log-likelihood is a downward parabola whose sharpness grows with
-    the sample size N — more data ⇒ more curvature ⇒ a more certain estimate."""
+    N(θ, 1) the expected log-likelihood is a downward parabola centred at the
+    true mean, with curvature equal to the sample size N — more data ⇒ more
+    curvature ⇒ a more certain estimate."""
     import matplotlib.pyplot as plt
 
-    rng = np.random.default_rng(17)
     theta_true = 2.0
     theta = np.linspace(0.5, 3.5, 400)
 
     fig, ax = plt.subplots(figsize=(6.6, 4.1))
     for n, col in zip([5, 20, 80], CYCLE):
-        x = rng.normal(theta_true, 1.0, n)
-        # per-sample log-likelihood, shifted to peak at 0 for comparison
-        ll = -0.5 * np.sum((x[:, None] - theta[None, :]) ** 2, axis=0)
-        ll = ll - ll.max()
+        # Expected log-likelihood (up to a constant): -N/2 (θ - θ*)²; its
+        # curvature N at the peak is exactly the Fisher information.
+        ll = -0.5 * n * (theta - theta_true) ** 2
         ax.plot(theta, ll, color=col, lw=2.0, label=f"$N={n}$")
     ax.axvline(theta_true, color=FG_MUTE, ls=":", lw=1.2, label="$\\theta_{\\mathrm{true}}=2$")
     ax.set_title("Log-likelihood curvature = Fisher information")
     ax.set_xlabel("$\\theta$")
-    ax.set_ylabel("log-likelihood (peak-aligned)")
+    ax.set_ylabel("expected log-likelihood (up to const.)")
     ax.set_ylim(-30, 2)
     ax.legend(loc="lower center", ncol=2)
     fig.tight_layout()

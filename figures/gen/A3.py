@@ -193,7 +193,6 @@ def convex_functions() -> None:
     ax1.plot(x, x**2, color=C, lw=2.2)
     a, b = -1.5, 1.0
     ax1.plot([a, b], [a**2, b**2], "-o", color=HOT, ms=5)
-    ax1.fill_between([a, b], [a**2, b**2], [a**2, b**2], color=HOT, alpha=0)
     ax1.set_title("Convex: chord stays above")
     ax1.set_xlabel("$x$")
     ax1.set_ylabel("$f(x)=x^2$")
