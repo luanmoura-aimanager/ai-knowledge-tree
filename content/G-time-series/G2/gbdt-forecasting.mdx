@@ -70,6 +70,13 @@ previous horizons' predictions, combining the strengths. In practice, recursive 
 the default for long horizons with cheap retraining; direct wins when $H$ is small
 and accuracy at each specific lead time matters.
 
+```mermaid
+graph LR
+  T["time series"] --> F["build features:<br/>lags, rolling stats, calendar"]
+  F --> G["gradient-boosted trees"]
+  G --> P["next-step forecast"]
+```
+
 ## A global model across many series
 
 When forecasting thousands of related series (every product in a catalogue), a

@@ -65,6 +65,14 @@ value projection and their weights are averaged, which makes a single attention
 map you can read as "which past time steps influenced this forecast." That map is
 the model's temporal explanation.
 
+```mermaid
+graph LR
+  In["inputs: past, known<br/>future, and static"] --> VS["variable selection"]
+  VS --> L["LSTM encoder"]
+  L --> A["interpretable<br/>multi-head attention"]
+  A --> Q["quantile forecasts"]
+```
+
 ## Training with the quantile (pinball) loss
 
 To produce prediction intervals directly, TFT outputs a set of quantiles (for
