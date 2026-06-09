@@ -111,6 +111,16 @@ production.
 - **Limited resolution**: typical CLIP runs at 224×224 or 336×336.
   High-resolution variants exist but are more expensive.
 
+```mermaid
+graph LR
+  IM["image"] --> IE["image encoder"]
+  TX["text caption"] --> TE["text encoder"]
+  IE --> EI["image embedding"]
+  TE --> ET["text embedding"]
+  EI --> S["contrastive matching:<br/>matched pairs align"]
+  ET --> S
+```
+
 ## What this enabled
 
 CLIP made text-conditioned image generation feasible (latent

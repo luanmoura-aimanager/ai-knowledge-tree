@@ -131,6 +131,15 @@ remain better when:
 In practice the choice is dominated by what your team is already good
 at and what pretrained checkpoints are available.
 
+```mermaid
+graph LR
+  X["input"] --> C1["conv 3x3<br/>BN + ReLU"]
+  C1 --> C2["conv 3x3 + BN"]
+  X -->|skip connection| ADD["add"]
+  C2 --> ADD
+  ADD --> R["ReLU -> output"]
+```
+
 ## The state of CNNs at a glance
 
 | Architecture | Year | Notable trick | Notes |

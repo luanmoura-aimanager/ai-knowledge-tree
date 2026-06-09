@@ -101,6 +101,15 @@ For classification (small inputs, single image label), the cost is
 manageable. For dense prediction (segmentation, detection on
 high-resolution images), specialized architectures dominate.
 
+```mermaid
+graph LR
+  I["image"] --> PA["split into patches"]
+  PA --> EM["linear embed<br/>+ position"]
+  EM --> T["transformer encoder"]
+  T --> CLS["class token"]
+  CLS --> H["MLP head -> class"]
+```
+
 ## Check it on arrays
 
 ```python

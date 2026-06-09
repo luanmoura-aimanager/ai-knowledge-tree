@@ -144,6 +144,14 @@ For very long contexts, even **single sequences** don't fit per GPU:
 
 Critical for long-context training (100K+ tokens).
 
+```mermaid
+graph LR
+  M["model too big<br/>for one device"] --> SP["split layers<br/>across devices"]
+  SP --> D1["device 1:<br/>layers 1 to k"]
+  D1 --> D2["device 2:<br/>layers k+1 to L"]
+  D2 --> O["output"]
+```
+
 ## Practical recommendations
 
 For a typical training setup:

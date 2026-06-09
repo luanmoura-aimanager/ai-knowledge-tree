@@ -141,6 +141,15 @@ dominated by the per-step compute, which is mostly attention against the
 KV cache. This is what motivates the linear-attention and SSM
 alternatives later.
 
+```mermaid
+graph TD
+  X["token + position embeddings"] --> MHA["multi-head<br/>self-attention"]
+  MHA --> A1["add and norm"]
+  A1 --> FF["feed-forward MLP"]
+  FF --> A2["add and norm"]
+  A2 --> O["to next block"]
+```
+
 ## Check it on arrays
 
 ```python

@@ -102,6 +102,18 @@ For scalar-output networks, reverse mode is the right choice. For
 networks with many outputs and few inputs (rare in deep learning),
 forward mode wins.
 
+```mermaid
+graph LR
+  X["input"] --> H1["layer 1"]
+  H1 --> H2["layer 2"]
+  H2 --> Y["output"]
+  Y --> L["loss"]
+  L -.->|dL/dy| Y
+  Y -.->|dL/dh2| H2
+  H2 -.->|dL/dh1| H1
+  H1 -.->|dL/dW per layer| X
+```
+
 ## Check it on arrays
 
 ```python

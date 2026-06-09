@@ -110,6 +110,15 @@ object across the entire video.
 - **Video object tracking**: prompt once, track across frames with SAM 2.
 - **3D extension**: SAM + multi-view + NeRF for 3D segmentation.
 
+```mermaid
+graph LR
+  I["image"] --> IE["image encoder ViT"]
+  P["prompt: point,<br/>box, or mask"] --> PE["prompt encoder"]
+  IE --> MD["mask decoder"]
+  PE --> MD
+  MD --> M["segmentation mask"]
+```
+
 ## The promptable-foundation pattern
 
 The SAM recipe has broader resonance beyond segmentation:

@@ -99,6 +99,15 @@ prior.
 Less common in the limelight than diffusion or GANs as of 2024, but
 ubiquitous as backend components.
 
+```mermaid
+graph LR
+  X["input x"] --> EN["encoder<br/>q(z given x)"]
+  EN --> Z["latent z, sampled"]
+  Z --> DE["decoder<br/>p(x given z)"]
+  DE --> R["reconstruction"]
+  EN -.->|KL to prior, beta-weighted| Z
+```
+
 ## The bigger picture
 
 The β-VAE trades expressiveness for interpretability; the VQ-VAE

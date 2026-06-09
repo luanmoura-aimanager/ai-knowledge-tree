@@ -109,6 +109,15 @@ Two approaches:
 - **Overlap and occlusion**: amodal segmentation predicts the full
   shape including occluded parts; specialized methods needed.
 
+```mermaid
+graph LR
+  I["image"] --> E["encoder<br/>downsample"]
+  E --> B["bottleneck"]
+  B --> D["decoder<br/>upsample"]
+  D --> M["per-pixel labels"]
+  E -.->|skip connections| D
+```
+
 ## What changed with foundation models
 
 The next lesson covers **Segment Anything (SAM)**, which trained a

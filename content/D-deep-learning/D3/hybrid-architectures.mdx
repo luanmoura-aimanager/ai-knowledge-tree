@@ -139,6 +139,15 @@ time**, especially for long-context inference:
 For applications like long-document summarization, RAG-with-retrieval,
 or code generation with large context, hybrids dominate.
 
+```mermaid
+graph LR
+  X["input sequence"] --> A["attention layers:<br/>global mixing"]
+  X --> S["SSM / conv layers:<br/>long-range, linear cost"]
+  A --> M["interleave and combine"]
+  S --> M
+  M --> O["output"]
+```
+
 ## This closes the D3 sequence-modeling track
 
 Pillar D's sequence track ran from word embeddings through RNNs and

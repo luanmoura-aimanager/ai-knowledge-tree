@@ -125,6 +125,14 @@ The choice often matters less than the depth, regularization, and
 training recipe. Modern GNN libraries (PyG, DGL) make it trivial to
 swap layer types.
 
+```mermaid
+graph LR
+  N["node + neighbors"] --> A["aggregate neighbor features"]
+  A -->|GCN: degree-weighted| Cc["combine"]
+  A -->|GAT: attention-weighted| Cc
+  Cc --> U["updated node embedding"]
+```
+
 ## Check it on arrays
 
 ```python

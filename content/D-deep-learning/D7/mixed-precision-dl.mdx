@@ -155,6 +155,15 @@ for batch in loader:
 
 That's the whole recipe. The framework handles all the casts.
 
+```mermaid
+graph TD
+  F["forward + backward<br/>in fp16"] --> SC["scale loss"]
+  SC --> G["fp16 gradients"]
+  G --> UN["unscale"]
+  UN --> M["update fp32<br/>master weights"]
+  M --> F
+```
+
 ## Check it on arrays
 
 ```python
