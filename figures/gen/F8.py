@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import GOOD, HOT, apply_style, color, save
 
 SUB = "F8"
 C = color(SUB)  # pillar-F accent (cyan)
@@ -53,10 +53,10 @@ def conformal_prediction() -> None:
 
     rng = np.random.default_rng(0)
     f = lambda x: 1.5 * np.sin(x)
-    xc = rng.uniform(-4, 4, 200); yc = f(xc) + 0.5 * rng.normal(size=xc.size)
+    xc = rng.uniform(-4, 4, 2000); yc = f(xc) + 0.5 * rng.normal(size=xc.size)
     resid = np.abs(yc - f(xc))
     q = np.quantile(resid, 0.90)
-    xt = rng.uniform(-4, 4, 200); yt = f(xt) + 0.5 * rng.normal(size=xt.size)
+    xt = rng.uniform(-4, 4, 600); yt = f(xt) + 0.5 * rng.normal(size=xt.size)
     inside = np.abs(yt - f(xt)) <= q
     xs = np.linspace(-4, 4, 200)
 
