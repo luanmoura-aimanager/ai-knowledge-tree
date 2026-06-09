@@ -18,6 +18,7 @@ Design goals:
 from __future__ import annotations
 
 import os
+import warnings
 
 import matplotlib
 
@@ -58,6 +59,12 @@ _OUT = os.path.join(_ROOT, "public", "figures")
 
 def apply_style() -> None:
     """Set dark-native rcParams sized for the 760px lesson column."""
+    # NumPy 2.0's SIMD matmul can raise spurious FP-flag RuntimeWarnings on
+    # benign products (platform-dependent, also from inside sklearn); they do
+    # not indicate bad output. Suppress just those.
+    warnings.filterwarnings(
+        "ignore", message=".*encountered in matmul", category=RuntimeWarning
+    )
     plt.rcParams.update(
         {
             "figure.figsize": (7.0, 4.0),
