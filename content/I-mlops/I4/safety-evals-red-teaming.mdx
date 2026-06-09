@@ -64,6 +64,15 @@ would plausibly produce. Only then can you say B is safer rather than luckier. T
 is the same hypothesis-testing logic used everywhere else; the point is that safety
 claims are statistical claims and deserve the same rigor.
 
+```mermaid
+graph LR
+  R["red team:<br/>adversarial prompts"] --> M["model"]
+  M --> E["evaluate harms"]
+  E --> F["find failures"]
+  F --> P["patch: filters,<br/>fine-tuning"]
+  P -->|re-test| R
+```
+
 ## Worked example
 
 Two models are each hit with $200$ attacks. We compute each ASR with a Wilson

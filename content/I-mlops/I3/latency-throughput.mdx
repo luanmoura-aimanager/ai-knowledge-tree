@@ -72,6 +72,8 @@ throughput and pay in latency. The serving engineer's job is to choose the large
 batch whose $T(b)$ still fits inside the $p99$ latency target, which is precisely
 the tension that [LLM serving](llm-serving) must manage dynamically.
 
+![Batching trades latency for throughput: larger batches keep the accelerator busier so throughput climbs toward saturation, but each request waits longer. Serving picks the batch that meets the latency budget while maximizing throughput.](/figures/I3/latency-throughput.svg)
+
 ## Worked example
 
 We summarize a skewed latency sample with percentiles, apply Little's law, and

@@ -52,6 +52,15 @@ cost a full copy per day. The storage for $k$ snapshots is the size of the *unio
 of their chunks, not the sum of their sizes. Identical chunks, however many
 snapshots reference them, are paid for once.
 
+```mermaid
+graph LR
+  D["raw data"] --> V1["dataset v1<br/>(hash + snapshot)"]
+  V1 --> V2["dataset v2"]
+  M1["model A"] -.->|trained on| V1
+  M2["model B"] -.->|trained on| V2
+  V2 --> Lin["lineage: reproduce<br/>any run"]
+```
+
 ## Worked example
 
 We hash four data chunks, store two daily snapshots that overlap, and confirm that

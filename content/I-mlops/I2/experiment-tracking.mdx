@@ -49,6 +49,17 @@ input among several; reproducibility requires pinning the whole tuple. This is
 precisely the lineage record, and it is what lets a tracker say "rerun this exact
 experiment" and mean it.
 
+```mermaid
+graph LR
+  R["training run"] --> P["log params + config"]
+  R --> M["log metrics over time"]
+  R --> A["log artifacts:<br/>model, plots"]
+  P --> DB["tracking server"]
+  M --> DB
+  A --> DB
+  DB --> Cmp["compare and reproduce runs"]
+```
+
 ## Worked example
 
 A toy "training" run consumes seeded random draws to perturb a dataset and returns

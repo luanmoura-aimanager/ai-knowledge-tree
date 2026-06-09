@@ -51,6 +51,14 @@ On-device targets are bounded by resources the cloud treats as free:
   (CPUs, mobile GPUs, and neural accelerators like Apple's Neural Engine or
   Qualcomm's Hexagon), each with its own instruction set.
 
+```mermaid
+graph LR
+  T["train in the cloud"] --> O["optimize:<br/>quantize + prune"]
+  O --> Co["compile for the<br/>target device"]
+  Co --> E["deploy on edge:<br/>phone, sensor, car"]
+  E -->|telemetry| T
+```
+
 ## Exchange formats and graph optimization
 
 Two pieces of machinery make a trained model portable and fast on this hardware.
