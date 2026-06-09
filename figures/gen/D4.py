@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, CYCLE, FG_DIM, GOOD, GRID, HOT, apply_style, color, save
+from _style import CYCLE, FG_DIM, GOOD, GRID, HOT, apply_style, color, save
 
 SUB = "D4"
 C = color(SUB)  # pillar-D accent (blue)
@@ -26,7 +26,11 @@ def vae() -> None:
     KL = 0.5 * (M**2 + S**2 - 1 - 2 * np.log(S))
 
     fig, ax = plt.subplots(figsize=(6.6, 4.4))
-    cf = ax.contourf(M, S, KL, levels=np.linspace(0, 6, 25), cmap="viridis", extend="max")
+    # Rasterize the filled contour (everything below zorder 0) so the SVG embeds
+    # a compact raster instead of thousands of vector polygons (~10x smaller).
+    ax.set_rasterization_zorder(0)
+    cf = ax.contourf(M, S, KL, levels=np.linspace(0, 6, 25), cmap="viridis",
+                     extend="max", zorder=-10)
     ax.contour(M, S, KL, levels=[0.25, 1, 2, 4], colors=GRID, linewidths=0.6)
     ax.plot(0, 1, "*", color="#ffffff", ms=16, zorder=5)
     ax.annotate("KL = 0\n(μ=0, σ=1)", xy=(0, 1), xytext=(0.7, 1.9), color="#ffffff",
@@ -95,7 +99,7 @@ def diffusion() -> None:
     ax1.set_ylabel("value")
     ax1.legend(loc="center right", fontsize=9)
 
-    cols = [C, ACCENT, CYCLE[4], HOT]
+    cols = [C, GOOD, CYCLE[4], HOT]
     for t, col in zip([1, 25, 60, 100], cols):
         xt = np.sqrt(alpha_bar[t - 1]) * x0 + np.sqrt(1 - alpha_bar[t - 1]) * rng.normal(size=x0.size)
         ax2.hist(xt, bins=80, density=True, histtype="step", color=col, lw=2.0,

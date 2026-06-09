@@ -126,9 +126,9 @@ def dl_optimizers() -> None:
 
 
 def normalization() -> None:
-    """Stacking 30 naive-init ReLU layers makes activation variance explode;
-    inserting LayerNorm at each layer holds it steady — why normalization makes
-    deep nets trainable. Lesson's setup, rng(0)."""
+    """Stacking 30 naive-init ReLU layers lets activation variance decay toward
+    zero; inserting LayerNorm at each layer holds it steady — why normalization
+    keeps deep nets trainable. Lesson's setup, rng(0)."""
     import matplotlib.pyplot as plt
 
     rng = np.random.default_rng(0)
@@ -154,7 +154,7 @@ def normalization() -> None:
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
     ax.semilogy(run(False), "-o", color=FG_MUTE, ms=3.5, label="no normalization")
     ax.semilogy(run(True), "-o", color=C, ms=3.5, label="LayerNorm each layer")
-    ax.set_title("Normalization stabilizes activation variance")
+    ax.set_title("Normalization keeps activation variance steady")
     ax.set_xlabel("layer")
     ax.set_ylabel("activation variance")
     ax.legend(loc="center right")
