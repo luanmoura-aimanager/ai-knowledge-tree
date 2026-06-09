@@ -55,6 +55,8 @@ trained), and gradients flow through the quantized base to update them. The comb
 4-bit frozen base plus tiny full-precision adapters, is what lets a model that would need
 multiple GPUs for full fine-tuning be tuned on a single one.
 
+![Full fine-tuning must store gradients and Adam optimizer states for every weight, dwarfing the model itself; LoRA trains only small adapters (so gradients and optimizer state nearly vanish) and QLoRA also 4-bit-quantizes the frozen base — turning a multi-GPU job into a single-GPU one. (7B model.)](/figures/J4/lora-qlora.svg)
+
 ## Worked example
 
 We count the trainable parameters for one weight matrix under full versus LoRA fine-

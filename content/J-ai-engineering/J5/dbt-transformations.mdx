@@ -51,6 +51,14 @@ The same `SELECT` can be made physical in different ways, chosen per model by it
 Choosing materializations is the main performance lever in a dbt project: views for cheap
 staging logic, tables for frequently-queried marts, incremental for the big event tables.
 
+```mermaid
+graph LR
+  Src["raw sources"] --> St["staging models<br/>(clean, typed)"]
+  St --> In["intermediate joins"]
+  In --> M["marts:<br/>business tables"]
+  M --> BI["BI + ML features"]
+```
+
 ## Tests and docs make it a codebase
 
 Two features turn transformations into maintained software. **Tests** are declarative
