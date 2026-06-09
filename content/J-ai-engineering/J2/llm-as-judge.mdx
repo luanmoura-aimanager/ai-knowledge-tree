@@ -58,6 +58,14 @@ logic: a one-sided test against the baseline tells you whether the build genuine
 regressed or just drew an unlucky sample. This is what turns "it seems worse" into a
 release-blocking signal.
 
+```mermaid
+graph LR
+  R["candidate responses"] --> J["judge LLM<br/>with a rubric"]
+  Re["reference / criteria"] --> J
+  J --> S["score or<br/>pairwise winner"]
+  S --> Ag["aggregate into<br/>a leaderboard"]
+```
+
 ## Worked example
 
 We measure judge-human agreement with Cohen's kappa, then run a regression gate that
