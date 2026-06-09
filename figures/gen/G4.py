@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_MUTE, GOOD, HOT, apply_style, color, save
 
 SUB = "G4"
 C = color(SUB)  # pillar-G accent (teal)
@@ -53,7 +53,8 @@ def statistical_anomaly_detection() -> None:
     x[anom] += np.array([3.5, -3.0, 3.2])
     w = 20
     mean = np.array([x[max(0, t - w):t + 1].mean() for t in range(n)])
-    sd = np.array([x[max(0, t - w):t + 1].std() + 1e-6 for t in range(n)])
+    sd = np.array([x[max(0, t - w):t + 1].std() for t in range(n)])
+    sd = np.maximum(sd, 0.6)                         # floor: don't flag normal jitter
     flag = np.abs(x - mean) > 3 * sd
 
     fig, ax = plt.subplots(figsize=(7.4, 4.2))

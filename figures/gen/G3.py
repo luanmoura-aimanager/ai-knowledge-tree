@@ -28,8 +28,9 @@ def deepar() -> None:
     ax.plot(t, hist, color=C, lw=1.4, label="history")
     ax.plot(ft, median, color=HOT, lw=2.0, label="forecast median")
     ax.fill_between(ft, median - 2.6 * width, median + 2.6 * width, color=HOT, alpha=0.12,
+                    label="P1–P99")
+    ax.fill_between(ft, median - 1.3 * width, median + 1.3 * width, color=HOT, alpha=0.18,
                     label="P10–P90")
-    ax.fill_between(ft, median - 1.3 * width, median + 1.3 * width, color=HOT, alpha=0.18)
     ax.axvline(n - 1, color=FG_MUTE, ls=":", lw=1.2)
     ax.set_title("DeepAR: probabilistic forecast")
     ax.set_xlabel("time"); ax.set_ylabel("value")

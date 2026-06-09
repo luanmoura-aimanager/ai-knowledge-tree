@@ -25,8 +25,8 @@ def prophet() -> None:
 
     fig, axes = plt.subplots(3, 1, figsize=(7.4, 5.4), sharex=True)
     axes[0].plot(y, color=FG_MUTE, lw=0.9, label="data")
-    axes[0].plot(10 + trend + seasonal, color=C, lw=2.0, label="fit")
-    axes[0].set_title("Prophet fit = trend + seasonality"); axes[0].legend(loc="upper left", fontsize=8)
+    axes[0].plot(10 + trend + seasonal, color=C, lw=2.0, label="trend + seasonal")
+    axes[0].set_title("Prophet = trend + seasonality"); axes[0].legend(loc="upper left", fontsize=8)
     axes[1].plot(10 + trend, color=HOT, lw=2.0)
     axes[1].set_title("trend component")
     axes[2].plot(seasonal, color=GOOD, lw=2.0)
