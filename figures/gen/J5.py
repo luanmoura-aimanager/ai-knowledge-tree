@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_DIM, FG_MUTE, HOT, apply_style, color, save
+from _style import ACCENT, FG_DIM, apply_style, color, save
 
 SUB = "J5"
 C = color(SUB)  # pillar-J accent
