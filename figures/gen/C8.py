@@ -11,9 +11,9 @@ C = color(SUB)  # pillar-C accent
 
 
 def matrix_factorization() -> None:
-    """Matrix factorization explains a sparse rating matrix as a low-rank product
-    U Vᵀ: a few latent factors per user and item reconstruct the full matrix and
-    fill in the missing entries. rng(0), rank-4 signal."""
+    """Matrix factorization explains a rating matrix as a low-rank product U Vᵀ: a
+    few latent factors per user and item capture its dominant structure, so the
+    rank-4 reconstruction recovers the signal and filters out noise. rng(0)."""
     import matplotlib.pyplot as plt
 
     rng = np.random.default_rng(0)

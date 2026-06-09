@@ -78,8 +78,8 @@ def knn() -> None:
 
 def fisher_lda() -> None:
     """Fisher's LDA finds the direction that maximizes between-class separation
-    relative to within-class spread: two overlapping 2D clouds collapse to cleanly
-    separated 1D histograms along that axis. rng(0)."""
+    relative to within-class spread: two overlapping 2D clouds collapse to
+    well-separated 1D histograms along that axis. rng(0)."""
     import matplotlib.pyplot as plt
     from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
@@ -132,7 +132,8 @@ def lda_qda() -> None:
     fig, axes = plt.subplots(1, 2, figsize=(8.6, 4.2))
     for ax, model, ttl in [(axes[0], LDA(), "LDA: linear boundaries"),
                            (axes[1], QDA(), "QDA: quadratic boundaries")]:
-        Z = model.fit(X, y).predict(grid).reshape(gx.shape)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            Z = model.fit(X, y).predict(grid).reshape(gx.shape)
         ax.contourf(gx, gy, Z, levels=[-0.5, 0.5, 1.5, 2.5], colors=cols, alpha=0.2)
         for ci in range(3):
             ax.scatter(X[y == ci, 0], X[y == ci, 1], s=8, color=cols[ci], edgecolor="none")

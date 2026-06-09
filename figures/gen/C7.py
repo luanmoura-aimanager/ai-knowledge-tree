@@ -11,36 +11,35 @@ C = color(SUB)  # pillar-C accent
 
 
 def ensemble_theory() -> None:
-    """Averaging decorrelated models cuts variance roughly like 1/B without adding
-    bias — the whole point of bagging. Measured prediction variance of a bagged
-    degree-10 fit vs ensemble size, against the 1/B reference. rng(0)."""
+    """Averaging B independent models cuts prediction variance exactly like 1/B
+    without adding bias — the core reason ensembles reduce error. Measured variance
+    of an averaged degree-3 fit vs ensemble size, tracking the 1/B reference."""
     import matplotlib.pyplot as plt
 
     def f(x):
         return np.sin(2 * np.pi * x)
 
-    xt = np.linspace(0, 1, 120)
-    Bs = [1, 2, 5, 10, 20, 50, 100]
-    trials = 60
+    xt = np.linspace(0.1, 0.9, 40)        # interior points (avoid edge extrapolation)
+    Bs = [1, 2, 4, 8, 16, 32, 64]
+    trials = 400
     var = []
     for B in Bs:
         preds = np.zeros((trials, xt.size))
         for t in range(trials):
-            r = np.random.default_rng(1000 + t + B * 7919)
-            x = r.uniform(0, 1, 30)
-            y = f(x) + 0.3 * r.normal(size=30)
+            r = np.random.default_rng(10_000 * B + t)
             acc = np.zeros(xt.size)
-            for _ in range(B):
-                bi = r.integers(0, 30, 30)            # bootstrap resample
-                acc += np.polyval(np.polyfit(x[bi], y[bi], 10), xt)
+            for _ in range(B):                       # each model: own independent data
+                x = r.uniform(0, 1, 20)
+                y = f(x) + 0.3 * r.normal(size=20)
+                acc += np.polyval(np.polyfit(x, y, 3), xt)
             preds[t] = acc / B
         var.append(preds.var(axis=0).mean())
 
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    ax.loglog(Bs, var, "-o", color=C, ms=5, label="bagged ensemble")
+    ax.loglog(Bs, var, "-o", color=C, ms=5, label="averaged ensemble")
     ax.loglog(Bs, [var[0] / B for B in Bs], color=FG_MUTE, ls="--",
-              label="$\\propto 1/B$ reference")
-    ax.set_title("Bagging reduces variance like 1/B")
+              label="$1/B$ reference")
+    ax.set_title("Averaging reduces variance like 1/B")
     ax.set_xlabel("ensemble size $B$")
     ax.set_ylabel("prediction variance")
     ax.legend(loc="lower left", fontsize=9)
