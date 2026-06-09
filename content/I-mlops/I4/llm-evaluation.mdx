@@ -79,6 +79,16 @@ training corpus, prefer benchmarks released *after* the model's data cutoff, and
 hold out private test sets. A headline score without a contamination check should be
 read with suspicion.
 
+```mermaid
+graph LR
+  M["LLM"] --> B["benchmark suite:<br/>knowledge, reasoning, code"]
+  M --> J["LLM-as-judge:<br/>graded responses"]
+  M --> H["human preference"]
+  B --> S["scorecard"]
+  J --> S
+  H --> S
+```
+
 ## Worked example
 
 We confirm the unbiased pass@k estimator recovers the true value where the naive

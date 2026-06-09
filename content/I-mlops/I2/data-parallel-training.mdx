@@ -76,6 +76,16 @@ learning rate by $K$ when the batch grows by $K$ (with a short warmup to stay
 stable early). The intuition: a $K\times$ larger, less noisy gradient can safely be
 trusted with a $K\times$ larger step.
 
+```mermaid
+graph TD
+  B["data batch"] --> S["split across GPUs"]
+  S --> G1["GPU 1: replica"]
+  S --> G2["GPU 2: replica"]
+  G1 --> AR["all-reduce gradients"]
+  G2 --> AR
+  AR --> U["synchronized update"]
+```
+
 ## Worked example
 
 We compute local gradients on $K$ disjoint slices of a batch and confirm their
