@@ -18,6 +18,7 @@ Design goals:
 from __future__ import annotations
 
 import os
+import warnings
 
 import matplotlib
 
@@ -51,6 +52,9 @@ PARTIAL = PILLAR["A"]  # = pillar A gold
 # A small ordered cycle for multi-series plots (distinct, palette-consistent).
 CYCLE = ["#7aa2f7", "#f7768e", "#9ece6a", "#e0af68", "#bb9af7", "#7dcfff", "#ff9e64"]
 
+# Background for framed legends placed over data (a touch lighter than --card).
+LEGEND_BG = "#161c3a"
+
 # Repo root = two levels up from this file (figures/gen/_style.py).
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _OUT = os.path.join(_ROOT, "public", "figures")
@@ -58,6 +62,12 @@ _OUT = os.path.join(_ROOT, "public", "figures")
 
 def apply_style() -> None:
     """Set dark-native rcParams sized for the 760px lesson column."""
+    # NumPy 2.0's SIMD matmul can raise spurious FP-flag RuntimeWarnings on
+    # benign products (platform-dependent, also from inside sklearn); they do
+    # not indicate bad output. Suppress just those.
+    warnings.filterwarnings(
+        "ignore", message=".*encountered in matmul", category=RuntimeWarning
+    )
     plt.rcParams.update(
         {
             "figure.figsize": (7.0, 4.0),
