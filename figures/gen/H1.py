@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_DIM, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import ACCENT, FG_DIM, FG_MUTE, GOOD, GRID, apply_style, color, save
 
 SUB = "H1"
 C = color(SUB)  # pillar-H accent (pink)
@@ -70,7 +70,7 @@ def monte_carlo() -> None:
         returns = true + rng.normal(0, 3, 600)
         run = np.cumsum(returns) / np.arange(1, 601)
         ax.plot(run, color=col, lw=1.4, alpha=a)
-    ax.axhline(true, color=HOT, ls="--", lw=1.8, label="true value")
+    ax.axhline(true, color=FG_MUTE, ls="--", lw=2.0, label="true value")
     ax.set_title("Monte-Carlo estimate converges to the true value")
     ax.set_xlabel("episodes"); ax.set_ylabel("running average return")
     ax.legend(loc="upper right", fontsize=9)
