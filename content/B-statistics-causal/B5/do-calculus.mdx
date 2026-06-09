@@ -84,6 +84,13 @@ $$
 
 This identifies the causal effect without observing the confounder.
 
+```mermaid
+graph LR
+  G["DAG with<br/>edges into X"] -->|intervene on X| G2["mutilated graph:<br/>edges into X removed"]
+  G2 -->|do-calculus rules| Q["identify effect<br/>of X on Y"]
+  Q --> B["e.g. backdoor<br/>adjustment formula"]
+```
+
 ## Implementation
 
 ```python

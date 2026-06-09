@@ -74,6 +74,21 @@ The **backdoor criterion**: a set $Z$ satisfies the backdoor criterion if it blo
 all backdoor paths from $X$ to $Y$ and contains no descendant of $X$. Conditioning
 on $Z$ then identifies the causal effect.
 
+```mermaid
+graph LR
+  subgraph "chain"
+    cx["X"] --> cm["M"] --> cy["Y"]
+  end
+  subgraph "fork"
+    fc["C"] --> fx["X"]
+    fc --> fy["Y"]
+  end
+  subgraph "collider"
+    kx["X"] --> kk["K"]
+    ky["Y"] --> kk
+  end
+```
+
 ## Implementation
 
 ```python

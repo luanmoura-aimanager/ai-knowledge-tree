@@ -76,6 +76,14 @@ The jackknife is inconsistent for the median and other non-smooth statistics bec
 removing one point can shift a quantile by a discrete jump, making the linear
 approximation inaccurate. The bootstrap handles these cases correctly.
 
+```mermaid
+graph LR
+  D["data X1..Xn"] -->|leave one out| R["n estimates<br/>theta without point i"]
+  R --> M["average of them"]
+  M --> B["bias estimate"]
+  M --> S["standard-error estimate"]
+```
+
 ## Implementation
 
 ```python
