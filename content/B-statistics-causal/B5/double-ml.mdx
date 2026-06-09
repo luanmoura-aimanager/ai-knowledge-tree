@@ -72,6 +72,15 @@ The name "double ML" comes from the two regressions: one for the outcome ($Y \si
 and one for the treatment ($W \sim X$). Both must be flexible. Using a misspecified
 nuisance in either step reintroduces bias.
 
+```mermaid
+graph TD
+  D["data Y, W, X"] --> K["cross-fitting folds"]
+  K --> N["fit nuisances:<br/>predict Y from X<br/>predict W from X"]
+  N --> Rr["residualize Y and W"]
+  Rr --> F["regress Y-residual<br/>on W-residual"]
+  F --> O["orthogonal, debiased<br/>estimate"]
+```
+
 ## Implementation
 
 ```python-static

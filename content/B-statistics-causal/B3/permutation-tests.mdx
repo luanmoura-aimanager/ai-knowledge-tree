@@ -58,6 +58,13 @@ a known null distribution, the Wilcoxon test has a closed-form p-value (from the
 Wilcoxon table) even without explicit permutation. It tests whether a randomly
 drawn observation from $A$ tends to exceed one from $B$.
 
+```mermaid
+graph TD
+  O["observed statistic<br/>t_obs"] --> P["shuffle labels<br/>recompute t"]
+  P -->|repeat many times| N["null distribution of t"]
+  N --> V["p-value = fraction<br/>at least as extreme as t_obs"]
+```
+
 ## Implementation
 
 ```python-static

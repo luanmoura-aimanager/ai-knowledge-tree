@@ -81,6 +81,13 @@ $\theta^* = \Sigma_{XX}^{-1} \Sigma_{XY}$, and the adjusted outcome is
 $\tilde Y_i = Y_i - \theta^{*\top}(\mathbf{X}_i - \bar{\mathbf{X}})$.
 The variance reduction is $1 - R^2$ where $R^2$ is from regressing $Y$ on $\mathbf{X}$.
 
+```mermaid
+graph LR
+  X["pre-experiment<br/>covariate X"] -->|theta = cov / var| A
+  Y["outcome Y"] --> A["adjusted Y<br/>minus theta times X"]
+  A --> V["variance cut by<br/>1 minus rho squared"]
+```
+
 ## Implementation
 
 ```python-static

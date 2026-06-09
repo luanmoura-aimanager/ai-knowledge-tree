@@ -76,6 +76,18 @@ $$
 Inference uses **permutation tests**: apply the synthetic control to each donor
 unit (as if it were treated) and compare the post-treatment gap to the treated unit's gap.
 
+```mermaid
+graph TD
+  TPre["treated<br/>pre"] --> TPost["treated<br/>post"]
+  CPre["control<br/>pre"] --> CPost["control<br/>post"]
+  TPre --> DT["treated change"]
+  TPost --> DT
+  CPre --> DC["control change"]
+  CPost --> DC
+  DT --> R["DiD = treated change<br/>minus control change"]
+  DC --> R
+```
+
 ## Implementation
 
 ```python-static
