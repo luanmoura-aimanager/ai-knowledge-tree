@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_DIM, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_DIM, FG_MUTE, GRID, HOT, apply_style, color, save
 
 SUB = "E8"
 C = color(SUB)  # pillar-E accent (purple)
@@ -45,8 +45,9 @@ def induction_heads() -> None:
     attn = np.zeros((n, n)) + 0.02
     for t in range(1, n):
         for j in range(t):
-            if seq[j] == seq[t - 1] and j + 1 < t:
-                attn[t, j + 1] += 1.0                    # attend to token AFTER the match
+            # query token seq[t] recurred at j -> attend to what FOLLOWED it
+            if seq[j] == seq[t] and j + 1 < t:
+                attn[t, j + 1] += 1.0
     attn = attn / attn.sum(axis=1, keepdims=True)
     cmap = LinearSegmentedColormap.from_list("e8", ["#141a35", C])
 
@@ -106,8 +107,9 @@ def sparse_autoencoders() -> None:
 
 def superposition() -> None:
     """Superposition: a model can represent more features than it has dimensions by
-    storing them as nearly-orthogonal directions. Five features packed into a 2D
-    space spread out as a pentagon, tolerating slight interference between them."""
+    storing them as spread-out, non-orthogonal directions. Five features packed into
+    a 2D space sit 72° apart as a pentagon — the model tolerates the resulting
+    interference because each feature is active only rarely."""
     import matplotlib.pyplot as plt
 
     n_feat = 5

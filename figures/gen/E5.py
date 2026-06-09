@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
 
 SUB = "E5"
 C = color(SUB)  # pillar-E accent (purple)
@@ -41,7 +41,8 @@ def decoding() -> None:
 def kv_cache() -> None:
     """The KV cache stores one key and value vector per layer for every token
     generated so far, so its memory grows linearly with sequence length — at long
-    context it dominates and caps the batch size. Shown for a 7B-class model."""
+    context it dominates and caps the batch size. Shown for a 32-layer, 4096-dim
+    model with full multi-head attention (grouped-query attention shrinks it)."""
     import matplotlib.pyplot as plt
 
     seq = np.linspace(0, 128_000, 200)

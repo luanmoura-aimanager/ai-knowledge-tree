@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_MUTE, GOOD, HOT, apply_style, color, save
+from _style import FG_MUTE, GOOD, HOT, apply_style, color, save
 
 SUB = "E1"
 C = color(SUB)  # pillar-E accent (purple)
