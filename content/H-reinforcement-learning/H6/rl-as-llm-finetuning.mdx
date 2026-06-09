@@ -76,6 +76,14 @@ put); as $\beta \to 0$ it sharpens onto the reward-maximizing token (pure reward
 chasing). This same closed form is the identity that [DPO](E4/ppo-rlhf) inverts to
 skip the RL loop entirely.
 
+```mermaid
+graph LR
+  B["base LLM"] --> SFT["supervised fine-tune"]
+  SFT --> RM["reward model<br/>from preferences"]
+  RM --> RL["RL (PPO or GRPO):<br/>reward minus KL"]
+  RL --> Al["aligned LLM"]
+```
+
 ## Worked check: the closed form is the optimum, and $\beta$ interpolates
 
 Treat one generation step as a bandit over a small vocabulary with a reference

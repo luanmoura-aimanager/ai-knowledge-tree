@@ -55,6 +55,15 @@ makes gradients explode (the same exploding-gradient problem as deep recurrent
 nets), which is why Dreamer uses stable latent dynamics, short imagination
 horizons, and gradient clipping.
 
+```mermaid
+graph LR
+  O["observations"] --> En["encoder to latent"]
+  En --> WM["world model:<br/>latent dynamics"]
+  WM --> Im["imagine rollouts"]
+  Im --> Pol["train actor + critic<br/>in imagination"]
+  Pol -->|act| O
+```
+
 ## Worked check: backprop a return through a model to learn a controller
 
 The mechanism in isolation: a differentiable latent model and a policy trained

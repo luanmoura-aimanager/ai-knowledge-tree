@@ -83,6 +83,15 @@ $\lambda \approx 0.95$ keeps most of the variance reduction while accepting a sm
 bias. The advantages are computed in one backward pass via the recursion
 $A_t = \delta_t + \gamma\lambda\, A_{t+1}$.
 
+```mermaid
+graph LR
+  S["state"] --> Ac["actor:<br/>policy over actions"]
+  S --> Cr["critic:<br/>value V(s)"]
+  Ac -->|action| En["environment"]
+  En -->|reward| Cr
+  Cr -->|TD error guides| Ac
+```
+
 ## Worked check: GAE interpolates between TD and Monte Carlo
 
 Take a random trajectory with arbitrary rewards and value estimates, compute the

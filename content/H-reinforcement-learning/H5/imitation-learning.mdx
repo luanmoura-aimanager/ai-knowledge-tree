@@ -63,6 +63,14 @@ restores the linear $\epsilon T$ error rate, at the cost of needing an
 **interactive** expert that can be queried on arbitrary states, not just a fixed
 log of demonstrations.
 
+```mermaid
+graph LR
+  Ex["expert demonstrations"] --> BC["behavior cloning:<br/>supervised on actions"]
+  BC --> Pol["policy"]
+  Pol -->|visits new states| DA["DAgger: query<br/>the expert there"]
+  DA --> BC
+```
+
 ## Worked check: cloning error is quadratic, DAgger error is linear
 
 Model the two regimes abstractly. The cloned policy errs with probability

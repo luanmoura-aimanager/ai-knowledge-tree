@@ -77,6 +77,14 @@ turns the current network into a stronger search policy), and the network traini
 is the policy-evaluation-and-distillation step that folds the improvement back in.
 The two reinforce each other from random initialization up to superhuman play.
 
+```mermaid
+graph LR
+  Se["select (UCT)"] --> Ex["expand a leaf"]
+  Ex --> Ev["evaluate with<br/>policy + value net"]
+  Ev --> Bp["backup the value"]
+  Bp -->|repeat| Se
+```
+
 ## Worked check: bare MCTS finds wins and never loses at tic-tac-toe
 
 Implement UCT MCTS with random rollouts (the pre-AlphaZero version) on
