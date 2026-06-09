@@ -163,7 +163,7 @@ def positional_encoding() -> None:
 
 
 def linear_attention() -> None:
-    """Softmax attention builds an n×n score matrix, so its compute and memory grow
+    """Softmax attention builds an n×n score matrix, so its cost grows
     quadratically with sequence length; linear-attention variants factor the
     softmax to grow linearly, winning decisively for long sequences."""
     import matplotlib.pyplot as plt
