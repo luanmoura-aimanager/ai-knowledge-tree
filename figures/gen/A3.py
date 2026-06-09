@@ -355,12 +355,12 @@ def convex_sets() -> None:
     ax1.plot([-0.7, 0.6], [0.3, -0.5], "-o", color=ACCENT, lw=2)
     ax1.set_title("Convex: chord stays inside")
 
-    big = np.column_stack([1.3 * np.cos(t), 1.3 * np.sin(t)])
-    small = np.column_stack([1.3 * np.cos(t) + 0.7, 1.3 * np.sin(t)])
-    ax2.fill(big[:, 0], big[:, 1], color=C, alpha=0.3)
-    ax2.fill(small[:, 0], small[:, 1], color="#0a0e1f")
-    ax2.plot([-1.0, 1.7], [0.4, 0.4], "-o", color=HOT, lw=2)
-    ax2.set_title("Non-convex: chord exits")
+    from matplotlib.patches import Annulus
+
+    ax2.add_patch(Annulus((0, 0), 1.3, 0.75, facecolor=C, alpha=0.3, edgecolor="none"))
+    ax2.plot([-1.0, 1.0], [0.0, 0.0], "-o", color=HOT, lw=2)  # chord through the hole
+    ax2.set_xlim(-1.5, 1.5); ax2.set_ylim(-1.5, 1.5)
+    ax2.set_title("Non-convex: chord exits (annulus)")
     for ax in (ax1, ax2):
         ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([]); ax.grid(False)
     fig.tight_layout()

@@ -41,7 +41,7 @@ def complexity_analysis() -> None:
 def sorting() -> None:
     """Comparison counts make the gap concrete: the O(n log n) sorts (merge, quick)
     scale gracefully, while insertion sort's O(n²) comparisons blow up — for n=2000
-    that is a ~90× difference."""
+    that is a ~45× difference."""
     import matplotlib.pyplot as plt
 
     n = np.arange(10, 2001)
