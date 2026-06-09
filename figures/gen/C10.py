@@ -104,8 +104,70 @@ def classification_metrics() -> None:
     save(fig, SUB, "classification-metrics")
 
 
+def calibration() -> None:
+    """A reliability diagram bins predictions by confidence and plots the observed
+    frequency in each bin: a calibrated model hugs the diagonal, while an
+    over-confident one bows below it (its high probabilities are too high). rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 4000
+    p_true = rng.uniform(0, 1, n)
+    y = (rng.random(n) < p_true).astype(int)
+    logit = np.log(p_true / (1 - p_true))
+    p_over = 1 / (1 + np.exp(-3 * logit))     # sharpened → over-confident
+
+    def reliability(p):
+        idx = np.clip((p * 10).astype(int), 0, 9)
+        xs, ys = [], []
+        for b in range(10):
+            m = idx == b
+            if m.sum() > 5:
+                xs.append(p[m].mean()); ys.append(y[m].mean())
+        return np.array(xs), np.array(ys)
+
+    fig, ax = plt.subplots(figsize=(5.6, 5.2))
+    ax.plot([0, 1], [0, 1], color=FG_MUTE, ls="--", label="perfectly calibrated")
+    for p, col, lab in [(p_true, ACCENT, "calibrated model"),
+                        (p_over, HOT, "over-confident model")]:
+        xs, ys = reliability(p)
+        ax.plot(xs, ys, "-o", color=col, ms=5, label=lab)
+    ax.set_aspect("equal")
+    ax.set_title("Reliability diagram")
+    ax.set_xlabel("predicted probability")
+    ax.set_ylabel("observed frequency")
+    ax.legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "calibration")
+
+
+def regression_metrics() -> None:
+    """The loss shape sets outlier sensitivity: squared error grows quadratically
+    and is dominated by large residuals, absolute error grows linearly, and Huber
+    is quadratic near zero but linear in the tails."""
+    import matplotlib.pyplot as plt
+
+    r = np.linspace(-5, 5, 400)
+    delta = 1.0
+    huber = np.where(np.abs(r) <= delta, 0.5 * r**2, delta * (np.abs(r) - 0.5 * delta))
+
+    fig, ax = plt.subplots(figsize=(6.6, 4.2))
+    ax.plot(r, r**2, color=HOT, lw=2.2, label="squared error (MSE)")
+    ax.plot(r, np.abs(r), color=ACCENT, lw=2.2, label="absolute error (MAE)")
+    ax.plot(r, huber, color=C, lw=2.6, label="Huber (δ=1)")
+    ax.set_ylim(0, 8)
+    ax.set_title("Regression loss functions")
+    ax.set_xlabel("residual")
+    ax.set_ylabel("loss")
+    ax.legend(loc="upper center", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "regression-metrics")
+
+
 def main() -> None:
     apply_style()
+    calibration()
+    regression_metrics()
     learning_curves()
     classification_metrics()
 

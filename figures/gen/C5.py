@@ -240,8 +240,39 @@ def tsne_umap() -> None:
     save(fig, SUB, "tsne-umap")
 
 
+def kmedoids() -> None:
+    """k-medoids uses an actual data point — the medoid, which minimizes total
+    distance to its group — as each center. Unlike the mean (the k-means center),
+    a few far outliers cannot drag the medoid out of the dense cluster. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    cluster = rng.normal([0, 0], 0.7, (60, 2))
+    outliers = rng.normal([8, 8], 0.5, (8, 2))
+    X = np.vstack([cluster, outliers])
+
+    mean = X.mean(0)                                              # k-means center
+    medoid = X[np.linalg.norm(X[:, None] - X[None], axis=2).sum(1).argmin()]
+
+    fig, ax = plt.subplots(figsize=(6.4, 5.0))
+    ax.scatter(cluster[:, 0], cluster[:, 1], s=16, color=C, alpha=0.6,
+               edgecolor="none", label="cluster")
+    ax.scatter(outliers[:, 0], outliers[:, 1], s=28, color=FG_MUTE,
+               edgecolor="none", label="outliers")
+    ax.scatter(*mean, s=200, marker="X", color=HOT, label="mean (k-means, pulled)")
+    ax.scatter(*medoid, s=260, marker="*", color=ACCENT, edgecolor="none",
+               label="medoid (k-medoids, robust)")
+    ax.set_title("The medoid resists outliers; the mean does not")
+    ax.set_xlabel("$x_1$")
+    ax.set_ylabel("$x_2$")
+    ax.legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "kmedoids")
+
+
 def main() -> None:
     apply_style()
+    kmedoids()
     kmeans()
     kmeans_init_and_k()
     gmm_em()

@@ -179,8 +179,45 @@ def common_kernels() -> None:
     save(fig, SUB, "common-kernels")
 
 
+def perceptron() -> None:
+    """The perceptron walks a separating hyperplane into place: each misclassified
+    point nudges the weight vector until the two classes are split. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 100
+    Xp = rng.normal([2.5, 1.0], 0.8, (n, 2))
+    Xn = rng.normal([-1.5, -1.0], 0.8, (n, 2))
+    X = np.vstack([Xp, Xn])
+    y = np.array([1] * n + [-1] * n)
+    Xa = np.column_stack([np.ones(len(X)), X])
+    w = np.zeros(3)
+    for _ in range(50):
+        errs = 0
+        for i in rng.permutation(len(X)):
+            if y[i] * (Xa[i] @ w) <= 0:
+                w += y[i] * Xa[i]
+                errs += 1
+        if errs == 0:
+            break
+
+    fig, ax = plt.subplots(figsize=(6.2, 4.8))
+    ax.scatter(Xp[:, 0], Xp[:, 1], s=14, color=HOT, edgecolor="none")
+    ax.scatter(Xn[:, 0], Xn[:, 1], s=14, color=ACCENT, edgecolor="none")
+    xs = np.array([X[:, 0].min() - 0.5, X[:, 0].max() + 0.5])
+    ax.plot(xs, -(w[0] + w[1] * xs) / w[2], color=C, lw=2.6, label="learned boundary")
+    ax.set_title("Perceptron: a separating hyperplane")
+    ax.set_xlabel("$x_1$")
+    ax.set_ylabel("$x_2$")
+    ax.legend(loc="upper left", fontsize=9, frameon=True, facecolor=LEGEND_BG,
+              edgecolor=GRID)
+    fig.tight_layout()
+    save(fig, SUB, "perceptron")
+
+
 def main() -> None:
     apply_style()
+    perceptron()
     hard_margin_svm()
     soft_margin_svm()
     kernel_trick()

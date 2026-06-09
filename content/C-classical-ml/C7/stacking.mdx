@@ -86,6 +86,14 @@ is more prone to overfitting on the small validation set.
   cost and $M$ times the deployment surface area. Often a single tuned
   gradient-boosted model is the better engineering choice.
 
+```mermaid
+graph TD
+  A["base learners:<br/>logistic, forest, kNN"] --> B["k-fold out-of-fold<br/>predictions"]
+  B --> C["meta-features<br/>n by M matrix"]
+  C --> D["meta-learner<br/>fit on meta-features"]
+  D --> E["stacked prediction"]
+```
+
 ## Check it on arrays
 
 ```python

@@ -84,6 +84,15 @@ ALS often matches BPR with simpler infrastructure.
 When it does not: long-tail items rarely interacted with stay at near-zero
 embeddings, and the cold-start problem persists for new items and users.
 
+```mermaid
+graph LR
+  C["click and view counts"] --> P["preference:<br/>1 if interacted, else 0"]
+  C --> W["confidence:<br/>grows with count"]
+  P --> M["weighted matrix<br/>factorization"]
+  W --> M
+  M --> F["user and item factors"]
+```
+
 ## Check it on arrays
 
 ```python

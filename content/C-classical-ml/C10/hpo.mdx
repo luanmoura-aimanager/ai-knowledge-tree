@@ -113,6 +113,15 @@ Some hyperparameters look important but are not (e.g. random seeds in
 some settings). Sensitivity analysis on a small budget reveals which
 parameters are worth tuning.
 
+```mermaid
+graph TD
+  A["hyperparameter space"] --> B["sample a config:<br/>grid, random, or Bayesian"]
+  B --> C["train and cross-validate"]
+  C -->|update search| B
+  C --> D["pick best config"]
+  D --> E["final test-set eval"]
+```
+
 ## Check it on arrays
 
 A minimal random search + Bayesian-ish refinement for a single

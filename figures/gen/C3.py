@@ -200,8 +200,40 @@ def feature_importance() -> None:
     save(fig, SUB, "feature-importance")
 
 
+def tree_pruning() -> None:
+    """Pruning trades fit for generalization: deep unpruned trees memorize the
+    training set (train accuracy → 1) while test accuracy peaks at a moderate depth
+    and then falls — the overfitting that pruning controls. rng(0)."""
+    import matplotlib.pyplot as plt
+    from sklearn.tree import DecisionTreeClassifier
+
+    rng = np.random.default_rng(0)
+    n = 600
+    X = rng.uniform(-3, 3, (n, 2))
+    y = ((X[:, 0] + X[:, 1] > 0) ^ (rng.random(n) < 0.1)).astype(int)
+    Xtr, ytr, Xte, yte = X[:400], y[:400], X[400:], y[400:]
+    depths = [1, 2, 3, 4, 6, 8, 12, 20]
+    tr, te = [], []
+    for d in depths:
+        clf = DecisionTreeClassifier(max_depth=d, random_state=0).fit(Xtr, ytr)
+        tr.append(clf.score(Xtr, ytr)); te.append(clf.score(Xte, yte))
+    best = depths[int(np.argmax(te))]
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    ax.plot(depths, tr, "-o", color=FG_MUTE, ms=4, label="training accuracy")
+    ax.plot(depths, te, "-o", color=C, ms=4, lw=2.2, label="test accuracy")
+    ax.axvline(best, color=HOT, ls=":", lw=1.4, label=f"best depth = {best}")
+    ax.set_title("Pruning prevents overfitting")
+    ax.set_xlabel("tree depth")
+    ax.set_ylabel("accuracy")
+    ax.legend(loc="lower center", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "tree-pruning")
+
+
 def main() -> None:
     apply_style()
+    tree_pruning()
     decision_trees()
     impurity_criteria()
     bagging_rf()

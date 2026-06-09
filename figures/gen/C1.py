@@ -309,9 +309,37 @@ def linear_regression_mle() -> None:
     save(fig, SUB, "linear-regression-mle")
 
 
+def poisson_gamma_glm() -> None:
+    """A Poisson GLM uses a log link, so its mean stays positive and grows
+    multiplicatively with the predictor — fitting count data that an ordinary
+    straight-line regression cannot. rng(0)."""
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import LinearRegression, PoissonRegressor
+
+    rng = np.random.default_rng(0)
+    x = np.sort(rng.uniform(-1.5, 1.5, 250))
+    y = rng.poisson(np.exp(0.6 + 1.2 * x))
+    X = x[:, None]
+    xs = np.linspace(-1.5, 1.5, 200)[:, None]
+    pr = PoissonRegressor(alpha=0).fit(X, y)
+    lr = LinearRegression().fit(X, y)
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    ax.scatter(x, y, s=16, color=C, alpha=0.5, edgecolor="none", label="counts")
+    ax.plot(xs, pr.predict(xs), color=HOT, lw=2.6, label="Poisson GLM (log link)")
+    ax.plot(xs, lr.predict(xs), color=ACCENT, lw=2.0, ls="--", label="linear regression")
+    ax.set_title("Poisson GLM fits count data")
+    ax.set_xlabel("predictor $x$")
+    ax.set_ylabel("count $y$")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "poisson-gamma-glm")
+
+
 def main() -> None:
     apply_style()
     bias_variance()
+    poisson_gamma_glm()
     ridge_regression()
     lasso()
     elastic_net()

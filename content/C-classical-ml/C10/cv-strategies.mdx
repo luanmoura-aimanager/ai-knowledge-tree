@@ -102,6 +102,17 @@ covariate shift), CV measures the wrong thing. Standard remedies:
 CV cannot fix distribution shift. It can only honestly estimate
 performance under the assumption that your CV setup mimics production.
 
+```mermaid
+graph TD
+  D["data"] --> Q{"data structure?"}
+  Q -->|iid| K["k-fold or<br/>stratified k-fold"]
+  Q -->|groups| G["group k-fold:<br/>keep a group intact"]
+  Q -->|time series| T["walk-forward:<br/>train past, test future"]
+  K --> E["honest error estimate"]
+  G --> E
+  T --> E
+```
+
 ## Check it on arrays
 
 ```python

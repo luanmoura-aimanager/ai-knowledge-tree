@@ -96,6 +96,14 @@ sophisticated than a simple lookup.
   metrics. Always evaluate with **time-respecting splits** (train on past,
   test on future).
 
+```mermaid
+graph LR
+  S["item sequence<br/>i1, i2, ..., iT"] --> M["sequence model<br/>SASRec or BERT4Rec"]
+  M --> U["user state embedding"]
+  U --> D["score candidate items<br/>by dot product"]
+  D --> R["recommend next item"]
+```
+
 ## Check it on arrays
 
 A minimal SASRec-like next-item predictor: linear attention over the item
