@@ -65,6 +65,16 @@ smooth seasonal curve. These are deterministic functions of the timestamp, so th
 carry no leakage risk and extend cleanly into the forecast horizon. Calendar
 features (day of week, month, holiday flags) complement them for irregular effects.
 
+```mermaid
+graph LR
+  TS["raw series"] --> L["lag features<br/>y(t-1), y(t-7)"]
+  TS --> R["rolling stats:<br/>mean, std"]
+  TS --> Cal["calendar:<br/>day, month, holiday"]
+  L --> M["feature matrix"]
+  R --> M
+  Cal --> M
+```
+
 ## The cardinal rule: no leakage
 
 Every feature at row $t$ must be computable from data up to time $t$ only. The two

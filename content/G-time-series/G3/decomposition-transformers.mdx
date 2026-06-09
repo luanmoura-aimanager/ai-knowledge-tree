@@ -70,6 +70,16 @@ so keeping a random sample of modes captures the signal at $O(L)$ cost. FEDforme
 keeps Autoformer's trend-seasonal decomposition and adds this frequency-enhanced
 block, giving linear complexity with strong long-horizon accuracy.
 
+```mermaid
+graph LR
+  X["input series"] --> D["decompose:<br/>trend + seasonal"]
+  D --> Tr["trend branch"]
+  D --> Se["seasonal branch<br/>(attention)"]
+  Tr --> Co["combine"]
+  Se --> Co
+  Co --> F["forecast"]
+```
+
 ## The shared lesson
 
 All three encode a prior that classical analysis already knew: time series are

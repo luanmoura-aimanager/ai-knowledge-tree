@@ -80,6 +80,16 @@ least-squares lesson is the underlying machinery. MinT uses every level's foreca
 to correct every other level, which is why it dominates bottom-up and top-down on
 accuracy while guaranteeing coherence.
 
+```mermaid
+graph TD
+  Tot["total forecast"] --> R1["region A"]
+  Tot --> R2["region B"]
+  R1 --> S1["store 1"]
+  R1 --> S2["store 2"]
+  R2 --> S3["store 3"]
+  S2 -.->|reconcile: children<br/>sum to parent| Tot
+```
+
 ## Grouped versus strictly hierarchical
 
 A strict **hierarchy** has a single tree (store within region within country).

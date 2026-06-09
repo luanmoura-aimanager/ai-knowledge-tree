@@ -64,6 +64,17 @@ into a trend curve plus a seasonal curve, readable like an ETS decomposition. Th
 **generic** variant instead learns $V$ freely, trading interpretability for a bit
 more accuracy.
 
+```mermaid
+graph LR
+  X["input window"] --> B1["block 1:<br/>backcast + forecast"]
+  B1 -->|residual| B2["block 2"]
+  B2 -->|residual| B3["block 3"]
+  B1 --> S["sum the forecasts"]
+  B2 --> S
+  B3 --> S
+  S --> F["final forecast"]
+```
+
 ## N-HiTS: multi-rate sampling for long horizons
 
 N-BEATS treats every horizon step at full resolution, which is wasteful for long
