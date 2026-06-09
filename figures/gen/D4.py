@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import CYCLE, FG_DIM, GOOD, GRID, HOT, apply_style, color, save
+from _style import CYCLE, FG_DIM, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
 
 SUB = "D4"
 C = color(SUB)  # pillar-D accent (blue)
@@ -112,11 +112,107 @@ def diffusion() -> None:
     save(fig, SUB, "diffusion")
 
 
+def autoencoders() -> None:
+    """An autoencoder squeezes data through a bottleneck: reconstruction error falls
+    sharply until the bottleneck matches the data's intrinsic dimension, then
+    plateaus at the noise floor. Shown with the optimal linear (PCA) reconstruction
+    on data whose signal lives in ~4 dimensions. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 500
+    t = rng.uniform(0, 2 * np.pi, n)
+    X = np.column_stack([np.cos(t), np.sin(t), 0.5 * np.cos(2 * t), 0.5 * np.sin(2 * t),
+                         rng.normal(scale=0.05, size=(n, 6))])
+    Xc = X - X.mean(0)
+    s = np.linalg.svd(Xc, compute_uv=False)
+    total = (s**2).sum()
+    ks = np.arange(1, X.shape[1] + 1)
+    mse = [(total - (s[:k] ** 2).sum()) / n for k in ks]
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    ax.plot(ks, mse, "-o", color=C, ms=5)
+    ax.axvline(4, color=HOT, ls=":", lw=1.4, label="intrinsic dimension ≈ 4")
+    ax.set_title("Reconstruction error vs bottleneck size")
+    ax.set_xlabel("bottleneck dimension $k$")
+    ax.set_ylabel("reconstruction MSE")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "autoencoders")
+
+
+def flow_matching() -> None:
+    """Flow matching learns a velocity field that transports a base Gaussian to the
+    data along straight conditional paths: each sample rides a line from noise (t=0)
+    to a target point (t=1), so the cloud morphs into the target ring. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    m = 600
+    x0 = rng.normal(scale=0.6, size=(m, 2))
+    ang = rng.uniform(0, 2 * np.pi, m)
+    x1 = np.column_stack([3 * np.cos(ang), 3 * np.sin(ang)]) + 0.15 * rng.normal(size=(m, 2))
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.4))
+    idx = rng.choice(m, 40, replace=False)
+    for i in idx:
+        ax.plot([x0[i, 0], x1[i, 0]], [x0[i, 1], x1[i, 1]], color=FG_MUTE, lw=0.5, alpha=0.5)
+    ax.scatter(x0[:, 0], x0[:, 1], s=8, color=HOT, alpha=0.5, edgecolor="none",
+               label="base $t=0$")
+    mid = 0.5 * x0 + 0.5 * x1
+    ax.scatter(mid[:, 0], mid[:, 1], s=8, color=GOOD, alpha=0.4, edgecolor="none",
+               label="midpoint $t=0.5$")
+    ax.scatter(x1[:, 0], x1[:, 1], s=8, color=C, alpha=0.6, edgecolor="none",
+               label="target $t=1$")
+    ax.set_aspect("equal")
+    ax.set_title("Flow matching: straight-line transport")
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
+    ax.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "flow-matching")
+
+
+def normalizing_flows() -> None:
+    """A normalizing flow is an invertible map: stacked coupling layers warp a simple
+    Gaussian into a complex shape, and because each step is invertible with a known
+    Jacobian, the exact density transfers with it. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    base = rng.normal(size=(2000, 2))
+
+    def coupling(x, Ws, Wt, flip=False):
+        a, b = (x[:, 1], x[:, 0]) if flip else (x[:, 0], x[:, 1])
+        s = np.tanh(a[:, None] @ Ws).ravel()
+        t = np.tanh(a[:, None] @ Wt).ravel()
+        b2 = b * np.exp(0.6 * s) + t
+        return np.column_stack([b2, a] if flip else [a, b2])
+
+    z = base.copy()
+    for layer in range(4):
+        r = np.random.default_rng(layer)
+        z = coupling(z, r.normal(scale=0.8, size=(1, 1)), r.normal(scale=1.0, size=(1, 1)),
+                     flip=bool(layer % 2))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 4.2))
+    ax1.scatter(base[:, 0], base[:, 1], s=5, color=FG_MUTE, alpha=0.4, edgecolor="none")
+    ax1.set_title("base density (Gaussian)")
+    ax2.scatter(z[:, 0], z[:, 1], s=5, color=C, alpha=0.4, edgecolor="none")
+    ax2.set_title("after invertible coupling layers")
+    for ax in (ax1, ax2):
+        ax.set_aspect("equal"); ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
+    fig.tight_layout()
+    save(fig, SUB, "normalizing-flows")
+
+
 def main() -> None:
     apply_style()
     vae()
     gan()
     diffusion()
+    autoencoders()
+    flow_matching()
+    normalizing_flows()
 
 
 if __name__ == "__main__":

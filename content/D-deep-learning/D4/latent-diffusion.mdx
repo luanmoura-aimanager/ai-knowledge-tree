@@ -121,6 +121,16 @@ tunes, ControlNets, custom checkpoints) is enormous.
 The same recipe powers latent **video** diffusion (Sora, Veo) and
 latent **audio** diffusion (AudioLDM).
 
+```mermaid
+graph LR
+  I["image"] --> E["VAE encoder"]
+  E --> Z["latent z"]
+  Z --> DF["diffusion:<br/>denoise in latent space"]
+  DF --> Z2["clean latent"]
+  Z2 --> DE["VAE decoder"]
+  DE --> O["generated image"]
+```
+
 ## Limits and current research
 
 - **Sampling speed**: still 20-50 steps in practice. Distillation

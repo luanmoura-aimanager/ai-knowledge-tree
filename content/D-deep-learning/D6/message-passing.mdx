@@ -118,6 +118,14 @@ Message-passing operations naturally handle this because they only
 look at within-graph neighborhoods. Graph-level readouts (mean / sum
 pooling) use the graph index to pool per-graph.
 
+```mermaid
+graph LR
+  N["node v"] --> M["gather messages<br/>from neighbors"]
+  M --> AG["aggregate:<br/>sum, mean, or max"]
+  AG --> U["update: combine<br/>with node state"]
+  U -->|repeat per layer| N
+```
+
 ## Check it on arrays
 
 ```python

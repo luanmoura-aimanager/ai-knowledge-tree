@@ -162,12 +162,102 @@ def positional_encoding() -> None:
     save(fig, SUB, "positional-encoding")
 
 
+def linear_attention() -> None:
+    """Softmax attention builds an n×n score matrix, so its cost grows
+    quadratically with sequence length; linear-attention variants factor the
+    softmax to grow linearly, winning decisively for long sequences."""
+    import matplotlib.pyplot as plt
+
+    n = np.logspace(1, 4.5, 100)
+    d = 64
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    ax.loglog(n, n**2 * d, color=HOT, lw=2.4, label="softmax attention  $O(n^2 d)$")
+    ax.loglog(n, n * d**2, color=C, lw=2.4, label="linear attention  $O(n d^2)$")
+    ax.axvline(d, color=FG_MUTE, ls=":", lw=1.4, label=f"crossover n ≈ d = {d}")
+    ax.set_title("Attention cost vs sequence length")
+    ax.set_xlabel("sequence length $n$")
+    ax.set_ylabel("operations")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "linear-attention")
+
+
+def state_space_models() -> None:
+    """A state-space model's output is a convolution with a kernel built from
+    decaying modes Aᵏ: eigenvalues near 1 decay slowly and carry long-range memory,
+    while small eigenvalues forget quickly."""
+    import matplotlib.pyplot as plt
+
+    k = np.arange(0, 100)
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    for lam, col, lab in [(0.99, C, "λ = 0.99 (long memory)"),
+                          (0.95, GOOD, "λ = 0.95"),
+                          (0.80, HOT, "λ = 0.80 (forgets fast)")]:
+        ax.plot(k, lam**k, color=col, lw=2.4, label=lab)
+    ax.set_title("SSM convolution kernel: decaying modes")
+    ax.set_xlabel("time lag $k$")
+    ax.set_ylabel("kernel weight $\\lambda^k$")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "state-space-models")
+
+
+def word_embeddings() -> None:
+    """Skip-gram with negative sampling learns vectors whose geometry reflects
+    co-occurrence: words sharing contexts land near each other, so a 2D PCA of the
+    learned embeddings reveals the corpus's topical clusters. rng(0)."""
+    import matplotlib.pyplot as plt
+    from sklearn.decomposition import PCA
+
+    rng = np.random.default_rng(0)
+    groups = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]
+    sentences = []
+    for _ in range(120):
+        g = groups[rng.integers(3)]
+        sentences.append(list(rng.choice(g, size=3, replace=False)))
+    V, d, window, k_neg, lr = 12, 16, 2, 5, 0.05
+    U = rng.normal(scale=0.1, size=(V, d))
+    W = rng.normal(scale=0.1, size=(V, d))
+    sig = lambda z: 1 / (1 + np.exp(-z))
+    for _ in range(60):
+        for s in sentences:
+            for i, c in enumerate(s):
+                for j in range(max(0, i - window), min(len(s), i + window + 1)):
+                    if j == i:
+                        continue
+                    o = s[j]
+                    g = (sig(U[c] @ W[o]) - 1) * W[o]
+                    W[o] -= lr * (sig(U[c] @ W[o]) - 1) * U[c]
+                    for ng in rng.integers(0, V, k_neg):
+                        g = g + sig(U[c] @ W[ng]) * W[ng]
+                        W[ng] -= lr * sig(U[c] @ W[ng]) * U[c]
+                    U[c] -= lr * g
+
+    emb = PCA(n_components=2).fit_transform(U)
+    fig, ax = plt.subplots(figsize=(6.2, 5.0))
+    cols = [C, GOOD, HOT]
+    for gi, grp in enumerate(groups):
+        ax.scatter(emb[grp, 0], emb[grp, 1], s=90, color=cols[gi], edgecolor="none",
+                   label=f"topic {gi + 1}")
+        for w in grp:
+            ax.annotate(f"w{w}", (emb[w, 0], emb[w, 1]), fontsize=8, color=FG_DIM,
+                        xytext=(4, 4), textcoords="offset points")
+    ax.set_title("Word embeddings cluster by co-occurrence (PCA)")
+    ax.set_xlabel("PC 1"); ax.set_ylabel("PC 2")
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "word-embeddings")
+
+
 def main() -> None:
     apply_style()
     rnn()
     lstm_gru()
     self_attention()
     positional_encoding()
+    linear_attention()
+    state_space_models()
+    word_embeddings()
 
 
 if __name__ == "__main__":

@@ -172,6 +172,14 @@ But knowing the pieces helps you:
 - Avoid pathological costs (write rate to checkpoint storage, fall-back
   to TCP from RDMA, etc.).
 
+```mermaid
+graph LR
+  D["data pipeline"] --> W["distributed workers"]
+  W --> OPT["optimizer step<br/>+ gradient sync"]
+  OPT --> CK["checkpoint + logging"]
+  CK -->|resume and monitor| W
+```
+
 ## This closes pillar D
 
 D ran from the basic MLP, through CNNs and Transformers, into the

@@ -81,6 +81,15 @@ cost scales linearly in batch size and quadratically (roughly) in width.
 Depth multiplies cost by a constant; the doubling of layers does not
 square the cost.
 
+```mermaid
+graph LR
+  X["input x"] --> A1["affine W1 x + b1"]
+  A1 --> N1["nonlinearity ReLU"]
+  N1 --> A2["affine W2 h + b2"]
+  A2 --> N2["nonlinearity"]
+  N2 --> O["output logits"]
+```
+
 ## Check it on arrays
 
 ```python

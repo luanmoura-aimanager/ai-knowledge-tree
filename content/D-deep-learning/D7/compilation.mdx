@@ -136,6 +136,14 @@ minimal code changes. The savings compound over thousands of GPU-hours.
   algorithm).
 - Not free debugging (compiled code is harder to step through).
 
+```mermaid
+graph LR
+  M["model code"] --> T["trace to a graph"]
+  T --> O["optimize:<br/>fuse ops, simplify"]
+  O --> K["generate fused kernels"]
+  K --> R["faster execution"]
+```
+
 ## Practical recipe
 
 For a typical PyTorch training pipeline:

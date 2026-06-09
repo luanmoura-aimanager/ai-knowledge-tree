@@ -92,6 +92,16 @@ This is why every deep-learning framework defaults to reverse mode.
 - **Higher-order derivatives** come from running autodiff on the
   gradient itself.
 
+```mermaid
+graph LR
+  X["inputs"] --> O1["op a = f(x)"]
+  O1 --> O2["op b = g(a)"]
+  O2 --> L["loss"]
+  L -.->|seed grad 1| O2
+  O2 -.->|times local derivative| O1
+  O1 -.->|accumulate grad on x| X
+```
+
 ## Check it on arrays
 
 ```python

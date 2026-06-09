@@ -119,6 +119,16 @@ auxiliary losses (in VQ-GAN, in consistency models), and StyleGAN-like
 generators are sometimes distilled from diffusion models for fast
 inference.
 
+```mermaid
+graph LR
+  Z["noise z"] --> G["generator"]
+  G --> F["fake sample"]
+  R["real sample"] --> D["discriminator"]
+  F --> D
+  D --> S["real or fake score"]
+  S -.->|adversarial gradient| G
+```
+
 ## The next lesson
 
 The next lesson moves to a different kind of generative model:

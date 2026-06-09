@@ -128,6 +128,16 @@ Synchronous SGD dominates in 2024 because the all-reduce overhead is
 small compared to the compute, and the convergence guarantees are
 stronger.
 
+```mermaid
+graph TD
+  B["data batch"] --> S["split across replicas"]
+  S --> G1["GPU 1:<br/>forward + backward"]
+  S --> G2["GPU 2:<br/>forward + backward"]
+  G1 --> AR["all-reduce gradients"]
+  G2 --> AR
+  AR --> U["every replica applies<br/>the same update"]
+```
+
 ## In practice
 
 - Models up to ~7B on 80GB GPUs: DDP is fine.

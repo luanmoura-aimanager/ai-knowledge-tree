@@ -124,6 +124,15 @@ For a typical vision project:
 
 Steps 1-3 cover the vast majority of vision projects.
 
+```mermaid
+graph LR
+  V1["view 1"] --> ON["online encoder<br/>+ predictor"]
+  V2["view 2"] --> TG["target encoder<br/>stop-gradient"]
+  ON --> L["match predictions"]
+  TG --> L
+  L -.->|EMA update| TG
+```
+
 ## The next lesson
 
 The next lesson covers the masked-modeling SSL approach, originally

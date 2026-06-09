@@ -134,6 +134,14 @@ most production pipelines still include some form of NMS for safety.
 - **Long-tail vocabulary**: rare classes get few training examples.
   Federated heads, balanced sampling, and large-scale pretraining help.
 
+```mermaid
+graph LR
+  I["image"] --> B["backbone CNN<br/>feature maps"]
+  B --> H["head: box + class<br/>per anchor"]
+  H --> N["non-max suppression"]
+  N --> O["final boxes"]
+```
+
 ## When to use each
 
 - **Two-stage** (Faster R-CNN, Cascade R-CNN): highest accuracy on
