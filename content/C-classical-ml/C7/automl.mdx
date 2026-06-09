@@ -82,6 +82,14 @@ worked on similar tasks).
 - Hold out a **separate test set** the AutoML never sees, to estimate
   generalization honestly.
 
+```mermaid
+graph TD
+  A["pipeline search space:<br/>preprocess + model + params"] --> B["search strategy:<br/>random, Bayesian, genetic"]
+  B --> C["train and cross-validate<br/>each candidate"]
+  C -->|update search| B
+  C --> D["best pipeline"]
+```
+
 ## Check it on arrays
 
 The core of AutoML is BO over configurations. A skeleton, scaled down:

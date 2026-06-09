@@ -104,6 +104,14 @@ In production, FAISS, hnswlib, ScaNN, and managed vector DBs all expose
 HNSW or HNSW + quantization. The next lesson surveys what the major
 vector DBs do.
 
+```mermaid
+graph TD
+  A["multi-layer graph<br/>levels 0 to L"] --> B["sparse top layers,<br/>dense bottom layer"]
+  B --> C["start at the top,<br/>greedy nearest hop"]
+  C --> D["descend a layer<br/>and repeat"]
+  D --> E["nearest neighbors<br/>in about log n hops"]
+```
+
 ## Check it on arrays
 
 A toy HNSW with a single layer (greedy search on a small-world graph). The

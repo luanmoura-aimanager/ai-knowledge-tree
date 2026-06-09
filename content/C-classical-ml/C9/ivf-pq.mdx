@@ -96,6 +96,16 @@ no extra serving cost (the rotation is applied once per query).
 
 Both are first-class citizens of FAISS.
 
+```mermaid
+graph TD
+  A["database vectors"] --> B["IVF: k-means into<br/>coarse cells"]
+  B --> C["inverted lists<br/>plus PQ codes"]
+  D["query"] --> E["probe nearest<br/>few cells"]
+  C --> F["product-quantization<br/>table lookups"]
+  E --> F
+  F --> G["ranked candidates"]
+```
+
 ## Check it on arrays
 
 ```python

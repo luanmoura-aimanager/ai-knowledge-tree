@@ -92,6 +92,15 @@ direct adaptations of all three families.
 The two-tower lesson hinted at this: training with cosine or dot-product
 makes the ANN problem at serving time tractable.
 
+```mermaid
+graph LR
+  Q["query vector"] --> E["exact kNN:<br/>linear scan O(n d)"]
+  E --> X["too slow at scale"]
+  Q --> A["approximate NN:<br/>trade recall for speed"]
+  A --> M["index: LSH, IVF, or HNSW"]
+  M --> G["high recall,<br/>sublinear query"]
+```
+
 ## Check it on arrays
 
 This gives a sense of the scale at which exact search breaks down.

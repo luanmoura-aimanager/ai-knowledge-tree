@@ -99,6 +99,14 @@ The knobs that matter most, roughly in order:
 Cross-validation with **early stopping** is the standard fitting recipe:
 add trees while held-out loss improves, stop when it plateaus.
 
+```mermaid
+graph TD
+  A["training data + gradients"] --> B["histogram binning<br/>256 bins per feature"]
+  B --> C["Newton split gain<br/>uses g and h, plus lambda"]
+  C --> D["grow tree:<br/>leaf-wise or level-wise"]
+  D --> E["add shrunk tree<br/>to the ensemble"]
+```
+
 ## Check it on arrays
 
 ```python

@@ -125,6 +125,15 @@ single index. Sharding gets you linear throughput scaling.
 
 The vector DB market is young. Re-evaluate annually.
 
+```mermaid
+graph LR
+  D["vectors + metadata"] --> I["embed and index<br/>HNSW or IVF"]
+  I --> S["store with<br/>persistence"]
+  Q["query"] --> F["metadata filter<br/>plus ANN search"]
+  S --> F
+  F --> R["ranked, filtered results"]
+```
+
 ## Check it on arrays
 
 This is a demo of `pgvector`-style integration: filter first by

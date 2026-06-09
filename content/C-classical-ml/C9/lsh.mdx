@@ -105,6 +105,14 @@ of the candidate set retrieved.
 LSH is conceptually elegant and memory-light at moderate recall, which
 made it the workhorse before graph methods matured.
 
+```mermaid
+graph LR
+  X["vector x"] --> H["hash:<br/>SimHash or MinHash"]
+  H --> B["bucket signature"]
+  B --> C["collision probability<br/>rises with similarity"]
+  C --> N["similar vectors<br/>land in one bucket"]
+```
+
 ## Check it on arrays
 
 ```python
