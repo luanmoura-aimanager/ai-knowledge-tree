@@ -43,10 +43,10 @@ FG = "#e6e9f5"        # primary text
 FG_DIM = "#9aa3c7"    # axis labels / ticks
 FG_MUTE = "#6c7596"   # de-emphasized
 GRID = "#242b52"      # grid + spines
-ACCENT = "#7aa2f7"    # generic accent
 GOOD = "#9ece6a"
 HOT = "#f7768e"
-PARTIAL = "#e0af68"
+ACCENT = PILLAR["D"]   # generic accent (= pillar D blue)
+PARTIAL = PILLAR["A"]  # = pillar A gold
 
 # A small ordered cycle for multi-series plots (distinct, palette-consistent).
 CYCLE = ["#7aa2f7", "#f7768e", "#9ece6a", "#e0af68", "#bb9af7", "#7dcfff", "#ff9e64"]
@@ -62,6 +62,9 @@ def apply_style() -> None:
         {
             "figure.figsize": (7.0, 4.0),
             "figure.dpi": 110,
+            # Fixed salt → deterministic <defs> element ids across runs, so
+            # re-running gives byte-identical SVGs (clean git diffs).
+            "svg.hashsalt": "ai-knowledge-tree",
             "savefig.transparent": True,
             "figure.facecolor": "none",
             "axes.facecolor": "none",
@@ -99,7 +102,9 @@ def save(fig, sub: str, name: str) -> None:
     out_dir = os.path.join(_OUT, sub)
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{name}.svg")
-    fig.savefig(path, format="svg", bbox_inches="tight")
+    # metadata={"Date": None} drops the per-run <dc:date> timestamp so output is
+    # byte-stable (paired with the fixed svg.hashsalt in apply_style).
+    fig.savefig(path, format="svg", bbox_inches="tight", metadata={"Date": None})
     plt.close(fig)
     rel = os.path.relpath(path, _ROOT)
     print(f"  wrote {rel}")

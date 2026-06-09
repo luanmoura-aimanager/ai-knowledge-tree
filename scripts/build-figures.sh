@@ -20,6 +20,7 @@ fi
 
 ran=0
 for f in figures/gen/*.py; do
+  [ -e "$f" ] || continue   # no-match glob stays literal under set -e; skip it
   case "$(basename "$f")" in
     _*) continue ;;  # skip _style.py and other helpers
   esac
