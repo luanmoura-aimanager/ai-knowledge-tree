@@ -58,6 +58,14 @@ own skill. Self-play drove AlphaZero and superhuman play in Go, chess, and
 StarCraft. Maintaining a pool of past opponents prevents the cycle where two agents
 chase each other's latest weaknesses and forget how to beat older strategies.
 
+```mermaid
+graph LR
+  A1["agent 1"] -->|action| E["shared environment"]
+  A2["agent 2"] -->|action| E
+  E -->|reward + observation| A1
+  E -->|reward + observation| A2
+```
+
 ## Worked check: fictitious play converges to the Nash equilibrium
 
 A clean window on multi-agent learning is **fictitious play**: each player best-

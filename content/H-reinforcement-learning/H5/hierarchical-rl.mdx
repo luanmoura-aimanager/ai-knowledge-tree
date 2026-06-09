@@ -62,6 +62,14 @@ RL, where a single policy $\pi(a \mid s, g)$ is trained to reach any goal $g$, a
 higher level chooses which goals to pursue. The hierarchy is learned end to end, no
 hand-designed options required.
 
+```mermaid
+graph TD
+  HP["high-level policy"] -->|picks a subgoal| LP["low-level policy"]
+  LP -->|primitive actions| E["environment"]
+  E -->|state| HP
+  E -->|state| LP
+```
+
 ## Worked check: an option propagates reward in one episode
 
 Compare value propagation on a length-$L$ corridor with the goal at the end. Flat

@@ -63,6 +63,14 @@ A direct consequence is that the latent can be much **smaller** than the true
 state, collapsing observations that behave identically into one latent. Planning in
 that compact model gives the same answer as planning in the full one.
 
+```mermaid
+graph LR
+  O["observation"] --> Rp["representation net<br/>to a latent state"]
+  Rp --> Dy["dynamics net:<br/>latent + action to<br/>next latent, reward"]
+  Dy --> Pr["prediction net:<br/>policy + value"]
+  Dy -->|unroll| Dy
+```
+
 ## Worked check: a compact value-equivalent model plans identically
 
 Construct a true environment whose states come in behaviorally identical pairs (two

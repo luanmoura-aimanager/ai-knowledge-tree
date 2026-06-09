@@ -63,6 +63,14 @@ rewarded. The reasoning is instrumental: it is selected because it pays off at t
 verifier, the clearest demonstration that capability can come from reward signal
 alone rather than demonstrations.
 
+```mermaid
+graph LR
+  P["problem"] --> G["LLM generates<br/>a reasoning chain"]
+  G --> V["verifier checks<br/>the final answer"]
+  V -->|reward if correct| RL["RL update"]
+  RL -->|improve| G
+```
+
 ## Worked check: group-relative advantages train toward the verified answer
 
 Model one prompt with $K$ candidate answers, exactly one of which the verifier
