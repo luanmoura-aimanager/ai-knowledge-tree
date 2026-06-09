@@ -120,6 +120,15 @@ print(f"Predicted class: {pred_cls}")
 print(f"Probabilities: {dict(zip(classes, probs.round(3)))}")
 ```
 
+```mermaid
+graph LR
+  IM["image"] --> IE["image encoder"]
+  TX["text labels"] --> TE["text encoder"]
+  IE --> S["match in a shared<br/>embedding space"]
+  TE --> S
+  S --> Z["zero-shot classification"]
+```
+
 ## What CLIP learns and where it fails
 
 **Learns:** object categories, scenes, textures, styles, relationships -- essentially

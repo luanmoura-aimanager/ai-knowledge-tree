@@ -87,6 +87,14 @@ $\beta$ term controls how far the policy may move from the reference: small $\be
 close, large $\beta$ lets preferences dominate, the same KL-control knob that the
 [RLHF KL penalty](/pillar/E/E4/ppo-rlhf) provides in the PPO route.
 
+```mermaid
+graph LR
+  SFT["SFT model"] --> PREF["preference pairs"]
+  PREF --> DPO["DPO loss"]
+  REF["frozen reference"] --> DPO
+  DPO --> AL["aligned mini-model"]
+```
+
 ## 4. What to expect
 
 After a few steps on the synthetic pairs, sample again and compare to the reference: the

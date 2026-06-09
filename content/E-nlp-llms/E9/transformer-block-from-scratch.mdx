@@ -82,6 +82,16 @@ class FeedForward(nn.Module):
         return self.net(x)
 ```
 
+```mermaid
+graph TD
+  X["input"] --> LN1["layer norm"]
+  LN1 --> ATT["causal self-attention"]
+  ATT --> R1["add residual"]
+  R1 --> LN2["layer norm"]
+  LN2 --> MLP["MLP"]
+  MLP --> R2["add residual, output"]
+```
+
 ## 3. The block: pre-norm residuals
 
 The block wires attention and the MLP as residual branches, each preceded by a LayerNorm.

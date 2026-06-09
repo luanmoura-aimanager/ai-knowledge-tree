@@ -121,6 +121,14 @@ Key findings from DeepSeek-R1:
 - A "cold start" with a small amount of SFT on curated reasoning chains before GRPO prevents
   reward hacking and improves final performance.
 
+```mermaid
+graph LR
+  Q["prompt"] --> G["sample a group<br/>of responses"]
+  G --> R["score each"]
+  R --> A["advantage = score<br/>minus group mean"]
+  A --> U["policy update"]
+```
+
 ## Comparison: PPO vs DPO vs GRPO
 
 | Property | PPO | DPO | GRPO |

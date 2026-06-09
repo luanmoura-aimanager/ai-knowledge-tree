@@ -125,6 +125,13 @@ where $\text{odds}_\theta(y|x) = p_\theta(y|x) / (1 - p_\theta(y|x))$.
 ORPO uses the ratio of odds rather than log-ratios to a reference, making it a
 true single-stage training method with no SFT warm-up required.
 
+```mermaid
+graph LR
+  P["preference pairs:<br/>chosen vs rejected"] --> D["DPO loss: raise chosen,<br/>lower rejected"]
+  REF["frozen reference model"] --> D
+  D --> M["aligned policy,<br/>no separate reward model"]
+```
+
 ## Comparison
 
 | Method | Requires RM? | Requires ref model? | Pairs required? |

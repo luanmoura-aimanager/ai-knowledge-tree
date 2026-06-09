@@ -118,6 +118,14 @@ analytical queries benefit from graph-based retrieval.
 **Contextual compression:** after retrieval, use an LLM to compress each retrieved passage
 to only the parts relevant to the query, reducing context window usage.
 
+```mermaid
+graph LR
+  Q["query"] --> R["retrieve candidates"]
+  R --> RR["rerank"]
+  RR --> AUG["augment prompt<br/>with context"]
+  AUG --> G["generate answer"]
+```
+
 ## Evaluation
 
 RAG evaluation is a two-stage problem:

@@ -143,6 +143,14 @@ def speculative_decode_step(target, draft, context, k=4):
     return accepted
 ```
 
+```mermaid
+graph LR
+  D["small draft model"] --> G["propose k tokens"]
+  G --> V["big model verifies<br/>in parallel"]
+  V --> A["accept the longest<br/>matching prefix"]
+  A -->|repeat| D
+```
+
 ## Variants
 
 **Self-speculative decoding:** use the target model with early exit as the draft -- faster

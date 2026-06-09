@@ -136,6 +136,14 @@ Empirically, adding the "honesty" direction reduces dishonest outputs; adding "h
 direction makes the model generate more positive text. The steering is graded and reversible.
 The runnable demo above shows all three steps: patching, direction extraction, and steering.
 
+```mermaid
+graph LR
+  P["prompt"] --> A["model activations"]
+  V["steering vector:<br/>a concept direction"] --> ADD["add at a layer"]
+  A --> ADD
+  ADD --> O["behavior shifts<br/>toward the concept"]
+```
+
 ## Relation to SAEs
 
 SAEs extract monosemantic feature directions. Representation engineering steers along

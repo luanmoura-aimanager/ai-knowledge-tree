@@ -59,6 +59,15 @@ through the unembedding. Applying the unembedding to an *intermediate* $x_\ell$ 
 effect on a logit can be read off as its write projected onto the relevant unembedding
 direction, which is what makes attribution tractable.
 
+```mermaid
+graph LR
+  E["token embedding"] --> R["residual stream"]
+  R --> A["attention writes<br/>to the stream"]
+  A --> R2["residual stream"]
+  R2 --> M["MLP writes<br/>to the stream"]
+  M --> U["unembed to logits"]
+```
+
 ## 4. Bandwidth and superposition
 
 The stream has a fixed width $d$, shared by every component across all layers. The number

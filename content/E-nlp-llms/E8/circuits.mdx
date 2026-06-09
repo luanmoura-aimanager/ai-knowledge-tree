@@ -133,6 +133,14 @@ for name, pattern in [("prev-token", pattern_prev),
     print(f"{name:12s}: prev_token={analysis['prev_token']:.3f}, uniform={analysis['uniform']:.3f}")
 ```
 
+```mermaid
+graph LR
+  IN["input tokens"] --> H1["attention heads<br/>move information"]
+  H1 --> M["MLP neurons<br/>compute features"]
+  M --> H2["later heads<br/>combine them"]
+  H2 --> O["a circuit doing<br/>one task"]
+```
+
 ## Activation patching to validate circuits
 
 Once a circuit is hypothesized, validate it by **activation patching**: run the model on

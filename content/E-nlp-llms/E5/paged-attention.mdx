@@ -109,6 +109,13 @@ pools.
 This disaggregation avoids the "prefill-decode interference" problem (a long prefill
 blocks all decode steps in the same batch) and allows independent scaling of each phase.
 
+```mermaid
+graph LR
+  K["KV cache"] --> P["split into fixed<br/>blocks (pages)"]
+  P --> T["page table<br/>per sequence"]
+  T --> S["share and reuse pages,<br/>no fragmentation"]
+```
+
 ## Impact
 
 In the original vLLM paper, PagedAttention + continuous batching achieved:

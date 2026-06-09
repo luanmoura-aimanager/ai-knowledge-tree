@@ -28,11 +28,11 @@ Tool use is implemented as a special conversation structure:
 
 ```mermaid
 graph LR
-    user["User: What is 2^32?"] --> llm["LLM"]
-    llm --> call["tool_use: calculator\n{expr: '2**32'}"]
-    call --> tool["Calculator tool\n→ 4294967296"]
-    tool --> llm2["LLM reads result"]
-    llm2 --> answer["2^32 = 4,294,967,296"]
+    user["User asks: 2 to the 32?"] --> llm["LLM"]
+    llm --> tcall["tool call:<br/>calculator"]
+    tcall --> ctool["calculator tool<br/>returns 4294967296"]
+    ctool --> llm2["LLM reads result"]
+    llm2 --> answer["answer:<br/>4294967296"]
 ```
 
 ## Tool definition schema
