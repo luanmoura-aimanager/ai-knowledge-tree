@@ -235,6 +235,165 @@ def mle() -> None:
     save(fig, SUB, "mle")
 
 
+def change_of_variables() -> None:
+    """A monotonic transform reshapes a density: the Jacobian stretches or
+    compresses probability mass. Here X ~ Exp(1) maps through Y = X² — the same
+    mass, redistributed."""
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(1e-3, 5, 400)
+    fx = np.exp(-x)                       # Exp(1)
+    y = np.linspace(1e-3, 6, 400)
+    fy = np.exp(-np.sqrt(y)) / (2 * np.sqrt(y))   # f_Y(y), Y = X^2
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 3.8))
+    ax1.plot(x, fx, color=C, lw=2.2)
+    ax1.fill_between(x, fx, color=C, alpha=0.2)
+    ax1.set_title("$f_X(x)$, X ~ Exp(1)")
+    ax1.set_xlabel("$x$"); ax1.set_ylabel("density")
+    ax2.plot(y, fy, color=ACCENT, lw=2.2)
+    ax2.fill_between(y, fy, color=ACCENT, alpha=0.2)
+    ax2.set_title("$f_Y(y)$, $Y = X^2$  (Jacobian)")
+    ax2.set_xlabel("$y$")
+    ax2.set_ylim(0, 1.2)
+    fig.tight_layout()
+    save(fig, SUB, "change-of-variables")
+
+
+def expectation() -> None:
+    """The expectation is the distribution's balance point: place the probability
+    mass on a beam and E[X] is where it balances. A fair die balances at 3.5."""
+    import matplotlib.pyplot as plt
+
+    k = np.arange(1, 7)
+    p = np.full(6, 1 / 6)
+    fig, ax = plt.subplots(figsize=(6.6, 4.0))
+    ax.bar(k, p, color=C, width=0.6)
+    ax.axvline(3.5, color=HOT, lw=2.0, ls="--", label="E[X] = 3.5 (balance point)")
+    ax.plot(3.5, 0, marker="^", color=HOT, ms=16, clip_on=False)
+    ax.set_title("Expectation as the center of mass")
+    ax.set_xlabel("outcome")
+    ax.set_ylabel("probability")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "expectation")
+
+
+def inequalities() -> None:
+    """Tail bounds from limited information: Markov's inequality bounds P(X ≥ a) by
+    E[X]/a using only the mean. For Exp(1) the true tail e⁻ᵃ falls far faster — the
+    bound is valid but loose."""
+    import matplotlib.pyplot as plt
+
+    a = np.linspace(1, 6, 200)
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
+    ax.plot(a, np.exp(-a), color=C, lw=2.4, label="true tail $P(X\\geq a)=e^{-a}$")
+    ax.plot(a, 1 / a, color=HOT, lw=2.2, ls="--", label="Markov bound $E[X]/a = 1/a$")
+    ax.fill_between(a, np.exp(-a), 1 / a, color=FG_MUTE, alpha=0.15, label="slack")
+    ax.set_yscale("log")
+    ax.set_title("Markov's inequality (Exp(1))")
+    ax.set_xlabel("threshold $a$")
+    ax.set_ylabel("tail probability")
+    ax.legend(loc="lower left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "inequalities")
+
+
+def joint_distributions() -> None:
+    """A joint distribution couples two variables; the marginals (on the axes) are
+    its shadows. Positively correlated X and Y, rng(0)."""
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+
+    rng = np.random.default_rng(0)
+    z = rng.normal(size=2000)
+    X = z + 0.6 * rng.normal(size=2000)
+    Y = z + 0.6 * rng.normal(size=2000)
+
+    fig = plt.figure(figsize=(6.2, 6.0))
+    gs = GridSpec(3, 3, figure=fig, hspace=0.05, wspace=0.05)
+    ax = fig.add_subplot(gs[1:, :2])
+    axx = fig.add_subplot(gs[0, :2], sharex=ax)
+    axy = fig.add_subplot(gs[1:, 2], sharey=ax)
+    ax.scatter(X, Y, s=6, color=C, alpha=0.3, edgecolor="none")
+    axx.hist(X, bins=40, color=ACCENT, alpha=0.8)
+    axy.hist(Y, bins=40, orientation="horizontal", color=ACCENT, alpha=0.8)
+    ax.set_xlabel("$X$"); ax.set_ylabel("$Y$")
+    axx.set_title("Joint distribution with its marginals")
+    axx.tick_params(labelbottom=False); axy.tick_params(labelleft=False)
+    axx.grid(False); axy.grid(False)
+    save(fig, SUB, "joint-distributions")
+
+
+def map_conjugate() -> None:
+    """MAP estimation returns the posterior mode. With a Beta(2,2) prior and 14
+    heads in 20 flips, the MAP sits between the MLE (k/n) and the prior mean — the
+    prior pulls the estimate toward 0.5."""
+    import matplotlib.pyplot as plt
+    from scipy.stats import beta
+
+    a0, b0, n, k = 2.0, 2.0, 20, 14
+    g = np.linspace(0, 1, 400)
+    post = beta.pdf(g, a0 + k, b0 + n - k)
+    mle = k / n
+    mapv = (a0 + k - 1) / (a0 + b0 + n - 2)
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
+    ax.plot(g, post, color=C, lw=2.4, label="posterior")
+    ax.axvline(mapv, color=HOT, lw=2.0, label=f"MAP = {mapv:.2f} (mode)")
+    ax.axvline(mle, color=ACCENT, lw=2.0, ls="--", label=f"MLE = {mle:.2f}")
+    ax.axvline(0.5, color=FG_MUTE, lw=1.4, ls=":", label="prior mean 0.5")
+    ax.set_title("MAP vs MLE on the posterior")
+    ax.set_xlabel("θ")
+    ax.set_ylabel("density")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "map-conjugate")
+
+
+def random_variables() -> None:
+    """A random variable assigns a number to each outcome; its PMF gives the
+    per-value probabilities and its CDF the running total. Binomial(3, 0.5)."""
+    import matplotlib.pyplot as plt
+    from math import comb
+
+    k = np.arange(0, 4)
+    pmf = np.array([comb(3, i) * 0.5**3 for i in k])
+    cdf = np.cumsum(pmf)
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
+    ax.bar(k, pmf, color=C, width=0.5, label="PMF")
+    ax.step(np.concatenate([[-0.5], k, [3.5]]),
+            np.concatenate([[0], cdf, [1]]), where="post", color=ACCENT, lw=2.2,
+            label="CDF")
+    ax.set_title("Binomial(3, 0.5): PMF and CDF")
+    ax.set_xlabel("k (number of heads)")
+    ax.set_ylabel("probability")
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "random-variables")
+
+
+def variance_moments() -> None:
+    """Variance is the second central moment — the spread around the mean. Three
+    Gaussians share mean 0 but differ in σ, so the same center looks very
+    different."""
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(-7, 7, 400)
+    fig, ax = plt.subplots(figsize=(6.8, 4.0))
+    for sd, col in zip([0.7, 1.5, 3.0], [C, ACCENT, HOT]):
+        ax.plot(x, np.exp(-x**2 / (2 * sd**2)) / (sd * np.sqrt(2 * np.pi)),
+                color=col, lw=2.2, label=f"σ = {sd}")
+    ax.axvline(0, color=FG_MUTE, ls=":", lw=1.2)
+    ax.set_title("Same mean, different variance")
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("density")
+    ax.legend(loc="upper right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "variance-moments")
+
+
 def main() -> None:
     apply_style()
     common_distributions()
@@ -244,6 +403,13 @@ def main() -> None:
     markov_chains()
     kl_cross_entropy()
     mle()
+    change_of_variables()
+    expectation()
+    inequalities()
+    joint_distributions()
+    map_conjugate()
+    random_variables()
+    variance_moments()
 
 
 if __name__ == "__main__":
