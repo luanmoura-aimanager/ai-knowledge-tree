@@ -13,7 +13,7 @@ A pretrained language model generates plausible continuations of text -- it is a
 completion engine. It is not (yet) an instruction follower: ask it a question and it may
 continue generating questions rather than answering them. **Supervised fine-tuning (SFT)**
 bridges this gap by training on (instruction, response) pairs where responses are
-human-written or human-curated.
+human-written or human-curated<FN n="1" />.
 
 ## The SFT objective
 
@@ -127,5 +127,12 @@ trainer = Trainer(model=model, args=args, train_dataset=dataset)
 trainer.train()
 ```
 
-SFT is the first of three stages in RLHF. The SFT model is the starting point for reward
+SFT is the first of three stages in RLHF<FN n="2" />. The SFT model is the starting point for reward
 modeling and policy optimization, which the next lessons derive.
+
+<Footnotes>
+  <FNItem n="1">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".
+    *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). Stage 1 is supervised fine-tuning on human-written demonstrations.</FNItem>
+  <FNItem n="2">**Stiennon, N., et al.** (2020). "Learning to summarize from human feedback".
+    *NeurIPS*. [arXiv:2009.01325](https://arxiv.org/abs/2009.01325). An earlier pipeline that fine-tunes a supervised policy before preference-based optimization.</FNItem>
+</Footnotes>

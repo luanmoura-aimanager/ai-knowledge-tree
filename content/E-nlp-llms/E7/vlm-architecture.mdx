@@ -11,7 +11,7 @@ prerequisites: ["clip"]
 
 CLIP aligns image and text embeddings in a shared space but cannot generate text.
 **Vision-language models (VLMs)** wire a visual encoder to a language model, enabling
-tasks like visual question answering, image captioning, and visual instruction following.
+tasks like visual question answering, image captioning, and visual instruction following<FN n="3" />.
 
 ## The architecture challenge
 
@@ -28,7 +28,7 @@ dimension and (2) how to interleave visual and text tokens.
 ## LLaVA: linear projection
 
 **LLaVA (Liu et al., 2023)** uses the simplest possible bridge: a **single linear
-projection layer** $W \in \mathbb{R}^{d_{\text{LLM}} \times d_{\text{CLIP}}}$.
+projection layer** $W \in \mathbb{R}^{d_{\text{LLM}} \times d_{\text{CLIP}}}$<FN n="1" />.
 
 ```mermaid
 graph LR
@@ -59,7 +59,7 @@ tuning data.
 
 **BLIP-2 (Li et al., 2023)** uses a learned bottleneck -- the **Querying Transformer
 (Q-Former)** -- to compress 256 patch embeddings into a small fixed number of query
-embeddings (typically 32).
+embeddings (typically 32)<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -128,3 +128,9 @@ def llava_forward(image, question, clip_model, projection, llm_model, llm_tokeni
 
 **Trend:** more recent models (LLaVA-NeXT, InternVL, Qwen-VL) use higher-resolution image
 tiles, dynamic resolution encoding, and larger LLMs. GPT-4V and Claude 3 are proprietary.
+
+<Footnotes>
+  <FNItem n="1">**Liu, H., Li, C., Wu, Q., & Lee, Y. J.** (2023). "Visual instruction tuning (LLaVA)". *NeurIPS*. [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)</FNItem>
+  <FNItem n="2">**Li, J., Li, D., Savarese, S., & Hoi, S.** (2023). "BLIP-2: bootstrapping language-image pre-training with frozen image encoders and large language models". *ICML*. [arXiv:2301.12597](https://arxiv.org/abs/2301.12597)</FNItem>
+  <FNItem n="3">**Alayrac, J.-B., et al.** (2022). "Flamingo: a visual language model for few-shot learning". *NeurIPS*. [arXiv:2204.14198](https://arxiv.org/abs/2204.14198)</FNItem>
+</Footnotes>

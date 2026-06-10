@@ -16,7 +16,7 @@ request -- large enough for the maximum possible output length. This wastes memo
 limits concurrency.
 
 **PagedAttention** (Kwon et al., 2023, vLLM) and **continuous batching** are the two
-key techniques that make production LLM serving efficient.
+key techniques that make production LLM serving efficient<FN n="1" />.
 
 ## The memory waste problem
 
@@ -124,3 +124,8 @@ In the original vLLM paper, PagedAttention + continuous batching achieved:
 
 These techniques are now standard in all production LLM serving frameworks (vLLM, TGI,
 SGLang, TensorRT-LLM).
+
+<Footnotes>
+  <FNItem n="1">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention".
+    *SOSP*. [arXiv:2309.06180](https://arxiv.org/abs/2309.06180). The vLLM paper: paged KV blocks, copy-on-write prefix sharing, and continuous batching.</FNItem>
+</Footnotes>

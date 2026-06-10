@@ -23,11 +23,11 @@ Vocabulary size reaches millions; most entries appear too rarely to train good e
 costs $O(T^2)$ in sequence length, making character-level prohibitively expensive.
 
 **Subword (the winning middle):** frequent words become single tokens (short sequences);
-rare words decompose into subword pieces (no OOV). Typical vocabulary: 30K-200K entries.
+rare words decompose into subword pieces (no OOV). Typical vocabulary: 30K-200K entries<FN n="3" />.
 
 ## Byte-pair encoding (BPE)
 
-BPE is a compression algorithm adapted for tokenization (Sennrich et al., 2016).
+BPE is a compression algorithm adapted for tokenization<FN n="1" />.
 
 ### Training algorithm
 
@@ -142,12 +142,12 @@ WordPiece represents out-of-vocabulary words by marking internal subword pieces 
 
 ## SentencePiece and the unigram model
 
-SentencePiece (Kudo and Richardson, 2018) differs in two ways:
+SentencePiece differs in two ways:
 
 1. It treats whitespace as a regular character (represented as `▁`), so it can handle
    any language without a pre-tokenizer regex.
 2. It offers a **unigram language model** variant alongside BPE. The unigram model
-   starts with a large vocabulary and prunes entries, keeping those that minimize:
+   starts with a large vocabulary and prunes entries, keeping those that minimize<FN n="2" />:
 
 $$
 \mathcal{L} = -\sum_{s \in \mathcal{C}} \log p(s), \quad p(s) = \sum_{\mathbf{x} \in \text{seg}(s)} \prod_{x_i \in \mathbf{x}} p(x_i),
@@ -179,3 +179,9 @@ needs 3 bytes; without a specific vocabulary entry it costs 3 tokens). The trade
 each vocabulary entry adds one row to the embedding matrix and the LM head.
 
 The next subsection moves to neural models that consume these token sequences.
+
+<Footnotes>
+  <FNItem n="1">**Sennrich, R., Haddow, B., & Birch, A.** (2016). "Neural machine translation of rare words with subword units (BPE)". *ACL*. [arXiv:1508.07909](https://arxiv.org/abs/1508.07909)</FNItem>
+  <FNItem n="2">**Kudo, T.** (2018). "Subword regularization: improving NMT models with multiple subword candidates". *ACL*. The unigram-LM tokenizer and its segmentation likelihood. [arXiv:1804.10959](https://arxiv.org/abs/1804.10959)</FNItem>
+  <FNItem n="3">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). Subword tokenization and the BPE algorithm.</FNItem>
+</Footnotes>

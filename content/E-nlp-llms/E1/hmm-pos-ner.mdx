@@ -16,7 +16,7 @@ entity recognition (NER) labels spans as Person, Organization, Location, or Othe
 Both tasks share a structure: the output is a sequence of the same length as the input,
 and adjacent labels are strongly correlated (a noun is likely followed by a verb; an
 "I" (inside) tag must follow a "B" (begin) tag of the same entity type). The
-**Hidden Markov Model** is the canonical probabilistic model for this structure.
+**Hidden Markov Model** is the canonical probabilistic model for this structure<FN ns="1, 2" />.
 
 ## HMM definition
 
@@ -59,7 +59,7 @@ $$
 $$
 
 Brute force over $K^T$ sequences is exponential. The **Viterbi algorithm** solves this
-in $O(TK^2)$ with dynamic programming.
+in $O(TK^2)$ with dynamic programming<FN n="3" />.
 
 Define $v_t(j) = \max_{y_1, \dots, y_{t-1}} p(y_1, \dots, y_{t-1}, y_t = j, x_1, \dots, x_t)$:
 the probability of the best path ending in state $j$ at time $t$.
@@ -158,6 +158,12 @@ graph LR
 ## HMM limitations
 
 The emission probability $p(x_t \mid y_t)$ conditions only on the current word. It cannot
-use surrounding words as features -- "run" and "runs" have independent emission distributions.
+use surrounding words as features: "run" and "runs" have independent emission distributions.
 The next lesson introduces CRFs, which replace this generative model with a discriminative one
 that can use arbitrary features of the full input sentence.
+
+<Footnotes>
+  <FNItem n="1">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). HMMs, POS tagging, and named entity recognition.</FNItem>
+  <FNItem n="2">**Manning, C. D., & Schütze, H.** (1999). *Foundations of Statistical Natural Language Processing.* MIT Press. Markov models and tagging.</FNItem>
+  <FNItem n="3">**Rabiner, L. R.** (1989). "A tutorial on hidden Markov models and selected applications in speech recognition". *Proceedings of the IEEE*, 77(2), 257-286. The standard reference for the forward, Viterbi, and Baum-Welch algorithms. [doi:10.1109/5.18626](https://doi.org/10.1109/5.18626)</FNItem>
+</Footnotes>

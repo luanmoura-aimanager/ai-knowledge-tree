@@ -16,7 +16,7 @@ gradients can travel backward through time without repeated matrix multiplicatio
 
 ## The LSTM cell
 
-The LSTM (Hochreiter and Schmidhuber, 1997) maintains two vectors per time step:
+The LSTM (Hochreiter and Schmidhuber, 1997)<FN n="1" /> maintains two vectors per time step:
 - $c_t \in \mathbb{R}^m$: the **cell state** (long-term memory).
 - $h_t \in \mathbb{R}^m$: the **hidden state** (output passed to the next layer).
 
@@ -111,7 +111,7 @@ print("Last hidden state norm:", np.linalg.norm(hs[-1]))
 
 ## Gated Recurrent Unit (GRU)
 
-The GRU (Cho et al., 2014) is a simplified LSTM that merges cell and hidden states and
+The GRU (Cho et al., 2014)<FN n="2" /> is a simplified LSTM that merges cell and hidden states and
 uses two gates instead of four:
 
 $$
@@ -179,3 +179,8 @@ graph LR
 GRU matches LSTM on most benchmarks with fewer parameters; LSTM tends to win on very
 long sequences where the separate cell state helps. Both are superseded by Transformers
 for most tasks, but appear as components in sequence models and state-space models.
+
+<Footnotes>
+  <FNItem n="1">**Hochreiter, S., & Schmidhuber, J.** (1997). "Long short-term memory". *Neural Computation*, 9(8), 1735-1780. [doi:10.1162/neco.1997.9.8.1735](https://doi.org/10.1162/neco.1997.9.8.1735). The cell state and constant error carousel.</FNItem>
+  <FNItem n="2">**Cho, K., et al.** (2014). "Learning phrase representations using RNN encoder-decoder for statistical machine translation". *EMNLP*. [arXiv:1406.1078](https://arxiv.org/abs/1406.1078). Introduces the GRU.</FNItem>
+</Footnotes>

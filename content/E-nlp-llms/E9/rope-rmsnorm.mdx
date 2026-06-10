@@ -26,7 +26,7 @@ $$
 
 where $g \in \mathbb{R}^d$ is a learned gain and $\varepsilon$ guards against division by
 zero. It has fewer operations and parameters than LayerNorm and matches its quality in
-practice, which is why it became standard.
+practice, which is why it became standard<FN n="1" />.
 
 ```python-static
 import torch
@@ -51,7 +51,7 @@ A learned position embedding stores one vector per absolute position and adds it
 input. RoPE instead injects position *inside attention* by rotating each query and key by an
 angle proportional to its position. The dot product of a query at position $m$ and a key at
 position $n$ then depends only on the relative offset $m - n$, which is what gives RoPE its
-length-generalization behavior, derived in
+length-generalization behavior<FN n="2" />, derived in
 [positional encodings](/pillar/E/E3/positional-encodings).
 
 Group the head dimension into pairs and rotate each pair $(x_{2i}, x_{2i+1})$ by angle
@@ -89,3 +89,8 @@ contexts than it trained on, while the [training loop](nanogpt-setup) is unchang
 
 The architecture is now current. The [next lesson](mini-rlhf-dpo) takes this pretrained base
 and runs a minimal preference-tuning pass, the alignment step from E4 at toy scale.
+
+<Footnotes>
+  <FNItem n="1">**Zhang, B., & Sennrich, R.** (2019). "Root mean square layer normalization (RMSNorm)". *NeurIPS*. [arXiv:1910.07467](https://arxiv.org/abs/1910.07467).</FNItem>
+  <FNItem n="2">**Su, J., Lu, Y., Pan, S., Wen, B., & Liu, Y.** (2021). "RoFormer: enhanced transformer with rotary position embedding (RoPE)". [arXiv:2104.09864](https://arxiv.org/abs/2104.09864).</FNItem>
+</Footnotes>

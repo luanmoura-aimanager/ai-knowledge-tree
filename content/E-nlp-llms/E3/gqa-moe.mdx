@@ -18,7 +18,7 @@ architectural innovations address each.
 
 **Standard MHA** has $h$ query heads, $h$ key heads, and $h$ value heads.
 **Multi-query attention (MQA, Shazeer 2019)** keeps $h$ query heads but reduces to
-**one shared** key head and one shared value head:
+**one shared** key head and one shared value head<FN n="1" />:
 
 $$
 \text{MQA}: \quad Q_i = X W_i^Q, \quad K = X W^K, \quad V = X W^V \quad (i = 1, \dots, h).
@@ -34,7 +34,7 @@ with different keys. In practice this is a noticeable (though small) accuracy lo
 
 **GQA (Ainslie et al., 2023; used by LLaMA-2 70B, LLaMA-3, Mistral)** is a
 compromise: divide the $h$ query heads into $g$ groups, and give each group its own
-key and value head:
+key and value head<FN n="2" />:
 
 $$
 \text{GQA}: \quad Q_i = X W_i^Q, \quad K_j = X W_j^K, \quad V_j = X W_j^V,
@@ -83,7 +83,7 @@ print("GQA output shape:", out.shape)   # (h, T, dk)
 ## Mixture of Experts (MoE)
 
 **MoE** replaces the dense FFN layer in a transformer block with a set of $E$ expert FFNs,
-routing each token to only $k$ of them:
+routing each token to only $k$ of them<FN n="3" />:
 
 ```mermaid
 graph LR
@@ -153,3 +153,14 @@ gating probability assigned to expert $e$. This loss encourages uniform routing.
 DeepSeek-V3 uses **expert specialization** (each expert tends to handle specific types
 of tokens) and **shared experts** (2 experts always active, 6 routed) -- a refinement
 that improves learning stability.
+
+<Footnotes>
+  <FNItem n="1">**Shazeer, N.** (2019). "Fast transformer decoding: one write-head is
+    all you need (MQA)". [arXiv:1911.02150](https://arxiv.org/abs/1911.02150)</FNItem>
+  <FNItem n="2">**Ainslie, J., et al.** (2023). "GQA: training generalized multi-query
+    transformer models from multi-head checkpoints". *EMNLP*.
+    [arXiv:2305.13245](https://arxiv.org/abs/2305.13245)</FNItem>
+  <FNItem n="3">**Fedus, W., Zoph, B., & Shazeer, N.** (2022). "Switch transformers:
+    scaling to trillion parameter models with simple and efficient sparsity". *JMLR*.
+    [arXiv:2101.03961](https://arxiv.org/abs/2101.03961)</FNItem>
+</Footnotes>

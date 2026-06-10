@@ -12,7 +12,7 @@ prerequisites: ["ppo-rlhf"]
 PPO requires a trained value model (the critic) to compute advantages. Training two models
 simultaneously -- the policy and the value network -- is expensive and adds complexity.
 **Group Relative Policy Optimization (GRPO, Shao et al., 2024)** eliminates the value model
-by estimating baselines from a **group** of responses sampled from the current policy.
+by estimating baselines from a **group** of responses sampled from the current policy<FN n="1" />.
 
 ## The core idea
 
@@ -32,7 +32,7 @@ This is essentially REINFORCE with leave-one-out baseline, adapted to the LLM se
 
 ## The GRPO objective
 
-For each group of $G$ responses, the objective mirrors PPO's clipped surrogate:
+For each group of $G$ responses, the objective mirrors PPO's clipped surrogate<FN n="2" />:
 
 $$
 \mathcal{L}_{\text{GRPO}} = -\frac{1}{G} \sum_{i=1}^{G} \min\!\left(\rho_i \hat{A}_i,\ \text{clip}(\rho_i, 1-\epsilon, 1+\epsilon) \hat{A}_i\right) + \beta\, \mathrm{KL}(\pi_\theta \| \pi_{\text{ref}}),
@@ -143,3 +143,10 @@ graph LR
 GRPO occupies a useful middle ground: simpler than PPO (no value model), but online
 (generates new rollouts) and compatible with verifiable rewards -- making it the method
 of choice for reasoning-oriented RL.
+
+<Footnotes>
+  <FNItem n="1">**Shao, Z., et al.** (2024). "DeepSeekMath: pushing the limits of mathematical reasoning in open language models (GRPO)".
+    [arXiv:2402.03300](https://arxiv.org/abs/2402.03300). Introduces the group-relative baseline that replaces the value model.</FNItem>
+  <FNItem n="2">**Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O.** (2017). "Proximal policy optimization algorithms (PPO)".
+    [arXiv:1707.06347](https://arxiv.org/abs/1707.06347). The clipped surrogate objective GRPO reuses with a group-mean baseline.</FNItem>
+</Footnotes>

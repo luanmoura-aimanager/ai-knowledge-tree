@@ -11,7 +11,7 @@ codeExempt: true
 ---
 
 Text-to-image generation is the task of synthesizing a photorealistic (or stylized) image
-from a natural language description. The three dominant approaches -- DALL-E 2, Stable
+from a natural language description<FN n="1" />. The three dominant approaches -- DALL-E 2, Stable
 Diffusion, and Midjourney -- share a foundation in diffusion models and CLIP-based text
 conditioning, but differ in architecture and training.
 
@@ -77,7 +77,7 @@ values produces semantically similar images with different visual styles.
 ## Stable Diffusion: latent diffusion
 
 **Stable Diffusion (Rombach et al., 2022)** reduces compute by running the diffusion
-process in a compressed **latent space** rather than pixel space.
+process in a compressed **latent space** rather than pixel space<FN n="2" />.
 
 1. **VAE encoder:** compress the image $x \in \mathbb{R}^{H \times W \times 3}$ to a latent
    $z \in \mathbb{R}^{H/8 \times W/8 \times 4}$ (8x spatial compression, 4 latent channels).
@@ -94,7 +94,8 @@ in seconds.
 
 **Text encoder:** Stable Diffusion 1.x uses CLIP ViT-L text encoder; SD 2.x uses OpenCLIP;
 SD 3 uses three text encoders (CLIP-L, OpenCLIP-G, and T5-XXL) whose embeddings are
-concatenated.
+concatenated. Conditioning on a large frozen language model (T5) for stronger text
+alignment was introduced by Imagen<FN n="3" />.
 
 ## SDXL and SD 3: scaling up
 
@@ -137,3 +138,9 @@ graph LR
 All three systems score high on CLIP and FID but differ substantially on human preference
 and compositional accuracy. Text rendering (letters in images) remains an active challenge,
 partially addressed by SD 3 and DALL-E 3.
+
+<Footnotes>
+  <FNItem n="1">**Ramesh, A., et al.** (2021). "Zero-shot text-to-image generation (DALL-E)". *ICML*. [arXiv:2102.12092](https://arxiv.org/abs/2102.12092)</FNItem>
+  <FNItem n="2">**Rombach, R., et al.** (2022). "High-resolution image synthesis with latent diffusion models (Stable Diffusion)". *CVPR*. [arXiv:2112.10752](https://arxiv.org/abs/2112.10752)</FNItem>
+  <FNItem n="3">**Saharia, C., et al.** (2022). "Photorealistic text-to-image diffusion models with deep language understanding (Imagen)". *NeurIPS*. [arXiv:2205.11487](https://arxiv.org/abs/2205.11487)</FNItem>
+</Footnotes>

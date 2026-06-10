@@ -12,7 +12,7 @@ prerequisites: []
 A **language model** assigns a probability to every sequence of tokens. That probability is the
 central object of NLP: generate text by sampling from it, score a candidate translation by evaluating
 it, measure how surprised a model is by a new document with it. Before neural networks, the canonical
-parameterization was the **n-gram model** -- simple, interpretable, and fast to build, but with
+parameterization was the **n-gram model**<FN ns="1, 2" />: simple, interpretable, and fast to build, but with
 fundamental structural limits that motivate every architecture that follows.
 
 ## The autoregressive factorization
@@ -24,7 +24,7 @@ $$
 p(x_1, \dots, x_T) = \prod_{t=1}^{T} p(x_t \mid x_{<t}).
 $$
 
-This factorization is exact -- no approximation so far. The challenge is representing
+This factorization is exact, no approximation so far. The challenge is representing
 $p(x_t \mid x_{<t})$, which in principle conditions on the entire prefix $x_1, \dots, x_{t-1}$.
 
 ## The Markov approximation
@@ -37,9 +37,9 @@ $$
 
 This is the **$(n-1)$th-order Markov assumption**. The special cases:
 
-- $n=1$ (unigram): $p(x_t)$ -- no context, just a bag-of-words distribution.
-- $n=2$ (bigram): $p(x_t \mid x_{t-1})$ -- conditions on one previous token.
-- $n=3$ (trigram): $p(x_t \mid x_{t-2}, x_{t-1})$ -- two-token context.
+- $n=1$ (unigram): $p(x_t)$, no context, just a bag-of-words distribution.
+- $n=2$ (bigram): $p(x_t \mid x_{t-1})$, conditions on one previous token.
+- $n=3$ (trigram): $p(x_t \mid x_{t-2}, x_{t-1})$, two-token context.
 
 ## Maximum-likelihood estimation
 
@@ -101,14 +101,14 @@ probability zero, so any test sentence containing an unseen bigram gets probabil
 infinite cross-entropy loss.
 
 **2. Parameter explosion.** For vocabulary size $V$ and order $n$, the table has $V^n$ entries.
-At $V = 50{,}000$ and $n = 3$: $1.25 \times 10^{14}$ entries -- impossible to store or estimate.
+At $V = 50{,}000$ and $n = 3$: $1.25 \times 10^{14}$ entries, impossible to store or estimate.
 
 **3. Fixed range.** The Markov assumption guarantees that any dependency spanning more than $n-1$
 tokens is invisible. The model can never resolve long-distance coreference or syntactic agreement.
 
 These limits are the structural motivation for neural language models.
 
-![Word frequencies follow Zipf's law — frequency falls roughly as 1/rank, a near-straight line on log-log axes. The long tail of rare words is why high-order n-grams hit unseen contexts and need smoothing.](/figures/E1/ngram-lm.svg)
+![Word frequencies follow Zipf's law: frequency falls roughly as 1/rank, a near-straight line on log-log axes. The long tail of rare words is why high-order n-grams hit unseen contexts and need smoothing.](/figures/E1/ngram-lm.svg)
 
 ## Perplexity
 
@@ -157,3 +157,8 @@ print(f"log p = {log_prob:.3f}, perplexity = {ppl:.2f}")
 
 The zero-probability problem is immediate: any unseen bigram sends log probability to $-\infty$.
 The next lesson introduces smoothing to fix this.
+
+<Footnotes>
+  <FNItem n="1">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). N-gram language models, the Markov assumption, and perplexity.</FNItem>
+  <FNItem n="2">**Manning, C. D., & Schütze, H.** (1999). *Foundations of Statistical Natural Language Processing.* MIT Press. Statistical n-gram estimation and evaluation.</FNItem>
+</Footnotes>

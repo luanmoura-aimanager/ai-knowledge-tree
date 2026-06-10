@@ -13,7 +13,7 @@ SFT teaches a model to follow instructions. But "good" is multidimensional -- re
 should be helpful, harmless, and honest, with tradeoffs between these properties that
 are hard to specify via demonstrations alone. A **reward model (RM)** captures human
 preferences as a scalar score, then acts as a differentiable proxy for human judgment
-during policy optimization.
+during policy optimization<FN n="1" />.
 
 ## Preference data collection
 
@@ -42,7 +42,7 @@ $$
 where $r(x, y)$ is the reward model's scalar output for response $y$ given prompt $x$,
 and $\sigma$ is the logistic sigmoid.
 
-The training objective is maximum likelihood on the preference dataset:
+The training objective is maximum likelihood on the preference dataset<FN n="2" />:
 
 $$
 \mathcal{L}_{\text{RM}} = -\mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma(r(x, y_w) - r(x, y_l)) \right].
@@ -55,7 +55,7 @@ large and positive for preferred responses.
 
 The RM is initialized from the **SFT model** (same transformer backbone), with one
 modification: the language model head is replaced by a linear layer projecting the final
-token's hidden state to a scalar:
+token's hidden state to a scalar<FN n="3" />:
 
 $$
 r(x, y) = \mathbf{w}^\top h_T(x \| y),
@@ -131,3 +131,12 @@ The trained reward model $r_\phi(x, y)$ is frozen and used to score policy rollo
 
 Step 4 is PPO (next lesson). The RM turns the non-differentiable human preference signal
 into a gradient signal the policy can be trained on.
+
+<Footnotes>
+  <FNItem n="1">**Christiano, P., et al.** (2017). "Deep reinforcement learning from human preferences".
+    *NeurIPS*. [arXiv:1706.03741](https://arxiv.org/abs/1706.03741). Introduced learning a reward model from human preference comparisons.</FNItem>
+  <FNItem n="2">**Stiennon, N., et al.** (2020). "Learning to summarize from human feedback".
+    *NeurIPS*. [arXiv:2009.01325](https://arxiv.org/abs/2009.01325). Trains a Bradley-Terry reward model on pairwise comparisons of summaries.</FNItem>
+  <FNItem n="3">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".
+    *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). Initializes the reward model from the SFT model with a scalar output head.</FNItem>
+</Footnotes>

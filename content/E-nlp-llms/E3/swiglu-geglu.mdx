@@ -11,7 +11,7 @@ prerequisites: ["transformer-block"]
 
 The position-wise feed-forward network (FFN) inside a transformer block is, in the
 original design, a two-layer MLP with a ReLU in the middle. Modern LLMs (PaLM, LLaMA,
-Mistral) replace it with a *gated* variant that consistently lowers loss at equal compute.
+Mistral) replace it with a *gated* variant that consistently lowers loss at equal compute<FN n="1" />.
 This lesson derives that variant and the width adjustment that makes the comparison fair.
 
 ## 1. The baseline FFN
@@ -130,3 +130,8 @@ difference between the architectures is a difference in *form*, not in size.
 
 Next, [multi-head latent attention](mla) attacks the other half of the block, compressing
 the attention KV cache the same way this lesson reshaped the FFN.
+
+<Footnotes>
+  <FNItem n="1">**Shazeer, N.** (2020). "GLU variants improve transformer (SwiGLU/GeGLU)".
+    [arXiv:2002.05202](https://arxiv.org/abs/2002.05202)</FNItem>
+</Footnotes>

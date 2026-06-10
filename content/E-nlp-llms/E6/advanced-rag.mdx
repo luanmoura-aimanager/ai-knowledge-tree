@@ -10,7 +10,7 @@ prerequisites: ["dense-retrieval"]
 codeExempt: true
 ---
 
-Basic RAG retrieves passages using a query embedding, then passes them to an LLM. Several
+Basic RAG retrieves passages using a query embedding, then passes them to an LLM<FN n="1" />. Several
 failure modes motivate extensions: query-document mismatch (the query is short and
 keyword-sparse while documents are verbose), poor passage ranking (relevant but non-top
 passages missed), and disconnected facts (answers requiring multi-hop reasoning across
@@ -50,7 +50,9 @@ $$
 
 The cross-encoder sees full interaction between query and document tokens, catching
 fine-grained relevance signals that the independent bi-encoder embeddings cannot.
-After reranking, keep top-$k'$ (e.g., $k'=5$) for the LLM context.
+After reranking, keep top-$k'$ (e.g., $k'=5$) for the LLM context. Fusion-in-Decoder
+encodes each retained passage separately and lets the decoder attend over the union,
+scaling generation quality with the number of passages kept<FN n="2" />.
 
 **Popular rerankers:** `BAAI/bge-reranker-large`, `cross-encoder/ms-marco-MiniLM-L-12-v2`,
 Cohere Rerank API.
@@ -134,3 +136,8 @@ RAG evaluation is a two-stage problem:
   relevance (does it answer the question?), context precision (is the retrieved context useful?).
 
 **RAGAS** (Shahul et al.) is a popular framework for all three metrics using LLM-as-judge.
+
+<Footnotes>
+  <FNItem n="1">**Lewis, P., et al.** (2020). "Retrieval-augmented generation for knowledge-intensive NLP tasks". *NeurIPS*. [arXiv:2005.11401](https://arxiv.org/abs/2005.11401). The basic retrieve-then-generate pipeline these techniques extend.</FNItem>
+  <FNItem n="2">**Izacard, G., & Grave, E.** (2021). "Leveraging passage retrieval with generative models for open-domain question answering". *EACL*. [arXiv:2007.01282](https://arxiv.org/abs/2007.01282). Fusion-in-Decoder, which improves with the number of retrieved passages.</FNItem>
+</Footnotes>

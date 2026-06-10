@@ -12,7 +12,7 @@ prerequisites: ["ngram-lm"]
 The MLE bigram assigns probability zero to any pair never seen in training. One unseen bigram
 in a test sentence collapses the entire sentence probability to zero and the perplexity to
 $+\infty$. **Smoothing** redistributes a portion of the probability mass from seen n-grams
-to unseen ones, so that every grammatical sentence receives a positive score.
+to unseen ones, so that every grammatical sentence receives a positive score<FN ns="2, 3" />.
 
 ## Laplace add-one smoothing
 
@@ -54,9 +54,9 @@ $\lambda(a)$ is redistributed to unseen bigrams by a **back-off** distribution.
 
 ## Kneser-Ney smoothing
 
-Kneser-Ney (KN) is the best-performing classical smoother; it was the standard for over a decade.
+Kneser-Ney (KN) is the best-performing classical smoother; it was the standard for over a decade<FN n="1" />.
 The key innovation is the back-off distribution $p_{\text{KN}}(b)$: instead of using the unigram
-frequency of $b$, use the **continuation probability** -- the number of distinct contexts in which
+frequency of $b$, use the **continuation probability**, the number of distinct contexts in which
 $b$ appears.
 
 $$
@@ -129,13 +129,19 @@ The MLE model returns $+\infty$ because "I like" was unseen. Add-one fixes this 
 of significant probability distortion: each seen bigram has its probability shrunk to allocate
 mass to the vast space of unseen events.
 
-![Maximum-likelihood n-gram estimates give unseen events probability 0 — fatal for a language model. Smoothing shaves mass off the seen events and redistributes it to the unseen ones.](/figures/E1/smoothing.svg)
+![Maximum-likelihood n-gram estimates give unseen events probability 0, fatal for a language model. Smoothing shaves mass off the seen events and redistributes it to the unseen ones.](/figures/E1/smoothing.svg)
 
 ## What smoothing cannot fix
 
 No smoothing method overcomes the **fixed-range** structural limit. Redistributing mass among
-unseen bigrams says nothing about *which* unseen bigrams are more likely -- that requires
+unseen bigrams says nothing about *which* unseen bigrams are more likely; that requires
 generalizing through the geometry of word representations, which is exactly what embedding-based
 neural models provide.
 
 The next lesson introduces BPE subword tokenization, which is a prerequisite for any neural LM.
+
+<Footnotes>
+  <FNItem n="1">**Chen, S. F., & Goodman, J.** (1999). "An empirical study of smoothing techniques for language modeling". *Computer Speech & Language*, 13(4), 359-394. The definitive comparison; establishes interpolated Kneser-Ney as the strongest classical method. [doi:10.1006/csla.1999.0128](https://doi.org/10.1006/csla.1999.0128)</FNItem>
+  <FNItem n="2">**Manning, C. D., & Schütze, H.** (1999). *Foundations of Statistical Natural Language Processing.* MIT Press. Discounting, back-off, and interpolation.</FNItem>
+  <FNItem n="3">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). Smoothing of n-gram models.</FNItem>
+</Footnotes>

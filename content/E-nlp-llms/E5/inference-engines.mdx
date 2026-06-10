@@ -18,7 +18,7 @@ open-source frameworks have emerged to solve this problem.
 ## vLLM
 
 **vLLM** (Kwon et al., UC Berkeley, 2023) introduced PagedAttention and continuous batching
-as open-source software. It is the most widely used open-source inference framework.
+as open-source software<FN n="1" />. It is the most widely used open-source inference framework.
 
 **Architecture:**
 - **Scheduler:** manages request queues, priorities, and prefill/decode batching.
@@ -43,7 +43,7 @@ for self-hosted models.
 **TGI** (Hugging Face) is the inference server used to power the Hugging Face Inference API.
 
 **Key features:**
-- Flash Attention 2 integration for memory-efficient attention.
+- Flash Attention 2 integration for memory-efficient attention<FN n="2" />.
 - Paged Attention (added after vLLM).
 - Continuous batching with token streaming.
 - Quantization: GPTQ, AWQ, bitsandbytes (8-bit, 4-bit).
@@ -118,4 +118,14 @@ heavy structured output requirements.
 where the engineering overhead of compilation is justified.
 
 The inference engine is invisible to end users but determines the cost and latency of
-every API call.
+every API call. The throughput these engines extract rests on the partitioning and
+memory-traffic analysis of large-model inference<FN n="3" />.
+
+<Footnotes>
+  <FNItem n="1">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention".
+    *SOSP*. [arXiv:2309.06180](https://arxiv.org/abs/2309.06180). The vLLM system paper.</FNItem>
+  <FNItem n="2">**Dao, T., Fu, D., Ermon, S., Rudra, A., & Ré, C.** (2022). "FlashAttention: fast and memory-efficient exact attention with IO-awareness".
+    *NeurIPS*. [arXiv:2205.14135](https://arxiv.org/abs/2205.14135). The IO-aware fused attention kernel these servers build on.</FNItem>
+  <FNItem n="3">**Pope, R., et al.** (2023). "Efficiently scaling transformer inference".
+    *MLSys*. [arXiv:2211.05102](https://arxiv.org/abs/2211.05102). Partitioning strategies and the latency/throughput tradeoffs of serving large transformers.</FNItem>
+</Footnotes>

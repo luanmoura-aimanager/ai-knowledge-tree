@@ -14,8 +14,9 @@ this requires $70 \times 10^9 \times 2 \approx 140$GB of gradient memory alone -
 beyond a single GPU and impractical for most users.
 
 **Parameter-efficient fine-tuning (PEFT)** methods update only a small subset of
-parameters while freezing the rest. **LoRA (Hu et al., 2022)** is the dominant method:
-it injects small, trainable rank-decomposition matrices alongside each frozen weight matrix.
+parameters while freezing the rest, a practical necessity for the supervised and preference
+fine-tuning stages<FN n="1" />. **LoRA (Hu et al., 2022)** is the dominant method:
+it injects small, trainable rank-decomposition matrices alongside each frozen weight matrix<FN n="2" />.
 
 ## LoRA: Low-Rank Adaptation
 
@@ -152,7 +153,7 @@ $$
 DoRA consistently outperforms LoRA at the same rank, approaching full fine-tuning quality
 at ranks as low as $r = 16$.
 
-![LoRA freezes the weight matrix and learns a low-rank update ΔW = BA, so trainable parameters are 2·d·r instead of d² — a few percent even at generous ranks.](/figures/E4/lora.svg)
+![LoRA freezes the weight matrix and learns a low-rank update ΔW = BA, so trainable parameters are 2·d·r instead of d², a few percent even at generous ranks.](/figures/E4/lora.svg)
 
 ## Merging LoRA weights
 
@@ -165,3 +166,10 @@ $$
 No runtime overhead during inference -- the merged weight is identical in shape to $W_0$.
 Multiple LoRA adapters (for different tasks) can be merged independently or combined
 with task weights (LoRAHub).
+
+<Footnotes>
+  <FNItem n="1">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".
+    *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). The supervised and preference fine-tuning stages LoRA makes parameter-efficient.</FNItem>
+  <FNItem n="2">**Hu, E. J., et al.** (2021). "LoRA: low-rank adaptation of large language models".
+    *ICLR*. [arXiv:2106.09685](https://arxiv.org/abs/2106.09685). The frozen-base, low-rank adapter method and its scaling-factor parameterization.</FNItem>
+</Footnotes>

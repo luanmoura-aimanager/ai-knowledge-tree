@@ -12,7 +12,7 @@ codeExempt: true
 
 Training a large language model begins before a single gradient is computed: with
 **data curation**. The quality and composition of the pretraining corpus is one of the
-largest determinants of model capability, often more important than architectural choices.
+largest determinants of model capability, often more important than architectural choices<FN n="1" />.
 
 ## Sources
 
@@ -61,7 +61,7 @@ sensitive hashing (LSH) finds approximate near-duplicates in $O(N)$ rather than 
 **Exact deduplication.** SHA-256 hashes of document text; remove identical documents.
 
 The Chinchilla paper found that deduplication improved data quality enough to shift the
-optimal data mix significantly -- 1T deduplicated tokens is worth more than 2T raw tokens.
+optimal data mix significantly -- 1T deduplicated tokens is worth more than 2T raw tokens<FN n="2" />.
 
 ## Domain mixing
 
@@ -109,3 +109,10 @@ compute on padding tokens.
 
 For long documents that span multiple chunks, the model never sees the document boundary
 across chunks (gradient is not backpropagated across chunk boundaries in most implementations).
+
+<Footnotes>
+  <FNItem n="1">**Brown, T., et al.** (2020). "Language models are few-shot learners (GPT-3)".
+    *NeurIPS*. [arXiv:2005.14165](https://arxiv.org/abs/2005.14165). Trained on a curated, filtered, and weighted mixture of Common Crawl, WebText, Books, and Wikipedia.</FNItem>
+  <FNItem n="2">**Hoffmann, J., et al.** (2022). "Training compute-optimal large language models (Chinchilla)".
+    *NeurIPS*. [arXiv:2203.15556](https://arxiv.org/abs/2203.15556). Source of the deduplication and data-quality findings discussed here.</FNItem>
+</Footnotes>

@@ -15,7 +15,7 @@ improves model quality. A complementary axis: spending more compute at **inferen
 
 **Test-time compute scaling** (Snell et al., 2024; Lightman et al., 2023) shows that with
 the right search algorithms and verifiers, allocating more inference FLOPs can match the
-gains from training a much larger model.
+gains from training a much larger model<FN n="1" />.
 
 ## Why test-time compute helps
 
@@ -24,7 +24,7 @@ inference step. A 100-step chain of thought uses 100x more inference compute tha
 one-token answer -- and as CoT demonstrated, this extra compute improves accuracy.
 
 Test-time compute scaling extends this: instead of one linear chain of thought, search
-over a **tree** of reasoning paths. More compute = explore more branches = higher
+over a **tree** of reasoning paths<FN n="2" />. More compute = explore more branches = higher
 probability of finding the correct answer.
 
 ## Process reward models (PRMs)
@@ -126,4 +126,9 @@ verifiable math and code rewards. Key insights:
 
 Snell et al. (2024) show that compute-matched comparisons favor test-time scaling for
 math: a small model with best-of-N can match a large model trained with much more compute,
-as long as a verifier is available.
+as long as a verifier is available<FN n="1" />.
+
+<Footnotes>
+  <FNItem n="1">**Snell, C., Lee, J., Xu, K., & Kumar, A.** (2024). "Scaling LLM test-time compute optimally can be more effective than scaling model parameters". [arXiv:2408.03314](https://arxiv.org/abs/2408.03314). The compute-matched argument for best-of-N and search over verifiers.</FNItem>
+  <FNItem n="2">**Yao, S., et al.** (2023). "Tree of thoughts: deliberate problem solving with large language models". *NeurIPS*. [arXiv:2305.10601](https://arxiv.org/abs/2305.10601). Searching over a tree of reasoning paths rather than one linear chain.</FNItem>
+</Footnotes>

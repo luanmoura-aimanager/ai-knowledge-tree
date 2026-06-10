@@ -12,7 +12,7 @@ prerequisites: ["word2vec"]
 Skip-gram trains on individual (center, context) pairs sampled sequentially. The same
 co-occurrence information is already summarized in the word-word **co-occurrence matrix** --
 if we could fit directly to that matrix, we could exploit global statistics in one shot.
-**GloVe** (Global Vectors) does exactly this.
+**GloVe** (Global Vectors) does exactly this<FN n="1" />.
 
 ## GloVe: global co-occurrence
 
@@ -116,8 +116,8 @@ Word2vec and GloVe treat each word as an atomic unit. This breaks on:
   embeddings with no guaranteed similarity.
 - **Out-of-vocabulary (OOV)**: a word not in the training vocabulary gets no embedding.
 
-**fastText** (Bojanowski et al., 2017) represents each word as the sum of its **character
-n-gram** embeddings plus its full-word embedding.
+**fastText** (Bojanowski et al., 2017)<FN n="2" /> represents each word as the sum of its
+**character n-gram** embeddings plus its full-word embedding.
 
 For word $w$ with character n-grams $\mathcal{G}_w$ (for $n \in [3, 6]$):
 
@@ -181,3 +181,8 @@ graph LR
 All three produce **static** embeddings -- one vector per word type. The next lesson
 introduces RNNs, which produce a hidden state that reads the entire sequence and can be
 used to build the first contextual representations.
+
+<Footnotes>
+  <FNItem n="1">**Pennington, J., Socher, R., & Manning, C. D.** (2014). "GloVe: global vectors for word representation". *EMNLP*. [doi:10.3115/v1/D14-1162](https://doi.org/10.3115/v1/D14-1162). The log-bilinear objective and weighting function.</FNItem>
+  <FNItem n="2">**Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T.** (2017). "Enriching word vectors with subword information". *TACL*, 5, 135-146. [arXiv:1607.04606](https://arxiv.org/abs/1607.04606). The fastText subword model.</FNItem>
+</Footnotes>

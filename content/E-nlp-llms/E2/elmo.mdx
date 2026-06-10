@@ -11,7 +11,7 @@ prerequisites: ["lstm-gru"]
 
 Word2vec assigns a single vector to each word type, regardless of context. "Bank" in "river
 bank" and "bank" in "central bank" receive the same embedding. **ELMo** (Embeddings from
-Language Models; Peters et al., 2018) produces **contextual embeddings**: the representation
+Language Models; Peters et al., 2018)<FN n="1" /> produces **contextual embeddings**: the representation
 of each token depends on the entire surrounding sentence.
 
 ## Bidirectional language model
@@ -23,7 +23,7 @@ one reading left-to-right, one reading right-to-left.
 
 **Backward LM:** $p(x_1, \dots, x_T) = \prod_t p(x_t \mid x_{t+1}, \dots, x_T)$.
 
-Each LM is an $L$-layer stacked LSTM. The joint log-likelihood:
+Each LM is an $L$-layer stacked LSTM<FN n="2" />. The joint log-likelihood:
 
 $$
 \mathcal{L} = \sum_t \left[ \log p(x_t \mid x_{<t}; \Theta_{\text{fwd}}) + \log p(x_t \mid x_{>t}; \Theta_{\text{bwd}}) \right].
@@ -121,3 +121,8 @@ and only concatenated; they never jointly attend to the full context at each lay
 BERT (E3) fixes this with a Transformer encoder trained with **masked language modeling** --
 the model predicts randomly masked tokens using bidirectional attention in every layer, not
 just at the output.
+
+<Footnotes>
+  <FNItem n="1">**Peters, M. E., et al.** (2018). "Deep contextualized word representations". *NAACL*. [arXiv:1802.05365](https://arxiv.org/abs/1802.05365). Introduces ELMo and the task-specific layer weighting.</FNItem>
+  <FNItem n="2">**Hochreiter, S., & Schmidhuber, J.** (1997). "Long short-term memory". *Neural Computation*, 9(8), 1735-1780. [doi:10.1162/neco.1997.9.8.1735](https://doi.org/10.1162/neco.1997.9.8.1735). The LSTM backbone of the biLM.</FNItem>
+</Footnotes>
