@@ -14,7 +14,7 @@ yesterday's orders" must finish before "join orders with customers," which must
 finish before "compute daily revenue features." An **orchestrator** (Airflow,
 Dagster, Prefect) is the system that knows this dependency structure, runs each
 task only after its inputs are ready, retries failures, and lets you rerun a past
-date. Three ideas make that possible: the dependency graph, a schedule derived
+date<FN n="1" />. Three ideas make that possible: the dependency graph, a schedule derived
 from it, and idempotency.
 
 ## A pipeline is a directed acyclic graph
@@ -70,7 +70,7 @@ doubles those rows if it runs twice. A task that *replaces the partition* for
 yesterday's date (delete-then-write, or an upsert keyed by date) leaves the same
 state no matter how many times it runs. Idempotency is what makes "just rerun it"
 a safe instruction rather than a data-corruption risk, and it is the single most
-important property of a well-built pipeline task.
+important property of a well-built pipeline task<FN n="2" />.
 
 ## Worked example
 
@@ -132,3 +132,8 @@ append leaves six rows after a single retry, the partition-replace leaves the
 correct three. With a safe-to-rerun task graph in hand, the next lesson serves
 those features consistently to training and inference through a
 [feature store](feature-stores).
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Orchestration, scheduling, and the role of DAG-based workflow systems.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Idempotence and the reliability of retried, replayed operations.</FNItem>
+</Footnotes>

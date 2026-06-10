@@ -17,7 +17,7 @@ catalog of trained-model **artifacts**, each one immutable and versioned, with a
 small set of named **stages** (typically `None` → `Staging` → `Production` →
 `Archived`) that a model moves through. Deployment becomes a metadata operation,
 move version 7 to `Production`, rather than a rebuild, and that one indirection
-buys auditability and instant rollback.
+buys auditability and instant rollback<FN n="1" />.
 
 ## A version is an immutable artifact, not a file
 
@@ -59,6 +59,11 @@ checks must pass before a version advances. A model entering `Staging` runs the
 test suite of the [next lesson](I2/ml-cicd), schema validation, a behavioral
 threshold on a held-out set, before any traffic depends on it. The registry is
 the spine that those checks hang off: it gives every candidate a stable identity
-to test, promote, serve, and, when something regresses, fall back from. The next
+to test, promote, serve, and, when something regresses, fall back from<FN n="2" />. The next
 lesson builds the [CI/CD pipeline](I2/ml-cicd) that decides whether a registered
 version is allowed through the gate.
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Model versioning, staged promotion, and deployment as a metadata operation.</FNItem>
+  <FNItem n="2">**Sculley, D., et al.** (2015). "Hidden technical debt in machine learning systems". *NeurIPS*. Undeclared model dependencies and the value of a stable, auditable artifact identity.</FNItem>
+</Footnotes>

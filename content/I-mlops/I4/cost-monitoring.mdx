@@ -15,7 +15,7 @@ ships. A single large model can cost dollars per hour per GPU, and a product can
 make millions of calls a day, so a tenth of a cent per request is the difference
 between a viable product and an unsustainable one. **Cost monitoring** treats cost
 per request like an [SLI](slos-and-error-budgets): measured, tracked, and budgeted.
-The unit that makes it tractable is the **token**.
+The unit that makes it tractable is the **token**<FN n="1" />.
 
 ## From hardware cost to cost per token
 
@@ -33,7 +33,7 @@ you win directly lowers unit cost. This is the economic restatement of the
 [serving](I3/llm-serving) lesson. Continuous batching and a well-sized KV cache
 raise $r$, and through this formula a higher $r$ shows up immediately as a cheaper
 token. Batching is not only a latency-throughput tradeoff; it is the main lever on
-the bill.
+the bill<FN n="2" />.
 
 ## Cost per request
 
@@ -110,3 +110,8 @@ subsection and pillar I: a model trained on versioned data, tuned and trained on
 shared infrastructure, served under a latency budget, and now watched for drift,
 safety, and cost in production. The applied glue that ties these systems into a
 shipped product is the subject of pillar J, AI Engineering.
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Treating compute cost as a tracked, budgeted operational metric (Ch. 8-10).</FNItem>
+  <FNItem n="2">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention". *SOSP*. [arXiv:2309.06180](https://arxiv.org/abs/2309.06180) Throughput gains from batching and KV-cache management that set cost per token.</FNItem>
+</Footnotes>

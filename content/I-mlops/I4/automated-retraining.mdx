@@ -14,7 +14,7 @@ it does not tell you what to do about it. The answer is **retraining**, fitting 
 fresh model on recent data, but retraining is not free, and retraining blindly is
 its own failure mode. This lesson treats retraining as a *decision*: when the
 accumulated cost of a stale model exceeds the cost of refreshing it, you retrain,
-and you choose the **trigger** that fires that decision automatically.
+and you choose the **trigger** that fires that decision automatically<FN n="1" />.
 
 ## When is retraining worth it?
 
@@ -53,7 +53,7 @@ week and misses a sudden shift. A **drift-based** trigger instead fires when the
 [drift statistic](I1/drift-detection) (KS or PSI) or a monitored performance
 metric crosses a threshold, adapting to *when the world actually moves*. Mature
 pipelines combine both: a drift trigger for shocks plus a scheduled floor so the
-model never goes stale during a long, low-drift stretch.
+model never goes stale during a long, low-drift stretch<FN n="2" />.
 
 ## Don't trust the challenger blindly
 
@@ -98,3 +98,8 @@ The same machinery that *detected* decay now *schedules* the response and the
 [champion-challenger gate](I2/ml-cicd) keeps a bad refresh from reaching users.
 That closes the production loop, data → training → serving → monitoring →
 retraining, that the whole [Machine Learning Engineer path](/) is built around.
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Retraining as a cost decision and continual-learning cadence (Ch. 9).</FNItem>
+  <FNItem n="2">**Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M., & Bouchachia, A.** (2014). "A survey on concept drift adaptation". *ACM Computing Surveys*, 46(4), 1-37. [doi:10.1145/2523813](https://doi.org/10.1145/2523813) Scheduled vs drift-triggered adaptation strategies.</FNItem>
+</Footnotes>

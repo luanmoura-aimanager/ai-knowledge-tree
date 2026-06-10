@@ -23,7 +23,7 @@ output carries far more information than the single correct label. A teacher tha
 classifies an image as "dog" with $82\%$ confidence but puts $11\%$ on "wolf" and
 $5\%$ on "cat" is telling the student that dogs look more like wolves than cats,
 **dark knowledge** that a hard one-hot label ("dog", everything else zero) throws
-away.
+away<FN n="1" />.
 
 To expose it, soften the teacher's output with a **temperature** $T$ in the
 softmax. For logits $z_j$, the softened probability of class $j$ is
@@ -56,7 +56,7 @@ than removing weights at random. The damage is real but recoverable: a short
 **fine-tune** after pruning lets the surviving weights adjust to compensate, which
 is the [regularization](D/regularization)-flavored second half of every practical
 pruning recipe. Aggressive pruning followed by fine-tuning can remove a large
-fraction of weights for little quality loss.
+fraction of weights for little quality loss<FN n="2" />.
 
 ![Pruning removes weights to shrink and speed up a model: accuracy holds nearly flat while redundant weights go, then falls off a cliff once too much capacity is removed. The sweet spot is the knee just before the drop.](/figures/I3/distillation-pruning.svg)
 
@@ -110,3 +110,8 @@ pruning at $50\%$ sparsity perturbs the output far less than random pruning of t
 same count. These techniques assume a cloud GPU as the target; the last lesson of
 the subsection asks what changes when the model must run on a phone, in
 [edge deployment](edge-deployment).
+
+<Footnotes>
+  <FNItem n="1">**Hinton, G., Vinyals, O., & Dean, J.** (2015). "Distilling the knowledge in a neural network". *NeurIPS Workshop*. [arXiv:1503.02531](https://arxiv.org/abs/1503.02531) Introduces temperature-softened soft targets and "dark knowledge".</FNItem>
+  <FNItem n="2">**Han, S., Mao, H., & Dally, W. J.** (2016). "Deep compression: compressing deep neural networks with pruning, trained quantization and Huffman coding". *ICLR*. [arXiv:1510.00149](https://arxiv.org/abs/1510.00149) Magnitude pruning with fine-tuning recovery.</FNItem>
+</Footnotes>

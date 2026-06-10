@@ -13,7 +13,7 @@ Training a model is an experiment, and an experiment that cannot be reproduced i
 not a result. A month after a promising run you will want to ask: what data was
 this trained on, what hyperparameters, what code, and can I get the same number
 again? **Experiment tracking** (Weights & Biases, MLflow) answers those questions
-by recording, for every run, the full set of *inputs* and *outputs*. The discipline
+by recording, for every run, the full set of *inputs* and *outputs*<FN n="1" />. The discipline
 behind it is **lineage**: a run's metric is reproducible only if everything that
 fed into it was captured.
 
@@ -47,7 +47,7 @@ shapes the update. Change the data version while keeping the seed, and the same
 random draws act on different data, producing a different result. The seed is one
 input among several; reproducibility requires pinning the whole tuple. This is
 precisely the lineage record, and it is what lets a tracker say "rerun this exact
-experiment" and mean it.
+experiment" and mean it<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -103,3 +103,8 @@ different data versions, which is exactly why a tracker logs the data hash besid
 the seed. With runs now individually reproducible, the next question is how to
 *choose* the config in the first place, the [hyperparameter search](hyperparameter-search)
 problem.
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Experiment tracking, lineage, and the inputs a run must log to be reproducible.</FNItem>
+  <FNItem n="2">**Sculley, D., et al.** (2015). "Hidden technical debt in machine learning systems". *NeurIPS*. Reproducibility debt and the tangle of undocumented configuration and data dependencies.</FNItem>
+</Footnotes>

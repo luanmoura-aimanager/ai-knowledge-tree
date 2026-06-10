@@ -14,7 +14,7 @@ The reliability discipline (from Google's SRE practice) gives three: a measurabl
 **indicator** of quality, a **target** for it, and the **budget** of failures the
 target permits. Together they convert "the service should be fast and available"
 into something you can monitor, alert on, and make decisions against, including the
-decision of whether you can afford to ship a risky change this week.
+decision of whether you can afford to ship a risky change this week<FN n="1" />.
 
 ## SLI and SLO
 
@@ -71,7 +71,7 @@ A burn rate of $14.4$ over an hour would, if sustained, burn a whole $30$-day bu
 in about two days, which is why fast-burn alerts fire on multiples like that. Tying
 alerts to burn rate rather than to raw error counts means you page a human when the
 *budget* is genuinely threatened, not on every transient blip, which is the cure
-for alert fatigue.
+for alert fatigue<FN n="2" />.
 
 ![An error budget is the failure a target allows (a 99.9% SLO permits 0.1% errors); it burns down as errors occur, and a steep burn from an incident eats the month's budget early, signaling that reliability work must take priority.](/figures/I4/slos-and-error-budgets.svg)
 
@@ -114,3 +114,8 @@ times the rate and trips the fast-burn alert. This whole machinery assumes you c
 *tell* a good event from a bad one promptly; for a model's *accuracy*, the labels
 that decide "good" often arrive late or never, which is the
 [production-drift](production-drift) problem.
+
+<Footnotes>
+  <FNItem n="1">**Beyer, B., Jones, C., Petoff, J., & Murphy, N. R.** (2016). *Site Reliability Engineering: How Google Runs Production Systems.* O'Reilly. SLIs, SLOs, and error budgets (Ch. 3-4).</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Monitoring, alerting, and burn-rate-style triggers for ML services (Ch. 8).</FNItem>
+</Footnotes>

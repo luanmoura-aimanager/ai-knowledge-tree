@@ -16,7 +16,7 @@ training, and accuracy quietly collapses. A **feature store** exists to guarante
 they agree, and to solve a subtler problem in building the training set itself:
 computing a feature's value *as it was at the moment of each training example*,
 not as it is now. That second problem, **point-in-time correctness**, is where
-most label leakage in tabular ML hides.
+most label leakage in tabular ML hides<FN n="1" />.
 
 ## Two stores, one definition
 
@@ -40,7 +40,7 @@ graph TD
 
 Because both stores are populated from the *same* definition, the value a model
 trains on and the value it serves on are computed by identical logic. Eliminating
-that gap, called **training-serving skew**, is the feature store's first job.
+that gap, called **training-serving skew**, is the feature store's first job<FN n="2" />.
 
 ## The point-in-time problem
 
@@ -107,3 +107,8 @@ model could never have at those dates; the point-in-time join recovers $2$ on da
 and the online lookups now reflect feature values that genuinely existed at the
 time, which only matters if you can also reproduce *which* historical data went
 into them: that reproducibility is the job of [data versioning](data-versioning).
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Feature stores, point-in-time joins, and the leakage they prevent.</FNItem>
+  <FNItem n="2">**Sculley, D., et al.** (2015). "Hidden technical debt in machine learning systems". *NeurIPS*. Training-serving skew and the data dependencies that accrue technical debt.</FNItem>
+</Footnotes>

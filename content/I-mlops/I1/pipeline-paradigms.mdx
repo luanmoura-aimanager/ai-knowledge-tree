@@ -50,7 +50,7 @@ nothing to reprocess from. ELT keeps the raw data, so any transform can be
 rerun or added later against the original, at the cost of storing everything and
 pushing heavy compute into the warehouse. Cheap cloud storage and fast warehouses
 made ELT the default for analytics and ML, precisely because **keeping the raw
-data is what lets you recompute features when the model's needs change**.
+data is what lets you recompute features when the model's needs change**<FN n="1" />.
 
 ## Axis 2: when the data moves
 
@@ -66,7 +66,7 @@ up to a day stale.
 arrives, maintaining continuously-updated state. It delivers fresh results with
 sub-second latency, which a fraud or recommendation model may genuinely need, but
 the engineering is harder: the input is an unbounded stream, records can arrive
-late or out of order, and "rerun it" no longer has an obvious meaning.
+late or out of order, and "rerun it" no longer has an obvious meaning<FN n="2" />.
 
 The two axes are independent. A nightly ELT job that loads raw events and rebuilds
 feature tables is *batch ELT*. A streaming job that cleans events and writes
@@ -91,3 +91,8 @@ Two questions settle most designs:
 These choices set up the rest of the discipline: a pipeline is a graph of tasks
 that has to be scheduled, retried, and backfilled, which is the
 [orchestration](orchestration-dags) problem the next lesson takes up.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Batch and stream processing systems, and the storage-versus-recomputation trade behind ETL and ELT.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. The data-engineering lifecycle: batch vs streaming ingestion and where transformation belongs.</FNItem>
+</Footnotes>

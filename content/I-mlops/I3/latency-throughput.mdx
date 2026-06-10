@@ -31,7 +31,7 @@ not the average: optimizing the average can leave a miserable tail untouched.
 ## Little's law
 
 The three quantities are tied together by **Little's law**, a result that holds
-for any stable queueing system regardless of its internals. Let $L$ be the average
+for any stable queueing system regardless of its internals<FN n="1" />. Let $L$ be the average
 number of requests *in the system* at once (the concurrency), $\lambda$ the average
 **throughput** (requests arriving and completing per second), and $W$ the average
 **latency** (time a request spends in the system). Then
@@ -68,7 +68,7 @@ $$
 which **increases** with $b$ toward the ceiling $1/c_1$ as the fixed cost is spread
 ever thinner. But a request in a batch waits for the whole batch to finish, so its
 latency is about $T(b)$, which **increases** with $b$. Bigger batches buy
-throughput and pay in latency. The serving engineer's job is to choose the largest
+throughput and pay in latency<FN n="2" />. The serving engineer's job is to choose the largest
 batch whose $T(b)$ still fits inside the $p99$ latency target, which is precisely
 the tension that [LLM serving](llm-serving) must manage dynamically.
 
@@ -114,3 +114,8 @@ requirement, and the batch sweep shows throughput climbing toward $1/c_1$ while
 per-request latency climbs with it. Autoregressive models complicate this picture,
 because each request is not one forward pass but a *loop* of them, which the next
 lesson on [LLM serving](llm-serving) takes on.
+
+<Footnotes>
+  <FNItem n="1">**Little, J. D. C.** (1961). "A proof for the queuing formula: L = λW". *Operations Research*, 9(3), 383-387. [doi:10.1287/opre.9.3.383](https://doi.org/10.1287/opre.9.3.383)</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Model serving, batching, and the latency/throughput tradeoff (Ch. 7).</FNItem>
+</Footnotes>
