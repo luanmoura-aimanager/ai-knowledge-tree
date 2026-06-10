@@ -11,7 +11,7 @@ prerequisites: ["F1/bayesian-networks", "A2/bayes-rule"]
 
 Speech recognition, genomics, and financial regime detection all share a structure:
 an underlying latent process evolves over time, and we observe noisy emissions.
-The **Hidden Markov Model** (HMM) is the simplest formal treatment of this situation.
+The **Hidden Markov Model** (HMM) is the simplest formal treatment of this situation<FN n="1" />.
 
 ## HMM structure
 
@@ -70,7 +70,7 @@ $$
 
 ## Viterbi decoding
 
-The Viterbi algorithm finds the single most probable state sequence:
+The Viterbi algorithm finds the single most probable state sequence<FN n="2" />:
 
 $$
 Z^*_{1:T} = \arg\max_{Z_{1:T}} P(Z_{1:T} \mid X_{1:T}).
@@ -86,7 +86,7 @@ $$
 
 Backtrack from $\arg\max_k \delta_T(k)$ using $\psi$.
 
-![The forward algorithm filters a hidden state from noisy observations, maintaining a running posterior P(state | observations so far) — here the belief tracks the true (shaded) two-state sequence, lagging slightly at each switch.](/figures/F3/hidden-markov-models.svg)
+![The forward algorithm filters a hidden state from noisy observations, maintaining a running posterior P(state | observations so far); here the belief tracks the true (shaded) two-state sequence, lagging slightly at each switch.](/figures/F3/hidden-markov-models.svg)
 
 ## Implementation
 
@@ -164,3 +164,8 @@ print(f"Viterbi states: {z_viterbi}")
 Viterbi is often more interpretable than the marginal posteriors: it gives a single consistent sequence rather than per-step mode estimates, which can be inconsistent across time steps.
 
 The next lesson extends the HMM to continuous Gaussian states, yielding the Kalman filter.
+
+<Footnotes>
+  <FNItem n="1">**Rabiner, L. R.** (1989). "A tutorial on hidden Markov models and selected applications in speech recognition". *Proceedings of the IEEE*, 77(2), 257-286. [doi:10.1109/5.18626](https://doi.org/10.1109/5.18626)</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 13. Springer. Forward-backward and Viterbi as instances of the sum-product and max-sum algorithms.</FNItem>
+</Footnotes>

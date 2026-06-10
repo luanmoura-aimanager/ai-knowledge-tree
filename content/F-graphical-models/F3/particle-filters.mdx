@@ -13,7 +13,7 @@ When the state-space model is nonlinear or the noise is non-Gaussian, the Kalman
 fails to stay Gaussian: the true posterior $P(z_t \mid x_{1:t})$ is an arbitrary
 distribution that cannot be tracked in closed form.
 **Particle filters** (sequential Monte Carlo) approximate this distribution with a
-weighted set of samples called **particles**.
+weighted set of samples called **particles**<FN n="1" />.
 
 ## Sequential importance sampling
 
@@ -57,7 +57,7 @@ restoring equal weights. It should trigger when $N_\text{eff}$ drops below $N/2$
 **Systematic resampling** uses a single uniform draw $u \sim \text{Uniform}(0, 1/N)$
 and selects $N$ equally spaced points $u, u + 1/N, \ldots, u + (N-1)/N$ along the
 cumulative weight distribution.
-This achieves $O(N)$ complexity and lower variance than multinomial resampling.
+This achieves $O(N)$ complexity and lower variance than multinomial resampling<FN n="2" />.
 
 ## Sequential importance resampling (SIR)
 
@@ -133,3 +133,8 @@ The particle filter tracks the highly nonlinear dynamics where the Kalman filter
 
 The next subsection turns to exact inference algorithms for general graphical models,
 starting with variable elimination.
+
+<Footnotes>
+  <FNItem n="1">**Arulampalam, M. S., Maskell, S., Gordon, N., & Clapp, T.** (2002). "A tutorial on particle filters for online nonlinear/non-Gaussian Bayesian tracking". *IEEE Transactions on Signal Processing*, 50(2), 174-188. [doi:10.1109/78.978374](https://doi.org/10.1109/78.978374)</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 13. Springer. Sequential importance sampling and the resampling step for sequential data.</FNItem>
+</Footnotes>

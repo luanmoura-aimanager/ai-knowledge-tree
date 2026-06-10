@@ -13,7 +13,7 @@ Mean-field VI and Gaussian encoders limit the variational family to simple, unim
 distributions.
 **Normalizing flows** compose a series of invertible transformations to map a simple
 base distribution into a rich, complex posterior, while keeping the log-density tractable
-via the change-of-variables formula.
+via the change-of-variables formula<FN n="1" />.
 
 ## Change-of-variables formula
 
@@ -57,7 +57,7 @@ so $|\det J| = |1 + u^\top (h'(w^\top z + b) w)|$.
 
 ## ELBO with flow posterior
 
-The ELBO using a $K$-step flow as variational posterior is:
+The ELBO using a $K$-step flow as variational posterior is<FN n="2" />:
 
 $$
 \mathcal{L} = \mathbb{E}_{q_0(z_0)}\!\left[
@@ -138,3 +138,8 @@ making the ELBO gradient tractable.
 
 The next subsection covers sampling methods that explore the posterior by simulation
 rather than optimization, starting with the foundational rejection and importance sampling.
+
+<Footnotes>
+  <FNItem n="1">**Rezende, D. J., & Mohamed, S.** (2015). "Variational inference with normalizing flows". *ICML*. [arXiv:1505.05770](https://arxiv.org/abs/1505.05770). Introduces flow posteriors and the planar flow.</FNItem>
+  <FNItem n="2">**Kingma, D. P., & Welling, M.** (2014). "Auto-encoding variational bayes (VAE)". *ICLR*. [arXiv:1312.6114](https://arxiv.org/abs/1312.6114). The amortized ELBO that the flow posterior tightens.</FNItem>
+</Footnotes>

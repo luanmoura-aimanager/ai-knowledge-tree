@@ -11,7 +11,7 @@ prerequisites: ["mean-field-vi"]
 
 CAVI processes the full dataset at each update step: its cost scales linearly with $N$.
 **Stochastic variational inference** (SVI) makes VI practical at scale by estimating the
-ELBO gradient on random mini-batches and applying stochastic gradient ascent.
+ELBO gradient on random mini-batches and applying stochastic gradient ascent<FN n="1" />.
 
 ## Mini-batch ELBO
 
@@ -57,7 +57,7 @@ $$
 $$
 
 This **pathwise estimator** has much lower variance than the score-function estimator
-because the gradient passes through $f$ directly rather than through $\log q$.
+because the gradient passes through $f$ directly rather than through $\log q$<FN n="2" />.
 
 ## Score-function estimator (REINFORCE)
 
@@ -72,7 +72,7 @@ This holds for any $q_\phi$ (no reparameterizability required), but the variance
 typically orders of magnitude higher than the reparameterization trick.
 Control variates (baselines) reduce variance at the cost of additional code complexity.
 
-![Stochastic VI optimizes the ELBO with noisy mini-batch gradients — it climbs toward the optimum quickly but rattles around it, unlike the smooth full-batch ascent.](/figures/F5/stochastic-vi.svg)
+![Stochastic VI optimizes the ELBO with noisy mini-batch gradients: it climbs toward the optimum quickly but rattles around it, unlike the smooth full-batch ascent.](/figures/F5/stochastic-vi.svg)
 
 ## Implementation
 
@@ -126,3 +126,8 @@ low-variance, unbiased gradient estimates through the stochastic node.
 
 The next lesson replaces the per-datapoint variational parameters with a shared encoder
 network, which is the amortized VI strategy behind VAEs.
+
+<Footnotes>
+  <FNItem n="1">**Hoffman, M. D., Blei, D. M., Wang, C., & Paisley, J.** (2013). "Stochastic variational inference". *JMLR*, 14, 1303-1347. Introduces mini-batch ELBO updates for VI at scale.</FNItem>
+  <FNItem n="2">**Blei, D. M., Kucukelbir, A., & McAuliffe, J. D.** (2017). "Variational inference: a review for statisticians". *JASA*, 112(518), 859-877. [arXiv:1601.00670](https://arxiv.org/abs/1601.00670). Reviews pathwise and score-function gradient estimators.</FNItem>
+</Footnotes>

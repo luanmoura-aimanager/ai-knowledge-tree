@@ -14,7 +14,7 @@ a structure: given an observed input sequence $\mathbf{x} = (x_1, \ldots, x_T)$,
 predict an output label sequence $\mathbf{y} = (y_1, \ldots, y_T)$.
 A **conditional random field** (CRF) models $P(\mathbf{y} \mid \mathbf{x})$ directly,
 without modeling $P(\mathbf{x})$, which is the discriminative advantage over generative
-HMMs.
+HMMs<FN ns="1, 2" />.
 
 ## Linear-chain CRF
 
@@ -42,7 +42,7 @@ programming structure.
 ## Forward algorithm for the partition function
 
 Naively summing over all $|\mathcal{Y}|^T$ label sequences to compute $Z(\mathbf{x})$
-is exponential. The forward algorithm runs in $O(T \cdot |\mathcal{Y}|^2)$:
+is exponential. The forward algorithm runs in $O(T \cdot |\mathcal{Y}|^2)$<FN n="3" />:
 
 **Step 1.** Define log-potentials $\psi(y', y, t) = \mathbf{w}^\top \mathbf{f}(y', y, \mathbf{x}, t)$.
 
@@ -132,3 +132,9 @@ print(f"log Z (forward):     {log_Z_forward:.4f}")
 Both methods agree on $\log Z$; the forward algorithm achieves this in $O(T \cdot |\mathcal{Y}|^2)$ rather than $O(|\mathcal{Y}|^T)$.
 
 The next lesson generalizes the message-passing view of these algorithms to factor graphs.
+
+<Footnotes>
+  <FNItem n="1">**Lafferty, J., McCallum, A., & Pereira, F.** (2001). "Conditional random fields: probabilistic models for segmenting and labeling sequence data". *ICML*. The paper introducing CRFs and the label-bias argument against MEMMs.</FNItem>
+  <FNItem n="2">**Sutton, C., & McCallum, A.** (2012). "An introduction to conditional random fields". *Foundations and Trends in Machine Learning*, 4(4), 267-373. A tutorial treatment of linear-chain CRFs and their training ([arXiv:1011.4088](https://arxiv.org/abs/1011.4088)).</FNItem>
+  <FNItem n="3">**Koller, D., & Friedman, N.** (2009). *Probabilistic Graphical Models: Principles and Techniques.* MIT Press. The forward recursion for the partition function on chains.</FNItem>
+</Footnotes>

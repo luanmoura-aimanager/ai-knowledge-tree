@@ -13,7 +13,7 @@ Many models contain latent variables $\mathbf{Z}$ that explain the observations 
 but are never directly observed.
 The **EM algorithm** maximizes the marginal log-likelihood $\log P(\mathbf{X} \mid \theta)$
 by alternating between computing the posterior over latents and updating parameters to
-maximize the expected complete-data log-likelihood.
+maximize the expected complete-data log-likelihood<FN ns="1, 2" />.
 
 ## Derivation from the ELBO
 
@@ -54,7 +54,7 @@ the marginal likelihood is at least as large after the update.
 
 ## Gaussian mixture model EM
 
-For a $K$-component GMM with parameters $\theta = \{\pi_k, \mu_k, \Sigma_k\}_{k=1}^K$:
+For a $K$-component GMM with parameters $\theta = \{\pi_k, \mu_k, \Sigma_k\}_{k=1}^K$<FN n="2" />:
 
 **E-step.** Compute soft assignments (responsibilities):
 
@@ -70,7 +70,7 @@ $$
 \Sigma_k^{\text{new}} = \frac{\sum_n r_{nk} (x_n - \mu_k^{\text{new}})(x_n - \mu_k^{\text{new}})^\top}{N_k}.
 $$
 
-![EM alternates soft assignments (E-step) with parameter updates (M-step); each round can only raise the data log-likelihood, so it climbs monotonically to a local optimum — here fitting a 3-component Gaussian mixture.](/figures/F7/em-algorithm.svg)
+![EM alternates soft assignments (E-step) with parameter updates (M-step); each round can only raise the data log-likelihood, so it climbs monotonically to a local optimum; here fitting a 3-component Gaussian mixture.](/figures/F7/em-algorithm.svg)
 
 ## Implementation
 
@@ -128,3 +128,8 @@ The log-likelihood increases monotonically across iterations, confirming the the
 guarantee.
 
 The next lesson applies EM to LDA, a latent variable model for discrete text data.
+
+<Footnotes>
+  <FNItem n="1">**Dempster, A. P., Laird, N. M., & Rubin, D. B.** (1977). "Maximum likelihood from incomplete data via the EM algorithm". *Journal of the Royal Statistical Society: Series B*, 39(1), 1-38. The paper that named and unified EM ([doi:10.1111/j.2517-6161.1977.tb01600.x](https://doi.org/10.1111/j.2517-6161.1977.tb01600.x)).</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 9. Springer. The ELBO derivation and the Gaussian-mixture EM updates.</FNItem>
+</Footnotes>

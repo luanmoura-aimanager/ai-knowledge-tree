@@ -20,7 +20,7 @@ independent models.
 Dropout randomly zeros activations at rate $p$ during training.
 Gal and Ghahramani (2016) showed that training a network with dropout is equivalent
 to a variational Bayesian approximation over the weights, where the variational family
-consists of Bernoulli-masked Gaussian distributions.
+consists of Bernoulli-masked Gaussian distributions<FN n="1" />.
 
 At test time, instead of turning dropout off (the standard practice), keep it active
 and run $T$ forward passes with different random masks.
@@ -54,7 +54,7 @@ a single prediction mixes both.
 ## Deep ensembles
 
 Train $M$ independent networks with different random seeds (different weight initializations
-and data shuffles).
+and data shuffles)<FN n="2" />.
 At test time, average their predictions:
 
 $$
@@ -75,7 +75,7 @@ trajectories, not from explicit Bayesian inference.
 Deep ensembles consistently outperform MC dropout on calibration and OOD benchmarks
 but require training $M$ models instead of one.
 
-![MC dropout and deep ensembles estimate uncertainty by sampling many predictors; each is a slightly different function and their spread is the predictive uncertainty — narrow on data, fanning out where the model extrapolates.](/figures/F8/mc-dropout-ensembles.svg)
+![MC dropout and deep ensembles estimate uncertainty by sampling many predictors; each is a slightly different function and their spread is the predictive uncertainty: narrow on data, fanning out where the model extrapolates.](/figures/F8/mc-dropout-ensembles.svg)
 
 ## Implementation
 
@@ -129,3 +129,8 @@ epistemic uncertainty: the model is uncertain where it has not seen data.
 
 The next lesson shows how to place a prior directly over network weights for a more
 principled Bayesian neural network.
+
+<Footnotes>
+  <FNItem n="1">**Gal, Y., & Ghahramani, Z.** (2016). "Dropout as a Bayesian approximation: representing model uncertainty in deep learning". *ICML*. Casts test-time dropout as approximate variational inference ([arXiv:1506.02142](https://arxiv.org/abs/1506.02142)).</FNItem>
+  <FNItem n="2">**Lakshminarayanan, B., Pritzel, A., & Blundell, C.** (2017). "Simple and scalable predictive uncertainty estimation using deep ensembles". *NeurIPS*. Shows independently trained ensembles give strong, well-calibrated uncertainty ([arXiv:1612.01474](https://arxiv.org/abs/1612.01474)).</FNItem>
+</Footnotes>

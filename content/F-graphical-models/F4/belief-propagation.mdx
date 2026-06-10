@@ -13,7 +13,7 @@ Variable elimination computes one marginal per run.
 To compute all $n$ marginals, run VE $n$ times, each time eliminating all other variables.
 **Belief propagation** (BP) achieves the same result in $O(n)$ work by recognizing
 that the sub-computations share structure: messages computed when marginalizing $X_1$
-can be reused when marginalizing $X_2$.
+can be reused when marginalizing $X_2$<FN n="1" />.
 
 ## Message passing on a tree
 
@@ -56,7 +56,7 @@ The resulting beliefs are no longer guaranteed to be exact marginals;
 they are approximate, sometimes well-calibrated and sometimes not.
 
 Loopy BP is nonetheless effective in practice: it is the decoding algorithm for
-LDPC error-correcting codes and an ingredient in early image segmentation models.
+LDPC error-correcting codes and an ingredient in early image segmentation models<FN n="2" />.
 
 ```mermaid
 graph TD
@@ -136,3 +136,8 @@ print("Max abs error:", np.abs(belief_c - p_c_brute).max())
 BP on the star graph returns exact marginals in a single pass because the graph has no cycles.
 
 The next lesson extends this to general graphs by first converting them to a junction tree.
+
+<Footnotes>
+  <FNItem n="1">**Pearl, J.** (1988). *Probabilistic Reasoning in Intelligent Systems.* Morgan Kaufmann. Introduces belief propagation as message passing in trees.</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 8. Springer. The sum-product algorithm on factor graphs and the loopy approximation.</FNItem>
+</Footnotes>

@@ -15,7 +15,7 @@ For $N$ datapoints this is $2N$ parameters, and inference at test time requires
 additional optimization per new input.
 **Amortized VI** eliminates per-datapoint parameters by training a shared **encoder network**
 (also called an inference network or recognition model) that maps inputs directly to
-variational parameters.
+variational parameters<FN n="1" />.
 
 ## The amortized objective
 
@@ -32,7 +32,7 @@ and the reconstruction term rewards the decoder $p_\theta(x \mid z)$ for explain
 
 Both $\phi$ (encoder) and $\theta$ (decoder) are optimized jointly via gradient ascent on $\mathcal{L}$.
 The reparameterization trick makes this tractable: sample $z = \mu_\phi(x) + \sigma_\phi(x) \cdot \epsilon$
-with $\epsilon \sim \mathcal{N}(0,I)$.
+with $\epsilon \sim \mathcal{N}(0,I)$<FN n="2" />.
 
 ## The amortization gap
 
@@ -118,3 +118,8 @@ without ever running per-datapoint optimization.
 
 The next lesson replaces the Gaussian encoder with a normalizing flow to represent
 more expressive posterior families.
+
+<Footnotes>
+  <FNItem n="1">**Kingma, D. P., & Welling, M.** (2014). "Auto-encoding variational bayes (VAE)". *ICLR*. [arXiv:1312.6114](https://arxiv.org/abs/1312.6114). Introduces the inference network and the amortized ELBO.</FNItem>
+  <FNItem n="2">**Blei, D. M., Kucukelbir, A., & McAuliffe, J. D.** (2017). "Variational inference: a review for statisticians". *JASA*, 112(518), 859-877. [arXiv:1601.00670](https://arxiv.org/abs/1601.00670). Situates amortization and the reparameterization gradient.</FNItem>
+</Footnotes>

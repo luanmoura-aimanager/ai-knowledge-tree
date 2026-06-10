@@ -13,7 +13,7 @@ Random-walk MCMC explores the target by taking small, random steps.
 In high dimensions, random walks mix slowly: they waste time near the current point
 because most random directions point away from the high-probability region.
 **Hamiltonian Monte Carlo** (HMC) uses the gradient of the log-target to propose
-large, directed moves that follow the target's geometry.
+large, directed moves that follow the target's geometry<FN n="1" />.
 
 ## Hamiltonian dynamics
 
@@ -67,7 +67,7 @@ Repeat for $L$ steps to obtain the proposal $(q^*, p^*)$.
 
 These properties guarantee that the MH acceptance ratio is close to 1 when $\varepsilon$
 is small: the numerical error in $H$ is $O(\varepsilon^4)$ per step, so proposals are
-accepted with high probability.
+accepted with high probability<FN n="2" />.
 
 ## The HMC step
 
@@ -85,7 +85,7 @@ HMC requires tuning $\varepsilon$ and $L$.
 to double back on itself (the "U-turn" criterion).
 NUTS is the default sampler in Stan and PyMC.
 
-![Hamiltonian Monte Carlo adds momentum and follows the distribution's gradient via leapfrog integration, proposing distant points that are still accepted — far more efficient than random-walk steps.](/figures/F6/hamiltonian-mc.svg)
+![Hamiltonian Monte Carlo adds momentum and follows the distribution's gradient via leapfrog integration, proposing distant points that are still accepted: far more efficient than random-walk steps.](/figures/F6/hamiltonian-mc.svg)
 
 ## Implementation
 
@@ -150,3 +150,8 @@ yielding an effective sample size greater than $N$.
 
 The next lesson introduces Langevin dynamics, a gradient-based method that connects
 MCMC to stochastic gradient descent.
+
+<Footnotes>
+  <FNItem n="1">**Neal, R. M.** (2011). "MCMC using Hamiltonian dynamics". In *Handbook of Markov Chain Monte Carlo*. [arXiv:1206.1901](https://arxiv.org/abs/1206.1901). The standard reference for HMC and the leapfrog integrator.</FNItem>
+  <FNItem n="2">**Betancourt, M.** (2017). "A conceptual introduction to Hamiltonian Monte Carlo". [arXiv:1701.02434](https://arxiv.org/abs/1701.02434). Explains why volume preservation keeps acceptance high.</FNItem>
+</Footnotes>
