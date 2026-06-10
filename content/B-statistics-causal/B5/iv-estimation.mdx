@@ -23,7 +23,7 @@ unobserved confounders.
 2. **Exclusion restriction:** $Z$ affects $Y$ only through $W$. No direct path
    $Z \to Y$ (and no $Z \to U \to Y$).
 3. **Independence (exogeneity):** $Z$ is independent of the unmeasured confounders
-   $U$. Formally, $Z \perp U$.
+   $U$. Formally, $Z \perp U$<FN n="1" />.
 
 If any condition fails, the IV estimate is biased and inconsistent. Conditions 2
 and 3 are untestable from data alone and must be justified by design or domain
@@ -75,7 +75,7 @@ which is exogenous.
 
 The IV estimator does not identify the ATE for the full population. It identifies
 the **LATE** (Imbens and Angrist, 1994): the average treatment effect for
-**compliers**, units whose treatment status is changed by the instrument.
+**compliers**, units whose treatment status is changed by the instrument<FN n="2" />.
 
 - **Always-takers:** $W = 1$ regardless of $Z$.
 - **Never-takers:** $W = 0$ regardless of $Z$.
@@ -87,7 +87,7 @@ $$
 $$
 
 The LATE equals the ATE only when all units are compliers (perfect compliance),
-which holds in a randomized experiment with full compliance.
+which holds in a randomized experiment with full compliance<FN n="3" />.
 
 ![An instrument Z shifts treatment (first stage) and moves the outcome only through it (reduced form); their ratio (the Wald estimate) recovers the true effect.](/figures/B5/iv-estimation.svg)
 
@@ -144,3 +144,9 @@ instrument is relevant.
 
 The next lesson covers difference-in-differences, which uses panel data and a
 parallel-trends assumption to estimate causal effects without an instrument.
+
+<Footnotes>
+  <FNItem n="1">**Angrist, J. D., & Pischke, J.-S.** (2009). *Mostly Harmless Econometrics.* Princeton University Press. The applied econometrics treatment of IV, 2SLS, and the exclusion restriction.</FNItem>
+  <FNItem n="2">**Angrist, J. D., Imbens, G. W., & Rubin, D. B.** (1996). "Identification of causal effects using instrumental variables". *JASA*, 91(434), 444-455. Defines compliers and proves IV identifies the local average treatment effect ([doi:10.1080/01621459.1996.10476902](https://doi.org/10.1080/01621459.1996.10476902)).</FNItem>
+  <FNItem n="3">**Hernán, M. A., & Robins, J. M.** (2020). *Causal Inference: What If.* Chapman & Hall/CRC. Connects the IV conditions to potential outcomes and monotonicity.</FNItem>
+</Footnotes>
