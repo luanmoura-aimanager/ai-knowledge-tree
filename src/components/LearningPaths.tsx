@@ -56,6 +56,7 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
         color: sub?.pillar.color ?? "var(--fg-dim)",
         title: lesson?.title ?? s.lessonId,
         note: s.note,
+        section: s.section,
         available: lessonContentStatus(s.subId, s.lessonId) === "available",
         state,
       };

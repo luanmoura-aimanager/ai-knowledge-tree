@@ -21,6 +21,7 @@ export interface PathStepView {
   color: string;
   title: string;
   note?: string;
+  section?: string;
   available: boolean;
   state: "done" | "in-progress" | "untouched";
 }
@@ -59,6 +60,17 @@ const AMT_CHAPTERS: Record<string, string> = {
 function chapterOf(note?: string): string {
   const m = note?.match(/\d+/);
   return m ? m[0] : "";
+}
+
+/**
+ * The heading a step is grouped under. An explicit `section` wins (curated
+ * role-paths); otherwise fall back to the ai-math-theory chapter parsed from the
+ * note (the LLM Theory mirror). Empty string means "no header".
+ */
+function groupLabelOf(step: PathStepView): string {
+  if (step.section) return step.section;
+  const ch = chapterOf(step.note);
+  return AMT_CHAPTERS[ch] ?? ch;
 }
 
 /**
@@ -214,14 +226,14 @@ function PathSteps({ steps }: { steps: PathStepView[] }) {
       </h4>
       <ol className="m-0 p-0 list-none max-h-[440px] overflow-y-auto pr-1 flex flex-col gap-0.5">
         {steps.map((step, i) => {
-          const chapter = chapterOf(step.note);
+          const group = groupLabelOf(step);
           const showHeader =
-            i === 0 || chapterOf(steps[i - 1].note) !== chapter;
+            group !== "" && (i === 0 || groupLabelOf(steps[i - 1]) !== group);
           return (
             <li key={`${step.subId}/${step.lessonId}/${i}`}>
               {showHeader && (
                 <div className="text-[11px] font-semibold text-[var(--fg-dim)] mt-3 mb-1 sticky top-0 bg-[var(--card)] py-0.5">
-                  {AMT_CHAPTERS[chapter] ?? chapter}
+                  {group}
                 </div>
               )}
               <Link

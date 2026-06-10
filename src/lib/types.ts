@@ -78,6 +78,12 @@ export interface PathStep {
   subId: string;
   lessonId: string;
   note?: string;
+  /**
+   * Optional phase label used to group consecutive steps under a heading in the
+   * path detail (e.g. "Retrieval & agents"). When absent, the renderer falls
+   * back to the ai-math-theory chapter parsed from `note` (the LLM Theory path).
+   */
+  section?: string;
 }
 
 /** A curated reading sequence across the DAG, rendered in the learning-paths grid. */

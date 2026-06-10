@@ -8,10 +8,6 @@ Last reviewed: 2026-06-09 (after the 100%-coverage figures campaign, PRs #43–#
 
 ## Backlog
 
-- [ ] **Suggested-paths dropdown.** Review the suggested learning paths (`PATHS`
-  in `src/lib/dag.ts`, rendered by `LearningPaths`) and give every path a
-  collapsible dropdown, matching the existing 'LLM Theory' path pattern.
-
 - [ ] **Data Engineering pillar + path.** Author a new Data Engineering pillar
   (curriculum in `src/lib/curriculum/`, lessons in `content/`) and a "Data
   Engineer" suggested path. Add the pillar-authoring pattern to `content/STYLE.md`.
