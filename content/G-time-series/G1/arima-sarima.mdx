@@ -28,7 +28,7 @@ $\theta(L) = 1 + \theta_1 L + \dots + \theta_q L^q$ in the lag operator $L$.
 When a series has a unit root it is not stationary, so ARMA does not apply
 directly. The fix is to difference first. Define the difference operator
 $\Delta = 1 - L$, so $\Delta X_t = X_t - X_{t-1}$. An **ARIMA(p, d, q)** model
-applies ARMA to the $d$-times-differenced series:
+applies ARMA to the $d$-times-differenced series<FN n="1" />:
 
 $$
 \phi(L)\, (1 - L)^d X_t = \theta(L)\, \varepsilon_t.
@@ -72,7 +72,7 @@ $$
 where $\hat{L}$ is the maximized likelihood. Lower is better. Both reward higher
 likelihood and penalize parameters; BIC penalizes harder for large $n$, so it
 favours sparser models. Automatic order selection (the auto-ARIMA procedure)
-searches over $(p, d, q)(P, D, Q)$ and returns the minimizer.
+searches over $(p, d, q)(P, D, Q)$ and returns the minimizer<FN n="2" />.
 
 ![ARIMA differences a series to stationarity, fits its AR/MA structure, then integrates back; the forecast continues the trend with an interval that widens as the horizon grows.](/figures/G1/arima-sarima.svg)
 
@@ -113,3 +113,8 @@ $I(1)$ level into a clean MA(1).
 ARIMA estimates parameters by maximizing a likelihood; the next lesson shows the
 exponential-smoothing family, which reaches similar forecasts through recursive
 weighted averages rather than an explicit ARMA fit.
+
+<Footnotes>
+  <FNItem n="1">**Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M.** (2015). *Time Series Analysis: Forecasting and Control* (5th ed.). Wiley. Differencing, ARIMA, and the seasonal SARIMA extension.</FNItem>
+  <FNItem n="2">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Order selection by information criteria and the auto-ARIMA procedure.</FNItem>
+</Footnotes>

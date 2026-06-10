@@ -11,7 +11,7 @@ prerequisites: ["patchtst-itransformer", "E3/decoder-only"]
 
 Every model so far is trained on the series it forecasts. Foundation models break
 that: a single network is pretrained on millions of time series from many domains,
-then forecasts a brand-new series **zero-shot**, with no fitting at all. This is the
+then forecasts a brand-new series **zero-shot**, with no fitting at all<FN n="1" />. This is the
 same shift that large language models brought to text, transplanted to time series.
 
 ## Why a foundation model can transfer
@@ -41,7 +41,7 @@ generates token sequences; sampling many gives a predictive distribution, and
 de-quantizing plus un-scaling returns real-valued forecasts.
 
 The striking result: a language-model recipe, with values as tokens, matches or
-beats specialized forecasters zero-shot. The decoder-only generation loop is the
+beats specialized forecasters zero-shot<FN n="2" />. The decoder-only generation loop is the
 same one from the LLM lessons.
 
 ## TimeGPT and Lag-Llama
@@ -70,7 +70,7 @@ graph LR
 
 As with LLMs, accuracy improves predictably with more pretraining data, more
 diverse domains, and larger models, which is what makes zero-shot competitive with
-trained baselines. The open issues are specific to time series: covariates and
+trained baselines<FN n="1" />. The open issues are specific to time series: covariates and
 exogenous regressors are awkward to inject, very long horizons remain hard, and a
 well-tuned classical model on a clean stationary series can still win. The practical
 value is as a **strong default**: a good forecast on a new series with zero
@@ -110,3 +110,8 @@ representation that lets a plain language-model architecture forecast time serie
 Deep models excel at forecasting the expected path. The next subsection turns to a
 different question: detecting when a series departs from its normal behaviour,
 starting with classical statistical anomaly tests.
+
+<Footnotes>
+  <FNItem n="1">**Das, A., Kong, W., Sen, R., & Zhou, Y.** (2024). "A decoder-only foundation model for time-series forecasting (TimesFM)". *ICML*. [arXiv:2310.10688](https://arxiv.org/abs/2310.10688). A pretrained decoder-only model that forecasts unseen series zero-shot, with scaling that drives transfer.</FNItem>
+  <FNItem n="2">**Ansari, A. F., et al.** (2024). "Chronos: learning the language of time series". *TMLR*. [arXiv:2403.07815](https://arxiv.org/abs/2403.07815). Value tokenization that lets an LLM architecture forecast time series.</FNItem>
+</Footnotes>

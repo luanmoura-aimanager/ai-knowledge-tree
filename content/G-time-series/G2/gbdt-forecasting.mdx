@@ -10,7 +10,7 @@ prerequisites: ["ts-feature-engineering", "C3/xgboost-lightgbm"]
 ---
 
 Gradient-boosted decision trees (GBDT) win a large share of forecasting
-competitions when the data is tabular and rich in covariates. They take the
+competitions when the data is tabular and rich in covariates<FN n="1" />. They take the
 feature table from the previous lesson and learn nonlinear interactions between
 lags, calendar effects, and external regressors that linear ARIMA cannot. The new
 question they raise is how to forecast more than one step ahead, because a tree
@@ -83,7 +83,8 @@ When forecasting thousands of related series (every product in a catalogue), a
 **global** model trains one GBDT on the pooled rows of all series, with a series
 identifier or static features as columns. This shares statistical strength,
 regularizes short series toward the population, and beats fitting a separate model
-per series, the insight behind the winning M5-competition solutions.
+per series, the insight behind the winning M5-competition solutions and a now-standard
+recommendation in the forecasting literature<FN n="2" />.
 
 ```python
 import numpy as np
@@ -156,3 +157,8 @@ predictions back as inputs.
 A single GBDT treats all series with one flat model. The next lesson handles series
 that are organized into a hierarchy, where forecasts must add up consistently
 across levels.
+
+<Footnotes>
+  <FNItem n="1">**Makridakis, S., Spiliotis, E., & Assimakopoulos, V.** (2020). "The M4 competition: 100,000 time series and 61 forecasting methods". *International Journal of Forecasting*, 36(1), 54-74. [doi:10.1016/j.ijforecast.2019.04.014](https://doi.org/10.1016/j.ijforecast.2019.04.014). Documents the rise of machine-learning and combination methods in large-scale forecasting.</FNItem>
+  <FNItem n="2">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Recursive versus direct multi-step strategies and global pooled models across related series.</FNItem>
+</Footnotes>

@@ -13,7 +13,7 @@ Real forecasting problems mix three kinds of inputs: static metadata (a store's
 location), known-future covariates (next week's promotions, the calendar), and
 observed past values. The Temporal Fusion Transformer (TFT) is designed to ingest
 all three, decide which matter, and produce quantile forecasts that come with a
-readable explanation of what drove them.
+readable explanation of what drove them<FN n="1" />.
 
 ## Three input types, handled separately
 
@@ -88,7 +88,7 @@ $$
 Setting the expected subgradient to zero gives $P(y \le \hat{q}) = \tau$, so the
 minimizer is exactly the $\tau$-quantile. Summing $\mathcal{L}_\tau$ over the chosen
 levels and the horizon gives forecasts whose stated intervals have the right
-coverage by construction.
+coverage by construction<FN n="2" />.
 
 ```python
 import numpy as np
@@ -121,3 +121,8 @@ probabilistic and interpretable.
 TFT keeps an LSTM for local processing. The next lesson follows the line of
 attention-only forecasters built specifically for long horizons: Informer,
 Autoformer, and FEDformer.
+
+<Footnotes>
+  <FNItem n="1">**Lim, B., Arik, S. O., Loeff, N., & Pfister, T.** (2021). "Temporal Fusion Transformers for interpretable multi-horizon time series forecasting". *International Journal of Forecasting*, 37(4), 1748-1764. [arXiv:1912.09363](https://arxiv.org/abs/1912.09363). Variable selection, gated residual networks, and interpretable multi-head attention.</FNItem>
+  <FNItem n="2">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Quantile (pinball) scoring and the coverage of prediction intervals.</FNItem>
+</Footnotes>

@@ -45,7 +45,7 @@ PatchTST also uses **channel independence**: in a multivariate problem each vari
 (channel) is forecast by the *same* shared transformer applied independently, with
 no cross-channel attention. Counterintuitively this beats channel-mixing models,
 because it regularizes against spurious cross-series correlations and lets the
-shared weights learn universal temporal patterns.
+shared weights learn universal temporal patterns<FN n="1" />.
 
 ## iTransformer: invert the axes
 
@@ -64,7 +64,7 @@ token. The payoff:
 - **Cost depends on the number of variates, not the lookback**, so long lookbacks
   are cheap.
 - **No architecture change**, just a transposed application of the same transformer
-  block, which is why it slots into existing code trivially.
+  block, which is why it slots into existing code trivially<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -113,3 +113,8 @@ moves these models are built on.
 
 These models are still trained per dataset. The next lesson reaches the frontier:
 foundation models pretrained on huge corpora that forecast a new series zero-shot.
+
+<Footnotes>
+  <FNItem n="1">**Nie, Y., Nguyen, N. H., Sinthong, P., & Kalagnanam, J.** (2023). "A time series is worth 64 words: long-term forecasting with transformers (PatchTST)". *ICLR*. [arXiv:2211.14730](https://arxiv.org/abs/2211.14730). Subseries patching and channel independence.</FNItem>
+  <FNItem n="2">**Liu, Y., et al.** (2024). "iTransformer: inverted transformers are effective for time series forecasting". *ICLR*. [arXiv:2310.06625](https://arxiv.org/abs/2310.06625). Treating each variate's whole series as a token and attending across variates.</FNItem>
+</Footnotes>

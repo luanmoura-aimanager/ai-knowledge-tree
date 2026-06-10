@@ -12,7 +12,7 @@ prerequisites: ["arima-sarima", "F3/kalman-filter"]
 ARIMA and ETS look like different recipes, but both are instances of one object: a
 linear-Gaussian **state-space model**. Casting them this way gives a single engine,
 the Kalman filter, that evaluates the exact likelihood, handles missing data, and
-produces prediction intervals. This lesson connects the filter you derived for
+produces prediction intervals<FN n="1" />. This lesson connects the filter you derived for
 graphical models to time-series estimation.
 
 ## The state-space template
@@ -67,7 +67,7 @@ covariance. The **innovation** is the forecast error
 $e_t = x_t - \hat{x}_{t \mid t-1}$, and under the model $e_t \sim \mathcal{N}(0, S_t)$,
 independent across $t$.
 
-**Prediction-error decomposition.** Because the innovations are independent
+**Prediction-error decomposition.**<FN n="2" /> Because the innovations are independent
 Gaussians, the joint log-likelihood factorizes into a sum:
 
 $$
@@ -132,3 +132,8 @@ parameters.
 
 A single series can be modelled this way; the next lesson moves to several
 interacting series at once with the vector autoregression and cointegration.
+
+<Footnotes>
+  <FNItem n="1">**Hamilton, J. D.** (1994). *Time Series Analysis.* Princeton University Press. State-space form, the Kalman filter, and the likelihood for ARMA models (Ch. 13).</FNItem>
+  <FNItem n="2">**Brockwell, P. J., & Davis, R. A.** (1991). *Time Series: Theory and Methods* (2nd ed.). Springer. The innovations algorithm and the prediction-error likelihood.</FNItem>
+</Footnotes>

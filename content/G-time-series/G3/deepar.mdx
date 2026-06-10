@@ -12,7 +12,7 @@ prerequisites: ["G2/ts-feature-engineering", "D3/lstm-gru", "A2/mle"]
 Point forecasts hide what a planner actually needs: the range of plausible
 outcomes. DeepAR forecasts a full predictive distribution by having a recurrent
 network output not a number but the *parameters* of a probability distribution at
-each step. It also trains one global model across many related series at once,
+each step<FN n="1" />. It also trains one global model across many related series at once,
 which is what lets it forecast items with short or sparse histories.
 
 ## The architecture in one line
@@ -80,7 +80,7 @@ At inference the future values are unknown, so the autoregressive loop is run
 forward by sampling. Starting from the last hidden state, at each future step:
 draw $\hat{z}_t \sim p(\cdot \mid \theta_t)$, feed that sample back as the next
 input, and continue. Repeating the whole rollout many times produces a cloud of
-sample paths; their empirical quantiles give the prediction intervals. The forecast
+sample paths; their empirical quantiles give the prediction intervals<FN n="2" />. The forecast
 is a distribution of trajectories, not a single line.
 
 ```python
@@ -131,3 +131,8 @@ with the horizon, which is the probabilistic forecast DeepAR is built to deliver
 DeepAR conditions on its own past through a recurrent state. The next lesson takes a
 different stance: N-BEATS forecasts the whole horizon at once by projecting onto
 trend and seasonality basis functions, no recurrence at all.
+
+<Footnotes>
+  <FNItem n="1">**Salinas, D., Flunkert, V., Gasthaus, J., & Januschowski, T.** (2020). "DeepAR: probabilistic forecasting with autoregressive recurrent networks". *International Journal of Forecasting*, 36(3), 1181-1191. [arXiv:1704.04110](https://arxiv.org/abs/1704.04110). The global autoregressive RNN that emits likelihood parameters and trains by NLL.</FNItem>
+  <FNItem n="2">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Prediction intervals and simulation-based (sample-path) probabilistic forecasting.</FNItem>
+</Footnotes>

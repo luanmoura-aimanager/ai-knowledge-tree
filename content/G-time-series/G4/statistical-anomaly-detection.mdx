@@ -66,7 +66,7 @@ the MAD, quartiles are robust, so the rule resists masking.
 
 When the data is approximately normal and you want a principled test for **up to
 $r$** outliers, the generalized extreme studentized deviate (ESD) test iterates the
-z-score test while removing the most extreme point each round.
+z-score test while removing the most extreme point each round<FN n="1" />.
 
 **The procedure.** For $i = 1, \dots, r$:
 
@@ -88,7 +88,7 @@ problem, which is why ESD beats a single z-score pass.
 
 For time series, all of these are applied to the **residual** after removing trend
 and seasonality (the decomposition from earlier lessons), so a high but in-season
-value is not flagged as anomalous.
+value is not flagged as anomalous<FN n="2" />.
 
 ```python
 import numpy as np
@@ -120,3 +120,8 @@ reliably, the masking effect that motivates robust statistics.
 These tests flag individual points against a static notion of normal. The next
 lesson handles a different anomaly: a sustained *shift* in the series, detected
 sequentially as it happens with CUSUM.
+
+<Footnotes>
+  <FNItem n="1">**Rosner, B.** (1983). "Percentage points for a generalized ESD many-outlier procedure". *Technometrics*, 25(2), 165-172. The generalized ESD test ([doi:10.1080/00401706.1983.10487848](https://doi.org/10.1080/00401706.1983.10487848)).</FNItem>
+  <FNItem n="2">**Blázquez-García, A., Conde, A., Mori, U., & Lozano, J. A.** (2021). "A review on outlier/anomaly detection in time series data". *ACM Computing Surveys*, 54(3), 1-33. [arXiv:2002.04236](https://arxiv.org/abs/2002.04236)</FNItem>
+</Footnotes>

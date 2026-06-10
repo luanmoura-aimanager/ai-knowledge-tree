@@ -13,7 +13,7 @@ Sales aggregate: each store rolls up into a region, regions into a country. If y
 forecast every level independently, the store forecasts will not sum to the region
 forecast, and the numbers contradict each other. **Hierarchical forecasting** fixes
 this by producing **coherent** forecasts that respect the aggregation structure,
-and the good methods improve accuracy at the same time.
+and the good methods improve accuracy at the same time<FN n="1" />.
 
 ## The hierarchy and the summing matrix
 
@@ -65,7 +65,7 @@ best.
 
 The reconciliation error is $\tilde{\mathbf{y}} - \mathbf{y}_t$. Among all $G$ that
 yield unbiased coherent forecasts, **MinT** picks the one that minimizes the total
-variance of this error (the trace of its covariance). With $W$ the covariance of
+variance of this error (the trace of its covariance)<FN n="2" />. With $W$ the covariance of
 the base-forecast errors, the optimal map is
 
 $$
@@ -127,3 +127,8 @@ trusting any single level outright.
 GBDT, hierarchical reconciliation, and the next model all live in the classical-ML
 camp. The next lesson covers Prophet, a decomposable additive model designed for
 analyst-friendly forecasting at scale.
+
+<Footnotes>
+  <FNItem n="1">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Hierarchical and grouped time series, the summing matrix, and coherence (Ch. 11).</FNItem>
+  <FNItem n="2">**Hyndman, R. J., Ahmed, R. A., Athanasopoulos, G., & Shang, H. L.** (2011). "Optimal combination forecasts for hierarchical time series". *Computational Statistics & Data Analysis*, 55(9), 2579-2589. [doi:10.1016/j.csda.2011.03.006](https://doi.org/10.1016/j.csda.2011.03.006). The least-squares reconciliation projection underlying MinT.</FNItem>
+</Footnotes>
