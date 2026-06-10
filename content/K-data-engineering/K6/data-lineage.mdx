@@ -18,7 +18,7 @@ source extracts. When that number looks wrong, or when a producer wants to
 not scale past a handful of tables. **Data lineage** answers it structurally: it
 records the dependency graph of the whole pipeline, so "what breaks if I change
 this" and "where did this bad value enter" become graph traversals rather than
-guesswork.
+guesswork<FN n="1" />.
 
 ## Lineage is a DAG over datasets
 
@@ -79,7 +79,7 @@ notifying ten teams and notifying the one that actually consumes the field.
 
 **Provenance** is the audit companion to lineage: for a given output value, the
 record of exactly which inputs, transform version, and run produced it, the same
-back-pointer a [model registry](I2/model-registry) keeps for a trained artifact.
+back-pointer a [model registry](I2/model-registry) keeps for a trained artifact<FN n="2" />.
 Lineage tells you the shape of the dependency graph; provenance pins a specific
 value to the specific run that made it.
 
@@ -87,3 +87,8 @@ The next lesson watches these datasets *operationally*, freshness, volume, and
 null rates over time, so a feed that breaks upstream is flagged before its bad
 values propagate down the lineage graph you just learned to traverse:
 [data observability](K6/data-observability).
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Treats lineage as a cross-cutting concern for impact analysis, debugging, and governance.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Frames derived data and dataflow as a directed graph and motivates provenance for reasoning about where values come from.</FNItem>
+</Footnotes>

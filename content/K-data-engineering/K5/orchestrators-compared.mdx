@@ -25,7 +25,7 @@ In the task-centric model you author a [DAG](I1/orchestration-dags) whose nodes 
 **tasks**, units of work like "run this SQL", "call this API", "move this file". You
 wire the edges by hand: `extract >> transform >> load`. The orchestrator's job is to
 execute the tasks in a valid topological order, retrying and skipping per the edges
-you drew. The DAG is **imperative**: it says *do this, then that*. What a task reads or
+you drew<FN n="1" />. The DAG is **imperative**: it says *do this, then that*. What a task reads or
 writes is opaque to the orchestrator; a task is a black box that the scheduler knows
 only as "ran" or "failed".
 
@@ -76,7 +76,7 @@ answer, where the task-centric system could only report which tasks ran.
 
 The trade is a clean one. The task-centric model is maximally general about *what* runs
 and gives explicit control over *order*, at the price of being blind to the data the
-tasks move. The asset-centric model trades some of that generality (everything is
+tasks move<FN n="2" />. The asset-centric model trades some of that generality (everything is
 framed as producing an asset) for native lineage, surgical partial refresh, and
 data-level observability.
 
@@ -94,3 +94,8 @@ task-centric, and one that is mostly producing analytical tables leans asset-cen
 With orchestration covered, the pipeline can reliably build its tables; the
 [next subsection](K6/data-quality-dimensions) turns to whether the tables those runs
 produce are actually *correct*, making data quality measurable and enforceable.
+
+<Footnotes>
+  <FNItem n="1">**Apache Software Foundation.** "Apache Airflow documentation". [airflow.apache.org](https://airflow.apache.org/docs/). Airflow's task-centric DAGs, operators, and `>>` dependency wiring are the reference for imperative task orchestration.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Surveys orchestration frameworks and the shift toward declarative, asset-aware pipelines.</FNItem>
+</Footnotes>

@@ -13,7 +13,7 @@ A single machine can scan a few gigabytes; an [analytical workload](K1/oltp-vs-o
 routinely scans terabytes. The only way out is to split the data across many machines
 and have them work in parallel. MapReduce is the model that makes this tractable: it
 forces every distributed computation into three fixed phases, so the framework, not the
-programmer, handles partitioning, scheduling, and failures. The phases are **map**
+programmer, handles partitioning, scheduling, and failures<FN n="1" />. The phases are **map**
 (transform each record independently), **shuffle** (regroup records by key across the
 cluster), and **reduce** (aggregate each group). The first and third are embarrassingly
 parallel and run locally; the middle one moves data across the network, and that is
@@ -83,7 +83,7 @@ one reducer is swamped; that is the [straggler problem](data-skew) two lessons o
 The practical consequence: minimizing a MapReduce job means minimizing the intermediate
 data crossing the shuffle. A **combiner**, a local pre-aggregation that sums the $1$s for
 a word on the mapper before shipping, cuts the shuffle volume from "one record per word
-occurrence" down to "one record per distinct word per mapper", often a large reduction.
+occurrence" down to "one record per distinct word per mapper", often a large reduction<FN n="2" />.
 
 ![Cost of a MapReduce job split by phase. Map and reduce read and write local disk and stay cheap; the shuffle moves every intermediate record across the network and dominates the wall-clock cost.](/figures/K3/mapreduce.svg)
 
@@ -142,3 +142,8 @@ The shuffle moved one record per word occurrence here precisely because no combi
 a combiner would have collapsed repeated words per document first. This map-shuffle-reduce
 skeleton is exactly what [Spark's DataFrame engine](spark-dataframes) compiles down to,
 hiding the boilerplate while keeping the same shuffle boundary at its core.
+
+<Footnotes>
+  <FNItem n="1">**Dean, J., & Ghemawat, S.** (2008). "MapReduce: simplified data processing on large clusters". *Communications of the ACM*, 51(1), 107-113. [doi:10.1145/1327452.1327492](https://doi.org/10.1145/1327452.1327492). The original model: map, shuffle, reduce with framework-managed partitioning and fault tolerance.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 10 on batch processing covers combiners and the cost of the shuffle in MapReduce-style jobs.</FNItem>
+</Footnotes>

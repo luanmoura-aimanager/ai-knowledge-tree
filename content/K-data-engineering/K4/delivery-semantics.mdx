@@ -16,7 +16,7 @@ re-reads from the last committed offset, which is *before* the event it already
 processed, and processes it a second time. Or suppose it committed *first* and
 crashed before processing; on restart it skips the event entirely. The order of
 those two steps, process and commit, decides whether failures **lose** events or
-**duplicate** them, and that choice is the **delivery semantics** of the pipeline.
+**duplicate** them, and that choice is the **delivery semantics** of the pipeline<FN n="1" />.
 
 ## Three guarantees
 
@@ -74,7 +74,7 @@ A redelivered event has an id already in `seen`, so it is skipped, and the secon
 application is a no-op. The dedup check makes the whole consumer idempotent, so
 **at-least-once delivery plus an idempotent consumer equals effectively-once
 processing**, at the cost of storing the set of seen ids rather than a distributed
-transaction. The win is that the hard part (exactly-once *delivery*) is replaced by
+transaction<FN n="2" />. The win is that the hard part (exactly-once *delivery*) is replaced by
 the easy part (cheap delivery + a dedup set), and the result is the same.
 
 ![The same at-least-once stream, counted three ways. The true number of distinct events is the dashed line. A naive counter increments once per delivery, so it over-counts by the number of duplicates. An idempotent consumer dedups on the event id and recovers the true count exactly.](/figures/K4/delivery-semantics.svg)
@@ -124,3 +124,8 @@ by the dedup set. So far the source of events has been an application publishing
 the log. The [next lesson](K4/change-data-capture) asks where a *database's* changes
 enter the stream, and how to publish them without the dual-write inconsistency that
 duplicates and losses come from in the first place.
+
+<Footnotes>
+  <FNItem n="1">**Akidau, T., et al.** (2015). "The dataflow model: a practical approach to balancing correctness, latency, and cost in massive-scale, unbounded, out-of-order data processing". *VLDB*, 8(12), 1792-1803. [doi:10.14778/2824032.2824076](https://doi.org/10.14778/2824032.2824076). Frames the correctness guarantees a streaming pipeline must offer and where duplication enters.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 11 develops exactly-once via idempotent operations and deduplication on a stable message id.</FNItem>
+</Footnotes>

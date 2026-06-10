@@ -16,12 +16,14 @@ id appears twice. "Quality" is too vague to act on until it is split into
 **dimensions**, each a property you can compute a number for. Once every
 dimension is a number, a check is a comparison against a threshold, and a
 threshold is something you can alert on. This lesson defines four load-bearing
-dimensions and turns each into an automated check with a pass rate.
+dimensions and turns each into an automated check with a pass rate<FN n="1" />.
 
 ## The four dimensions
 
-Each dimension below is defined as a **pass rate**: the fraction of rows (or of
-the relevant pairs) that satisfy a rule. A pass rate lives in $[0, 1]$, so the
+The choice of dimensions is not arbitrary: completeness, validity, consistency, and
+the rest trace back to empirical work on what data consumers actually mean by
+"quality"<FN n="2" />. Each dimension below is defined as a **pass rate**: the fraction
+of rows (or of the relevant pairs) that satisfy a rule. A pass rate lives in $[0, 1]$, so the
 same alert logic, "page when the rate drops below $\tau$", applies to all of them.
 
 **Completeness** asks whether required values are present. For a column with $N$
@@ -143,3 +145,8 @@ why a quality report is auditable: each number is a defect count divided by a ro
 count, nothing hidden. The next lesson moves from "is today's data clean" to "did
 the *shape* of the data change", where a producer alters the
 [schema](K6/schema-evolution-contracts) out from under its consumers.
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Frames data quality as measurable, testable properties enforced in the pipeline.</FNItem>
+  <FNItem n="2">**Wang, R. Y., & Strong, D. M.** (1996). "Beyond accuracy: what data quality means to data consumers". *Journal of Management Information Systems*, 12(4), 5-33. [doi:10.1080/07421222.1996.11518099](https://doi.org/10.1080/07421222.1996.11518099). The empirical study behind the multi-dimensional view of data quality.</FNItem>
+</Footnotes>

@@ -34,7 +34,7 @@ The **partition key** (`date`) is not stored inside the files at all; it lives i
 the path. A query planner lists the directories, reads each key straight off the
 path, and keeps only the directories whose key satisfies the filter. This is
 **partition pruning**: a filter `WHERE date = '2026-06-09'` opens one directory
-out of however many exist, and never touches the rest.
+out of however many exist, and never touches the rest<FN n="1" />.
 
 ## How much a predicate prunes
 
@@ -83,7 +83,7 @@ one whole partition) brings that effect back, and the total becomes a genuine
 U-shape: the falling data term dominates at low $P$, the rising $sP\omega$
 overhead dominates at high $P$, and the minimum sits where the marginal data saved
 from one more split equals the marginal overhead it adds. The lesson is not "never
-partition" but "partition to that sweet spot, not past it."
+partition" but "partition to that sweet spot, not past it."<FN n="2" />
 
 ![Total query cost as a function of partition count for a selective predicate. Data scanned falls as finer partitions let the query skip more, while per-file overhead rises; their sum is U-shaped with a marked sweet spot, past which tiny-file overhead dominates.](/figures/K2/partitioning-pruning.svg)
 
@@ -138,3 +138,8 @@ per-file overhead, the small-file problem made quantitative. Partitioning gets a
 pile of Parquet files to the right granularity; the
 [next lesson](table-formats-lakehouse) adds the metadata layer that turns that
 pile into a transactional table.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Chapter 6 covers partitioning and how a filter on the partition key prunes the data scanned.</FNItem>
+  <FNItem n="2">**Melnik, S., et al.** (2010). "Dremel: interactive analysis of web-scale datasets". *VLDB*, 3(1-2), 330-339. [doi:10.14778/1920841.1920886](https://doi.org/10.14778/1920841.1920886). Web-scale columnar analytics where data layout and per-file overhead govern scan cost.</FNItem>
+</Footnotes>

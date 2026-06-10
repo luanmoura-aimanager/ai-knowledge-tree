@@ -26,7 +26,8 @@ time interval, and treat each scheduled run as responsible for exactly one parti
 A daily pipeline has one partition per calendar day; the run for `2026-01-02` reads
 that day's source rows and writes that day's output partition. Partitioning gives a
 unit of recomputation: to fix one day you recompute one partition, independent of all
-the others.
+the others. This per-interval run is the data-interval model Airflow schedules and
+backfills against<FN n="1" />.
 
 ## Dependency-driven scheduling
 
@@ -52,7 +53,7 @@ produces.
 
 Formally, let $T$ be the table and $W_d$ the operation that writes partition $d$.
 Append gives $W_d \circ W_d \ne W_d$: the partition's row count grows with each
-application. Overwrite gives
+application<FN n="2" />. Overwrite gives
 
 $$
 W_d \circ W_d = W_d,
@@ -124,3 +125,8 @@ partition overwrite is the rule every well-built task follows. The
 [next lesson](K5/orchestrators-compared) steps up to the systems that run these
 schedules, contrasting orchestrators that think in tasks with those that think in the
 data assets the tasks produce.
+
+<Footnotes>
+  <FNItem n="1">**Apache Software Foundation.** "Apache Airflow documentation". [airflow.apache.org](https://airflow.apache.org/docs/). The DAG, data-interval, scheduling, and backfill concepts model time-partitioned dependency-driven runs.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Treats idempotency and partition overwrite as the discipline that makes retries and backfills safe.</FNItem>
+</Footnotes>

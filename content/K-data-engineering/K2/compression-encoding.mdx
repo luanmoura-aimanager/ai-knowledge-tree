@@ -16,7 +16,7 @@ exactly what a general-purpose compressor cannot exploit on an interleaved row,
 but a column store can, with three encodings so cheap they decode at memory speed.
 Each targets one shape of data; together they explain why columnar files are often
 several times smaller than the raw bytes, on top of the I/O win from reading fewer
-columns.
+columns<FN n="1" />.
 
 The yardstick throughout is the **compression ratio**
 
@@ -47,7 +47,7 @@ $$
 
 When $d \ll R$ the dictionary term is negligible and $\rho_{\text{dict}} \approx
 w / b$: a 2-byte code for an 8-byte string is a $4\times$ win, independent of how
-many rows there are.
+many rows there are<FN n="2" />.
 
 ## Run-length encoding
 
@@ -147,3 +147,8 @@ formulas above predict from cardinality, run length, and delta width. A real
 columnar file (Parquet) stacks these encodings inside every column chunk and
 records per-chunk statistics on top; the [next lesson](parquet-internals) opens
 that file format up.
+
+<Footnotes>
+  <FNItem n="1">**Abadi, D. J., Boncz, P., & Harizopoulos, S.** (2013). *The Design and Implementation of Modern Column-Oriented Database Systems.* Foundations and Trends in Databases. [doi:10.1561/1900000024](https://doi.org/10.1561/1900000024). Surveys dictionary, run-length, and delta encoding in column stores.</FNItem>
+  <FNItem n="2">**Stonebraker, M., et al.** (2005). "C-Store: a column-oriented DBMS". *VLDB*. The column-store prototype whose per-column encodings these schemes follow.</FNItem>
+</Footnotes>

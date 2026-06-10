@@ -18,7 +18,7 @@ column exists, no test that it is correct, and no map of what breaks if a source
 column is renamed. The fix is to stop treating transformations as scripts and start
 treating them as **code**: each transformation a named, version-controlled unit whose
 dependencies are declared, not remembered. This is the mental model popularized by
-**dbt**; what matters here is the model, not the tool's syntax.
+**dbt**<FN n="1" />; what matters here is the model, not the tool's syntax.
 
 ## A model is a SELECT plus a materialization
 
@@ -65,7 +65,8 @@ descendants is its lineage.
 ## Version control, tests, and the payoff
 
 Because each model is a file of SQL, the whole transformation layer lives in a git
-repository. That brings the ordinary engineering disciplines to data:
+repository. That brings the ordinary engineering disciplines to data, the
+software-engineering posture data engineering increasingly adopts<FN n="2" />:
 
 - **Version control.** Every change to a transformation is a diff with an author, a
   timestamp, and a review. You can see when the revenue definition changed and roll
@@ -86,3 +87,8 @@ applies the same models, refs, and tests to the feature and training tables an M
 system consumes. The next lesson sharpens one detail of how these models run, by
 processing only the rows that changed instead of rebuilding every table from scratch,
 in [incremental models](K5/incremental-processing).
+
+<Footnotes>
+  <FNItem n="1">**dbt Labs.** (2024). "dbt documentation". [docs.getdbt.com](https://docs.getdbt.com). Models, `ref()`-based dependencies, materializations, and tests define the transformation-as-code mental model used here.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Argues for treating transformation pipelines with version control, testing, and CI as first-class software.</FNItem>
+</Footnotes>

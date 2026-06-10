@@ -16,7 +16,7 @@ rows, a join starts producing nulls it never did before. These are *operational*
 failures, and catching them needs a view *over time*: today's numbers compared
 against what this pipeline normally does. **Data observability** is that view, the
 continuous monitoring of a pipeline's operational signals so a broken upstream
-feed is flagged before its output reaches a dashboard.
+feed is flagged before its output reaches a dashboard<FN n="1" />.
 
 ## The operational signals
 
@@ -33,6 +33,9 @@ and watch over time:
   signals a broken join or a renamed source field.
 - **Schema**: the structure itself, watched for the
   [breaking changes](K6/schema-evolution-contracts) of the previous lesson.
+
+These freshness, volume, null-rate, and schema signals are the operational health
+metrics monitoring frameworks track to catch broken feeds early<FN n="2" />.
 
 Each is a series $x_1, x_2, \dots, x_t$, and "is today abnormal" is an anomaly
 question against the recent baseline.
@@ -127,3 +130,8 @@ honest because the drop never entered its own reference. The final lesson closes
 the discipline by protecting the data the pipeline carries, classifying and
 masking sensitive fields and meeting compliance regimes, in
 [governance](K6/governance-pii).
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Covers data observability and monitoring of freshness, volume, and quality signals across the lifecycle.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Its monitoring chapter develops operational data-health signals and anomaly detection over time series feeding ML systems.</FNItem>
+</Footnotes>

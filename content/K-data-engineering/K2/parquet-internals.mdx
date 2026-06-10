@@ -22,7 +22,7 @@ the file is structured to make those statistics actionable.
 
 A Parquet file is not one flat column store; it is **horizontally partitioned**
 into **row groups**, each holding a contiguous band of rows (often around a
-million, or 128 MB of data). Within a row group, the values are stored
+million, or 128 MB of data)<FN n="1" />. Within a row group, the values are stored
 **vertically**: each column gets its own **column chunk**, a contiguous run of
 that column's values for the rows in that group. A column chunk is further split
 into **pages**, the smallest unit that is encoded and compressed as a whole.
@@ -76,7 +76,7 @@ row by row. The test is **conservative**: it only ever skips groups that are
 *provably* all-non-matching, so it never drops a real result, and its power
 depends on the data being clustered, stats on a column sorted (or partitioned) by
 the filter give tight, non-overlapping `[min, max]` ranges that prune most groups,
-while a randomly shuffled column gives wide overlapping ranges that prune nothing.
+while a randomly shuffled column gives wide overlapping ranges that prune nothing<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -91,3 +91,8 @@ The same `min`/`max`/`null_count` stats also answer some aggregates outright
 coarse pruning *inside* a file; the [next lesson](partitioning-pruning) does the
 same trick one level up, pruning whole files via the directory layout, and shows
 why slicing too finely backfires.
+
+<Footnotes>
+  <FNItem n="1">**Melnik, S., et al.** (2010). "Dremel: interactive analysis of web-scale datasets". *VLDB*, 3(1-2), 330-339. [doi:10.14778/1920841.1920886](https://doi.org/10.14778/1920841.1920886). The nested columnar storage model that Parquet's row-group and column-chunk layout descends from.</FNItem>
+  <FNItem n="2">**Abadi, D. J., Boncz, P., & Harizopoulos, S.** (2013). *The Design and Implementation of Modern Column-Oriented Database Systems.* Foundations and Trends in Databases. [doi:10.1561/1900000024](https://doi.org/10.1561/1900000024). Covers per-chunk min/max statistics and the data clustering that makes pruning effective.</FNItem>
+</Footnotes>

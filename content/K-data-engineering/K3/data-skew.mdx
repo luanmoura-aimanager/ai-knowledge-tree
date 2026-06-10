@@ -15,7 +15,7 @@ oblige. User IDs, country codes, and event types follow power laws, where a hand
 keys account for most of the rows. When one key is far heavier than the rest, the reducer
 that owns it gets buried while the others sit idle, and the job waits on that one machine.
 That lagging machine is the **straggler**, and it is the dominant failure mode of large
-distributed aggregations.
+distributed aggregations<FN n="1" />.
 
 ## Job time tracks the maximum, not the mean
 
@@ -59,7 +59,7 @@ The cost is a second pass: each salted bucket produces a **partial** aggregate, 
 final step re-combines the $m$ partials for $k^\star$ into its true total. For an
 associative reduction (sum, count, max) this is exact, since $\sum$ over the whole is the
 $\sum$ of the partial $\sum$s. Salting trades one extra small aggregation for cutting the
-straggler down, and the heaviest reducer's load drops accordingly.
+straggler down, and the heaviest reducer's load drops accordingly<FN n="2" />.
 
 ![Per-reducer load before and after salting a skewed key distribution. Before, a power-law key piles onto one reducer and the max bar towers over the mean; salting splits the hot key across reducers, dropping the maximum toward the average.](/figures/K3/data-skew.svg)
 
@@ -110,3 +110,8 @@ reducer, where real salting splits that key into $m$ explicit sub-keys; both sha
 same point, that breaking up the one heavy key is what removes the straggler.
 Skew is the last of the runtime costs; the [next lesson](query-execution-pushdown) turns
 to how the query planner avoids reading data it does not need in the first place.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 10 names hot-key skew and the straggler it creates as the central hazard of partitioned aggregation, and salting as the remedy.</FNItem>
+  <FNItem n="2">**Dean, J., & Ghemawat, S.** (2008). "MapReduce: simplified data processing on large clusters". *Communications of the ACM*, 51(1), 107-113. [doi:10.1145/1327452.1327492](https://doi.org/10.1145/1327452.1327492). Identifies stragglers as a dominant cost and the original framework's backup-task mitigation.</FNItem>
+</Footnotes>
