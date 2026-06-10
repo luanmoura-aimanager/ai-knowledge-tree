@@ -302,6 +302,14 @@ npm run lint
 Auth + progress activate when `DATABASE_URL` + `AUTH_*` are set. See
 `.env.example` and `DEPLOY.md` (deploy steps are user-run; Vercel CLI required).
 
+## Roadmap (next steps)
+
+`ROADMAP.md` (repo root) is the canonical backlog of upcoming work. When the user
+asks "what are the next steps?" (or similar), read `ROADMAP.md` and answer from
+it. When you finish one of its items, check it off or remove it in the same change
+so the list never claims work that's already shipped. Add new agreed next steps
+there too — it is the single source of truth for planned work.
+
 ## What is intentionally NOT here
 
 - **Most lessons are unwritten.** Pillars A, C, D, E, B are complete; F through J
