@@ -13,8 +13,8 @@ Backpropagation by hand works for one architecture; framework users want
 to write any function and get gradients automatically. **Reverse-mode
 automatic differentiation** records the operations that produced each
 value into a graph at runtime, then walks the graph backward to compute
-all gradients. Every modern deep-learning framework is a variation of
-this pattern.
+all gradients<FN n="1" />. Every modern deep-learning framework is a
+variation of this pattern.
 
 ## The core idea: nodes that remember
 
@@ -81,7 +81,7 @@ input).
 - Outputs $\ll$ inputs (typical neural networks: scalar loss, millions
   of parameters): reverse mode wins by a factor of (# parameters).
 
-This is why every deep-learning framework defaults to reverse mode.
+This is why every deep-learning framework defaults to reverse mode<FN n="2" />.
 
 ## Limitations and extensions
 
@@ -171,3 +171,8 @@ explicit knowledge of the function `f`; it derived everything from the
 operations recorded during the forward pass. The next lesson zooms out:
 *why* can these stacks of affine maps and nonlinearities fit any
 function?
+
+<Footnotes>
+  <FNItem n="1">**Baydin, A. G., Pearlmutter, B. A., Radul, A. A., & Siskind, J. M.** (2018). "Automatic differentiation in machine learning: a survey". *JMLR*, 18, 1-43. [arXiv:1502.05767](https://arxiv.org/abs/1502.05767). Surveys reverse-mode AD and the operator-overloading / graph-recording implementation used here.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §6.5.9 (Differentiation outside the Deep Learning Community). MIT Press. Reverse-mode AD for scalar-output networks with many parameters.</FNItem>
+</Footnotes>

@@ -40,7 +40,7 @@ A 4-GPU pipeline could achieve 25% utilization at most.
 
 ### GPipe
 
-Huang et al. (2019). Split the batch into smaller **microbatches**.
+Huang et al. (2019)<FN n="1" />. Split the batch into smaller **microbatches**.
 Pipeline them: GPU 0 starts microbatch 2 once it's done with
 microbatch 1, while GPU 1 starts microbatch 1.
 
@@ -85,7 +85,7 @@ The matmul is split; the input $X$ must be available on all GPUs
 
 ### For Transformers
 
-Megatron-LM (Shoeybi et al., 2019). Combine column-split (output
+Megatron-LM (Shoeybi et al., 2019)<FN n="2" />. Combine column-split (output
 dimension) and row-split (input dimension) cleverly:
 
 - **Attention's QKV projection**: column-split (each GPU produces
@@ -106,7 +106,7 @@ server connected by NVLink), where the all-reduce is fast.
 
 Combine three axes:
 
-- **Data parallelism**: across nodes.
+- **Data parallelism**: across nodes (sharded with ZeRO / FSDP)<FN n="3" />.
 - **Pipeline parallelism**: across nodes within a data-parallel
   replica.
 - **Tensor parallelism**: across GPUs within a node.
@@ -169,3 +169,9 @@ alternative for greenfield projects.
 
 The next lesson covers a different scaling dimension: making the
 training compute itself faster via compilation.
+
+<Footnotes>
+  <FNItem n="1">**Huang, Y., et al.** (2019). "GPipe: efficient training of giant neural networks using pipeline parallelism". *NeurIPS*. [arXiv:1811.06965](https://arxiv.org/abs/1811.06965). Microbatched pipeline parallelism and the bubble-fraction analysis.</FNItem>
+  <FNItem n="2">**Shoeybi, M., et al.** (2019). "Megatron-LM: training multi-billion parameter language models using model parallelism". [arXiv:1909.08053](https://arxiv.org/abs/1909.08053). The column/row tensor-parallel split for attention and FFN.</FNItem>
+  <FNItem n="3">**Rajbhandari, S., Rasley, J., Ruwase, O., & He, Y.** (2020). "ZeRO: memory optimizations toward training trillion parameter models". *SC*. [arXiv:1910.02054](https://arxiv.org/abs/1910.02054). Sharded data parallelism, the third axis of 3D parallelism.</FNItem>
+</Footnotes>

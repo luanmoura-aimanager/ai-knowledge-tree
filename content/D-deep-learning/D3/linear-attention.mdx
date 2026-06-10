@@ -20,7 +20,7 @@ methods from the previous lesson.
 
 ## The cost to attack
 
-Standard attention computes $\operatorname{softmax}(QK^\top/\sqrt{d})V$:
+Standard attention computes $\operatorname{softmax}(QK^\top/\sqrt{d})V$<FN n="2" />:
 
 - $QK^\top$: $O(N^2 d)$ FLOPs, materializes an $N \times N$ matrix.
 - $\operatorname{softmax}$: $O(N^2)$ FLOPs, requires the full matrix.
@@ -62,7 +62,9 @@ $$
 
 Compute $\phi(K)^\top V \in \mathbb{R}^{m \times d}$ first ($O(N m d)$
 cost), then multiply by $\phi(Q)$ ($O(N m d)$ cost). Total cost
-$O(Nmd)$ instead of $O(N^2 d)$.
+$O(Nmd)$ instead of $O(N^2 d)$. Reordering the products this way also
+exposes an exact recurrent form, making a linear-attention layer an
+RNN at inference time<FN n="1" />.
 
 Performers use random features that approximate the softmax kernel
 unbiased. Other "linear attention" variants use elu+1, ReLU, or
@@ -149,3 +151,8 @@ angle: lower-rank approximations, sparse patterns, kernel features,
 memory-aware kernels, and complete architectural replacements. The next
 lesson covers the synthesis: hybrid architectures that combine the
 strengths of multiple sequence-mixing operations.
+
+<Footnotes>
+  <FNItem n="1">**Katharopoulos, A., Vyas, A., Pappas, N., & Fleuret, F.** (2020). "Transformers are RNNs: fast autoregressive transformers with linear attention". *ICML*. [arXiv:2006.16236](https://arxiv.org/abs/2006.16236). Replaces the softmax with a kernel feature map for linear-time attention.</FNItem>
+  <FNItem n="2">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). The exact softmax attention whose quadratic cost these methods attack.</FNItem>
+</Footnotes>

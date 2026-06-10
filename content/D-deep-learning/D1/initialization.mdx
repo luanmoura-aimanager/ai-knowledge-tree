@@ -44,7 +44,7 @@ For tanh, around zero $\tanh(z) \approx z$, so the activation
 approximately preserves variance for small inputs. The Glorot
 initialization compromises between forward variance preservation
 (needs $\sigma_W^2 = 1/d_{\ell-1}$) and backward variance preservation
-(needs $\sigma_W^2 = 1/d_\ell$) by averaging:
+(needs $\sigma_W^2 = 1/d_\ell$) by averaging<FN n="1" />:
 
 $$
 \sigma_W^2 = \frac{2}{d_{\ell-1} + d_\ell}.
@@ -64,7 +64,7 @@ $$
 \sigma_W^2 = \frac{2}{d_{\ell-1}}.
 $$
 
-In code: $W_{ij} \sim \mathcal{N}(0, 2/d_{\ell-1})$. He initialization is
+In code: $W_{ij} \sim \mathcal{N}(0, 2/d_{\ell-1})$<FN n="2" />. He initialization is
 the standard for any ReLU-family network (including GELU and Swish, which
 behave similarly enough that He's factor of 2 is a fine default).
 
@@ -108,7 +108,7 @@ that does not.
 - **Transformer attention output projection**: zero-init or small init
   helps stability in early training (used in many recent recipes).
 
-![Activation variance through a 20-layer ReLU network: naive (too-small) init collapses it toward zero and Xavier decays slowly, but He init holds it roughly constant — the condition for training deep nets.](/figures/D1/initialization.svg)
+![Activation variance through a 20-layer ReLU network: naive (too-small) init collapses it toward zero and Xavier decays slowly, but He init holds it roughly constant, the condition for training deep nets.](/figures/D1/initialization.svg)
 
 ## Check it on arrays
 
@@ -158,3 +158,8 @@ matches it for tanh. Naive small-scale initialization collapses variance
 to zero within a few layers. The next lesson installs normalization
 layers that make the network self-stabilizing even when initialization
 is imperfect.
+
+<Footnotes>
+  <FNItem n="1">**Glorot, X., & Bengio, Y.** (2010). "Understanding the difficulty of training deep feedforward neural networks". *AISTATS*. Derives the variance-preserving (Xavier) initialization for tanh and sigmoid networks.</FNItem>
+  <FNItem n="2">**He, K., Zhang, X., Ren, S., & Sun, J.** (2015). "Delving deep into rectifiers: surpassing human-level performance on ImageNet classification". *ICCV*. [arXiv:1502.01852](https://arxiv.org/abs/1502.01852). Corrects the variance factor to $2/d_{\ell-1}$ for ReLU networks.</FNItem>
+</Footnotes>

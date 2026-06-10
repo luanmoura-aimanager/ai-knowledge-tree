@@ -41,7 +41,7 @@ methods; flow matching is the next conceptual simplification.
 
 ## Flow matching
 
-Lipman et al. (2023). Skip the noise/score framing. Define a
+Lipman et al. (2023). Skip the noise/score framing<FN n="1" />. Define a
 **probability path** $p_t(x)$ that interpolates between a simple base
 $p_0$ (e.g., $\mathcal{N}(0, I)$) and the data distribution $p_1$. Each
 path has an associated **vector field** $v_t(x)$ that transports
@@ -69,7 +69,7 @@ sample at a specific schedule).
 
 ## Rectified flow
 
-Liu et al. (2023). The same idea, with iterative **rectification**:
+Liu et al. (2023). The same idea, with iterative **rectification**<FN n="2" />:
 after training a flow $v_\theta$, sample many pairs $(x_0, x_1)$ from
 the flow by integrating $v_\theta$, then retrain a new flow on these
 pairs. Each rectification makes the trajectories straighter, reducing
@@ -96,7 +96,7 @@ many 2024 models followed.
 ## Consistency models
 
 Song et al. (2023). Train a model that directly maps any noisy
-sample at any timestep to the same final clean sample:
+sample at any timestep to the same final clean sample<FN n="3" />:
 
 $$
 f_\theta(x_t, t) = f_\theta(x_{t'}, t')\ \ \text{for all }t, t'.
@@ -149,3 +149,9 @@ specific algorithmic choice (DDPM, score matching, flow matching,
 consistency) is converging on what works best at scale; the underlying
 generative recipe is now stable enough to be a foundational tool
 across modalities.
+
+<Footnotes>
+  <FNItem n="1">**Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M., & Le, M.** (2023). "Flow matching for generative modeling". *ICLR*. [arXiv:2210.02747](https://arxiv.org/abs/2210.02747). The conditional vector-field objective.</FNItem>
+  <FNItem n="2">**Liu, X., Gong, C., & Liu, Q.** (2023). "Flow straight and fast: learning to generate and transfer data with rectified flow". *ICLR*. [arXiv:2209.03003](https://arxiv.org/abs/2209.03003). Iterative rectification toward straight-line trajectories.</FNItem>
+  <FNItem n="3">**Song, Y., Dhariwal, P., Chen, M., & Sutskever, I.** (2023). "Consistency models". *ICML*. [arXiv:2303.01469](https://arxiv.org/abs/2303.01469). One-step generation via the consistency property.</FNItem>
+</Footnotes>

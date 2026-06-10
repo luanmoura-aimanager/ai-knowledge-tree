@@ -15,7 +15,7 @@ autoencoder (VAE)** adds a probabilistic structure: each input maps to
 a *distribution* over latents, and a prior keeps that distribution
 well-behaved. Sampling becomes principled, the model has a likelihood,
 and the math (the ELBO) generalizes to a huge family of latent-variable
-models.
+models<FN n="1" />.
 
 ## The generative story
 
@@ -86,7 +86,7 @@ $$
 
 Now $z$ is a differentiable function of $\phi$ (with $\epsilon$ random
 but treated as input), and backprop flows through the sample. This is
-the key trick that made VAE training practical.
+the key trick that made VAE training practical<FN n="2" />.
 
 ## Training procedure
 
@@ -138,7 +138,7 @@ VAEs hold up best as a representation-learning backbone and as a
 component in larger pipelines (e.g., the autoencoder in Stable
 Diffusion is a VAE).
 
-![The VAE's KL term, KL(N(μ,σ²)‖N(0,1)) = ½(μ²+σ²−1−2lnσ), is zero only at μ=0, σ=1 and grows as the code drifts — the pressure that keeps the latent space close to the prior.](/figures/D4/vae.svg)
+![The VAE's KL term, KL(N(μ,σ²)‖N(0,1)) = ½(μ²+σ²−1−2lnσ), is zero only at μ=0, σ=1 and grows as the code drifts: the pressure that keeps the latent space close to the prior.](/figures/D4/vae.svg)
 
 ## Check it on arrays
 
@@ -193,3 +193,8 @@ The ELBO splits cleanly into reconstruction and KL; prior samples
 decode to outputs in the data range (training would push them toward
 the modes). The next lesson covers VAE variants that improve
 disentanglement and discrete-latent control.
+
+<Footnotes>
+  <FNItem n="1">**Kingma, D. P., & Welling, M.** (2014). "Auto-encoding variational bayes". *ICLR*. [arXiv:1312.6114](https://arxiv.org/abs/1312.6114). The original VAE: the ELBO and the amortized variational posterior.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §20.10.3 (Variational Autoencoders). MIT Press. The reparameterization trick as a path to low-variance gradients.</FNItem>
+</Footnotes>

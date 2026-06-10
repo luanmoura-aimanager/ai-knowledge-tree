@@ -69,9 +69,9 @@ practice they do not:
 - **Exploding**: if the spectral radius is above 1, the product grows
   exponentially. Single gradient updates become huge, training NaNs.
 
-Both regimes are easy to enter. Vanilla RNNs in practice learn
+Both regimes are easy to enter<FN n="1" />. Vanilla RNNs in practice learn
 dependencies of length 10-20; longer ranges require the gated variants
-of the next lesson.
+of the next lesson<FN n="2" />.
 
 ## Gradient clipping
 
@@ -89,7 +89,7 @@ change.
 ## When RNNs are still used
 
 The dominant sequence architecture for years (2014-2018), then largely
-replaced by Transformers and state space models. Still useful when:
+replaced by Transformers and state space models<FN n="3" />. Still useful when:
 
 - **Memory matters**: an RNN processes sequences of arbitrary length
   with constant memory per step.
@@ -113,6 +113,12 @@ common.
 
 The next lesson tackles the vanishing-gradient problem head-on with
 LSTM and GRU gates.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §10.7 (The Challenge of Long-Term Dependencies). MIT Press. The vanishing/exploding gradient analysis for recurrent nets.</FNItem>
+  <FNItem n="2">**Hochreiter, S., & Schmidhuber, J.** (1997). "Long short-term memory". *Neural Computation*, 9(8), 1735-1780. [doi:10.1162/neco.1997.9.8.1735](https://doi.org/10.1162/neco.1997.9.8.1735). The gated cell that fixes vanishing gradients.</FNItem>
+  <FNItem n="3">**Sutskever, I., Vinyals, O., & Le, Q. V.** (2014). "Sequence to sequence learning with neural networks". *NeurIPS*. [arXiv:1409.3215](https://arxiv.org/abs/1409.3215). LSTM encoder-decoders as the dominant sequence architecture of the era.</FNItem>
+</Footnotes>
 
 ![The product of per-step Jacobians decides gradient flow through time: a recurrent spectral radius below 1 makes gradients vanish, above 1 makes them explode, and near 1 keeps them stable.](/figures/D3/rnn.svg)
 

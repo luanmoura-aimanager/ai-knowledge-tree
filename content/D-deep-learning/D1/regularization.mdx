@@ -36,7 +36,7 @@ the scaling).
   particular other unit, so the network learns redundant representations.
 - **Implicit ensembling**: each forward pass is a different random
   subnetwork. The full network at inference is an approximate average of
-  $2^N$ subnetworks.
+  $2^N$ subnetworks<FN n="1" />.
 
 Typical dropout rate: $p = 0.1$ to $0.5$, applied after activations and
 sometimes inside attention layers in Transformers. Too much dropout
@@ -70,7 +70,7 @@ $$
 $$
 
 This is **MAP estimation with a Gaussian prior on the weights**; the
-identity from the ridge-regression lesson generalizes here.
+identity from the ridge-regression lesson generalizes here<FN n="2" />.
 
 **Weight decay**, by convention, refers to the multiplicative shrinkage
 form (the second equation). For SGD they are identical; for adaptive
@@ -177,3 +177,8 @@ shrinks parameters geometrically, and in this noisy regression each one
 (or both together) reduces validation MSE relative to plain unregularized
 training. The next lesson chooses the right optimizer for the resulting
 regularized objective.
+
+<Footnotes>
+  <FNItem n="1">**Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., & Salakhutdinov, R.** (2014). "Dropout: a simple way to prevent neural networks from overfitting". *JMLR*, 15, 1929-1958. Introduces dropout and the implicit-ensemble interpretation.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §7.1 (Parameter Norm Penalties). MIT Press. L2 weight decay as MAP estimation with a Gaussian prior.</FNItem>
+</Footnotes>

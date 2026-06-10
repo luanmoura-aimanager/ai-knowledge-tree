@@ -13,7 +13,7 @@ Many domains have data that is naturally a **graph**: social networks,
 molecules, knowledge bases, road networks, code, scenes. **Graph neural
 networks (GNNs)** are deep learning models specialized to these
 structures. This lesson sets up the basics: how to encode a graph for a
-neural network, and what the standard learning tasks look like.
+neural network, and what the standard learning tasks look like<FN ns="1, 2" />.
 
 ## What a graph is
 
@@ -77,7 +77,9 @@ Two needs that distinguish GNNs:
 - **Local processing on neighborhoods**: each node's representation
   should depend on its neighbors' features, not on global position.
 
-The next lesson formalizes both with the message-passing framework.
+These two needs are the central inductive biases of the geometric deep
+learning program<FN n="3" />. The next lesson formalizes both with the
+message-passing framework.
 
 ## The Weisfeiler-Leman test
 
@@ -164,3 +166,9 @@ print(f"graph-level logits: {(graph_emb @ W_graph).round(2)}")
 The three task heads consume the same node embeddings differently. The
 next lesson formalizes how those node embeddings are produced through
 the message-passing framework.
+
+<Footnotes>
+  <FNItem n="1">**Hamilton, W. L., Ying, R., & Leskovec, J.** (2017). "Inductive representation learning on large graphs (GraphSAGE)". *NeurIPS*. [arXiv:1706.02216](https://arxiv.org/abs/1706.02216). Sets up node/edge/graph-level learning over node feature matrices.</FNItem>
+  <FNItem n="2">**Battaglia, P. W., et al.** (2018). "Relational inductive biases, deep learning, and graph networks". [arXiv:1806.01261](https://arxiv.org/abs/1806.01261). A unifying formalization of graph-structured learning tasks.</FNItem>
+  <FNItem n="3">**Bronstein, M. M., Bruna, J., Cohen, T., & Veličković, P.** (2021). "Geometric deep learning: grids, groups, graphs, geodesics, and gauges". [arXiv:2104.13478](https://arxiv.org/abs/2104.13478). Frames permutation invariance and local processing as the design principles for graphs.</FNItem>
+</Footnotes>

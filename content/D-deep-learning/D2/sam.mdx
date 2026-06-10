@@ -12,7 +12,7 @@ codeExempt: true
 
 Meta AI's **Segment Anything Model (SAM)** is the closest thing vision
 has to a foundation model: one model that produces high-quality masks
-for any object the user points at, without per-task fine-tuning. The
+for any object the user points at, without per-task fine-tuning<FN n="1" />. The
 recipe is interesting beyond segmentation: pretrain a promptable model
 at scale on a synthetic-then-real data flywheel, and downstream task
 specialization becomes prompt engineering.
@@ -33,7 +33,7 @@ class-specific.
 
 Three components:
 
-1. **Image encoder**: a ViT-H (Huge) trained to produce a dense feature
+1. **Image encoder**: a ViT-H (Huge)<FN n="2" /> trained to produce a dense feature
    embedding of the image, $\sim 64 \times 64 \times 256$. Heavy ($\sim$600M
    parameters) but run only once per image; cached for repeated prompts.
 2. **Prompt encoder**: tokenizes the prompt. Points and boxes become
@@ -134,3 +134,8 @@ This pattern is now being applied to many vision tasks (depth, normal
 estimation, etc.), and it is essentially how LLMs work too. The next
 lesson covers a different scaling story: pretraining vision models
 without labels.
+
+<Footnotes>
+  <FNItem n="1">**Kirillov, A., et al.** (2023). "Segment Anything (SAM)". *ICCV*. [arXiv:2304.02643](https://arxiv.org/abs/2304.02643). The promptable image/prompt/mask pipeline and the SA-1B data flywheel.</FNItem>
+  <FNItem n="2">**Dosovitskiy, A., et al.** (2021). "An image is worth 16x16 words: transformers for image recognition at scale (ViT)". *ICLR*. [arXiv:2010.11929](https://arxiv.org/abs/2010.11929). The ViT backbone SAM uses as its image encoder.</FNItem>
+</Footnotes>

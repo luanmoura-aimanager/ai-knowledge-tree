@@ -36,8 +36,8 @@ unequal gradient scales (which Transformers have).
 
 ## Adam and AdamW
 
-Adam from A3 maintains per-parameter first and second moments. **AdamW**
-fixes Adam's coupling between weight decay and adaptive rescaling:
+Adam from A3 maintains per-parameter first and second moments<FN n="1" />.
+**AdamW** fixes Adam's coupling between weight decay and adaptive rescaling:
 
 - Plain Adam adds $\lambda \theta$ to the gradient before computing
   $m$, $v$, and the update. The L2 term gets divided by $\sqrt{\hat v}$,
@@ -67,8 +67,8 @@ is its **schedule** over training:
 
 **Why warmup**: Adam's running statistics $\hat m, \hat v$ are unreliable
 in the first few hundred steps (large bias-correction factors), so taking
-full-size steps then leads to instability. Linear warmup lets the
-statistics stabilize before the steps grow.
+full-size steps then leads to instability<FN n="2" />. Linear warmup lets
+the statistics stabilize before the steps grow.
 
 **Why cosine decay**: late-training small steps are needed to land in a
 good local minimum without bouncing. Constant LR plus early stopping is
@@ -182,3 +182,8 @@ momentum because it rescales per coordinate; the warmup-cosine schedule
 starts at zero, peaks at warmup, and decays to zero. This closes the D1
 core-building-blocks track. The next subsection (D2) applies these
 foundations to image data with convolutional networks.
+
+<Footnotes>
+  <FNItem n="1">**Kingma, D. P., & Ba, J.** (2015). "Adam: a method for stochastic optimization". *ICLR*. [arXiv:1412.6980](https://arxiv.org/abs/1412.6980). The adaptive optimizer with per-parameter first and second moment estimates.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §8.5 (Algorithms with Adaptive Learning Rates). MIT Press. Adaptive-rate optimizers and the practical tuning of their schedules.</FNItem>
+</Footnotes>

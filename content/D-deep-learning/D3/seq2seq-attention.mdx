@@ -19,7 +19,7 @@ followed.
 
 ## The vanilla encoder-decoder
 
-Sutskever, Vinyals, Le (2014).
+Sutskever, Vinyals, Le (2014)<FN n="1" />.
 
 - **Encoder**: an LSTM that reads the input sequence $x_1, \dots, x_S$
   and produces a final hidden state $h_S$ (and cell state $c_S$).
@@ -27,13 +27,13 @@ Sutskever, Vinyals, Le (2014).
   At each step $t$ it consumes the previous output token (and possibly
   the previous hidden state) and predicts the next.
 
-A single vector $h_S$ has to encode the entire input. For short
+A single vector $h_S$ has to encode the entire input<FN n="2" />. For short
 sentences this is fine; for long ones, $h_S$ becomes a bottleneck and
 translation quality drops with sentence length.
 
 ## The attention fix
 
-Bahdanau et al. (2015), Luong et al. (2015).
+Bahdanau et al. (2015), Luong et al. (2015)<FN n="3" />.
 
 Instead of compressing the input into one vector, keep **all** encoder
 hidden states $\{h_1^{\text{enc}}, \dots, h_S^{\text{enc}}\}$ and let
@@ -167,3 +167,9 @@ encoder state best aligns with the decoder query; shifting the decoder
 state toward a specific source position pulls the attention to that
 position. The next lesson generalizes this to **self-attention**, where
 queries, keys, and values all come from the same sequence.
+
+<Footnotes>
+  <FNItem n="1">**Sutskever, I., Vinyals, O., & Le, Q. V.** (2014). "Sequence to sequence learning with neural networks". *NeurIPS*. [arXiv:1409.3215](https://arxiv.org/abs/1409.3215). The LSTM encoder-decoder for machine translation.</FNItem>
+  <FNItem n="2">**Cho, K., et al.** (2014). "Learning phrase representations using RNN encoder-decoder (GRU)". *EMNLP*. [arXiv:1406.1078](https://arxiv.org/abs/1406.1078). The RNN encoder-decoder whose single fixed-length code motivated attention.</FNItem>
+  <FNItem n="3">**Bahdanau, D., Cho, K., & Bengio, Y.** (2015). "Neural machine translation by jointly learning to align and translate". *ICLR*. [arXiv:1409.0473](https://arxiv.org/abs/1409.0473). Introduces additive attention over encoder states.</FNItem>
+</Footnotes>

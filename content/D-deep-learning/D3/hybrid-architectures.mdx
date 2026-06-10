@@ -28,7 +28,7 @@ A long-context language model needs both. Hybrid architectures use:
 
 - **Attention** for occasional global content-based mixing.
 - **SSM or linear attention** for everything else (local processing,
-  bulk sequence mixing).
+  bulk sequence mixing)<FN n="1" />.
 
 The savings are large: most layers being O(N) and only a few being
 O(N²) puts the overall cost solidly sub-quadratic.
@@ -70,7 +70,7 @@ production architectures.
 ## Jamba
 
 AI21 Labs (2024). Mixture of attention and Mamba blocks in a single
-backbone:
+backbone, the Mamba block being the selective SSM of the previous lesson<FN n="2" />:
 
 - Mostly Mamba blocks for cheap sequence mixing.
 - Every $K$-th block (e.g. one in every 8) is a standard Transformer
@@ -154,3 +154,8 @@ Pillar D's sequence track ran from word embeddings through RNNs and
 LSTMs to the Transformer, then beyond it to SSMs and hybrid
 architectures. The next subsection (D4) covers a different problem
 entirely: generating *new* data, not predicting from existing data.
+
+<Footnotes>
+  <FNItem n="1">**Katharopoulos, A., Vyas, A., Pappas, N., & Fleuret, F.** (2020). "Transformers are RNNs: fast autoregressive transformers with linear attention". *ICML*. [arXiv:2006.16236](https://arxiv.org/abs/2006.16236). The linear-attention recurrence that pure-recurrent hybrids build on.</FNItem>
+  <FNItem n="2">**Gu, A., & Dao, T.** (2023). "Mamba: linear-time sequence modeling with selective state spaces". [arXiv:2312.00752](https://arxiv.org/abs/2312.00752). The selective SSM block that Jamba and other hybrids interleave with attention.</FNItem>
+</Footnotes>

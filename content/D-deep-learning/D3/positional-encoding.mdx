@@ -36,7 +36,7 @@ lengths longer than training.
 
 ## Sinusoidal positional encoding
 
-The original Transformer: a fixed function of position, no parameters.
+The original Transformer: a fixed function of position, no parameters<FN n="1" />.
 
 $$
 \text{PE}(p, 2i) = \sin\!\left(\frac{p}{10000^{2i/d}}\right), \qquad \text{PE}(p, 2i + 1) = \cos\!\left(\frac{p}{10000^{2i/d}}\right).
@@ -87,7 +87,7 @@ distance.
 
 ## RoPE (Rotary Position Embedding)
 
-Su et al. (2021). The standard in LLaMA, GPT-4-class models.
+Su et al. (2021)<FN n="2" />. The standard in LLaMA, GPT-4-class models.
 
 Apply a position-dependent **rotation** to the query and key vectors
 before the attention dot product. For pairs of dimensions $(2i, 2i+1)$:
@@ -182,3 +182,8 @@ print(bias.round(2))
 The RoPE dot product depends on (pk - pq), not absolute positions; the
 ALiBi bias matrix is a function of distance only. The next lesson
 introduces an alternative to attention entirely: state space models.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). The original sinusoidal positional encoding.</FNItem>
+  <FNItem n="2">**Su, J., Lu, Y., Pan, S., Wen, B., & Liu, Y.** (2021). "RoFormer: enhanced transformer with rotary position embedding (RoPE)". [arXiv:2104.09864](https://arxiv.org/abs/2104.09864). Encodes relative position by rotating queries and keys.</FNItem>
+</Footnotes>

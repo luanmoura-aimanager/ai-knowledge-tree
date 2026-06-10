@@ -28,7 +28,7 @@ $$
 Then a learned affine $y_{i,c} = \gamma_c\, \hat x_{i,c} + \beta_c$
 restores any scale and shift the next layer wants. The statistics are
 computed per batch during training; **running averages** are kept for
-inference.
+inference<FN n="1" />.
 
 **Strengths**: enabled the original ResNet, lets you use larger learning
 rates, smooths the loss landscape. Most CNN architectures rely on it.
@@ -52,7 +52,7 @@ $$
 $$
 
 The statistics are computed per-example, so they do not depend on the
-batch. Eval-mode = train-mode, and batch size 1 works fine.
+batch. Eval-mode = train-mode, and batch size 1 works fine<FN n="2" />.
 
 **Strengths**: works on variable-length sequences, no train/eval
 mismatch, naturally handles small batches.
@@ -86,7 +86,7 @@ architectures (LLaMA, Mistral, most recent recipes).
   *weights* rather than activations. Less popular but still around.
 
 The choice is largely architectural: BatchNorm for vision CNNs at decent
-batch sizes; LayerNorm or RMSNorm for Transformers and sequence models.
+batch sizes; LayerNorm or RMSNorm for Transformers and sequence models<FN n="3" />.
 
 ## Pre-norm vs post-norm
 
@@ -115,7 +115,7 @@ The catch: a normalization layer adds compute and parameter count
 some non-locality (the normalization couples examples in a batch for
 BN).
 
-![Stacking 30 plain ReLU layers lets the activation variance decay toward zero; inserting LayerNorm at each layer holds it steady — why normalization keeps deep networks trainable.](/figures/D1/normalization.svg)
+![Stacking 30 plain ReLU layers lets the activation variance decay toward zero; inserting LayerNorm at each layer holds it steady, which is why normalization keeps deep networks trainable.](/figures/D1/normalization.svg)
 
 ## Check it on arrays
 
@@ -175,3 +175,9 @@ print(f"  with LayerNorm:   layer 5 = {with_norm[5]:.3f}, layer 30 = {with_norm[
 LayerNorm rescues a deep ReLU stack with deliberately bad initialization
 that otherwise collapses to zero. The next lesson covers two other
 training-stability tools: dropout and weight decay.
+
+<Footnotes>
+  <FNItem n="1">**Ioffe, S., & Szegedy, C.** (2015). "Batch normalization: accelerating deep network training by reducing internal covariate shift". *ICML*. [arXiv:1502.03167](https://arxiv.org/abs/1502.03167). Introduces BatchNorm with per-batch statistics and inference-time running averages.</FNItem>
+  <FNItem n="2">**Ba, J. L., Kiros, J. R., & Hinton, G. E.** (2016). "Layer normalization". [arXiv:1607.06450](https://arxiv.org/abs/1607.06450). Normalizes per-example across features, removing the batch dependence.</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §8.7.1 (Batch Normalization). MIT Press. Normalization as an optimization aid in deep networks.</FNItem>
+</Footnotes>

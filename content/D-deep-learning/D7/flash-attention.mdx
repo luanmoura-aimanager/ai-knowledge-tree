@@ -36,7 +36,7 @@ issue.
 
 ## The FlashAttention algorithm
 
-Dao et al. (2022). Two innovations:
+Dao et al. (2022)<FN n="1" />. Two innovations:
 
 **1. Tiling**: split the computation into blocks small enough to fit
 in SRAM. Compute each block fully before moving to the next.
@@ -124,6 +124,7 @@ Modern frameworks integrate FlashAttention transparently:
 # PyTorch 2.x: scaled_dot_product_attention auto-dispatches to FlashAttention
 y = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=True)
 ```
+<FN n="2" />
 
 The framework picks the right backend (FlashAttention, memory-efficient
 attention, naive) based on shapes, hardware, and dtype.
@@ -145,7 +146,7 @@ It is one of the most impactful systems contributions to modern deep
 learning, on par with mixed precision and FSDP for changing what is
 possible to train.
 
-![Standard attention materializes the full n×n score matrix (quadratic memory); FlashAttention streams it in tiles, keeping memory linear — gigabytes vs megabytes at long context.](/figures/D7/flash-attention.svg)
+![Standard attention materializes the full n×n score matrix (quadratic memory); FlashAttention streams it in tiles, keeping memory linear: gigabytes vs megabytes at long context.](/figures/D7/flash-attention.svg)
 
 ## The bigger lesson
 
@@ -159,3 +160,8 @@ This thinking permeates modern kernel writing: KV cache management,
 mixture-of-experts routing, attention variants. The next lesson
 covers the broader infrastructure that wraps all of these: training
 clusters and orchestration.
+
+<Footnotes>
+  <FNItem n="1">**Dao, T., Fu, D. Y., Ermon, S., Rudra, A., & Ré, C.** (2022). "FlashAttention: fast and memory-efficient exact attention with IO-awareness". *NeurIPS*. [arXiv:2205.14135](https://arxiv.org/abs/2205.14135). The tiling plus online-softmax algorithm derived here.</FNItem>
+  <FNItem n="2">**Paszke, A., et al.** (2019). "PyTorch: an imperative style, high-performance deep learning library". *NeurIPS*. [arXiv:1912.01703](https://arxiv.org/abs/1912.01703). The framework whose `scaled_dot_product_attention` auto-dispatches to a FlashAttention backend.</FNItem>
+</Footnotes>

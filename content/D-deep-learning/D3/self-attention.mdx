@@ -9,7 +9,7 @@ goal: "Define scaled dot-product self-attention and explain why the softmax of Q
 prerequisites: ["seq2seq-attention"]
 ---
 
-The single operation behind the Transformer revolution: **self-attention**.
+The single operation behind the Transformer revolution: **self-attention**<FN n="1" />.
 Each token in a sequence computes a query, a key, and a value; the
 attention from token $i$ to token $j$ is the (scaled, softmaxed) inner
 product of $i$'s query with $j$'s key, used to weight $j$'s value into
@@ -121,7 +121,8 @@ applied so padded positions get $-\infty$ scores.
   Used in encoder layers and self-attention sublayers of decoder layers.
 - **Cross-attention**: $Q$ comes from the decoder, $K$ and $V$ come from
   the encoder. The decoder queries the encoder's representation. Used
-  in encoder-decoder Transformers (translation, summarization).
+  in encoder-decoder Transformers (translation, summarization). This is
+  the direct successor of seq2seq attention<FN n="2" />.
 
 The next lesson assembles these primitives into the full Transformer.
 
@@ -185,3 +186,8 @@ The attention matrix is row-stochastic, the causal mask zeroes out
 future positions, and the multi-head computation returns to the
 original embedding dimension. The next lesson stacks attention and FFN
 blocks into the full Transformer.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). Defines scaled dot-product and multi-head self-attention.</FNItem>
+  <FNItem n="2">**Bahdanau, D., Cho, K., & Bengio, Y.** (2015). "Neural machine translation by jointly learning to align and translate". *ICLR*. [arXiv:1409.0473](https://arxiv.org/abs/1409.0473). The encoder-decoder attention that cross-attention generalizes.</FNItem>
+</Footnotes>
