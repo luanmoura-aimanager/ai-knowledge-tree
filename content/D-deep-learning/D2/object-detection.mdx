@@ -41,7 +41,7 @@ The original deep-learning detector. Three steps:
    bounding-box regressor.
 
 **Faster R-CNN** (2015) made this end-to-end by sharing the backbone
-between the RPN and the head, training both jointly. State-of-the-art
+between the RPN and the head, training both jointly<FN n="1" />. State-of-the-art
 accuracy for years and still common when speed is not the priority.
 
 Cost: two-stage means slow. ~5-10 frames per second on a GPU.
@@ -49,7 +49,7 @@ Cost: two-stage means slow. ~5-10 frames per second on a GPU.
 ## YOLO family (one-stage)
 
 Redmon's **YOLO (You Only Look Once)** treats detection as a single
-regression problem:
+regression problem<FN n="2" />:
 
 - Divide the image into a coarse $S \times S$ grid (e.g. 13x13).
 - Each grid cell predicts a small number of **anchor boxes**, each with
@@ -153,3 +153,8 @@ graph LR
 
 For new projects in 2024+, an RT-DETR or YOLOv8 is the sensible default.
 The next lesson tackles pixel-level prediction: segmentation.
+
+<Footnotes>
+  <FNItem n="1">**Ren, S., He, K., Girshick, R., & Sun, J.** (2015). "Faster R-CNN: towards real-time object detection with region proposal networks". *NeurIPS*. [arXiv:1506.01497](https://arxiv.org/abs/1506.01497). The learned RPN sharing a backbone with the detection head.</FNItem>
+  <FNItem n="2">**Redmon, J., Divvala, S., Girshick, R., & Farhadi, A.** (2016). "You only look once: unified, real-time object detection (YOLO)". *CVPR*. [arXiv:1506.02640](https://arxiv.org/abs/1506.02640). Single-shot grid detection in one forward pass.</FNItem>
+</Footnotes>

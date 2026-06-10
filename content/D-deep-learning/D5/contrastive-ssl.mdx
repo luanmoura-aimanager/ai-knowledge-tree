@@ -18,7 +18,7 @@ classification problem where each positive must beat many negatives.
 
 ## The InfoNCE loss
 
-van den Oord et al. (2018). Given an anchor representation $z$, its
+van den Oord et al. (2018)<FN n="3" />. Given an anchor representation $z$, its
 positive partner $z^+$, and $K$ negative partners $z^-_1, \dots, z^-_K$,
 the contrastive loss is
 
@@ -37,7 +37,7 @@ Estimation for Information").
 
 ## SimCLR
 
-Chen et al. (2020).
+Chen et al. (2020)<FN n="1" />.
 
 Given a batch of $N$ images, apply two random augmentations to each,
 producing $2N$ views. Treat each view's other-augmented version as its
@@ -70,7 +70,7 @@ is its main practical limitation.
 
 ## MoCo (Momentum Contrast)
 
-He et al. (2020). Avoid SimCLR's huge-batch requirement by maintaining a
+He et al. (2020)<FN n="2" />. Avoid SimCLR's huge-batch requirement by maintaining a
 **queue of past representations** as negatives.
 
 Two encoders:
@@ -190,3 +190,9 @@ The aligned positives produce a low loss and high top-1 classification
 accuracy among the batch; shuffling breaks both. The next lesson
 extends contrastive learning to cross-modal alignment with CLIP-style
 training, then surveys the non-contrastive alternatives.
+
+<Footnotes>
+  <FNItem n="1">**Chen, T., Kornblith, S., Norouzi, M., & Hinton, G.** (2020). "A simple framework for contrastive learning of visual representations (SimCLR)". *ICML*. [arXiv:2002.05709](https://arxiv.org/abs/2002.05709). Augmented-view positives, large-batch negatives, and the projection head.</FNItem>
+  <FNItem n="2">**He, K., Fan, H., Wu, Y., Xie, S., & Girshick, R.** (2020). "Momentum contrast for unsupervised visual representation learning (MoCo)". *CVPR*. [arXiv:1911.05722](https://arxiv.org/abs/1911.05722). The momentum-encoder queue that decouples negatives from batch size.</FNItem>
+  <FNItem n="3">**Oord, A. van den, Li, Y., & Vinyals, O.** (2018). "Representation learning with contrastive predictive coding (InfoNCE)". [arXiv:1807.03748](https://arxiv.org/abs/1807.03748). Introduces the InfoNCE loss as a mutual-information lower bound.</FNItem>
+</Footnotes>

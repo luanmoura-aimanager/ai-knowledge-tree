@@ -28,7 +28,7 @@ Non-contrastive methods solve collapse architecturally.
 
 ## BYOL (Bootstrap Your Own Latent)
 
-Grill et al. (2020).
+Grill et al. (2020)<FN n="1" />.
 
 Two networks:
 
@@ -55,14 +55,16 @@ Three architectural pieces prevent collapse:
 3. **Moving-average target update**: target features are slow-moving
    compared to online features.
 
-Without any of the three, BYOL collapses to constant features.
+Without any of the three, BYOL collapses to constant features. SimSiam
+later showed the stop-gradient alone is the critical ingredient, even
+without a moving-average target<FN n="2" />.
 
 Why it works precisely is still partly mysterious; empirically, the
 trio is sufficient.
 
 ## DINO (Distillation with No Labels)
 
-Caron et al. (2021). The Transformer-friendly variant.
+Caron et al. (2021)<FN n="3" />. The Transformer-friendly variant.
 
 Same two-network setup (student + teacher with EMA), but:
 
@@ -137,3 +139,9 @@ graph LR
 
 The next lesson covers the masked-modeling SSL approach, originally
 from BERT but now also dominant in vision (MAE).
+
+<Footnotes>
+  <FNItem n="1">**Grill, J.-B., et al.** (2020). "Bootstrap your own latent (BYOL)". *NeurIPS*. [arXiv:2006.07733](https://arxiv.org/abs/2006.07733). Negative-free SSL via an online predictor and an EMA target.</FNItem>
+  <FNItem n="2">**Chen, X., & He, K.** (2021). "Exploring simple siamese representation learning (SimSiam)". *CVPR*. [arXiv:2011.10566](https://arxiv.org/abs/2011.10566). Isolates stop-gradient as the key mechanism preventing collapse.</FNItem>
+  <FNItem n="3">**Caron, M., et al.** (2021). "Emerging properties in self-supervised vision transformers (DINO)". *ICCV*. [arXiv:2104.14294](https://arxiv.org/abs/2104.14294). Student-teacher distillation with centering, sharpening, and multi-crop.</FNItem>
+</Footnotes>

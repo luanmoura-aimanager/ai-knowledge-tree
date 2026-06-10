@@ -14,7 +14,7 @@ neural network. At each layer, every node receives "messages" from its
 neighbors, aggregates them, and uses the aggregate to update its own
 representation. Stacking $L$ message-passing layers gives each node
 information from its $L$-hop neighborhood. The specific choice of
-message function, aggregation, and update determines the GNN flavor.
+message function, aggregation, and update determines the GNN flavor<FN ns="1, 2" />.
 
 ## The three-step framework
 
@@ -52,10 +52,10 @@ node's representation at layer $L$ summarizes its $L$-hop neighborhood.
 
 - **GCN (Graph Convolutional Network)**: message = $W h_j^{(\ell)}$ (no
   source-target mixing), aggregate = degree-normalized sum, update =
-  ReLU. Spectrally motivated.
+  ReLU. Spectrally motivated<FN n="3" />.
 - **GraphSAGE**: message = $h_j^{(\ell)}$, aggregate = mean / max /
   LSTM, update = concatenate with self then MLP. Inductive
-  (handles unseen nodes).
+  (handles unseen nodes)<FN n="4" />.
 - **GAT (Graph Attention Network)**: message = $h_j^{(\ell)}$ weighted
   by a learned attention coefficient depending on $h_i, h_j$.
 - **MPNN**: explicit edge features and learned message functions.
@@ -184,3 +184,10 @@ After many message-passing rounds, features within a connected
 component converge to the same vector, demonstrating over-smoothing.
 The next lesson covers the three standard GNN flavors: GCN, GraphSAGE,
 GAT.
+
+<Footnotes>
+  <FNItem n="1">**Gilmer, J., Schoenholz, S. S., Riley, P. F., Vinyals, O., & Dahl, G. E.** (2017). "Neural message passing for quantum chemistry". *ICML*. [arXiv:1704.01212](https://arxiv.org/abs/1704.01212). Introduces the message/aggregate/update framework that unifies GNN variants.</FNItem>
+  <FNItem n="2">**Battaglia, P. W., et al.** (2018). "Relational inductive biases, deep learning, and graph networks". [arXiv:1806.01261](https://arxiv.org/abs/1806.01261). The graph-network formalism generalizing message passing.</FNItem>
+  <FNItem n="3">**Kipf, T. N., & Welling, M.** (2017). "Semi-supervised classification with graph convolutional networks (GCN)". *ICLR*. [arXiv:1609.02907](https://arxiv.org/abs/1609.02907). Degree-normalized sum aggregation.</FNItem>
+  <FNItem n="4">**Hamilton, W. L., Ying, R., & Leskovec, J.** (2017). "Inductive representation learning on large graphs (GraphSAGE)". *NeurIPS*. [arXiv:1706.02216](https://arxiv.org/abs/1706.02216). Sampled-neighbor mean/max/LSTM aggregation for unseen nodes.</FNItem>
+</Footnotes>

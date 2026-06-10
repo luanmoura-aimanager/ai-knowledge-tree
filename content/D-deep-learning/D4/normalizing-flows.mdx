@@ -13,7 +13,7 @@ A **normalizing flow** transforms a simple base distribution (a Gaussian)
 into the data distribution through a sequence of invertible neural
 network layers. Because each layer is invertible and has a tractable
 Jacobian determinant, the exact log-likelihood of any data point can
-be computed via the change-of-variables formula. This makes flows a
+be computed via the change-of-variables formula<FN n="1" />. This makes flows a
 clean middle ground between VAEs (likelihood lower bound) and GANs
 (no likelihood).
 
@@ -51,7 +51,7 @@ special structures that make the determinant cheap.
 ## Coupling layers (RealNVP)
 
 Dinh et al. (2017). Split the input into two halves $x = (x_a, x_b)$
-and apply:
+and apply<FN n="2" />:
 
 $$
 y_a = x_a, \qquad y_b = x_b \odot \exp(s(x_a)) + t(x_a).
@@ -177,3 +177,8 @@ print(f"log p(x) for a few samples: {log_px[:5].round(3)}")
 Each coupling layer is invertible and contributes a cheap log-Jacobian
 to the total log-density. The next lesson covers the generative method
 that took over from GANs: diffusion models.
+
+<Footnotes>
+  <FNItem n="1">**Rezende, D. J., & Mohamed, S.** (2015). "Variational inference with normalizing flows". *ICML*. [arXiv:1505.05770](https://arxiv.org/abs/1505.05770). The normalizing-flow framework via the change-of-variables formula.</FNItem>
+  <FNItem n="2">**Dinh, L., Sohl-Dickstein, J., & Bengio, S.** (2017). "Density estimation using Real NVP". *ICLR*. [arXiv:1605.08803](https://arxiv.org/abs/1605.08803). Affine coupling layers with triangular Jacobians.</FNItem>
+</Footnotes>

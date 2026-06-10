@@ -19,7 +19,7 @@ quality matters and speed matters more than likelihood.
 ## The minimax game
 
 Goodfellow et al. (2014). Generator $G_\theta: \mathcal{Z} \to \mathcal{X}$
-maps random noise $z \sim p(z)$ to samples; discriminator
+maps random noise $z \sim p(z)$ to samples<FN n="1" />; discriminator
 $D_\phi: \mathcal{X} \to [0, 1]$ assigns probability that an input is
 real. The objective:
 
@@ -80,7 +80,7 @@ Mitigations:
 ## Wasserstein GAN
 
 Arjovsky et al. (2017). Replace the JS-divergence-based loss with the
-**Wasserstein distance** (Earth Mover's distance):
+**Wasserstein distance** (Earth Mover's distance)<FN n="2" />:
 
 $$
 \min_\theta \max_{\phi \in \text{1-Lipschitz}} \mathbb{E}_{x}[D_\phi(x)] - \mathbb{E}_z[D_\phi(G_\theta(z))].
@@ -137,7 +137,7 @@ around 2021-2022. The pure-GAN line lost the lead, although:
 
 GANs are not dead; they're a tool in a larger toolbox.
 
-![Mode collapse: the data has two modes but the generator covers only one. The optimal discriminator D*(x)=p_data/(p_data+p_g) stays near 1 on the abandoned mode — the gradient signal that should pull the generator to cover it.](/figures/D4/gan.svg)
+![Mode collapse: the data has two modes but the generator covers only one. The optimal discriminator D*(x)=p_data/(p_data+p_g) stays near 1 on the abandoned mode: the gradient signal that should pull the generator to cover it.](/figures/D4/gan.svg)
 
 ## Check it on arrays
 
@@ -186,3 +186,8 @@ The discriminator initially has near-random output, the generator
 produces noise; training would alternate updates until $D$ cannot
 distinguish $G(z)$ from real data. The next lesson surveys the
 production GAN families: DCGAN, StyleGAN, BigGAN.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., et al.** (2014). "Generative adversarial nets". *NeurIPS*. [arXiv:1406.2661](https://arxiv.org/abs/1406.2661). The minimax game and the JS-divergence optimum.</FNItem>
+  <FNItem n="2">**Arjovsky, M., Chintala, S., & Bottou, L.** (2017). "Wasserstein GAN". *ICML*. [arXiv:1701.07875](https://arxiv.org/abs/1701.07875). The Wasserstein objective and its non-vanishing gradient.</FNItem>
+</Footnotes>

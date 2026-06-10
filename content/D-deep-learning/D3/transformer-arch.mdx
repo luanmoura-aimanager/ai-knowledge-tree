@@ -14,7 +14,7 @@ architecture that turns it into a full sequence model. Each block
 alternates self-attention with a position-wise feed-forward network,
 wraps both in residual connections and LayerNorm, and stacks $L$ of
 these blocks. The encoder-decoder variant adds cross-attention for
-seq2seq tasks. Every modern LLM, vision Transformer, and multimodal
+seq2seq tasks<FN n="1" />. Every modern LLM, vision Transformer, and multimodal
 model is a variation of this template.
 
 ## The encoder block
@@ -47,7 +47,7 @@ Two sublayers:
   $\sigma$ is GELU (or SwiGLU in modern LLMs).
 
 The residual connections let gradients flow directly through the depth
-of the stack; LayerNorm keeps the activation scale stable.
+of the stack; LayerNorm keeps the activation scale stable<FN n="2" />.
 
 ## Why "attention mixes, FFN processes"
 
@@ -224,3 +224,8 @@ The 4-block Transformer processes an 8-token sequence; FFN parameters
 already dominate attention parameters at this small scale, and the
 ratio only grows in real models. The next lesson covers how positional
 information is injected into the otherwise position-blind self-attention.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). The encoder-decoder Transformer: stacked self-attention, position-wise FFNs, residuals, and LayerNorm.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §8.7.5 (residual connections) and §6.3 (feed-forward units). MIT Press. The residual and FFN building blocks the Transformer block reuses.</FNItem>
+</Footnotes>

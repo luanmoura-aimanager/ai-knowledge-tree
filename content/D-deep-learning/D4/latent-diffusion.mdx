@@ -14,7 +14,7 @@ Pixel-space diffusion is expensive: 1000 steps × a forward pass on a
 $512 \times 512$ image is not feasible at scale. **Latent diffusion**
 (Rombach et al., 2022) runs the diffusion process in the lower-dimensional
 latent space of a pretrained autoencoder, then decodes the final latent
-to pixels. Stable Diffusion is the canonical example; the same recipe
+to pixels<FN n="1" />. Stable Diffusion is the canonical example; the same recipe
 underlies every modern open-source text-to-image system.
 
 ## The two-stage architecture
@@ -105,7 +105,7 @@ Latent diffusion easily supports edits:
   context.
 - **ControlNet** (Zhang et al., 2023): condition diffusion on auxiliary
   signals (depth maps, edge maps, pose skeletons) via a sidecar
-  network.
+  network<FN n="2" />.
 
 These compose with the same underlying diffusion model, so a single
 trained checkpoint serves many generation tasks.
@@ -142,3 +142,8 @@ graph LR
 
 The next lesson covers the continuous-time framework that's overtaking
 DDPM-style discrete diffusion: flow matching and rectified flow.
+
+<Footnotes>
+  <FNItem n="1">**Rombach, R., Blattmann, A., Lorenz, D., Esser, P., & Ommer, B.** (2022). "High-resolution image synthesis with latent diffusion models". *CVPR*. [arXiv:2112.10752](https://arxiv.org/abs/2112.10752). Diffusion in the latent space of a pretrained autoencoder, with cross-attention text conditioning.</FNItem>
+  <FNItem n="2">**Zhang, L., Rao, A., & Agrawala, M.** (2023). "Adding conditional control to text-to-image diffusion models (ControlNet)". *ICCV*. [arXiv:2302.05543](https://arxiv.org/abs/2302.05543). The sidecar network for spatial conditioning signals.</FNItem>
+</Footnotes>

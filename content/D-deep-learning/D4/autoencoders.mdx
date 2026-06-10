@@ -12,9 +12,9 @@ prerequisites: ["D1/mlp-forward"]
 The simplest generative-style neural network: an **autoencoder**
 compresses inputs through a low-dimensional bottleneck and reconstructs
 them. The reconstruction loss forces the bottleneck to capture whatever
-structure is useful for reproducing the data. This lesson grounds the
+structure is useful for reproducing the data<FN n="1" />. This lesson grounds the
 generative-modeling track by establishing the encoder-decoder pattern
-that VAEs and diffusion models will build on.
+that VAEs and diffusion models will build on<FN n="2" />.
 
 ## The architecture
 
@@ -116,7 +116,7 @@ a probabilistic structure to the latent space.
 - **Image compression**: trained autoencoders can outperform JPEG at
   low bit rates.
 
-![Reconstruction error falls steeply until the bottleneck matches the data's intrinsic dimension (~4 here), then plateaus at the noise floor — the compression/fidelity tradeoff.](/figures/D4/autoencoders.svg)
+![Reconstruction error falls steeply until the bottleneck matches the data's intrinsic dimension (~4 here), then plateaus at the noise floor: the compression/fidelity tradeoff.](/figures/D4/autoencoders.svg)
 
 ## Check it on arrays
 
@@ -191,3 +191,8 @@ print(f"PCA k=2 RMSE on the same data:     {rmse_pca:.4f}")
 The nonlinear autoencoder beats linear PCA at the same bottleneck
 because it can model the curved structure. The next lesson upgrades
 this to a proper generative model: the variational autoencoder.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §14 (Autoencoders). MIT Press. The encoder-decoder bottleneck and the denoising variant.</FNItem>
+  <FNItem n="2">**Kingma, D. P., & Welling, M.** (2014). "Auto-encoding variational bayes". *ICLR*. [arXiv:1312.6114](https://arxiv.org/abs/1312.6114). The variational autoencoder built on the encoder-decoder pattern this lesson establishes.</FNItem>
+</Footnotes>

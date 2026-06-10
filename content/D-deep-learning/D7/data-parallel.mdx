@@ -43,7 +43,7 @@ hardware-optimized implementations for GPU clusters.
 
 DDP scales linearly in number of GPUs for the throughput, modulo the
 all-reduce overhead. Standard for models that fit on a single GPU:
-ResNet-50 training, BERT, smaller LLMs.
+ResNet-50 training, BERT, smaller LLMs<FN n="1" />.
 
 ## Limitations of DDP
 
@@ -89,7 +89,7 @@ Microsoft's framework, predecessor of FSDP. Three "stages":
 
 - **ZeRO-1**: shard optimizer state only. Saves 4-8x optimizer memory.
 - **ZeRO-2**: shard optimizer state + gradients.
-- **ZeRO-3**: shard everything (the same as FSDP).
+- **ZeRO-3**: shard everything (the same as FSDP)<FN n="2" />.
 
 Each stage adds memory savings at the cost of more communication.
 ZeRO-3 / FSDP is the gold standard for memory-limited regimes.
@@ -151,3 +151,8 @@ infrastructure decision in large-scale training.
 
 The next lesson covers the orthogonal scaling axis: splitting a single
 model across devices via pipeline and tensor parallelism.
+
+<Footnotes>
+  <FNItem n="1">**Goyal, P., et al.** (2017). "Accurate, large minibatch SGD: training ImageNet in 1 hour". [arXiv:1706.02677](https://arxiv.org/abs/1706.02677). Synchronous all-reduce data parallelism scaled to large global batches.</FNItem>
+  <FNItem n="2">**Rajbhandari, S., Rasley, J., Ruwase, O., & He, Y.** (2020). "ZeRO: memory optimizations toward training trillion parameter models". *SC*. [arXiv:1910.02054](https://arxiv.org/abs/1910.02054). The three-stage optimizer/gradient/parameter sharding behind FSDP.</FNItem>
+</Footnotes>

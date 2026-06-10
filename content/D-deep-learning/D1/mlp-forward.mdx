@@ -13,8 +13,8 @@ A **multi-layer perceptron** (MLP) alternates two operations, an affine
 map and a pointwise nonlinearity, $L$ times. Each affine map is a linear
 algebra problem; each nonlinearity is a scalar function. The composition
 turns the linear-classifier story from pillar C into a function class
-that can fit any continuous target. This lesson sets up the forward pass
-so the next lesson can derive backprop on it.
+that can fit any continuous target<FN n="1" />. This lesson sets up the
+forward pass so the next lesson can derive backprop on it.
 
 ## The single layer
 
@@ -28,7 +28,7 @@ $$
 The matrix $W$ rotates and scales; the bias $b$ shifts; the elementwise
 $\sigma$ bends. Without $\sigma$ the layer is just a linear map, and the
 whole network would collapse to one large linear map regardless of depth.
-The nonlinearity is what makes stacking useful.
+The nonlinearity is what makes stacking useful<FN n="2" />.
 
 ## Stacking layers
 
@@ -142,3 +142,8 @@ print(f"~{flops:,} multiply-adds for one forward pass")
 The shapes flow consistently through the layers, the softmax rows sum to
 one, and the parameter count matches the matrix-plus-bias formula. The
 next lesson computes derivatives of this same forward pass: backpropagation.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §6.1-6.4 (Deep Feedforward Networks). MIT Press. The feedforward network as composed affine maps and nonlinearities.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §6.3 (Hidden Units). MIT Press. Why a nonlinearity between affine maps is what gives depth its expressive power.</FNItem>
+</Footnotes>

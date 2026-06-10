@@ -30,7 +30,7 @@ embeddings.
 
 ## word2vec: skip-gram with negative sampling
 
-Mikolov et al. (2013). Given a center word $w_c$ in a sentence, predict
+Mikolov et al. (2013)<FN n="1" />. Given a center word $w_c$ in a sentence, predict
 the surrounding context words within a window of size $L$.
 
 **Vanilla softmax loss**:
@@ -62,7 +62,7 @@ space.
 ## GloVe: matrix factorization view
 
 Pennington et al. (2014) showed that word2vec is implicitly factorizing
-a shifted log of the co-occurrence matrix. **GloVe** does this
+a shifted log of the co-occurrence matrix<FN n="2" />. **GloVe** does this
 explicitly:
 
 1. Count $X_{ij}$ = the number of times word $j$ appears in the context
@@ -109,7 +109,7 @@ representations of discrete symbols, trained by a self-supervised
 predictive objective, generalizing across NLP, biology (protein
 embeddings), recommendation systems (item embeddings), and beyond.
 
-![Skip-gram with negative sampling learns vectors whose geometry mirrors co-occurrence — a 2D PCA of the embeddings cleanly separates the corpus's topical groups.](/figures/D3/word-embeddings.svg)
+![Skip-gram with negative sampling learns vectors whose geometry mirrors co-occurrence: a 2D PCA of the embeddings cleanly separates the corpus's topical groups.](/figures/D3/word-embeddings.svg)
 
 ## Check it on arrays
 
@@ -168,3 +168,8 @@ print("similarity(word 1, word 9) =", round(cos(U[1], U[9]), 3),
 Words that co-occur in the toy corpus learn similar embeddings; words
 that never co-occur do not. The next lesson tackles sequences directly
 with recurrent networks.
+
+<Footnotes>
+  <FNItem n="1">**Mikolov, T., Chen, K., Corrado, G., & Dean, J.** (2013). "Efficient estimation of word representations in vector space (word2vec)". [arXiv:1301.3781](https://arxiv.org/abs/1301.3781). Introduces skip-gram and CBOW with negative sampling.</FNItem>
+  <FNItem n="2">**Pennington, J., Socher, R., & Manning, C. D.** (2014). "GloVe: global vectors for word representation". *EMNLP*. [doi:10.3115/v1/D14-1162](https://doi.org/10.3115/v1/D14-1162). The global co-occurrence matrix-factorization view of embeddings.</FNItem>
+</Footnotes>

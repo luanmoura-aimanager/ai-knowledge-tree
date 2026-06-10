@@ -15,7 +15,7 @@ during the forward pass, then reads them during backward to compute
 gradients. This memory grows linearly with depth and quickly becomes
 the limiting factor for large models. **Gradient checkpointing** drops
 most activations and recomputes them during the backward pass, trading
-extra compute for much less memory.
+extra compute for much less memory<FN n="1" />.
 
 ## The memory problem
 
@@ -52,7 +52,7 @@ For most use cases, the memory savings are worth the time cost.
 
 If you keep $K$ checkpoints, memory is $O(K + L/K)$ for the
 checkpoints plus the activations being recomputed for backward. The
-minimum is at $K \approx \sqrt{L}$, giving memory $O(\sqrt{L})$.
+minimum is at $K \approx \sqrt{L}$, giving memory $O(\sqrt{L})$<FN n="1" />.
 
 For a 100-layer network, this means keeping about 10 checkpoints and
 recomputing in 10-layer segments. Memory drops 10x; compute grows by
@@ -127,7 +127,7 @@ flexibility.
 In practice, checkpointing is on by default in training pipelines for
 LLMs and large vision models.
 
-![Storing K evenly spaced checkpoints needs about K + L/K layers of activations, minimized at K ≈ √L — turning O(L) activation memory into O(√L) for one extra forward pass.](/figures/D7/gradient-checkpointing.svg)
+![Storing K evenly spaced checkpoints needs about K + L/K layers of activations, minimized at K ≈ √L, turning O(L) activation memory into O(√L) for one extra forward pass.](/figures/D7/gradient-checkpointing.svg)
 
 ## The bigger context
 
@@ -147,3 +147,7 @@ real-world hardware.
 
 The next lesson covers the main scaling axis at the cluster level: data
 parallelism.
+
+<Footnotes>
+  <FNItem n="1">**Chen, T., Xu, B., Zhang, C., & Guestrin, C.** (2016). "Training deep nets with sublinear memory cost". [arXiv:1604.06174](https://arxiv.org/abs/1604.06174). The source of the $O(\sqrt{L})$-memory checkpointing strategy.</FNItem>
+</Footnotes>

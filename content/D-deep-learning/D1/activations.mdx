@@ -22,7 +22,7 @@ $$
 $$
 
 Gradient: $1$ if $z > 0$, $0$ if $z < 0$, undefined at $z = 0$ (use 0 or
-1 by convention; it does not matter in practice).
+1 by convention; it does not matter in practice)<FN n="1" />.
 
 Why it dominated:
 
@@ -45,8 +45,8 @@ Causes:
   bias deeply negative.
 
 Empirically, well-initialized ReLU networks have a small fraction of
-dead units that does not grow over training. Pathological cases (e.g.
-extreme learning rates) can kill 50%+ of the units.
+dead units that does not grow over training<FN n="2" />. Pathological
+cases (e.g. extreme learning rates) can kill 50%+ of the units.
 
 ## Leaky ReLU and PReLU
 
@@ -92,8 +92,8 @@ $$
 $$
 
 GELU consistently outperforms ReLU in Transformer feed-forward layers,
-typically by 0.1-0.5 perplexity points in language modeling. The reason
-is debated; the smooth gating around zero seems to matter.
+typically by 0.1-0.5 perplexity points in language modeling<FN n="3" />.
+The reason is debated; the smooth gating around zero seems to matter.
 
 ## Swish (SiLU)
 
@@ -159,3 +159,9 @@ typically 0, while a centered finite-difference averages them and prints
 how a substantial fraction of units can land in the dead region from a
 single poor initialization. The next lesson fixes this systematically with
 Xavier and He initialization.
+
+<Footnotes>
+  <FNItem n="1">**Nair, V., & Hinton, G. E.** (2010). "Rectified linear units improve restricted Boltzmann machines". *ICML*. The introduction of ReLU as a hidden-unit nonlinearity.</FNItem>
+  <FNItem n="2">**He, K., Zhang, X., Ren, S., & Sun, J.** (2015). "Delving deep into rectifiers: surpassing human-level performance on ImageNet classification". *ICCV*. [arXiv:1502.01852](https://arxiv.org/abs/1502.01852). Analyzes ReLU-family units (including the dead-unit regime) and the initialization that matches them.</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §6.3 (Hidden Units). MIT Press. Survey of activation choices and their gradient behavior.</FNItem>
+</Footnotes>

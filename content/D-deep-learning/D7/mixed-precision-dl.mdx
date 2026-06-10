@@ -12,7 +12,7 @@ prerequisites: ["A4/mixed-precision"]
 GPUs and TPUs are 2-8x faster on 16-bit floats than 32-bit. **Mixed-
 precision training** uses 16-bit storage and compute where possible and
 falls back to 32-bit where stability demands it. The recipe is now
-standard across deep learning frameworks; this lesson covers the
+standard across deep learning frameworks<FN n="1" />; this lesson covers the
 practical deployment for neural network training.
 
 ## Why mixed precision
@@ -78,7 +78,7 @@ small (smallest representable normal: ~6×10⁻⁸; gradients in the
 ~10⁻¹⁰ range vanish).
 
 **Loss scaling**: multiply the loss by a large factor $S$ before
-backward, divide gradients by $S$ before the optimizer step:
+backward, divide gradients by $S$ before the optimizer step<FN n="1" />:
 
 ```
 scaled_loss = loss * S
@@ -138,7 +138,7 @@ work as of 2024.
 
 ## What you do in practice
 
-Modern PyTorch:
+Modern PyTorch<FN n="2" />:
 
 ```python-static
 from torch.amp import autocast, GradScaler
@@ -202,3 +202,8 @@ rescues underflowing gradients; bf16 has somewhat larger per-element
 approximation error (7-bit vs fp16's 10-bit mantissa) but its much wider
 exponent range removes the need for loss scaling entirely. The next
 lesson handles a different memory tradeoff: gradient checkpointing.
+
+<Footnotes>
+  <FNItem n="1">**Micikevicius, P., et al.** (2018). "Mixed precision training". *ICLR*. [arXiv:1710.03740](https://arxiv.org/abs/1710.03740). Master fp32 weights plus dynamic loss scaling, the recipe used here.</FNItem>
+  <FNItem n="2">**Paszke, A., et al.** (2019). "PyTorch: an imperative style, high-performance deep learning library". *NeurIPS*. [arXiv:1912.01703](https://arxiv.org/abs/1912.01703). The framework whose `autocast` / `GradScaler` automate the casts.</FNItem>
+</Footnotes>
