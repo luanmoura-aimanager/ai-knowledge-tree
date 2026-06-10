@@ -43,7 +43,7 @@ s^2(x_\star) = k(x_\star, x_\star) - k_\star^\top (K + \sigma_n^2 I)^{-1} k_\sta
 $$
 
 where $K_{ij} = k(x_i, x_j)$, $(k_\star)_i = k(x_i, x_\star)$, and $\sigma_n^2$ is
-observation noise. The mean is the prediction; the variance grows away from observed
+observation noise<FN n="1" />. The mean is the prediction; the variance grows away from observed
 points, encoding "I have not looked here yet". This is the conjugate Gaussian update
 of the MAP lesson, lifted to functions.
 
@@ -61,7 +61,7 @@ $$
 
 with $\Phi, \phi$ the standard normal CDF and PDF. EI is large where the mean is low
 (promising) or the variance is high (uncertain), and it is zero where the model is
-confident the value is worse than $f^\star$. The next query is $\arg\max_x \text{EI}(x)$.
+confident the value is worse than $f^\star$. The next query is $\arg\max_x \text{EI}(x)$<FN n="2" />.
 
 ## The loop
 
@@ -73,7 +73,7 @@ Each step uses cheap GP and acquisition computation to decide where to spend one
 expensive evaluation, which is why it dominates random or grid search for
 hyperparameter tuning.
 
-![Bayesian optimization fits a GP surrogate to the evaluated points, then samples where the acquisition function (expected improvement) is largest — balancing exploration and exploitation.](/figures/A3/bayesian-optimization.svg)
+![Bayesian optimization fits a GP surrogate to the evaluated points, then samples where the acquisition function (expected improvement) is largest, balancing exploration and exploitation.](/figures/A3/bayesian-optimization.svg)
 
 ## Check it on arrays
 
@@ -127,3 +127,8 @@ Bayesian optimization locates the minimum to within grid resolution using only a
 a dozen evaluations, guided by expected improvement. This closes the A3 optimization
 track; the next subsection, A4, examines the finite-precision arithmetic these
 algorithms actually run in.
+
+<Footnotes>
+  <FNItem n="1">**Rasmussen, C. E., & Williams, C. K. I.** (2006). *Gaussian Processes for Machine Learning*, §2.2. MIT Press. The GP posterior mean and variance for regression.</FNItem>
+  <FNItem n="2">**Frazier, P. I.** (2018). "A tutorial on Bayesian optimization". Acquisition functions and expected improvement ([arXiv:1807.02811](https://arxiv.org/abs/1807.02811)).</FNItem>
+</Footnotes>

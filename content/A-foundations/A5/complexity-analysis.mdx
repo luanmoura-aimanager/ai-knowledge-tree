@@ -11,9 +11,9 @@ prerequisites: []
 
 When the input doubles, does the running time double, square, or stay the same?
 **Asymptotic complexity** answers this with a precise notation that ignores constants
-and low-order terms, the only ones that matter once inputs are large. Amortized
+and low-order terms, the only ones that matter once inputs are large<FN n="1" />. Amortized
 analysis extends the same idea to operations whose individual costs vary but whose
-average over a long sequence is what counts.
+average over a long sequence is what counts<FN n="2" />.
 
 ## Big-O notation
 
@@ -71,7 +71,7 @@ total. The cheap ones contribute $n$ more. The total is $\le 3n$, so the
 **amortized cost per insert is $O(1)$**, even though individual inserts can be
 $O(n)$.
 
-![The complexity classes separate sharply as input grows — constant and logarithmic stay flat while quadratic and exponential explode, which is why asymptotics decide scalability.](/figures/A5/complexity-analysis.svg)
+![The complexity classes separate sharply as input grows: constant and logarithmic stay flat while quadratic and exponential explode, which is why asymptotics decide scalability.](/figures/A5/complexity-analysis.svg)
 
 ## Check it on arrays
 
@@ -129,3 +129,8 @@ print(f"{n} appends: {elapsed:.4f}s  per-op {elapsed/n*1e6:.2f} us")
 The doubling fingerprint matches the predicted growth (around 2, 4, and a bit over
 2), and 100,000 dynamic-array appends complete in linear time despite individual
 expensive resizes. The next lesson formalizes this dynamic array and the hash map.
+
+<Footnotes>
+  <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Asymptotic notation and growth of functions (Ch. 3).</FNItem>
+  <FNItem n="2">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Amortized analysis, including the aggregate and potential methods (Ch. 17).</FNItem>
+</Footnotes>

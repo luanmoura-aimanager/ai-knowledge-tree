@@ -11,7 +11,7 @@ prerequisites: ["bayes-rule", "mle"]
 
 Maximum likelihood trusts the data alone. When data are scarce or you hold prior
 belief about a parameter, Bayesian inference combines both: it treats the parameter
-as random, places a prior on it, and updates to a posterior. **Conjugate priors**
+as random, places a prior on it, and updates to a posterior<FN n="1" />. **Conjugate priors**
 keep that update in closed form, and **MAP estimation** reads off its peak.
 
 ## The posterior over parameters
@@ -46,7 +46,7 @@ fixed, so the MAP estimate converges to the MLE: the prior washes out.
 ## Conjugate priors
 
 A prior is **conjugate** to a likelihood if the posterior belongs to the same family
-as the prior. Then updating only changes the family's parameters, with no integration
+as the prior<FN n="2" />. Then updating only changes the family's parameters, with no integration
 required.
 
 **Beta-Bernoulli.** For $n$ Bernoulli($q$) trials with $k$ successes, the likelihood
@@ -70,7 +70,7 @@ $$
 
 The MAP mode reduces to the MLE $k/n$ when $\alpha = \beta = 1$ (a flat prior).
 
-![MAP estimation returns the posterior mode, which sits between the data's MLE and the prior mean — the prior pulls the estimate toward 0.5.](/figures/A2/map-conjugate.svg)
+![MAP estimation returns the posterior mode, which sits between the data's MLE and the prior mean; the prior pulls the estimate toward 0.5.](/figures/A2/map-conjugate.svg)
 
 ## Check it on arrays
 
@@ -111,3 +111,8 @@ The conjugate update gives a Beta posterior whose density matches the
 likelihood-times-prior computed on a grid, and the MAP mode pulls the estimate toward
 the prior on this small sample. The next lesson shifts from estimating distributions
 to quantifying their information content, starting with entropy.
+
+<Footnotes>
+  <FNItem n="1">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning.* Springer. §1.2.5-1.2.6, MAP estimation and Bayesian curve fitting.</FNItem>
+  <FNItem n="2">**Murphy, K. P.** (2022). *Probabilistic Machine Learning: An Introduction.* MIT Press. §4.6, conjugate priors and the Beta-Bernoulli model.</FNItem>
+</Footnotes>

@@ -33,7 +33,7 @@ $$
 Row $i$ of $J$ is the gradient of $y_i$ with respect to $x$ (transposed). This
 **numerator layout** (also called "denominator layout" in some texts; conventions
 differ) makes the chain rule stack Jacobians in the natural left-to-right
-multiplication order: $\frac{\partial z}{\partial x} = \frac{\partial z}{\partial y}\frac{\partial y}{\partial x}$.
+multiplication order: $\frac{\partial z}{\partial x} = \frac{\partial z}{\partial y}\frac{\partial y}{\partial x}$<FN n="1" />.
 
 ## Gradient of the linear form
 
@@ -57,7 +57,7 @@ $$
 \frac{\partial f}{\partial x_k} = \sum_j a_{kj} x_j + \sum_i a_{ik} x_i = (Ax)_k + (A^\top x)_k = 2(Ax)_k,
 $$
 
-where the last step uses $A = A^\top$. So
+where the last step uses $A = A^\top$. So<FN n="2" />
 
 $$
 \nabla_x(x^\top A x) = 2Ax.
@@ -105,7 +105,7 @@ reusing work as it goes.
 Take a two-layer network $z = W_2 \sigma(W_1 x)$ with a scalar loss $L(z)$, where
 $\sigma$ is a nonlinearity (such as $\tanh$) applied to each entry. The forward
 pass computes the output and stores the intermediate quantities; the backward pass
-walks the same operations in reverse, carrying one gradient backward through each.
+walks the same operations in reverse, carrying one gradient backward through each<FN n="3" />.
 
 **Forward pass.** Computed left to right, saving each intermediate for the
 backward pass:
@@ -243,3 +243,9 @@ Finite differences confirm the analytic gradients, including the backpropagated
 $\nabla_{W_1} L$, to near-float precision.
 The final lesson generalizes this calculus to higher-order arrays (tensors) and
 the Einstein summation notation that batch computations in deep learning rely on.
+
+<Footnotes>
+  <FNItem n="1">**Petersen, K. B., & Pedersen, M. S.** (2012). *The Matrix Cookbook.* Technical University of Denmark. A reference for layout conventions and matrix-derivative identities.</FNItem>
+  <FNItem n="2">**Magnus, J. R., & Neudecker, H.** (2019). *Matrix Differential Calculus with Applications in Statistics and Econometrics* (3rd ed.). Wiley. [doi:10.1002/9781119541219](https://doi.org/10.1002/9781119541219). A rigorous treatment of vector and matrix differentiation.</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, ch. 6 (Deep Feedforward Networks). MIT Press. Backpropagation as repeated application of the chain rule.</FNItem>
+</Footnotes>

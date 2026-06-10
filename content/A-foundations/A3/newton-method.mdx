@@ -29,7 +29,7 @@ gives the **Newton step**:
 
 $$
 x_{t+1} = x_t - \big[\nabla^2 f(x_t)\big]^{-1} \nabla f(x_t).
-$$
+$$<FN n="1" />
 
 Where gradient descent uses a scalar step $\eta$, Newton uses the inverse Hessian as a
 matrix-valued step that rescales and rotates the gradient to match the local
@@ -51,14 +51,14 @@ Newton error obeys
 
 $$
 \lVert x_{t+1} - x^\star\rVert \le C\,\lVert x_t - x^\star\rVert^2.
-$$
+$$<FN n="2" />
 
 Once the error is small, squaring it each step means the count of accurate digits
 roughly doubles per iteration. This **quadratic** rate is far faster than the linear
 rate of gradient descent, but it is **local**: it holds only once the iterate is close
 enough that the quadratic model is trustworthy.
 
-![Near the optimum Newton's method converges quadratically — the error roughly squares each step, plunging far faster than gradient descent's linear rate.](/figures/A3/newton-method.svg)
+![Near the optimum Newton's method converges quadratically: the error roughly squares each step, plunging far faster than gradient descent's linear rate.](/figures/A3/newton-method.svg)
 
 ## Practical cautions
 
@@ -105,3 +105,8 @@ print("one Newton step error:", np.linalg.norm(x - np.linalg.solve(A, b)))
 Newton's error collapses quadratically while gradient descent decays linearly, and a
 single Newton step solves the quadratic exactly. The next lesson approximates the
 Hessian from gradients to keep this speed without the $O(n^3)$ cost.
+
+<Footnotes>
+  <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §3.3. Springer. The Newton step and its derivation from the quadratic model ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>
+  <FNItem n="2">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §9.5. Cambridge University Press. Affine invariance and the local quadratic convergence of Newton's method.</FNItem>
+</Footnotes>

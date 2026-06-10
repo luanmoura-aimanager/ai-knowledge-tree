@@ -11,7 +11,7 @@ prerequisites: ["catastrophic-cancellation"]
 
 The softmax and the log-likelihood of a classifier both involve $\log \sum_i e^{x_i}$,
 which overflows for any moderately large $x_i$ and underflows for moderately negative
-ones. The **log-sum-exp trick** is a one-line algebraic identity that makes the
+ones<FN n="1" />. The **log-sum-exp trick** is a one-line algebraic identity that makes the
 expression stable for any inputs. Every deep-learning framework uses it internally.
 
 ## The naive failure
@@ -38,7 +38,7 @@ $\log(ab) = \log a + \log b$. $\qquad\blacksquare$
 The identity holds for any $c$; the smart choice is $c = \max_i x_i$. Then $x_i - c \le 0$
 for all $i$, so each $e^{x_i - c} \in (0, 1]$, no term overflows, and at least one term
 equals 1 (avoiding underflow of the whole sum to zero). The shifted formula is
-**numerically stable for any input**.
+**numerically stable for any input**<FN n="2" />.
 
 ## Stable softmax
 
@@ -113,3 +113,8 @@ The naive computations break in both extremes while the shifted versions return
 finite, correct answers. Shifting by the max is the entire fix, and the cost is one
 extra pass over the array. The next lesson moves from elementwise numerics to solving
 systems by repeated approximation.
+
+<Footnotes>
+  <FNItem n="1">**Goldberg, D.** (1991). "What every computer scientist should know about floating-point arithmetic". *ACM Computing Surveys*, 23(1), 5-48. Overflow, underflow, and the exponential range ([doi:10.1145/103162.103163](https://doi.org/10.1145/103162.103163)).</FNItem>
+  <FNItem n="2">**Higham, N. J.** (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. Reformulation to avoid overflow in exponential sums ([doi:10.1137/1.9780898718027](https://doi.org/10.1137/1.9780898718027)).</FNItem>
+</Footnotes>

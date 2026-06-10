@@ -25,7 +25,7 @@ $$
 \kappa = \lim_{\delta \to 0}\sup_{\lVert \Delta x\rVert \le \delta}\frac{\lVert f(x + \Delta x) - f(x)\rVert / \lVert f(x)\rVert}{\lVert \Delta x\rVert / \lVert x\rVert}.
 $$
 
-It is the worst-case ratio of relative output change to relative input change. If the
+It is the worst-case ratio of relative output change to relative input change<FN n="1" />. If the
 input is known to floating-point precision $\varepsilon_{\text{machine}}$, the output
 is unavoidably uncertain by about $\kappa \cdot \varepsilon_{\text{machine}}$,
 regardless of how the computation is performed.
@@ -60,7 +60,7 @@ solver, with double-precision input, returns only 4 correct digits.
 ## Stability: a property of the algorithm
 
 An algorithm is **backward stable** if the computed answer is the exact answer to a
-slightly perturbed problem: $\hat y = f(x + \Delta x)$ with $\lVert \Delta x\rVert = O(\varepsilon_{\text{machine}})\lVert x\rVert$.
+slightly perturbed problem: $\hat y = f(x + \Delta x)$ with $\lVert \Delta x\rVert = O(\varepsilon_{\text{machine}})\lVert x\rVert$<FN n="2" />.
 Backward stability is the strongest practical guarantee, because combined with
 conditioning it yields the forward error bound
 
@@ -77,9 +77,9 @@ contaminates even a perfectly conditioned problem.
 The normal equations $A^\top A x = A^\top b$ have condition number $\kappa(A^\top A) = \kappa(A)^2$:
 **squaring** the conditioning of the original problem. The QR or SVD routes (from
 the A1 least-squares lesson) keep the conditioning at $\kappa(A)$ rather than
-$\kappa(A)^2$. Both routes solve the same problem; their *stability* differs.
+$\kappa(A)^2$<FN n="3" />. Both routes solve the same problem; their *stability* differs.
 
-![Solving Ax = b in double precision: the relative error grows in proportion to the condition number κ, staying under the κ·ε worst-case bound (dashed) — each extra factor of 10 in κ costs roughly one more digit of accuracy.](/figures/A4/conditioning-stability.svg)
+![Solving Ax = b in double precision: the relative error grows in proportion to the condition number κ, staying under the κ·ε worst-case bound (dashed): each extra factor of 10 in κ costs roughly one more digit of accuracy.](/figures/A4/conditioning-stability.svg)
 
 ## Check it on arrays
 
@@ -119,3 +119,9 @@ print("QR-route error: ", np.linalg.norm(x_qr - truth))
 The relative error grows with the condition number as predicted, and the normal-
 equations route loses precision the QR route preserves. The next lesson zooms in on
 the most common source of stability loss: subtracting near-equal numbers.
+
+<Footnotes>
+  <FNItem n="1">**Trefethen, L. N., & Bau, D.** (1997). *Numerical Linear Algebra.* SIAM. Conditioning, stability, and the condition number (Lectures 12-15).</FNItem>
+  <FNItem n="2">**Higham, N. J.** (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. The definitive treatment of backward stability and forward error ([doi:10.1137/1.9780898718027](https://doi.org/10.1137/1.9780898718027)).</FNItem>
+  <FNItem n="3">**Golub, G. H., & Van Loan, C. F.** (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press. Normal equations versus QR for least squares.</FNItem>
+</Footnotes>

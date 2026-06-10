@@ -12,7 +12,7 @@ prerequisites: ["common-distributions"]
 How much uncertainty is in a distribution? A fair coin is more uncertain than a
 biased one; a uniform die more than a loaded one. **Shannon entropy** turns this
 intuition into a number, measured in bits, and it is the floor on how many bits per
-symbol any lossless code can achieve. It is also the backbone of the cross-entropy
+symbol any lossless code can achieve<FN ns="1, 2" />. It is also the backbone of the cross-entropy
 loss.
 
 ## Surprise
@@ -32,7 +32,7 @@ products into sums. With $\log_2$, surprise is in **bits**.
 
 ## Entropy
 
-The **entropy** of a discrete distribution $p$ is the expected surprise:
+The **entropy** of a discrete distribution $p$ is the expected surprise<FN n="3" />:
 
 $$
 H(X) = \mathbb{E}[-\log p(X)] = -\sum_x p(x) \log p(x),
@@ -53,7 +53,7 @@ $$
 It is 0 at $q = 0$ and $q = 1$ (no uncertainty) and peaks at $q = 1/2$ with
 $H(1/2) = 1$ bit. A fair coin carries exactly one bit; any bias reduces it.
 
-![The binary entropy H(q): zero at the certain outcomes q = 0 and q = 1, and maximal — exactly 1 bit — at q = 1/2, where a coin flip is least predictable.](/figures/A2/entropy.svg)
+![The binary entropy H(q): zero at the certain outcomes q = 0 and q = 1, and maximal (1 bit) at q = 1/2, where a coin flip is least predictable.](/figures/A2/entropy.svg)
 
 ## Bounds
 
@@ -116,3 +116,9 @@ The binary entropy peaks at one bit for a fair coin, the uniform distribution
 attains the maximum $\log_2 K$, and average sampled surprise matches the entropy.
 The next lesson compares two distributions instead of summarizing one: the KL
 divergence.
+
+<Footnotes>
+  <FNItem n="1">**Shannon, C. E.** (1948). "A mathematical theory of communication". *Bell System Technical Journal*, 27, 379-423. The paper that introduced entropy and the noiseless source coding bound. [doi:10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x)</FNItem>
+  <FNItem n="2">**Cover, T. M., & Thomas, J. A.** (2006). *Elements of Information Theory* (2nd ed.). Wiley. Ch. 2, entropy and the source coding theorem. [doi:10.1002/047174882X](https://doi.org/10.1002/047174882X)</FNItem>
+  <FNItem n="3">**MacKay, D. J. C.** (2003). *Information Theory, Inference, and Learning Algorithms.* Cambridge University Press. Ch. 2-4, surprise, entropy, and Shannon information.</FNItem>
+</Footnotes>
