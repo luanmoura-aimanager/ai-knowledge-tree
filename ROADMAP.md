@@ -8,11 +8,6 @@ Last reviewed: 2026-06-09 (after the 100%-coverage figures campaign, PRs #43–#
 
 ## Backlog
 
-- [ ] **STYLE: mandate ≥1 image per new lesson.** Update `content/STYLE.md` so
-  every new lesson must include at least one image — a matplotlib plot and/or one
-  or more Mermaid diagrams. Codifies the completed figures-campaign norm as a
-  binding authoring rule.
-
 - [ ] **Suggested-paths dropdown.** Review the suggested learning paths (`PATHS`
   in `src/lib/dag.ts`, rendered by `LearningPaths`) and give every path a
   collapsible dropdown, matching the existing 'LLM Theory' path pattern.
