@@ -254,3 +254,11 @@ they do not count as the image.
 This applies even to `codeExempt: true` lessons. A conceptual lesson with no code
 surface still needs a diagram (a Mermaid flow or relationship map is almost always
 the right fit).
+
+## 7. Suggested paths (app data, not content)
+
+Suggested learning paths are app data, not lesson prose, so they live in
+`src/lib/dag.ts`, not under `content/`. When adding or editing one, follow the
+`steps[]` + `section` dropdown convention in **`CLAUDE.md` → "Add a suggested
+path"**: every path carries a hand-curated, phase-grouped lesson sequence with
+`pillars[]` synced to its step subsections.

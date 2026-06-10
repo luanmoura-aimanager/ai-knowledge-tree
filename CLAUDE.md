@@ -288,9 +288,32 @@ This is the workflow for every new pillar. Follow it in order.
    After opening the PR (step 4) and after pushing any fix commits (step 5), print
    the full GitHub PR URL so the user can navigate directly to it.
 
-### Add a topic / subsection / connection / path
+### Add a topic / subsection / connection
 Edit the relevant array in `src/lib/dag.ts`. Add `shortName` for new pillars and
 bump the graph grid (`cols`/`rows`) if you exceed 10 pillars.
+
+### Add a suggested path
+Add a `Path` to `PATHS` in `src/lib/dag.ts`. Every path **must** carry a
+hand-curated, phase-grouped `steps[]` lesson sequence (the layout shared by all
+paths), not just a `pillars[]` chip list:
+
+- **`steps[]`**: an ordered list of `{ subId, lessonId, section, note? }`. Each
+  step links one real lesson. Pick the lessons that tell the path's story in a
+  didactic order; you need not include every lesson of a subsection.
+- **`section`**: a short phase label (e.g. `"Retrieval & agents"`). Consecutive
+  steps sharing a `section` render under one collapsible heading in the path
+  detail, so **keep same-`section` steps contiguous**. (The LLM Theory path omits
+  `section` and instead groups by the ai-math-theory chapter parsed from `note`;
+  that `note`-based fallback exists for it alone.)
+- **`pillars[]`**: set it to the **distinct step subsections, in step order**. It
+  drives the discipline chips and the connections-graph highlight, so it must
+  match what `steps[]` traverses.
+- **Validate every id resolves**: each `subId/lessonId` must exist in
+  `src/lib/curriculum`, and each `pillars[]` (and any new `CONNECTIONS`) id must
+  be a real subsection. Dangling ids silently render raw slugs or broken links
+  rather than failing the build, so check them.
+
+Run `npm run build` and `npm run lint` before committing; both must be clean.
 
 ### Run / build / deploy
 ```bash
