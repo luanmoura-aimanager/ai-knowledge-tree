@@ -71,7 +71,7 @@ rng = np.random.default_rng(0)
 p0    = 0.90     # current model success rate
 delta = 0.02     # roll back if it drops by 2 points
 p1    = p0 - delta
-z_a, z_b = 1.96, 0.84            # alpha = 0.05 (two-sided), power = 0.80
+z_a, z_b = 1.96, 0.84            # two-sided alpha = 0.05, power = 0.80 (sizing)
 
 n = (z_a + z_b) ** 2 * (p0 * (1 - p0) + p1 * (1 - p1)) / delta ** 2
 n = int(np.ceil(n))
@@ -88,6 +88,8 @@ se = sqrt(pooled * (1 - pooled) * 2 / n)
 z = (pc - pk) / se
 print(f"control = {pc:.3f}, canary = {pk:.3f}, z = {z:.2f}")
 
+# We only act on the "worse" direction, so this is a one-sided gate; reusing the
+# two-sided 1.96 just makes it conservative (false-rollback rate ~2.5%, not 5%).
 ship = z < z_a            # not significantly worse -> safe to ramp
 print("decision:", "ROLL BACK" if not ship else "ramp up")
 assert not ship           # a true 2-point regression is correctly caught

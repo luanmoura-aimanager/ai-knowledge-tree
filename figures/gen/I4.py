@@ -117,7 +117,8 @@ def automated_retraining() -> None:
                 arrowprops=dict(arrowstyle="-|>", color=HOT, lw=1.6))
     ax.set_title("Automated retraining: the optimal cadence")
     ax.set_xlabel("retrain interval T (days)"); ax.set_ylabel("average daily cost ($)")
-    ax.set_ylim(0, total[T <= 120].max() * 0.6)
+    # Frame the U near its minimum; the steep K/T tail at small T runs off-top by design.
+    ax.set_ylim(0, 5 * total.min())
     ax.legend(loc="upper center", fontsize=8)
     fig.tight_layout()
     save(fig, SUB, "automated-retraining")

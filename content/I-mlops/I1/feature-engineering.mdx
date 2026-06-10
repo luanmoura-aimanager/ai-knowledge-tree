@@ -95,17 +95,21 @@ honest_test_std = standardize(x_test, mu_tr,  sd_tr ).std()
 
 print(f"train-fit mu, sigma     = {mu_tr:+.3f}, {sd_tr:.3f}")
 print(f"pooled   mu, sigma      = {mu_all:+.3f}, {sd_all:.3f}")
-print(f"test std, leaked fit    = {leaked_test_std:.3f}  (looks ~1: shift hidden)")
-print(f"test std, honest fit    = {honest_test_std:.3f}  (>1: true shift exposed)")
+print(f"test std, leaked fit    = {leaked_test_std:.3f}  (pulled toward 1: shift understated)")
+print(f"test std, honest fit    = {honest_test_std:.3f}  (full shift exposed)")
 
 assert honest_test_std > leaked_test_std
-print("leakage masks the distribution shift the model will actually face:", True)
+print("leakage understates the distribution shift the model will actually face:", True)
 ```
 
 The pooled fit folds the test block's own spread into $\sigma$, so the leaked
-standardization makes the test era look as well-behaved as training, exactly the
-optimism that evaporates in production. The train-only fit refuses to peek, so the
-shift shows up as a standard deviation above one, which is information your
+standardization pulls the test era's apparent scale back toward one (here $1.15$
+instead of the true $1.62$), understating how far it has moved, exactly the
+optimism that evaporates in production. This scaler leak is a deliberately mild,
+easy-to-see instance of the general mechanism, a statistic fit on held-out data;
+target and temporal leaks distort the offline *score* far more, but all share this
+one cause. The train-only fit refuses to peek, so the shift shows up as a standard
+deviation well above one, which is information your
 [drift detector](I1/drift-detection) and [production monitor](I4/production-drift)
 need to see. With clean features defined, the next subsection moves from the data
 layer to the [infrastructure that trains](I2/experiment-tracking) the models that

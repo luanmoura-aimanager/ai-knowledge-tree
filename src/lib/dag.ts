@@ -2374,12 +2374,12 @@ export const PATHS: Path[] = [
       },
       {
         subId: "C10",
-        lessonId: "metrics-roc-auc",
+        lessonId: "classification-metrics",
         section: "Model & evaluate",
       },
       {
         subId: "C10",
-        lessonId: "probability-calibration",
+        lessonId: "calibration",
         section: "Model & evaluate",
       },
       {
