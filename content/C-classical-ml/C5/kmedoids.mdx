@@ -13,7 +13,7 @@ k-means uses cluster *means* as centers, which requires a meaningful mean.
 For non-Euclidean distances (cosine, Manhattan, Hamming, edit) or for data
 where outliers blow up means, **k-medoids** is the natural alternative: each
 cluster's center is an *actual data point* (a **medoid**) that minimizes the
-total distance to the others in its cluster.
+total distance to the others in its cluster<FN n="1" />.
 
 ## The objective
 
@@ -30,7 +30,7 @@ constrained to be actual points.
 
 ## PAM (Partition Around Medoids)
 
-The classic algorithm. After initialization:
+The classic algorithm<FN n="1" />. After initialization:
 
 1. **Assignment**: each point goes to its closest medoid.
 2. **Update**: for each cluster, find the point that minimizes the total
@@ -61,7 +61,7 @@ FastPAM) trade exactness for speed.
 
 For large datasets, prefer **PAM-like sampling methods** (CLARANS), or use
 k-means on an embedded representation (apply PCA or learned embeddings, then
-cluster with k-means there).
+cluster with k-means there)<FN n="2" />.
 
 ## k-medians: the closely related cousin
 
@@ -139,3 +139,12 @@ The k-medoids centers are actual data points near each blob; k-means'
 centers are dragged toward the extreme outliers. The next lesson takes a
 completely different geometric stance: clusters are dense regions, identified
 by DBSCAN.
+
+<Footnotes>
+  <FNItem n="1">**Kaufman, L., & Rousseeuw, P. J.** (1990). *Finding Groups in
+    Data: An Introduction to Cluster Analysis.* Wiley. Introduces medoids and
+    the PAM algorithm (Ch. 2).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The
+    Elements of Statistical Learning* (2nd ed.). Springer, §14.3.10.
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7).</FNItem>
+</Footnotes>

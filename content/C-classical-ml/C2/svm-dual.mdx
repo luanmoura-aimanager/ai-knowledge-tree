@@ -12,7 +12,7 @@ prerequisites: ["soft-margin-svm", "A3/duality"]
 The SVM primal is a constrained QP over $w$ and $b$. The **dual** is a QP over
 one multiplier $\alpha_i$ per training example, with a structure that makes
 two things explicit: the solution is sparse in $\alpha$, and it depends on the
-data only through inner products. The second fact is what kernel methods
+data only through inner products<FN n="1" />. The second fact is what kernel methods
 exploit.
 
 ## Forming the dual
@@ -65,7 +65,7 @@ exactly one bucket:
 
 Only the support vectors have $\alpha_i > 0$, and only they contribute to $w$.
 The classifier is sparse in examples: most training points are forgotten after
-fitting.
+fitting<FN n="2" />.
 
 ## Recovering $w$ and $b$
 
@@ -149,3 +149,8 @@ The training set splits cleanly into the three KKT buckets; only the support
 vectors (margin + bound) shape the decision boundary. The next lesson exploits
 the dual's inner-product structure to lift the SVM into nonlinear feature
 spaces via the kernel trick.
+
+<Footnotes>
+  <FNItem n="1">**Cortes, C., & Vapnik, V.** (1995). "Support-vector networks". *Machine Learning*, 20(3), 273-297. Derives the dual QP and the inner-product structure ([doi:10.1007/BF00994018](https://doi.org/10.1007/BF00994018)).</FNItem>
+  <FNItem n="2">**Vapnik, V. N.** (1998). *Statistical Learning Theory.* Wiley. Treats the KKT conditions and support-vector sparsity in depth.</FNItem>
+</Footnotes>

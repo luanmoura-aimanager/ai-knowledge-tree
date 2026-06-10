@@ -12,7 +12,7 @@ prerequisites: ["classification-metrics", "C1/logistic-regression"]
 A classifier is **calibrated** if its predicted probabilities match
 empirical frequencies: when it says 0.8, the event happens about 80% of
 the time. Many strong classifiers (random forests, SVMs, Naive Bayes) are
-**uncalibrated**, even though their rankings are excellent. When
+**uncalibrated**, even though their rankings are excellent<FN n="1" />. When
 probabilities feed decisions (expected-value calculations, thresholding,
 weighted ensembles), calibration matters as much as raw accuracy.
 
@@ -79,7 +79,7 @@ $$
 
 with $s$ the raw score and $(a, b)$ estimated on a held-out set by
 log-likelihood. Two parameters; fast; works well when the miscalibration
-is a smooth monotonic distortion. The default for SVMs.
+is a smooth monotonic distortion. The default for SVMs<FN n="2" />.
 
 ## Isotonic regression
 
@@ -210,3 +210,12 @@ probabilities; isotonic on this small validation set overfits and ends up
 worse, illustrating the body's caveat about isotonic needing more
 calibration data. The next lesson covers how to construct the held-out
 sets properly: cross-validation strategies.
+
+<Footnotes>
+  <FNItem n="1">**Niculescu-Mizil, A., & Caruana, R.** (2005). "Predicting good
+    probabilities with supervised learning". *ICML*.
+    [doi:10.1145/1102351.1102430](https://doi.org/10.1145/1102351.1102430)</FNItem>
+  <FNItem n="2">**Platt, J.** (1999). "Probabilistic outputs for support vector
+    machines and comparisons to regularized likelihood methods".
+    *Advances in Large Margin Classifiers*. The origin of Platt scaling.</FNItem>
+</Footnotes>

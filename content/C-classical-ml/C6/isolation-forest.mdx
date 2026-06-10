@@ -13,7 +13,7 @@ Density-based and distance-based AD struggle in high dimensions. **Isolation
 Forest** flips the problem on its head: instead of building a model of the
 normal data and measuring deviation, it directly measures how easy each
 point is to **isolate** with random splits. Anomalies, being few and
-different, get isolated in shorter paths than normal points.
+different, get isolated in shorter paths than normal points<FN n="1" />.
 
 ## The idea
 
@@ -68,7 +68,8 @@ Pleasantly counterintuitive: smaller subsamples often make anomaly detection
 - **No distance metric**: works in mixed-type tabular data.
 - **High-dimensional friendly**: random feature selection means each tree
   sees a different subset of features.
-- **Out-of-the-box useful**: usually works with default parameters.
+- **Out-of-the-box useful**: usually works with default parameters, which is
+  why surveys list it among the standard tabular AD baselines<FN n="2" />.
 
 ## Limits
 
@@ -156,3 +157,8 @@ Isolation Forest ranks most of the planted anomalies in the top 20 by score,
 with a clear gap between normal and anomalous mean scores. The next lesson
 takes a completely different geometric view: enclose the normal region with
 a kernel SVM.
+
+<Footnotes>
+  <FNItem n="1">**Liu, F. T., Ting, K. M., & Zhou, Z.-H.** (2008). "Isolation forest". *ICDM*. [doi:10.1109/ICDM.2008.17](https://doi.org/10.1109/ICDM.2008.17). The original isolation-by-path-length algorithm, with the $2^{-E[h(x)]/c(n)}$ score and the $\psi = 256$ subsample.</FNItem>
+  <FNItem n="2">**Chandola, V., Banerjee, A., & Kumar, V.** (2009). "Anomaly detection: a survey". *ACM Computing Surveys*, 41(3), 1-58. [doi:10.1145/1541880.1541882](https://doi.org/10.1145/1541880.1541882). Positions isolation and tree-based methods among the broader AD taxonomy.</FNItem>
+</Footnotes>

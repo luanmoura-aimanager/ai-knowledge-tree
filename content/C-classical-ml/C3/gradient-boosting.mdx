@@ -12,8 +12,8 @@ prerequisites: ["adaboost", "A3/gradient-descent"]
 AdaBoost minimizes a specific loss (exponential) with a specific weak
 learner. **Gradient boosting** generalizes both: pick any differentiable loss,
 pick any weak learner, and at each round fit the learner to the negative
-gradient of the loss with respect to the current predictions. The result is
-the dominant tabular learner of the last decade.
+gradient of the loss with respect to the current predictions<FN n="1" />. The result is
+the dominant tabular learner of the last decade<FN n="2" />.
 
 ## Functional gradient descent
 
@@ -98,7 +98,7 @@ Three knobs to prevent overfitting:
 The next lesson covers the production-grade variants (XGBoost, LightGBM)
 that squeeze speed and accuracy out of this template.
 
-![Gradient boosting drives training loss down monotonically while validation loss bottoms out and then creeps up — the rationale for early stopping.](/figures/C3/gradient-boosting.svg)
+![Gradient boosting drives training loss down monotonically while validation loss bottoms out and then creeps up; the rationale for early stopping.](/figures/C3/gradient-boosting.svg)
 
 ## Check it on arrays
 
@@ -175,3 +175,8 @@ print(f"GB test RMSE: {rmse_te:.3f}  (noise sd 0.30, so RMSE ~0.30 is near-optim
 The boosted ensemble drives the test RMSE near the irreducible noise floor.
 The next lesson upgrades this template with second-order information and
 clever engineering: XGBoost and LightGBM.
+
+<Footnotes>
+  <FNItem n="1">**Friedman, J. H.** (2001). "Greedy function approximation: a gradient boosting machine". *The Annals of Statistics*, 29(5), 1189-1232. Boosting as functional gradient descent fitting trees to pseudo-residuals ([doi:10.1214/aos/1013203451](https://doi.org/10.1214/aos/1013203451)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Boosting, loss functions, and regularization ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

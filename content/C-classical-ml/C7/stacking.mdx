@@ -11,7 +11,7 @@ prerequisites: ["ensemble-theory"]
 
 Bagging and boosting combine many copies of the *same* learner. **Stacking**
 combines *different* learners by training a **meta-learner** to weight their
-predictions. With the right setup, it gives small but reliable gains over
+predictions<FN n="1" />. With the right setup, it gives small but reliable gains over
 any single model on a held-out set, and it is the standard way to win
 machine-learning competitions.
 
@@ -46,7 +46,7 @@ base model has not seen:
    then predict with the meta-learner.
 
 The OOF construction ensures the meta-learner sees base predictions on data
-the base learners have not memorized.
+the base learners have not memorized<FN n="2" />.
 
 ## Choosing the meta-learner
 
@@ -170,3 +170,8 @@ not clearly beat the best single learner: the win from stacking comes from
 heterogeneity and from problems where no single model is best across the
 data, not from any two random base learners. The next lesson covers cheap
 alternatives to true stacking: snapshot ensembles and voting.
+
+<Footnotes>
+  <FNItem n="1">**Wolpert, D. H.** (1992). "Stacked generalization". *Neural Networks*, 5(2), 241-259. The original formulation of training a meta-learner on base-model outputs ([doi:10.1016/S0893-6080(05)80023-1](https://doi.org/10.1016/S0893-6080(05)80023-1)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Stacking and out-of-fold prediction in §8.8 ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

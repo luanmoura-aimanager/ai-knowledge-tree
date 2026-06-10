@@ -65,14 +65,14 @@ $$
 F1 collapses precision and recall into one number with equal weight. F1 is
 useful as a single metric to optimize, especially under imbalance, but it
 hides the precision-recall tradeoff. **F$_\beta$** generalizes: $\beta < 1$
-favors precision, $\beta > 1$ favors recall.
+favors precision, $\beta > 1$ favors recall<FN n="2" />.
 
 ## ROC curve and AUC
 
 Vary the classifier's threshold and trace **TPR** (recall) against **FPR**
 ($FP / (FP + TN)$). The result is the **ROC curve**. The **area under the
 ROC curve (AUC-ROC)** is the probability that a randomly chosen positive
-gets a higher score than a randomly chosen negative.
+gets a higher score than a randomly chosen negative<FN n="1" />.
 
 Properties:
 
@@ -123,7 +123,7 @@ The honest answer is usually "report several and use the one that matches
 the real cost structure of mistakes". A single number rarely tells the
 whole story.
 
-![On an imbalanced problem the ROC curve (left) looks strong, but the precision-recall curve (right) is more honest — its baseline is the 5% positive rate, not 0.5.](/figures/C10/classification-metrics.svg)
+![On an imbalanced problem the ROC curve (left) looks strong, but the precision-recall curve (right) is more honest: its baseline is the 5% positive rate, not 0.5.](/figures/C10/classification-metrics.svg)
 
 ## Check it on arrays
 
@@ -188,3 +188,12 @@ print(f"\ntrivial all-zero classifier: accuracy={1 - y.mean():.3f}, recall=0.000
 The always-zero classifier has high accuracy but useless recall on the
 imbalanced data; PR-AUC reflects the actual ranking quality more honestly
 than accuracy. The next lesson covers the regression analogs.
+
+<Footnotes>
+  <FNItem n="1">**Fawcett, T.** (2006). "An introduction to ROC analysis".
+    *Pattern Recognition Letters*, 27(8), 861-874.
+    [doi:10.1016/j.patrec.2005.10.010](https://doi.org/10.1016/j.patrec.2005.10.010)</FNItem>
+  <FNItem n="2">**Powers, D. M. W.** (2011). "Evaluation: from precision, recall
+    and F-measure to ROC, informedness, markedness and correlation".
+    *Journal of Machine Learning Technologies*, 2(1), 37-63.</FNItem>
+</Footnotes>

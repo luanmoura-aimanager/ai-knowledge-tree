@@ -11,7 +11,7 @@ prerequisites: ["ann-problem"]
 
 **Locality-sensitive hashing (LSH)** is the simplest family of approximate
 nearest-neighbor methods: design a hash function whose **collision
-probability** is monotone in the similarity between two points. Similar
+probability** is monotone in the similarity between two points<FN n="1" />. Similar
 points land in the same bucket with high probability; dissimilar points
 land in different buckets. Lookup is then just a bucket fetch.
 
@@ -89,7 +89,7 @@ A single hash has weak collision guarantees. Combine multiple:
   $(p_1/p_2)^k$ grows.
 - **OR**: build $L$ hash tables with independent composites. Two points
   collide if they agree in *any* table. The collision probability becomes
-  $1 - (1 - p^k)^L$.
+  $1 - (1 - p^k)^L$<FN n="2" />.
 
 Tuning $k$ and $L$ trades recall against precision and against the size
 of the candidate set retrieved.
@@ -164,3 +164,8 @@ for k_bits in [4, 8, 12]:
 Longer signatures cut the candidate set; more tables (OR amplification)
 boost recall. The next lesson covers an inverted-index approach (IVF) that
 scales to billions of vectors.
+
+<Footnotes>
+  <FNItem n="1">**Indyk, P., & Motwani, R.** (1998). "Approximate nearest neighbors: towards removing the curse of dimensionality". *STOC*. [doi:10.1145/276698.276876](https://doi.org/10.1145/276698.276876). Introduced the locality-sensitive family and its collision-probability guarantee.</FNItem>
+  <FNItem n="2">**Gionis, A., Indyk, P., & Motwani, R.** (1999). "Similarity search in high dimensions via hashing". *VLDB*. The AND-OR table construction that amplifies the gap between $p_1$ and $p_2$.</FNItem>
+</Footnotes>

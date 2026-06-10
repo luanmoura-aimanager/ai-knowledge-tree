@@ -36,7 +36,7 @@ proximity to the centroid.
 
 Naive IVF still stores full vectors and computes full distances against
 them. **Product quantization** compresses each vector into a short
-codebook lookup.
+codebook lookup<FN n="1" />.
 
 Split each $d$-dimensional vector into $m$ sub-vectors of length $d/m$.
 Train a separate k-means codebook of $K_s$ centroids ($K_s = 256$ is
@@ -94,7 +94,7 @@ no extra serving cost (the rotation is applied once per query).
 - **Updates / inserts**: HNSW handles online insert; IVF-PQ requires
   periodic retraining of centroids and codebooks for best quality.
 
-Both are first-class citizens of FAISS.
+Both are first-class citizens of FAISS<FN n="2" />.
 
 ```mermaid
 graph TD
@@ -161,3 +161,8 @@ for nprobe in [1, 2, 4, 8, 16]:
 Increasing `nprobe` raises recall while visiting a small fraction of the
 database. The next lesson covers the graph-based alternative that often
 beats IVF at moderate scale: HNSW.
+
+<Footnotes>
+  <FNItem n="1">**Jégou, H., Douze, M., & Schmid, C.** (2011). "Product quantization for nearest neighbor search". *IEEE TPAMI*, 33(1), 117-128. [doi:10.1109/TPAMI.2010.57](https://doi.org/10.1109/TPAMI.2010.57). Introduced product quantization and its lookup-table distance estimates.</FNItem>
+  <FNItem n="2">**Johnson, J., Douze, M., & Jégou, H.** (2019). "Billion-scale similarity search with GPUs". *IEEE Transactions on Big Data*, 7(3), 535-547. [arXiv:1702.08734](https://arxiv.org/abs/1702.08734). The FAISS system that ships IVF and IVF-PQ at billion scale.</FNItem>
+</Footnotes>

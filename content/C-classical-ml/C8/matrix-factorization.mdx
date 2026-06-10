@@ -9,12 +9,12 @@ goal: "Factor the rating matrix into low-rank user and item embeddings, fit with
 prerequisites: ["A1/low-rank-pca"]
 ---
 
-Neighborhood CF works on observed ratings, item by item. **Matrix
+Neighborhood CF works on observed ratings, item by item<FN n="2" />. **Matrix
 factorization** models the rating matrix as a product of two low-rank
 factors, $R \approx U V^\top$, where each user and item gets a $k$-
 dimensional latent vector. The factor model generalizes across sparse
 entries, dramatically improves accuracy, and is the foundation of every
-modern recommendation system.
+modern recommendation system<FN n="1" />.
 
 ## The model
 
@@ -83,7 +83,7 @@ production for explicit-feedback MF.
 
 When the rating matrix is **fully observed** and there is no regularization,
 the optimal rank-$k$ factorization is the truncated SVD (the Eckart-Young
-theorem). MF generalizes this to sparse matrices and adds regularization.
+theorem)<FN n="1" />. MF generalizes this to sparse matrices and adds regularization.
 The "SVD" in the Netflix-prize literature is actually MF with SGD, not the
 classical algebraic SVD.
 
@@ -150,3 +150,8 @@ print(f"true ratings range: [{R_full.min():.2f}, {R_full.max():.2f}]")
 ALS recovers the true low-rank structure from a 20% sample, with held-out
 RMSE close to the noise level. The next lesson handles the harder
 implicit-feedback case where there are no ratings, only clicks.
+
+<Footnotes>
+  <FNItem n="1">**Koren, Y., Bell, R., & Volinsky, C.** (2009). "Matrix factorization techniques for recommender systems". *IEEE Computer*, 42(8), 30-37. [doi:10.1109/MC.2009.263](https://doi.org/10.1109/MC.2009.263). The biased latent-factor model, SGD vs ALS, and the SVD connection from the Netflix prize.</FNItem>
+  <FNItem n="2">**Sarwar, B., Karypis, G., Konstan, J., & Riedl, J.** (2001). "Item-based collaborative filtering recommendation algorithms". *WWW*. [doi:10.1145/371920.372071](https://doi.org/10.1145/371920.372071). The neighborhood baseline that matrix factorization improves on.</FNItem>
+</Footnotes>

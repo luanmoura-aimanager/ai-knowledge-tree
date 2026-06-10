@@ -12,7 +12,7 @@ prerequisites: []
 The simplest learning rule: to predict for a new point, find the $k$ closest
 training examples and reuse their labels. **k-nearest neighbors (k-NN)** has
 no training step (it stores the data) and almost no inductive bias beyond
-"nearby points have similar labels". It is a useful baseline, a sanity check,
+"nearby points have similar labels"<FN n="1" />. It is a useful baseline, a sanity check,
 and a stepping stone to the curse-of-dimensionality lesson that follows.
 
 ## The algorithm
@@ -38,7 +38,7 @@ $k$ is the regularization knob:
   bias (averaging across distant points blurs the structure). $k = n$
   predicts the global mean / majority everywhere.
 
-Pick $k$ by cross-validation. Common practice for classification: odd $k$
+Pick $k$ by cross-validation<FN n="2" />. Common practice for classification: odd $k$
 to avoid ties; values in the range $\sqrt{n}$ to $n/10$ are typical
 starting points.
 
@@ -137,3 +137,8 @@ The U-shape in $k$ is visible: $k = 1$ overfits, large $k$ underfits, with the
 sweet spot in between. Adding one high-magnitude noise feature drowns out the
 informative ones, confirming the scaling caveat. The next lesson explains why
 all of this gets worse as the dimension grows.
+
+<Footnotes>
+  <FNItem n="1">**Cover, T. M., & Hart, P. E.** (1967). "Nearest neighbor pattern classification". *IEEE Transactions on Information Theory*, 13(1), 21-27. The original analysis of the nearest-neighbor rule and its asymptotic error bound ([doi:10.1109/TIT.1967.1053964](https://doi.org/10.1109/TIT.1967.1053964)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. k-NN as a baseline and the bias-variance role of $k$ (§13.3) ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

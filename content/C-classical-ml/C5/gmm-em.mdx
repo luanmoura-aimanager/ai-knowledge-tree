@@ -11,9 +11,9 @@ prerequisites: ["kmeans", "A2/mle"]
 
 A **Gaussian mixture model (GMM)** describes data as drawn from a weighted
 sum of Gaussians, each with its own mean and covariance. Fitting it directly
-by MLE is hard, but **expectation-maximization (EM)** alternates two simple
+by MLE is hard, but **expectation-maximization (EM)**<FN n="1" /> alternates two simple
 steps: probabilistic cluster assignment (E-step) and Gaussian re-estimation
-(M-step). The result is a soft, covariance-aware generalization of k-means.
+(M-step). The result is a soft, covariance-aware generalization of k-means<FN n="2" />.
 
 ## The model
 
@@ -58,7 +58,7 @@ where $N_k = \sum_i \gamma_{ik}$ is the effective number of points assigned
 to component $k$.
 
 Each iteration is guaranteed to not decrease the log-likelihood (proof via
-Jensen's inequality applied to the latent-variable formulation). The
+Jensen's inequality applied to the latent-variable formulation)<FN n="1" />. The
 algorithm converges to a local maximum.
 
 ## GMM as soft k-means
@@ -187,3 +187,15 @@ GMM-EM recovers the mixing weights and means, the log-likelihood is
 monotonically increasing, and BIC correctly favors $K = 3$. The final C5
 lesson covers the visualization-focused dimensionality-reduction methods
 t-SNE and UMAP.
+
+<Footnotes>
+  <FNItem n="1">**Dempster, A. P., Laird, N. M., & Rubin, D. B.** (1977).
+    "Maximum likelihood from incomplete data via the EM algorithm". *JRSS-B*,
+    39(1), 1-38.
+    [doi:10.1111/j.2517-6161.1977.tb01600.x](https://doi.org/10.1111/j.2517-6161.1977.tb01600.x).
+    The general EM algorithm and its monotone-likelihood guarantee.</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The
+    Elements of Statistical Learning* (2nd ed.). Springer, §8.5, §14.3.
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7).
+    GMMs, EM as soft k-means, and BIC/AIC model selection.</FNItem>
+</Footnotes>

@@ -9,7 +9,7 @@ goal: "Diagnose bias vs variance from training/validation curves over sample siz
 prerequisites: ["C1/bias-variance"]
 ---
 
-The bias-variance decomposition is a theoretical tool. **Learning curves**
+The bias-variance decomposition is a theoretical tool<FN n="1" />. **Learning curves**
 and **validation curves** are the practical diagnostics that show, in real
 data, whether more data or a different model would help. Drawing these
 plots is the cheapest, most informative thing you can do when a model is
@@ -31,7 +31,7 @@ features, less regularization. More data will not help.
 **High variance (overfitting).** Training error is low, validation error
 is much higher, and the gap is large. The model has fit the training set
 but not the underlying function. More data will close the gap. Remedies:
-more data, more regularization, simpler model.
+more data, more regularization, simpler model<FN n="1" />.
 
 **Good fit.** Training and validation converge to the same low asymptote.
 The model class is appropriate and you have enough data.
@@ -94,7 +94,7 @@ The learning curve can flatten before reaching low error. Two diagnoses:
 The cure for both is data with **new** content (new features, new
 modalities) rather than more rows of the same.
 
-![Two diagnostics: error vs training-set size (left — the train/validation gap closes as data grows) and error vs model complexity (right — the validation U-shape picks the sweet spot).](/figures/C10/learning-curves.svg)
+![Two diagnostics: error vs training-set size (left: the train/validation gap closes as data grows) and error vs model complexity (right: the validation U-shape picks the sweet spot).](/figures/C10/learning-curves.svg)
 
 ## Check it on arrays
 
@@ -153,3 +153,10 @@ learner getting cured by data. The validation curve shows the U-shape:
 underfitting on the left, overfitting on the right. This closes the C10
 evaluation track and pillar C as a whole; the next pillar (D, Deep
 Learning) builds on these foundations.
+
+<Footnotes>
+  <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009).
+    *The Elements of Statistical Learning* (2nd ed.). Springer. Bias-variance
+    tradeoff and model complexity diagnostics (Ch. 7).
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)</FNItem>
+</Footnotes>

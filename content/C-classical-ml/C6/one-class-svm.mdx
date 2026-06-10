@@ -13,7 +13,7 @@ The two-class SVM finds the hyperplane separating two labeled classes. The
 **one-class SVM** treats anomaly detection as a degenerate classification:
 all the training data is "normal", and the algorithm finds the smallest
 region in feature space that contains the bulk of it. Anything outside is
-flagged as anomalous.
+flagged as anomalous<FN n="2" />.
 
 ## Two equivalent formulations
 
@@ -21,7 +21,7 @@ Two algorithms are commonly called "one-class SVM" and they are equivalent
 under a change of kernel:
 
 **Schölkopf's $\nu$-SVM.** Find a hyperplane in kernel feature space that
-separates the data from the origin with maximum margin. Equivalently, solve
+separates the data from the origin with maximum margin<FN n="1" />. Equivalently, solve
 
 $$
 \min_{w, \rho, \xi}\; \tfrac{1}{2}\lVert w\rVert^2 - \rho + \frac{1}{\nu n}\sum_i \xi_i \quad \text{s.t.}\quad w^\top \phi(x_i) \ge \rho - \xi_i,\ \xi_i \ge 0.
@@ -81,6 +81,11 @@ $f$ is a continuous score, useful for ranking.
 
 For large datasets, Isolation Forest (previous lesson) or deep AD methods
 (next lesson) are usually faster.
+
+<Footnotes>
+  <FNItem n="1">**Schölkopf, B., Platt, J. C., Shawe-Taylor, J., Smola, A. J., & Williamson, R. C.** (2001). "Estimating the support of a high-dimensional distribution". *Neural Computation*, 13(7), 1443-1471. [doi:10.1162/089976601750264965](https://doi.org/10.1162/089976601750264965). Introduces the $\nu$-SVM that separates data from the origin and the $\nu$ bound on outliers and support vectors.</FNItem>
+  <FNItem n="2">**Chandola, V., Banerjee, A., & Kumar, V.** (2009). "Anomaly detection: a survey". *ACM Computing Surveys*, 41(3), 1-58. [doi:10.1145/1541880.1541882](https://doi.org/10.1145/1541880.1541882). Frames one-class SVMs within classification-based anomaly detection.</FNItem>
+</Footnotes>
 
 ![A one-class SVM learns a boundary that tightly encloses the normal data; the ring of anomalies around the dense cluster falls outside and is flagged.](/figures/C6/one-class-svm.svg)
 

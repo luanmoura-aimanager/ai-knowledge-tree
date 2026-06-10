@@ -33,7 +33,7 @@ must build the rest yourself.
 The canonical open-source ANN library. Implements every index family:
 flat exhaustive, IVF, IVF-PQ, HNSW, OPQ, IVFADC, etc. Used inside
 Facebook's recommendation stack and as the engine behind many vector
-DBs.
+DBs<FN n="1" />.
 
 **Strengths**: best-in-class algorithmic coverage, fast, GPU support.
 **Limits**: a library, not a service. No persistence, no replication, no
@@ -101,7 +101,7 @@ the vendor's specific hybrid implementation.
 A single-vector lookup is fast (<10 ms for 100M vectors with HNSW).
 Throughput (queries per second per machine) is the operational metric
 you measure. Vector DBs usually serve 10^3-10^4 QPS per machine for a
-single index. Sharding gets you linear throughput scaling.
+single index. Sharding gets you linear throughput scaling<FN n="2" />.
 
 ## Cost model
 
@@ -180,3 +180,8 @@ When the filter is selective (here, 1 of 5 categories), pre-filter
 recovers more relevant neighbors than post-filter. This closes the C9
 ANN track; the final C10 lessons cover the evaluation and selection
 machinery that ties everything together.
+
+<Footnotes>
+  <FNItem n="1">**Johnson, J., Douze, M., & Jégou, H.** (2019). "Billion-scale similarity search with GPUs". *IEEE Transactions on Big Data*, 7(3), 535-547. [arXiv:1702.08734](https://arxiv.org/abs/1702.08734). The FAISS library underlying most production vector databases.</FNItem>
+  <FNItem n="2">**Aumüller, M., Bernhardsson, E., & Faithfull, A.** (2020). "ANN-Benchmarks: a benchmarking tool for approximate nearest neighbor algorithms". *Information Systems*, 87, 101374. [doi:10.1016/j.is.2019.02.006](https://doi.org/10.1016/j.is.2019.02.006). The recall-throughput methodology for comparing vector indices and systems.</FNItem>
+</Footnotes>

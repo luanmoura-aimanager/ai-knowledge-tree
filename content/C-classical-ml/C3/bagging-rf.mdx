@@ -11,10 +11,10 @@ prerequisites: ["tree-pruning", "C1/bias-variance"]
 
 Trees are high-variance learners: small data changes produce very different
 trees. **Bagging** (bootstrap aggregating) averages many trees fit on
-bootstrap resamples of the data, slashing the variance without adding bias.
+bootstrap resamples of the data, slashing the variance without adding bias<FN n="1" />.
 **Random forests** push the idea further by also randomizing which features
 each split can use, which decorrelates the trees and lowers variance even
-more.
+more<FN n="2" />.
 
 ## Variance reduction from averaging
 
@@ -36,7 +36,7 @@ $$
 
 where $\rho$ is the average correlation between trees. As $B \to \infty$, the
 variance floors at $\rho\sigma^2$. **Reducing $\rho$** is what random forests
-add on top of bagging.
+add on top of bagging<FN n="3" />.
 
 ## The random-forest twist
 
@@ -185,3 +185,9 @@ print(f"single tree test acc: {single_acc:.3f}  (forest reduces variance over th
 The random forest beats the single tree on the noisy test set, and the OOB
 accuracy tracks the held-out test accuracy. The next lesson opens the black
 box: how to read feature importance from a forest.
+
+<Footnotes>
+  <FNItem n="1">**Breiman, L.** (1996). "Bagging predictors". *Machine Learning*, 24(2), 123-140. Bootstrap aggregation as a variance-reduction scheme ([doi:10.1007/BF00058655](https://doi.org/10.1007/BF00058655)).</FNItem>
+  <FNItem n="2">**Breiman, L.** (2001). "Random forests". *Machine Learning*, 45(1), 5-32. Decorrelating bagged trees with random feature subsets ([doi:10.1023/A:1010933404324](https://doi.org/10.1023/A:1010933404324)).</FNItem>
+  <FNItem n="3">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. The correlation-variance bound for averaged predictors ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

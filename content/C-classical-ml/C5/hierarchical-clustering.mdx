@@ -11,7 +11,7 @@ prerequisites: []
 
 **Hierarchical clustering** builds a tree (dendrogram) instead of a flat
 partition: at the bottom, every point is its own cluster; at the top, one
-giant cluster. The choice of **linkage** decides how distances between
+giant cluster<FN n="1" />. The choice of **linkage** decides how distances between
 clusters are computed and produces very different dendrograms. Reading the
 dendrogram exposes structure at multiple scales.
 
@@ -38,7 +38,7 @@ For clusters $A, B$ with pairwise distances $d(a, b)$:
   Compromise between single and complete.
 - **Ward's linkage**: merges the two clusters whose union minimizes the
   increase in within-cluster sum of squares. Tends to produce balanced,
-  spherical clusters; the natural choice for Euclidean data.
+  spherical clusters; the natural choice for Euclidean data<FN n="2" />.
 
 Different linkages can give entirely different clusterings on the same data.
 Picking one is a domain decision, not a default.
@@ -70,7 +70,7 @@ the slowest classical clusterer.
 - **Non-Euclidean distances**: works with any distance, like k-medoids but
   produces a tree.
 
-![Agglomerative (Ward) clustering produces a dendrogram; cutting it at a chosen height yields the clusters — here three.](/figures/C5/hierarchical-clustering.svg)
+![Agglomerative (Ward) clustering produces a dendrogram; cutting it at a chosen height yields the clusters, here three.](/figures/C5/hierarchical-clustering.svg)
 
 ## Check it on arrays
 
@@ -148,3 +148,13 @@ print(f"\nWard cut to 3 clusters: cluster sizes = {[int((labels == c).sum()) for
 Each linkage produces a different set of merge distances. Cutting Ward's
 dendrogram at 3 clusters recovers the three blobs. The next lesson takes a
 fundamentally different stance again: clusters as Gaussians fit by EM.
+
+<Footnotes>
+  <FNItem n="1">**Kaufman, L., & Rousseeuw, P. J.** (1990). *Finding Groups in
+    Data: An Introduction to Cluster Analysis.* Wiley. Agglomerative and divisive
+    methods, the linkages, and reading dendrograms (Ch. 5-6).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The
+    Elements of Statistical Learning* (2nd ed.). Springer, §14.3.12.
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7).
+    Linkage comparison and Ward's criterion.</FNItem>
+</Footnotes>

@@ -11,9 +11,9 @@ prerequisites: ["kmeans"]
 
 Random initialization is the main cause of bad k-means results: Lloyd
 converges to a local minimum, and a bad start lands in a bad basin.
-**k-means++** picks initial centers far apart, with a probabilistic
+**k-means++**<FN n="1" /> picks initial centers far apart, with a probabilistic
 correctness guarantee. **Elbow** and **silhouette** are the two standard ways
-to pick the number of clusters $k$ when the truth is unknown.
+to pick the number of clusters $k$ when the truth is unknown<FN n="2" />.
 
 ## k-means++
 
@@ -33,7 +33,7 @@ make Lloyd less likely to get stuck.
 
 **Theorem** (Arthur & Vassilvitskii). k-means++ initialization gives an
 $O(\log k)$-approximation in expectation to the optimal inertia, *before*
-running Lloyd. After Lloyd, performance is typically much better than random
+running Lloyd<FN n="1" />. After Lloyd, performance is typically much better than random
 initialization with the same compute budget.
 
 ## Choosing $k$: the elbow method
@@ -167,3 +167,13 @@ k-means++ gives lower mean inertia with much less variance across trials,
 the elbow at $k = 3$ is visible, and the silhouette score peaks at the true
 $k$. The next lesson swaps cluster means for actual data points to handle
 non-Euclidean metrics: k-medoids.
+
+<Footnotes>
+  <FNItem n="1">**Arthur, D., & Vassilvitskii, S.** (2007). "k-means++: the
+    advantages of careful seeding". *SODA*. The $D^2$-weighted seeding and its
+    $O(\log k)$ expected-approximation guarantee.</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The
+    Elements of Statistical Learning* (2nd ed.). Springer, §14.3.
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7).
+    The gap statistic and model-selection criteria for $k$.</FNItem>
+</Footnotes>

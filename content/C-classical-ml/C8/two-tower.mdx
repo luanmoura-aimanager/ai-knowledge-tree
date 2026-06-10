@@ -12,7 +12,7 @@ prerequisites: ["matrix-factorization"]
 Matrix factorization gives each user and item one fixed embedding from the
 interaction matrix alone. **Two-tower models** generalize MF by computing
 the embeddings with **neural networks** that consume features (user
-demographics, item content, context). The dot-product scoring rule survives,
+demographics, item content, context)<FN n="1" />. The dot-product scoring rule survives,
 which is what lets two-tower models scale to billion-item catalogs through
 approximate nearest-neighbor retrieval.
 
@@ -73,7 +73,7 @@ dot-product they do. The C9 lessons cover the index structures.
 ## Why "two-tower" and not "one big network"
 
 A cross-feature model (concatenate user and item, pass through one network)
-would be more expressive but cannot precompute item embeddings: every
+would be more expressive but cannot precompute item embeddings<FN n="2" />: every
 (user, item) pair needs a forward pass at serving time. For a catalog of
 millions of items per query, this is too slow.
 
@@ -172,3 +172,8 @@ print(f"recall@10 over users: mean={np.mean(recall):.3f}, std={np.std(recall):.3
 The learned two-tower model recovers most true positives in the top-10. The
 next lesson takes the user tower further by consuming sequences instead of
 static features.
+
+<Footnotes>
+  <FNItem n="1">**Covington, P., Adams, J., & Sargin, E.** (2016). "Deep neural networks for YouTube recommendations". *RecSys*. [doi:10.1145/2959100.2959190](https://doi.org/10.1145/2959100.2959190). The two-stage retrieval/ranking split and the neural candidate-generation tower.</FNItem>
+  <FNItem n="2">**He, X., Liao, L., Zhang, H., Nie, L., Hu, X., & Chua, T.-S.** (2017). "Neural collaborative filtering". *WWW*. [arXiv:1708.05031](https://arxiv.org/abs/1708.05031). Replacing the MF dot product with learned neural interaction functions.</FNItem>
+</Footnotes>

@@ -30,7 +30,7 @@ $$
 
 This is the **logit link**. From the exponential-family lesson, the Bernoulli's
 natural parameter *is* the log-odds: the logistic does not just look natural,
-it falls out of the Bernoulli's algebra.
+it falls out of the Bernoulli's algebra<FN n="1" />.
 
 ## The log-likelihood
 
@@ -78,8 +78,8 @@ Rewriting, define the **working response**
 $z_i = x_i^\top \beta^{(t)} + (y_i - p_i^{(t)}) / (p_i^{(t)}(1 - p_i^{(t)}))$.
 Each Newton step is then a **weighted least-squares** fit
 $\beta^{(t+1)} = (X^\top W X)^{-1} X^\top W \mathbf{z}$, hence the name
-**iteratively reweighted least squares (IRLS)**. Quadratic local convergence,
-the same as Newton on any smooth convex objective.
+**iteratively reweighted least squares (IRLS)**<FN n="2" />. Quadratic local
+convergence, the same as Newton on any smooth convex objective.
 
 For large $n$ or sparse features, plain gradient descent (or its variants from
 A3) is simpler and often faster per epoch.
@@ -144,3 +144,8 @@ print("Hessian eigvals all <= 0:", np.all(np.linalg.eigvalsh(H) <= 1e-10))
 IRLS converges in a handful of steps; gradient descent reaches the same
 solution more slowly; the Hessian's eigenvalues are nonpositive, confirming
 concavity. The next lesson generalizes to multi-class with the softmax.
+
+<Footnotes>
+  <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §4.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). Logistic regression and its log-odds link.</FNItem>
+  <FNItem n="2">**McCullagh, P., & Nelder, J. A.** (1989). *Generalized Linear Models* (2nd ed.), §4.4. Chapman & Hall. IRLS as the standard fitting algorithm.</FNItem>
+</Footnotes>

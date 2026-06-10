@@ -12,7 +12,7 @@ prerequisites: ["A3/bayesian-optimization"]
 **AutoML** is the family of systems that automate the messy parts of
 classical ML: feature engineering, model selection, hyperparameter tuning,
 and ensembling. The good ones produce results competitive with expert
-hand-tuning on tabular data, with no expert in the loop. The not-so-good
+hand-tuning on tabular data, with no expert in the loop<FN n="1" />. The not-so-good
 ones over-promise on automation while requiring expert hand-holding anyway.
 
 ## The search problem
@@ -23,7 +23,7 @@ features, target encoding, embeddings), model class (linear, tree,
 boosting), and per-component hyperparameters. The space is enormous (often
 exponential in the number of choices), so search efficiency matters.
 
-Three search strategies dominate:
+Three search strategies dominate<FN n="2" />:
 
 - **Random search**: surprisingly hard to beat, especially as a baseline.
 - **Bayesian optimization (BO)**: model the objective with a Gaussian process
@@ -38,7 +38,7 @@ worked on similar tasks).
 
 ## Major flavors
 
-- **`auto-sklearn`** (Bayesian + meta-learning + ensembling). Open source,
+- **`auto-sklearn`** (Bayesian + meta-learning + ensembling)<FN n="3" />. Open source,
   scikit-learn ecosystem.
 - **TPOT** (genetic programming over scikit-learn pipelines).
 - **H2O AutoML** (random forest + GLM + GBM + deep learning stacking).
@@ -157,3 +157,9 @@ The random search produces a respectable result; the local search around the
 best initial point refines it modestly. Real AutoML systems do this at scale
 across pipeline spaces with hundreds of dimensions. This closes the C7
 ensembles track; the next subsection turns to recommendation systems.
+
+<Footnotes>
+  <FNItem n="1">**He, X., Zhao, K., & Chu, X.** (2021). "AutoML: a survey of the state-of-the-art". *Knowledge-Based Systems*, 212, 106622. Surveys the pipeline-search problem across feature engineering, model selection, and tuning ([doi:10.1016/j.knosys.2020.106622](https://doi.org/10.1016/j.knosys.2020.106622)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Model selection and search over the bias-variance frontier ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+  <FNItem n="3">**Feurer, M., Klein, A., Eggensperger, K., et al.** (2015). "Efficient and robust automated machine learning". *NeurIPS*. Introduces auto-sklearn, combining Bayesian optimization, meta-learning, and ensemble construction.</FNItem>
+</Footnotes>

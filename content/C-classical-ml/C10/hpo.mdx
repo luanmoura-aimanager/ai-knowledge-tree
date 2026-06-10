@@ -34,7 +34,7 @@ Sample hyperparameters from distributions (uniform on a scale, log-uniform
 on a regularization strength, categorical for choices). Evaluate $T$
 samples. Pick the best.
 
-**Random search beats grid search** (Bergstra & Bengio, 2012) on most
+**Random search beats grid search** (Bergstra & Bengio, 2012)<FN n="1" /> on most
 problems because real importance is concentrated in a few hyperparameters
 and grid wastes evaluations on the unimportant ones. With the same
 compute budget, random covers a wider range and finds better
@@ -47,7 +47,7 @@ Random search is the right default when you do not want to think hard.
 Build a surrogate model of "loss as a function of hyperparameters",
 typically a Gaussian process or tree-based estimator (TPE in Optuna /
 Hyperopt). Use the surrogate's posterior to choose the next
-configuration via expected improvement or similar acquisition functions.
+configuration via expected improvement or similar acquisition functions<FN n="2" />.
 
 The A3 lesson on Bayesian optimization is the foundation. For HPO
 specifically:
@@ -166,3 +166,11 @@ All three methods land near the optimum; BO-like local refinement gets
 slightly tighter than the others at the same evaluation budget. The
 final C10 lesson visualizes the model's behavior across training-set
 sizes: learning curves.
+
+<Footnotes>
+  <FNItem n="1">**Bergstra, J., & Bengio, Y.** (2012). "Random search for
+    hyper-parameter optimization". *Journal of Machine Learning Research*, 13, 281-305.</FNItem>
+  <FNItem n="2">**Snoek, J., Larochelle, H., & Adams, R. P.** (2012). "Practical
+    Bayesian optimization of machine learning algorithms". *NeurIPS*.
+    [arXiv:1206.2944](https://arxiv.org/abs/1206.2944)</FNItem>
+</Footnotes>

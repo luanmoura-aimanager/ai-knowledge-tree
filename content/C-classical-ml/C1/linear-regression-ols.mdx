@@ -60,7 +60,7 @@ Setting it to zero gives the **normal equations**
 
 $$
 X^\top X\, \hat\beta = X^\top \mathbf{y}.
-$$
+$$<FN n="1" />
 
 When $X$ has full column rank, $X^\top X$ is invertible and
 
@@ -80,7 +80,7 @@ $$
 $$
 
 where $P = X(X^\top X)^{-1}X^\top$ is the **projection matrix** onto the column
-space of $X$ (idempotent, $P^2 = P$, and symmetric). The residual
+space of $X$ (idempotent, $P^2 = P$, and symmetric)<FN n="2" />. The residual
 $\mathbf{r} = \mathbf{y} - \hat{\mathbf{y}}$ lives in the orthogonal complement:
 $X^\top \mathbf{r} = 0$ (this is exactly the normal equations rewritten).
 
@@ -100,7 +100,7 @@ $$
 solved by back-substitution. Production code uses QR (numpy's `lstsq`) or the
 SVD, not the explicit inverse.
 
-![Ordinary least squares fits the line that minimizes the sum of squared residuals — the vertical gaps from each point to the line.](/figures/C1/linear-regression-ols.svg)
+![Ordinary least squares fits the line that minimizes the sum of squared residuals: the vertical gaps from each point to the line.](/figures/C1/linear-regression-ols.svg)
 
 ## Check it on arrays
 
@@ -143,3 +143,8 @@ The three routes recover the same $\hat\beta$, the residual is numerically
 orthogonal to every feature column, and $P$ is idempotent. The next lesson asks
 where this estimator comes from probabilistically: it is the MLE under Gaussian
 noise.
+
+<Footnotes>
+  <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §3.2. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)</FNItem>
+  <FNItem n="2">**James, G., Witten, D., Hastie, T., & Tibshirani, R.** (2021). *An Introduction to Statistical Learning* (2nd ed.), §3.1. Springer. The projection/geometry reading of least squares.</FNItem>
+</Footnotes>

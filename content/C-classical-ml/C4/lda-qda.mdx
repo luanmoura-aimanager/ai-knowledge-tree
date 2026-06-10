@@ -11,7 +11,7 @@ prerequisites: ["naive-bayes", "A2/common-distributions"]
 
 Naive Bayes assumes feature independence given the class. **LDA** and **QDA**
 drop that assumption: each class gets a full multivariate Gaussian, including
-covariances between features. The shape of the decision boundary falls out of
+covariances between features<FN n="1" />. The shape of the decision boundary falls out of
 whether the classes share covariance or not.
 
 ## The setup
@@ -53,7 +53,7 @@ $$
 $$
 
 which is **linear in $x$**. The decision boundaries are hyperplanes; this is
-**Linear Discriminant Analysis (LDA)**.
+**Linear Discriminant Analysis (LDA)**<FN n="2" />.
 
 LDA has only $O(C d + d^2)$ parameters and is more stable than QDA in
 small-sample regimes. It is the right starting point and what
@@ -78,7 +78,7 @@ optimize:
 - **LDA** assumes Gaussian class-conditionals with shared covariance, fits by
   plug-in MLE on those Gaussians.
 - **Logistic regression** assumes only that the log-odds are linear in $x$,
-  fits by maximizing the conditional likelihood $\Pr(y \mid x)$.
+  fits by maximizing the conditional likelihood $\Pr(y \mid x)$<FN n="3" />.
 
 When the LDA assumption is approximately correct, LDA tends to be more
 data-efficient. When it is grossly wrong (non-Gaussian features), logistic
@@ -163,3 +163,9 @@ print("QDA wins when classes have different covariances; LDA wins when shared.")
 QDA usually edges out LDA here because the three Gaussians have genuinely
 different covariances. The next lesson reuses the LDA setup as a
 dimensionality-reduction method, the supervised twin of PCA.
+
+<Footnotes>
+  <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. LDA and QDA discriminants from Gaussian class-conditionals (§4.3) ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+  <FNItem n="2">**Fisher, R. A.** (1936). "The use of multiple measurements in taxonomic problems". *Annals of Eugenics*, 7(2), 179-188. The origin of linear discriminant analysis ([doi:10.1111/j.1469-1809.1936.tb02137.x](https://doi.org/10.1111/j.1469-1809.1936.tb02137.x)).</FNItem>
+  <FNItem n="3">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning.* Springer. Generative vs discriminative linear classifiers, LDA against logistic regression (§4.2-4.3).</FNItem>
+</Footnotes>
