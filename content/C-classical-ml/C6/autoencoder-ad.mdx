@@ -12,14 +12,14 @@ prerequisites: ["A1/low-rank-pca"]
 The simplest neural anomaly detector: train an **autoencoder** to compress
 and reconstruct normal data, then score test points by reconstruction error.
 Normal points reconstruct well (the model has seen their structure); anomalies
-do not (the model has no template for them). The idea works with any
+do not (the model has no template for them)<FN n="1" />. The idea works with any
 reconstruction model, including linear PCA.
 
 ## The setup
 
 An autoencoder is a pair of networks: an **encoder** $f_\phi: \mathcal{X} \to \mathbb{R}^k$
 maps inputs to a low-dimensional code, and a **decoder** $g_\theta: \mathbb{R}^k \to \mathcal{X}$
-maps the code back. Training minimizes reconstruction loss on a dataset of
+maps the code back<FN n="2" />. Training minimizes reconstruction loss on a dataset of
 normal examples:
 
 $$
@@ -138,3 +138,8 @@ The linear autoencoder (= PCA) reconstructs the 1D normal manifold cleanly;
 off-manifold anomalies have much larger reconstruction errors. This closes
 the C6 anomaly-detection track; the next subsection turns from outlier
 detection to combining many models: ensembles.
+
+<Footnotes>
+  <FNItem n="1">**Sakurada, M., & Yairi, T.** (2014). "Anomaly detection using autoencoders with nonlinear dimensionality reduction". *MLSDA Workshop*. [doi:10.1145/2689746.2689747](https://doi.org/10.1145/2689746.2689747). Shows reconstruction error from an autoencoder flags anomalies and improves on linear PCA on curved manifolds.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Encoder/decoder formulation and the sparse, denoising, and variational autoencoder variants (Ch. 14).</FNItem>
+</Footnotes>

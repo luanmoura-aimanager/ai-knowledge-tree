@@ -18,7 +18,7 @@ selection is sparse *and* the correlated coefficients stay together.
 
 $$
 \hat\beta = \arg\min_\beta\; \frac{1}{2n}\lVert \mathbf{y} - X\beta\rVert^2 + \lambda\!\left(\alpha\,\lVert\beta\rVert_1 + \frac{1-\alpha}{2}\,\lVert\beta\rVert_2^2\right),
-$$
+$$<FN n="1" />
 
 with $\alpha \in [0, 1]$ controlling the L1/L2 mix:
 
@@ -54,7 +54,7 @@ For two perfectly correlated columns, LASSO assigns the entire weight to one
 and zero to the other. Elastic net spreads the weight evenly across them
 because the L2 piece penalizes unequal magnitudes among correlated features.
 Formally: if $X_j = X_k$, the elastic-net solution satisfies $\hat\beta_j = \hat\beta_k$
-(no such guarantee for LASSO).
+(no such guarantee for LASSO)<FN n="2" />.
 
 ## Choosing the hyperparameters
 
@@ -64,7 +64,7 @@ common default) and cross-validate over $\lambda$. For genuinely sparse
 problems with uncorrelated features, $\alpha$ closer to 1 is fine. With many
 correlated groups, lower $\alpha$.
 
-![Penalty-ball geometry: the L1 diamond has corners that produce exact zeros, the L2 circle is smooth, and elastic-net blends the two — keeping corners while rounding the edges.](/figures/C1/elastic-net.svg)
+![Penalty-ball geometry: the L1 diamond has corners that produce exact zeros, the L2 circle is smooth, and elastic-net blends the two, keeping corners while rounding the edges.](/figures/C1/elastic-net.svg)
 
 ## Check it on arrays
 
@@ -111,3 +111,8 @@ print(f"Elastic net diff(b0,b1) = {abs(beta_enet[0] - beta_enet[1]):.3f}  (small
 LASSO collapses the correlated pair onto one coefficient; elastic net splits
 them evenly, recovering the grouping. The next lesson switches from regression
 to classification with logistic regression.
+
+<Footnotes>
+  <FNItem n="1">**Zou, H., & Hastie, T.** (2005). "Regularization and variable selection via the elastic net". *JRSS-B*, 67(2), 301-320. [doi:10.1111/j.1467-9868.2005.00503.x](https://doi.org/10.1111/j.1467-9868.2005.00503.x)</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §3.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). Elastic net and the grouping effect on correlated features.</FNItem>
+</Footnotes>

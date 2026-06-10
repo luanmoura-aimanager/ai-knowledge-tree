@@ -18,7 +18,7 @@ prefers them; the algorithmic counterpart is soft-thresholding.
 
 $$
 \hat\beta_\lambda = \arg\min_\beta\; \frac{1}{2n}\lVert \mathbf{y} - X\beta\rVert^2 + \lambda\,\lVert \beta \rVert_1.
-$$
+$$<FN n="1" />
 
 The L1 penalty $\lVert \beta\rVert_1 = \sum_j |\beta_j|$ is convex but not
 differentiable at zero. There is no closed-form solution in general; the
@@ -34,7 +34,7 @@ smallest ellipse touches the diamond.
 The L2 ball is round, so contact is generic, in the interior of a face; ridge
 shrinks but does not zero. The L1 ball has corners on the axes; the ellipse
 touches a corner with high probability, and at a corner some coordinates are
-*exactly* zero. The corners of L1 are where sparsity is born.
+*exactly* zero. The corners of L1 are where sparsity is born<FN n="2" />.
 
 ## Proximal gradient (ISTA)
 
@@ -76,7 +76,7 @@ Same algorithmic principle, different prior, different geometry.
 - **Grouped features.** LASSO selects within groups arbitrarily; the group
   LASSO penalizes group norms instead.
 
-![LASSO coefficient paths: as the penalty grows the coefficients hit exactly zero one by one, leaving only the few truly-nonzero ones — built-in feature selection.](/figures/C1/lasso.svg)
+![LASSO coefficient paths: as the penalty grows the coefficients hit exactly zero one by one, leaving only the few truly-nonzero ones (built-in feature selection).](/figures/C1/lasso.svg)
 
 ## Check it on arrays
 
@@ -123,3 +123,8 @@ LASSO recovers the true sparse support exactly at moderate $\lambda$; sweeping
 $\lambda$ traces a path from dense (small $\lambda$) to all-zero (large
 $\lambda$). The next lesson combines L1 and L2 to fix LASSO's
 correlated-feature behavior.
+
+<Footnotes>
+  <FNItem n="1">**Tibshirani, R.** (1996). "Regression shrinkage and selection via the lasso". *JRSS-B*, 58(1), 267-288. [doi:10.1111/j.2517-6161.1996.tb02080.x](https://doi.org/10.1111/j.2517-6161.1996.tb02080.x)</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §3.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). The L1-ball geometry that produces sparsity.</FNItem>
+</Footnotes>

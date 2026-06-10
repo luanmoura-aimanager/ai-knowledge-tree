@@ -11,7 +11,7 @@ prerequisites: ["dbscan"]
 
 DBSCAN needs a single $\varepsilon$, which fails when clusters have very
 different densities: a small $\varepsilon$ misses the sparse clusters, a
-large one merges the dense ones. **HDBSCAN** builds a *hierarchy* of DBSCAN
+large one merges the dense ones<FN n="1" />. **HDBSCAN**<FN n="2" /> builds a *hierarchy* of DBSCAN
 clusterings across all $\varepsilon$ values and extracts the most stable
 clusters, automatically handling varying density.
 
@@ -47,7 +47,7 @@ to noise, not a genuine split.
 A cluster's **stability** is its lifetime in the condensed tree: how long it
 persists as the threshold decreases. HDBSCAN extracts clusters by picking the
 selection that maximizes total stability subject to the rule "no cluster is
-both selected and a descendant of a selected cluster". The result is a flat
+both selected and a descendant of a selected cluster"<FN n="2" />. The result is a flat
 clustering where each cluster persists for a long density range.
 
 The intuition: durable clusters (visible across many density thresholds) are
@@ -144,3 +144,13 @@ Increasing the threshold merges clusters, but the dense cluster persists
 across a much wider range than the noise; HDBSCAN's stability criterion
 picks out the persistent ones. The next lesson abandons the flat clustering
 and walks the whole dendrogram explicitly.
+
+<Footnotes>
+  <FNItem n="1">**Ester, M., Kriegel, H.-P., Sander, J., & Xu, X.** (1996). "A
+    density-based algorithm for discovering clusters in large spatial databases
+    with noise". *KDD*. The single-$\varepsilon$ DBSCAN that HDBSCAN generalizes.</FNItem>
+  <FNItem n="2">**Campello, R. J. G. B., Moulavi, D., & Sander, J.** (2013).
+    "Density-based clustering based on hierarchical density estimates". *PAKDD*.
+    [doi:10.1007/978-3-642-37456-2_14](https://doi.org/10.1007/978-3-642-37456-2_14).
+    Mutual reachability, the condensed tree, and stability-based extraction.</FNItem>
+</Footnotes>

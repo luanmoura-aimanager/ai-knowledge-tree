@@ -30,7 +30,7 @@ vocabulary.
 
 ## SASRec (Self-Attentive Sequential Recommendation)
 
-A Transformer decoder applied to item sequences. Each item is represented by
+A Transformer decoder applied to item sequences<FN n="1" />. Each item is represented by
 an embedding (plus a positional embedding). The Transformer's
 self-attention learns which previous items in the history are most relevant
 for the next prediction.
@@ -68,7 +68,7 @@ next item from the rest of the sequence.
 
 The sequence model produces a single embedding for the current user state
 (the final position's hidden vector). Item embeddings are computed by the
-same model or a separate item tower. Retrieval is still dot-product over
+same model or a separate item tower<FN n="2" />. Retrieval is still dot-product over
 the item index, so ANN search is unchanged. The user encoder is just more
 sophisticated than a simple lookup.
 
@@ -171,3 +171,8 @@ illustrates the pattern: encode the history into a single vector, score
 candidates by dot product, train against sampled negatives. This closes the
 C8 recommendation track; the next subsection covers the data-structure side:
 approximate nearest neighbor search that makes all of this serve at scale.
+
+<Footnotes>
+  <FNItem n="1">**Kang, W.-C., & McAuley, J.** (2018). "Self-attentive sequential recommendation". *ICDM*. [arXiv:1808.09781](https://arxiv.org/abs/1808.09781). SASRec: a causal Transformer for next-item prediction.</FNItem>
+  <FNItem n="2">**Covington, P., Adams, J., & Sargin, E.** (2016). "Deep neural networks for YouTube recommendations". *RecSys*. [doi:10.1145/2959100.2959190](https://doi.org/10.1145/2959100.2959190). The user-state-plus-item-tower retrieval setup the sequence encoder slots into.</FNItem>
+</Footnotes>

@@ -11,7 +11,7 @@ prerequisites: ["perceptron", "A3/kkt"]
 
 The perceptron settles for *any* separating hyperplane. The **support vector
 machine (SVM)** demands a particular one: the hyperplane that maximizes the
-distance to the nearest training point. This **maximum-margin** formulation
+distance to the nearest training point<FN n="1" />. This **maximum-margin** formulation
 turns into a convex quadratic program, with a clean geometric story.
 
 ## The margin
@@ -75,7 +75,7 @@ $\alpha_i = 0$ unless the margin constraint is tight, i.e. $y_i(w^\top x_i + b) 
 Points with $\alpha_i > 0$ sit exactly on the margin boundary. They are the
 **support vectors**, and they are the only data points that contribute to $w$.
 Everything else is irrelevant to the classifier; this is the SVM's celebrated
-sparsity-in-examples property.
+sparsity-in-examples property<FN n="2" />.
 
 ## What hard-margin can't handle
 
@@ -144,3 +144,8 @@ The dual ascent identifies a handful of support vectors; the recovered weight
 vector classifies every training point correctly with a positive margin. The
 next lesson relaxes the hard constraints with slack variables so the SVM
 survives noisy and nonseparable data.
+
+<Footnotes>
+  <FNItem n="1">**Boser, B. E., Guyon, I. M., & Vapnik, V. N.** (1992). "A training algorithm for optimal margin classifiers". *COLT*. Introduces the maximum-margin classifier ([doi:10.1145/130385.130401](https://doi.org/10.1145/130385.130401)).</FNItem>
+  <FNItem n="2">**Vapnik, V. N.** (1998). *Statistical Learning Theory.* Wiley. The foundational treatment of margins, support vectors, and generalization.</FNItem>
+</Footnotes>

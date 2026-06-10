@@ -29,7 +29,7 @@ Poisson model handles both.
 
 The log link guarantees the mean stays positive. Coefficients are
 **multiplicative** effects on the rate: $e^{\beta_j}$ is the factor by which
-the expected count multiplies when $x_j$ increases by one unit.
+the expected count multiplies when $x_j$ increases by one unit<FN n="1" />.
 
 **Log-likelihood:**
 
@@ -52,7 +52,7 @@ themselves vary across units. Two standard remedies:
   estimates are the same as Poisson; the standard errors widen.
 - **Negative Binomial**: a Poisson-gamma mixture where each unit has its own
   rate drawn from a Gamma distribution, allowing
-  $\operatorname{Var}(y) = \mu + \mu^2/k$.
+  $\operatorname{Var}(y) = \mu + \mu^2/k$<FN n="2" />.
 
 A back-of-envelope check: if the sample variance of $y$ is much larger than
 the sample mean, expect overdispersion.
@@ -85,7 +85,7 @@ A short decision guide:
 - $y > 0$ is continuous with constant variance: linear regression on $\log y$
   is the lazy alternative.
 
-![A Poisson GLM uses a log link so its mean stays positive and grows multiplicatively with the predictor — fitting count data that a straight-line regression cannot.](/figures/C1/poisson-gamma-glm.svg)
+![A Poisson GLM uses a log link so its mean stays positive and grows multiplicatively with the predictor, fitting count data that a straight-line regression cannot.](/figures/C1/poisson-gamma-glm.svg)
 
 ## Check it on arrays
 
@@ -137,3 +137,8 @@ Both GLMs recover their true coefficients, the multiplicative interpretation
 of $e^\beta$ holds for the log link, and the Poisson sample variance is close
 to the sample mean. This closes the C1 linear-models track; the next subsection
 turns to a different geometric story: max-margin classifiers and kernels.
+
+<Footnotes>
+  <FNItem n="1">**McCullagh, P., & Nelder, J. A.** (1989). *Generalized Linear Models* (2nd ed.), §6 (Poisson), §8 (Gamma). Chapman & Hall.</FNItem>
+  <FNItem n="2">**Nelder, J. A., & Wedderburn, R. W. M.** (1972). "Generalized linear models". *JRSS-A*, 135(3), 370-384. [doi:10.2307/2344614](https://doi.org/10.2307/2344614). The original GLM treatment of Poisson and Gamma responses.</FNItem>
+</Footnotes>

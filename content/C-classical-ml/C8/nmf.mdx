@@ -10,11 +10,11 @@ prerequisites: ["matrix-factorization"]
 ---
 
 Standard matrix factorization produces latent factors that are
-unconstrained: a user embedding can subtract one feature from another, and
+unconstrained<FN n="2" />: a user embedding can subtract one feature from another, and
 the latent dimensions have no semantic interpretation. **Non-negative matrix
 factorization (NMF)** restricts both factors to be nonnegative, and the
 factors that emerge tend to be **additive parts** that combine to reconstruct
-the data. The interpretability comes essentially for free.
+the data<FN n="1" />. The interpretability comes essentially for free.
 
 ## The setup
 
@@ -34,7 +34,7 @@ parts.
 
 ## Multiplicative update rules
 
-Lee and Seung's classic algorithm: alternate two element-wise updates that
+Lee and Seung's classic algorithm<FN n="1" />: alternate two element-wise updates that
 preserve nonnegativity:
 
 $$
@@ -138,3 +138,8 @@ print(f"\ntopic recovery correlations: {[round(c, 2) for c in corrs]}")
 NMF recovers nonnegative factors with sparse entries, and the recovered
 topic vectors correlate strongly with the true ones. The next lesson moves
 to neural-net factor models: two-tower retrieval.
+
+<Footnotes>
+  <FNItem n="1">**Lee, D. D., & Seung, H. S.** (1999). "Learning the parts of objects by non-negative matrix factorization". *Nature*, 401, 788-791. [doi:10.1038/44565](https://doi.org/10.1038/44565). The parts-based interpretation and the multiplicative update rules.</FNItem>
+  <FNItem n="2">**Koren, Y., Bell, R., & Volinsky, C.** (2009). "Matrix factorization techniques for recommender systems". *IEEE Computer*, 42(8), 30-37. [doi:10.1109/MC.2009.263](https://doi.org/10.1109/MC.2009.263). The unconstrained latent-factor model NMF restricts.</FNItem>
+</Footnotes>

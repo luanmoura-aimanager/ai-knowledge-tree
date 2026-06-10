@@ -14,7 +14,7 @@ Bagging and boosting work for different reasons. **Bagging** lowers the
 **Boosting** lowers the **bias** of a high-bias learner by sequentially
 fitting residuals. The common failure mode for both is **correlated errors**:
 if every base model makes the same mistake, no amount of averaging will
-correct it.
+correct it<FN ns="1, 2" />.
 
 ## The bias-variance reading
 
@@ -22,7 +22,7 @@ Recall the decomposition for squared loss at a test point: expected error =
 bias$^2$ + variance + noise.
 
 **Bagging.** Averaging $B$ identically distributed predictors with pairwise
-correlation $\rho$ has variance
+correlation $\rho$ has variance<FN n="3" />
 
 $$
 \rho\,\sigma^2 + \frac{1 - \rho}{B}\,\sigma^2.
@@ -87,7 +87,7 @@ The standard tabular pipeline:
 3. **Stacking** (next lesson) when accuracy must be squeezed further by
    combining heterogeneous models.
 
-![Averaging B decorrelated models cuts prediction variance roughly like 1/B without adding bias — the core reason bagging works.](/figures/C7/ensemble-theory.svg)
+![Averaging B decorrelated models cuts prediction variance roughly like 1/B without adding bias. This is the core reason bagging works.](/figures/C7/ensemble-theory.svg)
 
 ## Check it on arrays
 
@@ -198,3 +198,9 @@ Bagging the deep polynomial cuts variance while leaving bias roughly
 unchanged; boosting stumps drops the bias far below a single stump because
 each round refits the residual with a fresh split. The next lesson
 combines multiple learners explicitly via stacking.
+
+<Footnotes>
+  <FNItem n="1">**Dietterich, T. G.** (2000). "Ensemble methods in machine learning". *Multiple Classifier Systems (MCS)*. Surveys why ensembles outperform single learners ([doi:10.1007/3-540-45014-9_1](https://doi.org/10.1007/3-540-45014-9_1)).</FNItem>
+  <FNItem n="2">**Hansen, L. K., & Salamon, P.** (1990). "Neural network ensembles". *IEEE TPAMI*, 12(10), 993-1001. Shows averaging independent classifiers reduces error when individual errors are uncorrelated ([doi:10.1109/34.58871](https://doi.org/10.1109/34.58871)).</FNItem>
+  <FNItem n="3">**Breiman, L.** (1996). "Bagging predictors". *Machine Learning*, 24(2), 123-140. Introduces bootstrap aggregation and the variance-reduction argument ([doi:10.1007/BF00058655](https://doi.org/10.1007/BF00058655)).</FNItem>
+</Footnotes>

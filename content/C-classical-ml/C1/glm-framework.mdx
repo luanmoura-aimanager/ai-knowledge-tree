@@ -26,13 +26,13 @@ A GLM is specified by:
    mean to the linear predictor.
 
 Equivalently, $\mu = g^{-1}(\eta) = g^{-1}(x^\top\beta)$. The link's job is to
-match the support of $\mu$ to the real line $\mathbb{R}$ that $\eta$ lives on.
+match the support of $\mu$ to the real line $\mathbb{R}$ that $\eta$ lives on<FN n="1" />.
 
 ## The natural (canonical) link
 
 The exponential-family lesson defined the natural parameter $\theta$ of a
 distribution. The **canonical link** sets $\theta = \eta$: the linear predictor
-*is* the natural parameter. With the canonical link the math simplifies
+*is* the natural parameter<FN n="2" />. With the canonical link the math simplifies
 dramatically:
 
 - **Gradient**: $\nabla \ell = X^\top(\mathbf{y} - \boldsymbol\mu)$, a clean
@@ -79,7 +79,7 @@ model that perfectly fits every observation:
 
 $$
 D = 2\big(\ell_{\text{sat}} - \ell(\hat\beta)\big).
-$$
+$$<FN n="3" />
 
 For Gaussian + identity link, the deviance is exactly the residual sum of
 squares. For other GLMs it generalizes appropriately, and is the goodness-of-fit
@@ -149,3 +149,9 @@ print("Poisson/log beta:      ", np.round(b_pois, 3), " (vs true", beta_pois_tru
 A single IRLS routine, parameterized by link and variance function, recovers
 linear, logistic, and Poisson regression. The next lesson zeroes in on the
 last two GLMs from the table: Poisson for counts and Gamma for durations.
+
+<Footnotes>
+  <FNItem n="1">**Nelder, J. A., & Wedderburn, R. W. M.** (1972). "Generalized linear models". *JRSS-A*, 135(3), 370-384. [doi:10.2307/2344614](https://doi.org/10.2307/2344614). The paper that introduced the GLM framework.</FNItem>
+  <FNItem n="2">**McCullagh, P., & Nelder, J. A.** (1989). *Generalized Linear Models* (2nd ed.), §2. Chapman & Hall. Exponential family, canonical links, and the catalog of GLMs.</FNItem>
+  <FNItem n="3">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §4.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). Deviance as the GLM goodness-of-fit.</FNItem>
+</Footnotes>

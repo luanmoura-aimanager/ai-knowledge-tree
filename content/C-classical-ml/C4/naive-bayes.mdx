@@ -13,7 +13,7 @@ prerequisites: ["A2/bayes-rule"]
 simplifying assumption: features are conditionally independent given the
 class. The assumption is rarely true, but the resulting classifier is fast,
 needs little data, and works surprisingly well, especially as a baseline for
-text and other high-dimensional sparse problems.
+text and other high-dimensional sparse problems<FN n="1" />.
 
 ## The model
 
@@ -64,7 +64,7 @@ p_{cj} = \frac{n_{cj} + \alpha}{\sum_k n_{ck} + \alpha V},
 $$
 
 with $V$ the vocabulary size. $\alpha = 1$ (Laplace smoothing) is standard.
-This is MAP under a symmetric Dirichlet prior.
+This is MAP under a symmetric Dirichlet prior<FN n="2" />.
 
 ## Why it works despite the wrong assumption
 
@@ -72,7 +72,7 @@ Conditional independence is rarely true (especially for text), so the
 posterior probabilities Naive Bayes produces are usually badly calibrated.
 But the **argmax** is often correct: even badly calibrated probabilities can
 rank classes correctly. NB is therefore a strong classifier and a weak
-probability estimator.
+probability estimator<FN n="3" />.
 
 When calibration matters (decisions weighted by probability), recalibrate
 with Platt scaling or isotonic regression (the calibration lesson in C10).
@@ -96,7 +96,7 @@ with Platt scaling or isotonic regression (the calibration lesson in C10).
 - Continuous-feature Gaussian NB assumes per-class normality, which is rarely
   true.
 
-![Gaussian naive Bayes assumes features are independent within each class, giving axis-aligned class densities and a simple decision boundary — often good enough even when independence does not hold.](/figures/C4/naive-bayes.svg)
+![Gaussian naive Bayes assumes features are independent within each class, giving axis-aligned class densities and a simple decision boundary, often good enough even when independence does not hold.](/figures/C4/naive-bayes.svg)
 
 ## Check it on arrays
 
@@ -167,3 +167,9 @@ print(f"Multinomial NB test acc: {np.mean(predict_multinomial_nb(X_count[te], mn
 Both NB flavors classify their respective tasks well. The next lesson tightens
 the Gaussian-NB assumption to use full per-class covariance matrices: LDA and
 QDA.
+
+<Footnotes>
+  <FNItem n="1">**Murphy, K. P.** (2012). *Machine Learning: A Probabilistic Perspective.* MIT Press. Naive Bayes classifiers and their flavors (§3.5).</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning.* Springer. Conjugate Dirichlet priors and MAP estimation for multinomial counts (§2.2).</FNItem>
+  <FNItem n="3">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Why Naive Bayes classifies well despite poor probability estimates (§6.6.3) ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

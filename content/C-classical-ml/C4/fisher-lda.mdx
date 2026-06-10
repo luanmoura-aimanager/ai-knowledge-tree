@@ -13,7 +13,7 @@ LDA can be cast as a projection problem: find the direction along which the
 classes are most separable, then apply a simple decision rule there. The
 **Fisher discriminant criterion** measures separability as the ratio of
 between-class to within-class variance, and its solution is a generalized
-eigenvalue problem. This reframing makes LDA also a **supervised
+eigenvalue problem<FN n="1" />. This reframing makes LDA also a **supervised
 dimensionality-reduction** method.
 
 ## The Fisher criterion
@@ -44,7 +44,7 @@ For $K$ classes, define:
   with overall mean $\bar\mu$).
 
 The multi-class Fisher criterion maximizes $\operatorname{tr}(W^\top S_B W) / \operatorname{tr}(W^\top S_W W)$
-over a projection matrix $W \in \mathbb{R}^{d \times k}$. The solution is the
+over a projection matrix $W \in \mathbb{R}^{d \times k}$<FN n="2" />. The solution is the
 top-$k$ eigenvectors of the generalized eigenproblem
 
 $$
@@ -141,3 +141,8 @@ LDA's eigenvalues fall off after $K - 1$, the projection lines the three
 classes up along one axis, and the class separation in the LDA projection
 beats PCA's. This closes the C4 track on instance-based and probabilistic
 classifiers; C5 moves to unsupervised learning.
+
+<Footnotes>
+  <FNItem n="1">**Fisher, R. A.** (1936). "The use of multiple measurements in taxonomic problems". *Annals of Eugenics*, 7(2), 179-188. The between-over-within scatter criterion and the original discriminant ([doi:10.1111/j.1469-1809.1936.tb02137.x](https://doi.org/10.1111/j.1469-1809.1936.tb02137.x)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Multi-class LDA as projection and its $K-1$ rank limit (§4.3.3) ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

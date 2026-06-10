@@ -10,7 +10,7 @@ prerequisites: ["kmeans"]
 ---
 
 k-means assumes clusters are spherical blobs and forces every point into some
-cluster. **DBSCAN** drops both assumptions: it defines clusters as
+cluster. **DBSCAN**<FN n="1" /> drops both assumptions: it defines clusters as
 **density-connected** regions, picks up clusters of arbitrary shape, and
 flags low-density points as **noise**. It is the right tool when you do not
 know $k$ in advance and clusters might be curved or interlaced.
@@ -27,7 +27,7 @@ neighbor count `minPts`:
 
 A core point is **density-reachable** from any other core point through a
 chain of overlapping $\varepsilon$-neighborhoods. A **cluster** is a maximal
-set of density-reachable points (core + border).
+set of density-reachable points (core + border)<FN n="1" />.
 
 ## The algorithm
 
@@ -70,7 +70,7 @@ error.
   clusters bleed together or misses the sparse ones. HDBSCAN (next lesson)
   fixes this.
 - **High dimensions**: the curse of dimensionality (C4 lesson) makes
-  density estimation unreliable.
+  density estimation unreliable<FN n="2" />.
 - **Border point ambiguity**: a border point can be reached from multiple
   clusters; assignment depends on visit order. Usually a minor effect.
 
@@ -136,3 +136,13 @@ print("eps ~ knee of k-distance plot (around the percentile where the curve bend
 DBSCAN separates the two moons and labels the random points as noise; the
 k-distance plot suggests a reasonable $\varepsilon$. The next lesson handles
 the varying-density case where one $\varepsilon$ is not enough: HDBSCAN.
+
+<Footnotes>
+  <FNItem n="1">**Ester, M., Kriegel, H.-P., Sander, J., & Xu, X.** (1996). "A
+    density-based algorithm for discovering clusters in large spatial databases
+    with noise". *KDD*. The original DBSCAN, core/border/noise points, and the
+    k-distance heuristic for $\varepsilon$.</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The
+    Elements of Statistical Learning* (2nd ed.). Springer.
+    [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7).</FNItem>
+</Footnotes>

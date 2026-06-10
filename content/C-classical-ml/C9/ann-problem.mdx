@@ -14,7 +14,7 @@ embedding and serves a user query by finding the items whose embeddings
 are closest to the user's. With billions of items, this nearest-neighbor
 search must be sub-millisecond. Exact nearest-neighbor search is
 impossible at that scale; **approximate nearest neighbor (ANN)** is the
-art of trading a small amount of recall for orders-of-magnitude speedup.
+art of trading a small amount of recall for orders-of-magnitude speedup<FN n="1" />.
 
 ## The exact problem
 
@@ -58,7 +58,7 @@ Production targets are typically 95-99% recall@10. Going from 99% to
 
 The cost metric is **queries per second (QPS)** at a target recall, often
 plotted as a recall-QPS Pareto curve. Different indices dominate at
-different points on the curve.
+different points on the curve<FN n="2" />.
 
 ## Two algorithmic families
 
@@ -159,3 +159,8 @@ print(f"\ntrivial-LSH mean recall@10: {np.mean(ann_recall_at_10):.3f}  "
 
 Exact search becomes slow even at $n = 10^6$; the trivial random-hyperplane
 LSH already gives meaningful recall. The next lesson covers LSH carefully.
+
+<Footnotes>
+  <FNItem n="1">**Indyk, P., & Motwani, R.** (1998). "Approximate nearest neighbors: towards removing the curse of dimensionality". *STOC*. [doi:10.1145/276698.276876](https://doi.org/10.1145/276698.276876). Formalized the ANN problem and its escape from the curse of dimensionality.</FNItem>
+  <FNItem n="2">**Aumüller, M., Bernhardsson, E., & Faithfull, A.** (2020). "ANN-Benchmarks: a benchmarking tool for approximate nearest neighbor algorithms". *Information Systems*, 87, 101374. [doi:10.1016/j.is.2019.02.006](https://doi.org/10.1016/j.is.2019.02.006). The standard recall-QPS Pareto comparison across indices.</FNItem>
+</Footnotes>

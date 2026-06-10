@@ -25,7 +25,7 @@ $$
 
 The denominator normalizes the scores into a probability distribution
 ($\sum_k p_k = 1$, every $p_k \ge 0$). This is the **softmax** of the score
-vector $z = (x^\top \beta_1, \dots, x^\top \beta_K)$.
+vector $z = (x^\top \beta_1, \dots, x^\top \beta_K)$<FN n="1" />.
 
 The model is **overparameterized**: adding a constant $c$ to every $\beta_k$
 leaves the probabilities unchanged. A common fix is to set $\beta_K = 0$
@@ -53,7 +53,7 @@ $$
 $$
 
 the data residual between predicted probability and the true-class indicator,
-weighted by features. The objective is convex (the Hessian is again of the form
+weighted by features<FN n="2" />. The objective is convex (the Hessian is again of the form
 $X^\top W X$ with $W$ positive semidefinite block matrix), so any local minimum
 is global.
 
@@ -123,3 +123,8 @@ The classifier gets the three Gaussian blobs apart, probabilities normalize per
 row, and the binary case reduces to logistic on the score difference. The next
 lesson zooms out to the general framework that unifies linear, logistic, and
 Poisson regression: GLMs.
+
+<Footnotes>
+  <FNItem n="1">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, §4.3.4. Springer. Softmax (multinomial logistic) regression.</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §4.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). Multiclass logistic regression and its gradient.</FNItem>
+</Footnotes>

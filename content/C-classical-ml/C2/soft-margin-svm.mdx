@@ -11,7 +11,7 @@ prerequisites: ["hard-margin-svm"]
 
 Hard-margin SVM is infeasible on nonseparable data and brittle near outliers.
 The **soft-margin** SVM relaxes the constraints with slack variables, charging
-a penalty for every margin violation. Rewriting the slack penalty as a loss
+a penalty for every margin violation<FN n="1" />. Rewriting the slack penalty as a loss
 gives the **hinge loss**, which is what production SVMs actually minimize.
 
 ## Slack variables
@@ -68,7 +68,7 @@ margin ($z \ge 1$), and grows linearly inside the margin and across the
 boundary.
 
 The soft-margin SVM is **regularized hinge-loss minimization**, the same shape
-as L2-regularized logistic regression but with hinge instead of cross-entropy.
+as L2-regularized logistic regression but with hinge instead of cross-entropy<FN n="2" />.
 
 ## Convex but not differentiable
 
@@ -136,3 +136,8 @@ print(f"\ntotal hinge loss = {hinge_loss:.3f}  (= sum of optimal slacks)")
 Larger $C$ tightens the margin and reduces the fraction of margin violations;
 the total hinge loss equals the sum of optimal slacks. The next lesson casts
 the SVM in its dual form, where the support-vector structure becomes explicit.
+
+<Footnotes>
+  <FNItem n="1">**Cortes, C., & Vapnik, V.** (1995). "Support-vector networks". *Machine Learning*, 20(3), 273-297. Introduces the soft-margin SVM with slack variables ([doi:10.1007/BF00994018](https://doi.org/10.1007/BF00994018)).</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. §12.3 frames the SVM as penalized hinge-loss minimization ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

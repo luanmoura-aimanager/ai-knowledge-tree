@@ -44,8 +44,8 @@ subtrees $T_0 \supset T_1 \supset \cdots \supset T_K = \{\text{root}\}$
 (weakest-link pruning). Cross-validation picks the $\alpha$ (equivalently the
 subtree) with the best held-out performance.
 
-This is **CART's cost-complexity pruning**, and it tends to outperform
-pre-pruning because it considers the full tree before deciding what to keep.
+This is **CART's cost-complexity pruning**<FN n="1" />, and it tends to outperform
+pre-pruning because it considers the full tree before deciding what to keep<FN n="2" />.
 
 ## Practical hyperparameters
 
@@ -67,7 +67,7 @@ Random forests and gradient boosting (later lessons) use many lightly
 regularized trees and average them, which reduces variance without paying for
 the interpretability of each tree.
 
-![Deep unpruned trees memorize the training set (accuracy → 1) while test accuracy peaks at a moderate depth and then falls — the overfitting that pruning controls.](/figures/C3/tree-pruning.svg)
+![Deep unpruned trees memorize the training set (accuracy → 1) while test accuracy peaks at a moderate depth and then falls; the overfitting that pruning controls.](/figures/C3/tree-pruning.svg)
 
 ## Check it on arrays
 
@@ -142,3 +142,8 @@ Deep trees achieve near-perfect training accuracy but lose on the test set;
 the shallow tree, with far fewer leaves, generalizes better. The next lesson
 exploits this variance directly: average many bootstrap-resampled trees to
 get a Random Forest.
+
+<Footnotes>
+  <FNItem n="1">**Breiman, L., Friedman, J., Olshen, R., & Stone, C.** (1984). *Classification and Regression Trees.* Wadsworth. Weakest-link cost-complexity pruning of an over-grown tree.</FNItem>
+  <FNItem n="2">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Tree size selection and pruning ([doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7)).</FNItem>
+</Footnotes>

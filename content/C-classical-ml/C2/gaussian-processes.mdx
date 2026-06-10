@@ -9,7 +9,7 @@ goal: "Treat the function as a draw from a GP prior, condition on data, and get 
 prerequisites: ["common-kernels", "A2/map-conjugate"]
 ---
 
-A **Gaussian process** is a probability distribution over functions. Place a
+A **Gaussian process** is a probability distribution over functions<FN n="1" />. Place a
 GP prior on the unknown regression function, condition on observed data, and
 the posterior is again a Gaussian (over function values), with a closed-form
 mean and variance at every test point. GPs marry kernels with full Bayesian
@@ -69,7 +69,7 @@ $$
 The first term rewards data fit; the second penalizes model complexity (the
 log-determinant grows when the kernel implies high flexibility). This is the
 Bayesian Occam's razor at work, with no separate validation set needed for
-hyperparameter selection.
+hyperparameter selection<FN n="2" />.
 
 ## Costs and scalability
 
@@ -157,3 +157,8 @@ samples and wide uncertainty far from them, and the marginal likelihood picks
 a reasonable length scale. This closes the C2 margin-and-kernels track; the
 next subsection switches to a very different inductive bias: trees that split
 the input space along axis-aligned cuts.
+
+<Footnotes>
+  <FNItem n="1">**Rasmussen, C. E., & Williams, C. K. I.** (2006). *Gaussian Processes for Machine Learning.* MIT Press. The canonical reference for GP regression, the posterior formulas, and scalable approximations.</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning.* Springer. §6.4 derives the GP marginal likelihood and the Bayesian Occam's razor.</FNItem>
+</Footnotes>

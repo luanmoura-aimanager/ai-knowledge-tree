@@ -14,7 +14,7 @@ feedback**: clicks, views, purchases, watch durations: positive evidence of
 interest, but no negative ratings. Implicit feedback breaks the standard MF
 loss in two ways: there are no observed negatives, and the positive signals
 have varying strengths. **Weighted MF** for implicit feedback
-(**Hu-Koren-Volinsky**, 2008) addresses both.
+(**Hu-Koren-Volinsky**, 2008)<FN n="1" /> addresses both.
 
 ## The implicit-feedback view
 
@@ -68,7 +68,7 @@ ALS scale to billions of (user, item) pairs.
 ## BPR: an alternative formulation
 
 **Bayesian personalized ranking (BPR)** trains MF on **triplets** $(u, i^+, i^-)$
-where $i^+$ is observed and $i^-$ is sampled negative. The loss maximizes
+where $i^+$ is observed and $i^-$ is sampled negative<FN n="2" />. The loss maximizes
 $\sigma(\mathbf{u}_u^\top \mathbf{v}_{i^+} - \mathbf{u}_u^\top \mathbf{v}_{i^-})$,
 the probability that the user prefers $i^+$ over $i^-$. BPR sidesteps the
 "all unobserved pairs" issue by sampling. Conceptually cleaner; in practice
@@ -151,3 +151,8 @@ print(f"Implicit-MF pairwise AUC: {auc:.3f}  (>0.5 means observed items ranked h
 
 The implicit-MF model ranks observed items above unobserved with high
 probability. The next lesson tightens the model to nonneg factors with NMF.
+
+<Footnotes>
+  <FNItem n="1">**Hu, Y., Koren, Y., & Volinsky, C.** (2008). "Collaborative filtering for implicit feedback datasets". *ICDM*. [doi:10.1109/ICDM.2008.22](https://doi.org/10.1109/ICDM.2008.22). The preference/confidence split, weighted loss, and the scalable ALS update.</FNItem>
+  <FNItem n="2">**Rendle, S., Freudenthaler, C., Gantner, Z., & Schmidt-Thieme, L.** (2009). "BPR: Bayesian personalized ranking from implicit feedback". *UAI*. The pairwise-ranking alternative with sampled negatives.</FNItem>
+</Footnotes>

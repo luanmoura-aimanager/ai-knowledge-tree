@@ -20,7 +20,7 @@ Train one model but save many checkpoints during training. With a cyclic
 learning-rate schedule (cosine annealing with restarts is standard), each
 restart converges to a different local minimum. Saving the model at each
 minimum produces a sequence of **diverse** snapshots, each one a usable
-model. Average their predictions at inference.
+model. Average their predictions at inference<FN n="1" />.
 
 The catch versus a true ensemble of independently trained models:
 snapshots from one training run are more correlated than fully independent
@@ -33,7 +33,7 @@ expensive.
 ## Hard voting
 
 For classification, **hard voting** picks the class that the majority of
-models predict:
+models predict<FN n="2" />:
 
 $$
 \hat y = \arg\max_c \sum_m \mathbf{1}[\hat y_m = c].
@@ -159,3 +159,8 @@ Both hard and soft voting beat the best single model when the models are
 roughly independent. Rank averaging gives similar results without needing
 calibrated probabilities. The next lesson hands the model search to an
 automatic system: AutoML.
+
+<Footnotes>
+  <FNItem n="1">**Hansen, L. K., & Salamon, P.** (1990). "Neural network ensembles". *IEEE TPAMI*, 12(10), 993-1001. Averaging multiple trained networks improves accuracy over any single one ([doi:10.1109/34.58871](https://doi.org/10.1109/34.58871)).</FNItem>
+  <FNItem n="2">**Breiman, L.** (1996). "Bagging predictors". *Machine Learning*, 24(2), 123-140. Majority voting over aggregated predictors as the classification analogue of averaging ([doi:10.1007/BF00058655](https://doi.org/10.1007/BF00058655)).</FNItem>
+</Footnotes>

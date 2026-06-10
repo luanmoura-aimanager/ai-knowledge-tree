@@ -56,7 +56,7 @@ Items also change more slowly than users, so the similarity matrix can be
 precomputed once and reused for many queries.
 
 The trick that made item-item CF a production reality (Sarwar et al., 2001;
-Amazon): precompute the item-item similarity matrix offline, then
+Amazon)<FN n="1" />: precompute the item-item similarity matrix offline, then
 recommendations at query time are a sparse matrix-vector product with the
 user's history.
 
@@ -84,7 +84,7 @@ Cold-start is the central design constraint of any practical rec-sys.
   content, or context.
 
 The matrix-factorization methods of the next lesson address sparsity and
-generalization more effectively.
+generalization more effectively<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -160,3 +160,8 @@ print(f"item-item CF held-out RMSE: {rmse:.3f}  (over {ok.sum()} predictable cel
 The held-out RMSE shows how well item-item CF predicts unseen ratings on a
 small synthetic table. The next lesson generalizes the approach with a
 latent-factor model that gracefully handles sparsity.
+
+<Footnotes>
+  <FNItem n="1">**Sarwar, B., Karypis, G., Konstan, J., & Riedl, J.** (2001). "Item-based collaborative filtering recommendation algorithms". *WWW*. [doi:10.1145/371920.372071](https://doi.org/10.1145/371920.372071). The item-item algorithm and offline precomputation that made neighborhood CF a production reality.</FNItem>
+  <FNItem n="2">**Koren, Y., Bell, R., & Volinsky, C.** (2009). "Matrix factorization techniques for recommender systems". *IEEE Computer*, 42(8), 30-37. [doi:10.1109/MC.2009.263](https://doi.org/10.1109/MC.2009.263). Why latent-factor models outperform neighborhood methods on sparse data.</FNItem>
+</Footnotes>
