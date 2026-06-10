@@ -17,7 +17,7 @@ steps part of the output, dramatically improving accuracy on multi-step tasks.
 ## Chain-of-thought prompting
 
 **Few-shot CoT (Wei et al., 2022):** include exemplars in the prompt that demonstrate
-reasoning step by step, not just the final answer.
+reasoning step by step, not just the final answer<FN n="1" />.
 
 **Standard prompting:**
 ```
@@ -78,7 +78,7 @@ print(prompt)
 ## Self-consistency (Wang et al., 2023)
 
 A single reasoning chain can make errors. **Self-consistency** addresses this by sampling
-$n$ diverse reasoning paths and taking a **majority vote** over the final answers:
+$n$ diverse reasoning paths and taking a **majority vote** over the final answers<FN n="2" />:
 
 1. Set temperature $> 0$ (e.g., $T = 0.7$).
 2. Sample $n$ completions (e.g., $n = 10$).
@@ -148,3 +148,8 @@ errors.
 **Tree-of-thought (ToT):** explore multiple reasoning paths simultaneously as a tree
 (using BFS or DFS), evaluating intermediate states and pruning unpromising branches.
 Generalization of self-consistency to structured search.
+
+<Footnotes>
+  <FNItem n="1">**Wei, J., et al.** (2022). "Chain-of-thought prompting elicits reasoning in large language models". *NeurIPS*. [arXiv:2201.11903](https://arxiv.org/abs/2201.11903). The few-shot CoT exemplar format used here.</FNItem>
+  <FNItem n="2">**Wang, X., et al.** (2023). "Self-consistency improves chain of thought reasoning in language models". *ICLR*. [arXiv:2203.11171](https://arxiv.org/abs/2203.11171). Sample-and-majority-vote over reasoning paths.</FNItem>
+</Footnotes>

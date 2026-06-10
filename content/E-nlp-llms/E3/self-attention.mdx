@@ -13,7 +13,7 @@ Bahdanau attention computes a context vector as a weighted sum of encoder states
 weights determined by a learned alignment score between the decoder state and each encoder
 position. The **Transformer** (Vaswani et al., 2017) generalizes this to a single unified
 mechanism: **scaled dot-product attention**, which any sequence -- not just encoder-decoder
-pairs -- can apply to itself.
+pairs -- can apply to itself<FN n="1" />.
 
 ## The query-key-value abstraction
 
@@ -47,7 +47,7 @@ largest score. This pushes the attention into a nearly-argmax regime where gradi
 tiny (the softmax is saturated). Dividing by $\sqrt{d_k}$ keeps the inputs to softmax
 at unit variance, maintaining informative gradients.
 
-![Scaled dot-product attention: the token-by-token weight matrix softmax(QKᵀ/√dₖ) (left), and why scaling matters — with large dₖ the unscaled scores saturate the softmax onto a single key, while the 1/√dₖ factor keeps the distribution soft (right).](/figures/E3/self-attention.svg)
+![Scaled dot-product attention: the token-by-token weight matrix softmax(QKᵀ/√dₖ) (left), and why scaling matters: with large dₖ the unscaled scores saturate the softmax onto a single key, while the 1/√dₖ factor keeps the distribution soft (right).](/figures/E3/self-attention.svg)
 
 ## Self-attention
 
@@ -128,3 +128,8 @@ FlashAttention (D7) and linear attention variants.
 
 The next lesson stacks $h$ independent attention heads in parallel -- multi-head attention --
 which allows different heads to attend to different representation subspaces.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need".
+    *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)</FNItem>
+</Footnotes>

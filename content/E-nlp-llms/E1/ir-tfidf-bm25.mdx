@@ -11,7 +11,7 @@ prerequisites: []
 
 **Information retrieval (IR)** is the problem of ranking documents by relevance to a query.
 Before dense neural retrieval (E6), sparse lexical methods dominated: rank documents by how
-well their term frequencies match the query, with rarer terms weighted more heavily.
+well their term frequencies match the query, with rarer terms weighted more heavily<FN n="1" />.
 
 ## Term frequency
 
@@ -60,7 +60,7 @@ TF-IDF has two known failure modes:
    repetitions.
 2. **No length normalization.** Longer documents accumulate higher raw TF for every term.
 
-**BM25** (Robertson and Walker, 1994) fixes both:
+**BM25** fixes both<FN n="2" />:
 
 $$
 \text{BM25}(t, d) = \text{IDF}(t) \cdot \frac{\text{tf}(t,d) \cdot (k_1 + 1)}{\text{tf}(t,d) + k_1 \left(1 - b + b \cdot \frac{|d|}{\text{avgdl}}\right)},
@@ -139,7 +139,7 @@ for doc_id, score in ranked:
     print(f"  {doc_id} ({score:.3f}): {docs[doc_id]}")
 ```
 
-![BM25 saturates term frequency: the first occurrence of a query term counts a lot, each extra one less and less — unlike raw TF, which grows without bound. The k1 knob sets the saturation rate.](/figures/E1/ir-tfidf-bm25.svg)
+![BM25 saturates term frequency: the first occurrence of a query term counts a lot, each extra one less and less, unlike raw TF, which grows without bound. The k1 knob sets the saturation rate.](/figures/E1/ir-tfidf-bm25.svg)
 
 ## Sparse retrieval in the LLM era
 
@@ -148,3 +148,8 @@ BM25 remains the backbone of production search engines (Elasticsearch, OpenSearc
 with dense neural retrieval (semantic, embedding-based) using reciprocal rank fusion to
 blend their ranked lists. BM25 handles precise keyword matches (product SKUs, proper nouns)
 better than dense retrievers, making hybrid retrieval a practical default.
+
+<Footnotes>
+  <FNItem n="1">**Manning, C. D., Raghavan, P., & Schütze, H.** (2008). *Introduction to Information Retrieval.* Cambridge University Press. TF-IDF weighting, the vector space model, and inverted indexes.</FNItem>
+  <FNItem n="2">**Robertson, S., & Zaragoza, H.** (2009). "The probabilistic relevance framework: BM25 and beyond". *Foundations and Trends in Information Retrieval*, 3(4), 333-389. The derivation and tuning of the BM25 saturation and length-normalization terms. [doi:10.1561/1500000019](https://doi.org/10.1561/1500000019)</FNItem>
+</Footnotes>

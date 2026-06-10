@@ -93,7 +93,7 @@ minutes of labeled speech (with a CTC output layer) achieves competitive word er
 ## Whisper: multitask supervised pretraining
 
 **Whisper** (Radford et al., OpenAI, 2022) takes the opposite approach: supervised
-pretraining on 680,000 hours of weakly labeled audio-transcript pairs.
+pretraining on 680,000 hours of weakly labeled audio-transcript pairs<FN n="1" />.
 
 **Architecture:** encoder-decoder transformer.
 - **Encoder:** 2D convolutions on the log-mel spectrogram (to reduce sequence length),
@@ -151,6 +151,11 @@ audio directly by predicting **discrete audio tokens** rather than text tokens.
   audio output (not just text), enabling real-time voice conversation.
 
 The architecture mirrors LLaVA: a frozen audio encoder, a projection to the LLM's
-token space, and a decoder-only LLM that generates text (or audio tokens). The key
+token space, and a decoder-only LLM that generates text (or audio tokens)<FN n="2" />. The key
 difference from VLMs: audio is sequential and temporal, so timing and streaming are
 first-class concerns.
+
+<Footnotes>
+  <FNItem n="1">**Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I.** (2023). "Robust speech recognition via large-scale weak supervision (Whisper)". *ICML*. [arXiv:2212.04356](https://arxiv.org/abs/2212.04356)</FNItem>
+  <FNItem n="2">**Liu, H., Li, C., Wu, Q., & Lee, Y. J.** (2023). "Visual instruction tuning (LLaVA)". *NeurIPS*. [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)</FNItem>
+</Footnotes>

@@ -14,7 +14,7 @@ token attends without recomputing them. That cache is the dominant memory cost a
 context. [Grouped-query attention](gqa-moe) shrinks it by sharing keys and values across
 groups of heads. Multi-head latent attention (MLA), introduced in DeepSeek-V2, shrinks it
 a different way: it caches a single low-rank latent per token and reconstructs the
-per-head keys and values on the fly.
+per-head keys and values on the fly<FN n="1" />.
 
 ## 1. The cost being optimized
 
@@ -115,3 +115,9 @@ MLA lands well below the multi-head cache and competitive with GQA, while keepin
 per-head keys and values distinct. The next architectural axes, sparsity and recurrence,
 are covered by [mixture of experts](gqa-moe) and the
 [state space models](/pillar/D/D3/state-space-models) in pillar D.
+
+<Footnotes>
+  <FNItem n="1">**DeepSeek-AI.** (2024). "DeepSeek-V2: a strong, economical, and efficient
+    mixture-of-experts language model (MLA)".
+    [arXiv:2405.04434](https://arxiv.org/abs/2405.04434)</FNItem>
+</Footnotes>

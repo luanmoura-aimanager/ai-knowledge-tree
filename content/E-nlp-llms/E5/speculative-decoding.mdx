@@ -15,7 +15,7 @@ decode phase -- it is memory-bandwidth bound, not compute bound.
 
 **Speculative decoding (Leviathan et al., 2023; Chen et al., 2023)** exploits this idle
 compute: a small, fast **draft model** generates $k$ tokens in parallel (or near-parallel),
-then the large **target model** verifies all $k$ in a single forward pass.
+then the large **target model** verifies all $k$ in a single forward pass<FN ns="1, 2" />.
 
 ## The algorithm
 
@@ -161,3 +161,10 @@ simultaneously. Lower hardware cost than a separate draft model.
 
 **EAGLE:** predicts draft tokens by conditioning on the target model's hidden states at
 the last accepted position, achieving higher acceptance rates than independent draft models.
+
+<Footnotes>
+  <FNItem n="1">**Leviathan, Y., Kalman, M., & Matias, Y.** (2023). "Fast inference from transformers via speculative decoding".
+    *ICML*. [arXiv:2211.17192](https://arxiv.org/abs/2211.17192). Introduces the draft-verify scheme and proves it preserves the target distribution.</FNItem>
+  <FNItem n="2">**Chen, C., et al.** (2023). "Accelerating large language model decoding with speculative sampling".
+    [arXiv:2302.01318](https://arxiv.org/abs/2302.01318). Concurrent formulation of speculative sampling for large autoregressive models.</FNItem>
+</Footnotes>

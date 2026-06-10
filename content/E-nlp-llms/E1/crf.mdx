@@ -12,17 +12,17 @@ prerequisites: ["hmm-pos-ner"]
 The HMM is a **generative model**: it specifies a joint $p(\mathbf{x}, \mathbf{y})$ by
 modeling how labels generate words. This forces two independence assumptions: the current
 word depends only on the current label ($B_{yx}$), and the current label depends only on
-the previous label ($A_{ij}$). In practice, knowing the whole sentence is invaluable -- the
+the previous label ($A_{ij}$). In practice, knowing the whole sentence is invaluable: the
 POS tag of "run" depends on whether the next word is a noun or a comma.
 
 A **Conditional Random Field (CRF)** is a discriminative model: it directly parameterizes
 $p(\mathbf{y} \mid \mathbf{x})$ without modeling the word distribution, freeing it to
-condition on arbitrary features of the full input.
+condition on arbitrary features of the full input<FN ns="1, 2" />.
 
 ## The linear-chain CRF
 
 The **linear-chain CRF** matches the HMM's factorization structure but uses log-linear
-(exponential family) potentials:
+(exponential family) potentials<FN n="1" />:
 
 $$
 p(\mathbf{y} \mid \mathbf{x}) = \frac{1}{Z(\mathbf{x})} \exp\!\left( \sum_{t=1}^{T} \sum_k \lambda_k f_k(y_{t-1}, y_t, \mathbf{x}, t) \right),
@@ -168,3 +168,8 @@ graph LR
 Modern NER systems stack a CRF on top of a pre-trained transformer encoder (BERT+CRF):
 the encoder produces contextual embeddings for each token, and the CRF layer enforces
 BIO transition constraints during decoding.
+
+<Footnotes>
+  <FNItem n="1">**Lafferty, J., McCallum, A., & Pereira, F.** (2001). "Conditional random fields: probabilistic models for segmenting and labeling sequence data". *ICML*. Introduces the linear-chain CRF and its training objective.</FNItem>
+  <FNItem n="2">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). Discriminative sequence labeling with CRFs.</FNItem>
+</Footnotes>

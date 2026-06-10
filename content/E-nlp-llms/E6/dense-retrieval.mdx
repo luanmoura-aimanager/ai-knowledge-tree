@@ -12,7 +12,7 @@ prerequisites: ["rag-fundamentals"]
 The "toy embedding" in RAG fundamentals used a random mapping. Real retrieval requires
 a trained embedding model that places semantically similar texts near each other.
 **Dense Passage Retrieval (DPR, Karpukhin et al., 2020)** trains a **bi-encoder** with
-a contrastive loss on (question, relevant passage) pairs.
+a contrastive loss on (question, relevant passage) pairs<FN n="1" />.
 
 ## Bi-encoder architecture
 
@@ -126,7 +126,7 @@ for sim, text in results:
 The standard metric for retrieval is **Recall@k**: the fraction of questions for which
 the correct passage appears in the top-$k$ results.
 
-- DPR achieves Recall@1 = 45.9% and Recall@5 = 68.8% on Natural Questions.
+- DPR achieves Recall@1 = 45.9% and Recall@5 = 68.8% on Natural Questions<FN n="1" />.
 - BM25 achieves Recall@1 = 40.0% and Recall@5 = 65.2%.
 - Hybrid (BM25 + DPR) with reciprocal rank fusion: Recall@5 ~72%.
 
@@ -154,3 +154,7 @@ query.
 
 Production systems use a two-stage approach: **bi-encoder retrieves top-100**, **cross-encoder
 reranks** the 100 results to produce the final top-$k$. This balances accuracy and speed.
+
+<Footnotes>
+  <FNItem n="1">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). Source of the bi-encoder, in-batch negatives, and the reported Recall numbers.</FNItem>
+</Footnotes>

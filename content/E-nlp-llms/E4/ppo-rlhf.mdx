@@ -12,7 +12,7 @@ prerequisites: ["reward-modeling", "D1/dl-optimizers"]
 The reward model gives a scalar signal for a complete response, but it is non-differentiable
 with respect to the token selection (argmax / sampling is not differentiable). **Reinforcement
 learning from human feedback (RLHF)** uses policy gradient methods to optimize the language
-model policy with this reward signal.
+model policy with this reward signal<FN ns="1, 2" />.
 
 ## The RLHF problem formulation
 
@@ -61,7 +61,7 @@ The baseline $V(s_t)$ reduces variance without changing the expectation.
 ## Proximal Policy Optimization (PPO)
 
 REINFORCE has high variance and large gradient steps can destabilize training. PPO (Schulman
-et al., 2017) adds two stabilization mechanisms:
+et al., 2017) adds two stabilization mechanisms<FN n="3" />:
 
 **1. Importance sampling ratio.** Reuse old rollouts for multiple gradient steps using
 importance weights:
@@ -156,3 +156,12 @@ graph LR
 DPO (next lesson) eliminates the reward model and value model entirely by showing that the
 optimal policy under the KL-penalized RLHF objective can be expressed as a closed-form
 function of the preference data.
+
+<Footnotes>
+  <FNItem n="1">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".
+    *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). The canonical three-stage RLHF pipeline (SFT, reward model, PPO with a KL penalty).</FNItem>
+  <FNItem n="2">**Stiennon, N., et al.** (2020). "Learning to summarize from human feedback".
+    *NeurIPS*. [arXiv:2009.01325](https://arxiv.org/abs/2009.01325). Applied PPO with a KL-to-reference penalty to optimize a learned reward.</FNItem>
+  <FNItem n="3">**Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O.** (2017). "Proximal policy optimization algorithms (PPO)".
+    [arXiv:1707.06347](https://arxiv.org/abs/1707.06347). The clipped surrogate objective used as the policy optimizer here.</FNItem>
+</Footnotes>

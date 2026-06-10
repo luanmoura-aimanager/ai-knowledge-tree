@@ -28,8 +28,9 @@ neighbors.
 **CBOW (Continuous Bag of Words):** predict the center word from its context.
 **Skip-gram:** predict context words from the center word.
 
-Skip-gram with negative sampling (SGNS) is the workhorse and produces better representations
-for rare words; we derive it in full.
+Both architectures come from the original word2vec work<FN n="1" />. Skip-gram with negative
+sampling (SGNS)<FN n="2" /> is the workhorse and produces better representations for rare
+words; we derive it in full.
 
 ## Skip-gram with negative sampling
 
@@ -44,7 +45,7 @@ $$
 
 where $\mathbf{v}_w$ is the **center embedding** of $w$, $\mathbf{u}_c$ is the **context
 embedding** of $c$, and $P_n(w) \propto f(w)^{3/4}$ is the noise distribution (unigram
-frequencies raised to the 3/4 power, which smooths the distribution toward rare words).
+frequencies raised to the 3/4 power, which smooths the distribution toward rare words)<FN n="2" />.
 $K \approx 5{-}15$ negative samples per positive pair.
 
 The sigmoid $\sigma(x) = 1/(1 + e^{-x})$ turns dot products into probabilities. Maximizing
@@ -141,7 +142,7 @@ top5  = sims.argsort()[-5:][::-1]
 print("\nNearest to 'cat':", [vocab[i] for i in top5])
 ```
 
-![word2vec encodes relations as directions: the man→woman vector is nearly parallel to king→queen, so king − man + woman lands next to queen — analogy by arithmetic.](/figures/E2/word2vec.svg)
+![word2vec encodes relations as directions: the man→woman vector is nearly parallel to king→queen, so king − man + woman lands next to queen: analogy by arithmetic.](/figures/E2/word2vec.svg)
 
 ## What word2vec captures (and misses)
 
@@ -152,3 +153,8 @@ the fundamental limitation that contextual embeddings (ELMo, BERT) address.
 It also misses morphology: "play," "plays," "playing," and "played" are four separate
 vocabulary entries with independently trained embeddings. FastText (next lesson) fixes
 this by composing embeddings from character n-grams.
+
+<Footnotes>
+  <FNItem n="1">**Mikolov, T., Chen, K., Corrado, G., & Dean, J.** (2013). "Efficient estimation of word representations in vector space". [arXiv:1301.3781](https://arxiv.org/abs/1301.3781). Introduces the CBOW and skip-gram architectures.</FNItem>
+  <FNItem n="2">**Mikolov, T., Sutskever, I., Chen, K., Corrado, G., & Dean, J.** (2013). "Distributed representations of words and phrases and their compositionality". *NeurIPS*. [arXiv:1310.4546](https://arxiv.org/abs/1310.4546). Negative sampling and the unigram^(3/4) noise distribution.</FNItem>
+</Footnotes>

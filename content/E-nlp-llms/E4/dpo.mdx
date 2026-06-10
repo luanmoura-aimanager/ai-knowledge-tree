@@ -13,11 +13,11 @@ PPO-RLHF requires a trained reward model and a value model, making the training 
 complex and memory-intensive. **Direct Preference Optimization (DPO, Rafailov et al. 2023)**
 shows that the optimal policy under the RLHF objective can be derived in closed form, and
 the reward model can be eliminated entirely -- the policy is trained directly on preference
-pairs with a simple classification-like objective.
+pairs with a simple classification-like objective<FN n="1" />.
 
 ## Deriving DPO
 
-Start from the KL-penalized RLHF objective:
+Start from the KL-penalized RLHF objective<FN n="2" />:
 
 $$
 \max_\pi \mathbb{E}_{y \sim \pi}[r(x, y)] - \beta\, \mathrm{KL}(\pi \| \pi_{\text{ref}}).
@@ -144,3 +144,10 @@ graph LR
 
 DPO and its variants are now the dominant preference optimization methods for open-source
 LLMs due to their simplicity, stability, and competitive performance with PPO.
+
+<Footnotes>
+  <FNItem n="1">**Rafailov, R., et al.** (2023). "Direct preference optimization (DPO)".
+    *NeurIPS*. [arXiv:2305.18290](https://arxiv.org/abs/2305.18290). The closed-form reparameterization that trains the policy directly on preference pairs.</FNItem>
+  <FNItem n="2">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".
+    *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). The KL-penalized RLHF objective DPO reparameterizes.</FNItem>
+</Footnotes>

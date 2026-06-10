@@ -10,7 +10,7 @@ prerequisites: ["circuits"]
 ---
 
 **Induction heads** (Olsson et al., 2022) are specific attention heads that implement a
-primitive form of in-context learning: if the pattern $[A][B] \dots [A]$ appears in the
+primitive form of in-context learning<FN n="1" />: if the pattern $[A][B] \dots [A]$ appears in the
 context, an induction head at the second $[A]$ predicts $[B]$ as the next token. This
 mechanism generalizes to sequences of tokens, enabling the model to copy and extend
 patterns from anywhere in the context.
@@ -29,7 +29,8 @@ followed it. An induction head does exactly this.
 
 ## The two-head circuit
 
-Induction is implemented by two attention heads working in sequence:
+Induction is implemented by two attention heads working in sequence, a composition the
+circuits framework makes precise<FN n="2" />:
 
 **1. Previous-token head (layer $\ell$):** for each position $t$, copies the embedding
 of the previous token $t-1$ into the residual stream at position $t$. After this head,
@@ -122,7 +123,7 @@ print(f"  induction_score  = {induction_score(ind_pattern):.3f}")
 This is a strong claim: a specific, interpretable mechanism -- the two-head induction
 circuit -- is largely responsible for the emergent ability of in-context learning.
 
-![An induction head does in-context copying: at a repeated token it attends to whatever followed the previous occurrence and predicts it next — the shifted-diagonal stripe.](/figures/E8/induction-heads.svg)
+![An induction head does in-context copying: at a repeated token it attends to whatever followed the previous occurrence and predicts it next, the shifted-diagonal stripe.](/figures/E8/induction-heads.svg)
 
 ## Generalization of induction
 
@@ -139,3 +140,8 @@ This generalizes far beyond literal token copying:
 
 These generalized forms involve more complex circuits built on top of the basic induction
 primitive.
+
+<Footnotes>
+  <FNItem n="1">**Olsson, C., et al.** (2022). "In-context learning and induction heads". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html). The phase-transition and ablation results cited here.</FNItem>
+  <FNItem n="2">**Elhage, N., et al.** (2021). "A mathematical framework for transformer circuits". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2021/framework/index.html). Formalizes the previous-token + induction-head composition.</FNItem>
+</Footnotes>

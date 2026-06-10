@@ -14,7 +14,7 @@ attending over an increasingly long sequence. The $t$-th forward pass computes a
 over all $t$ tokens: total cost $\sum_{t=1}^T O(t \cdot d) = O(T^2 \cdot d)$.
 
 The **KV cache** eliminates this redundancy: compute and store the key and value matrices
-for all previous tokens, then reuse them for each new token.
+for all previous tokens, then reuse them for each new token<FN n="1" />.
 
 ## Why keys and values are reusable
 
@@ -152,10 +152,17 @@ for i in range(3):
     print(f"  Decode step {i+1}: cache_len={attn_layer.cache_len}, out_norm={np.linalg.norm(out):.3f}")
 ```
 
-![The KV cache stores a key/value vector per layer for every token so far, so its memory grows linearly with sequence length — dominating memory and capping batch size at long context (shown for a 32-layer 4096-dim model with full multi-head attention; grouped-query attention shrinks it).](/figures/E5/kv-cache.svg)
+![The KV cache stores a key/value vector per layer for every token so far, so its memory grows linearly with sequence length, dominating memory and capping batch size at long context (shown for a 32-layer 4096-dim model with full multi-head attention; grouped-query attention shrinks it).](/figures/E5/kv-cache.svg)
 
 ## KV cache with GQA
 
 With Grouped-Query Attention (GQA), only $g$ key/value heads are stored instead of $h$
 query heads. The KV cache memory is reduced by $h/g$ -- the primary motivation for GQA
-in production models.
+in production models<FN n="2" />.
+
+<Footnotes>
+  <FNItem n="1">**Pope, R., et al.** (2023). "Efficiently scaling transformer inference".
+    *MLSys*. [arXiv:2211.05102](https://arxiv.org/abs/2211.05102). Analyzes KV-cache memory traffic and the memory-bandwidth limit of the decode phase.</FNItem>
+  <FNItem n="2">**Shazeer, N.** (2019). "Fast transformer decoding: one write-head is all you need".
+    [arXiv:1911.02150](https://arxiv.org/abs/1911.02150). Multi-query attention shares one K/V head to shrink the cache; GQA generalizes it.</FNItem>
+</Footnotes>

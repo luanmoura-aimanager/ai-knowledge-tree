@@ -13,7 +13,7 @@ codeExempt: true
 A pretrained VLM like LLaVA-1.0 (after stage 1 feature alignment) can describe images
 but cannot follow visual instructions ("Point out the errors in this code shown in the
 image"). **Visual instruction tuning** fine-tunes the model to follow natural language
-instructions about images.
+instructions about images<FN n="1" />.
 
 ## Visual instruction tuning data
 
@@ -62,7 +62,7 @@ Effective instruction tuning datasets cover:
 
 **Why freeze?** The image encoder already has good CLIP representations; the LLM has
 good language representations. We only need to teach the projection how to translate
-between them. Freezing prevents catastrophic forgetting.
+between them. Freezing prevents catastrophic forgetting<FN n="2" />.
 
 ### Stage 2: Instruction fine-tuning
 
@@ -130,3 +130,8 @@ Long-video understanding requires additional temporal modeling.
 
 **Grounded generation:** output bounding box coordinates and segmentation masks, not
 just text. Requires training on detection and segmentation datasets.
+
+<Footnotes>
+  <FNItem n="1">**Liu, H., Li, C., Wu, Q., & Lee, Y. J.** (2023). "Visual instruction tuning (LLaVA)". *NeurIPS*. [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)</FNItem>
+  <FNItem n="2">**Li, J., Li, D., Savarese, S., & Hoi, S.** (2023). "BLIP-2: bootstrapping language-image pre-training with frozen image encoders and large language models". *ICML*. [arXiv:2301.12597](https://arxiv.org/abs/2301.12597)</FNItem>
+</Footnotes>

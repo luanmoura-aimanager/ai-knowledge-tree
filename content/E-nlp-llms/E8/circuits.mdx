@@ -27,7 +27,7 @@ $$
 This means the residual stream at any layer is a sum of contributions from all previous
 layers. The key insight: **the full residual stream equals the sum of contributions from
 every component**. This linearity makes it tractable to analyze each component's contribution
-independently.
+independently<FN n="1" />.
 
 ## Attention head as a function
 
@@ -71,7 +71,7 @@ Attention patterns reveal function:
 - **Previous token heads:** attend to position $t-1$. Typical in early layers.
 - **First token heads:** attend heavily to the first token (`[BOS]`). Act as "sink" heads.
 - **Copying heads:** attend to the same token across different positions (useful for IOI).
-- **Induction heads:** attend to a past occurrence of the current token (explained in the next lesson).
+- **Induction heads:** attend to a past occurrence of the current token (explained in the next lesson)<FN n="2" />.
 
 ## Implementation: attention pattern analysis
 
@@ -153,3 +153,8 @@ from probing (which only shows correlation).
 
 The next lesson focuses on **induction heads**, the specific head type that implements
 in-context learning.
+
+<Footnotes>
+  <FNItem n="1">**Elhage, N., et al.** (2021). "A mathematical framework for transformer circuits". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2021/framework/index.html). The residual-stream and OV/QK-circuit decomposition.</FNItem>
+  <FNItem n="2">**Olsson, C., et al.** (2022). "In-context learning and induction heads". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html). Characterizes induction heads as a circuit.</FNItem>
+</Footnotes>

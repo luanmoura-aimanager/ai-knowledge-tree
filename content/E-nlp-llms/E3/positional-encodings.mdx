@@ -18,7 +18,7 @@ Positional encodings inject order information into the representations.
 
 ## Sinusoidal absolute encodings (Vaswani et al., 2017)
 
-Add a fixed, deterministic vector $\mathbf{p}_t$ to each token embedding at position $t$:
+Add a fixed, deterministic vector $\mathbf{p}_t$ to each token embedding at position $t$<FN n="1" />:
 
 $$
 PE(t, 2i)   = \sin\!\left(\frac{t}{10000^{2i/d}}\right), \quad
@@ -31,7 +31,8 @@ for feature index $i = 0, 1, \dots, d/2 - 1$.
 - Different frequencies mean positions are distinguishable.
 - Linearity: $\mathbf{p}_{t+k}$ can be written as a linear function of $\mathbf{p}_t$
   for any offset $k$ (rotation in 2D planes). The model can potentially learn to attend
-  based on relative offset.
+  based on relative offset, the idea made explicit by encoding relative positions directly
+  in the attention scores<FN n="2" />.
 - Unbounded: can generate encodings for any sequence length.
 
 **Limitation:** position information is added to the embedding, not the attention scores.
@@ -64,7 +65,7 @@ print("PE[1, :4]:", pe[1, :4].round(4))
 ## Rotary Position Encoding (RoPE)
 
 RoPE (Su et al., 2022; used by LLaMA, Mistral, Qwen) encodes position in the **attention
-score** rather than the embedding. The key insight: rotate the query and key vectors by
+score** rather than the embedding<FN n="3" />. The key insight: rotate the query and key vectors by
 an angle proportional to their position, so that the attention score between positions
 $t$ and $s$ depends only on the **relative offset** $t - s$.
 
@@ -139,7 +140,7 @@ bias = alibi_bias(T=8, n_heads=4)
 print("ALiBi bias[0]:\n", bias[0].round(3))  # head 0: steepest penalty
 ```
 
-![Sinusoidal positional encodings give each position a unique fingerprint — every dimension is a sine/cosine of a different frequency, so position is encoded smoothly and relative offsets become linear shifts.](/figures/E3/positional-encodings.svg)
+![Sinusoidal positional encodings give each position a unique fingerprint: every dimension is a sine/cosine of a different frequency, so position is encoded smoothly and relative offsets become linear shifts.](/figures/E3/positional-encodings.svg)
 
 ## Comparison
 
@@ -152,3 +153,13 @@ print("ALiBi bias[0]:\n", bias[0].round(3))  # head 0: steepest penalty
 
 Modern LLMs (LLaMA 3, Qwen, Mistral) universally use RoPE. ALiBi is preferred when
 extrapolation is a hard requirement without fine-tuning.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need".
+    *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)</FNItem>
+  <FNItem n="2">**Shaw, P., Uszkoreit, J., & Vaswani, A.** (2018). "Self-attention with
+    relative position representations". *NAACL*.
+    [arXiv:1803.02155](https://arxiv.org/abs/1803.02155)</FNItem>
+  <FNItem n="3">**Su, J., et al.** (2021). "RoFormer: enhanced transformer with rotary
+    position embedding (RoPE)". [arXiv:2104.09864](https://arxiv.org/abs/2104.09864)</FNItem>
+</Footnotes>

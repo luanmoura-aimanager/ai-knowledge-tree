@@ -16,7 +16,7 @@ practitioners to forecast model quality before committing to an expensive traini
 
 ## Kaplan et al. (2020): OpenAI scaling laws
 
-Kaplan et al. trained hundreds of models varying three quantities:
+Kaplan et al. trained hundreds of models varying three quantities<FN n="1" />:
 - $N$: number of non-embedding parameters.
 - $D$: number of training tokens.
 - $C$: training compute (FLOPs), approximately $C \approx 6ND$.
@@ -38,12 +38,12 @@ smoothly and predictably as a power law in either $N$ or $D$.
 **Finding 2: for a fixed compute budget $C$, model size should dominate.** Kaplan et al.
 found that for a given $C$, you should use the largest model that can be trained in the
 given compute budget (even if it means training for fewer tokens). This led to GPT-3 (175B
-parameters, 300B tokens) and the trend of training large models for relatively few tokens.
+parameters, 300B tokens) and the trend of training large models for relatively few tokens<FN n="2" />.
 
 ## Chinchilla (Hoffmann et al., 2022)
 
 Kaplan et al.'s recommendation turned out to be wrong. Hoffmann et al. ran a more careful
-analysis with better-controlled experiments and found a different optimal allocation.
+analysis with better-controlled experiments and found a different optimal allocation<FN n="3" />.
 
 **IsoFLOP analysis:** for a fixed compute budget $C$, vary $N$ and set
 $D = C / (6N)$ accordingly. Find the $(N, D)$ that minimizes final loss.
@@ -93,7 +93,7 @@ The origin is contested:
 The implication for practitioners: do not assume smooth performance scaling for all metrics.
 Some capabilities may be present-or-absent at given scales.
 
-![Scaling laws: test loss falls as a power law in compute — a straight line on log-log axes — bottoming out at an irreducible floor set by the data's entropy.](/figures/E4/scaling-laws.svg)
+![Scaling laws: test loss falls as a power law in compute (a straight line on log-log axes), bottoming out at an irreducible floor set by the data's entropy.](/figures/E4/scaling-laws.svg)
 
 ## Scaling laws for fine-tuning and alignment
 
@@ -106,3 +106,12 @@ Scaling laws for pretraining don't directly apply to fine-tuning:
 
 The practical lesson: spend most of the compute budget on pretraining (where scaling laws
 give predictable returns), then fine-tune efficiently with smaller datasets.
+
+<Footnotes>
+  <FNItem n="1">**Kaplan, J., et al.** (2020). "Scaling laws for neural language models".
+    [arXiv:2001.08361](https://arxiv.org/abs/2001.08361). The original power-law fits for loss versus parameters, data, and compute.</FNItem>
+  <FNItem n="2">**Brown, T., et al.** (2020). "Language models are few-shot learners (GPT-3)".
+    *NeurIPS*. [arXiv:2005.14165](https://arxiv.org/abs/2005.14165). The 175B-parameter, 300B-token model that followed the Kaplan allocation.</FNItem>
+  <FNItem n="3">**Hoffmann, J., et al.** (2022). "Training compute-optimal large language models (Chinchilla)".
+    *NeurIPS*. [arXiv:2203.15556](https://arxiv.org/abs/2203.15556). The IsoFLOP analysis giving the equal-scaling rule and the 20-tokens-per-parameter heuristic.</FNItem>
+</Footnotes>

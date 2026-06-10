@@ -12,7 +12,8 @@ prerequisites: ["word2vec", "D1/backprop"]
 N-gram models fix context length to $n-1$ tokens, discarding everything before that window.
 A **Recurrent Neural Network (RNN)** maintains a **hidden state** $h_t$ that summarizes
 the entire prefix $x_1, \dots, x_t$ -- in principle, arbitrarily long dependencies are
-accessible.
+accessible. The neural language modeling program that RNN-LMs extend begins with Bengio
+et al.'s feedforward neural probabilistic LM<FN n="1" />.
 
 ## The RNN recurrence
 
@@ -95,7 +96,7 @@ The spectral radius of $W_h^\top$ and the saturating $\tanh$ derivative interact
   with gradient clipping: $\nabla \leftarrow \nabla \cdot \min(1, \tau / \|\nabla\|)$.
 
 The vanishing case is the harder structural problem: clipping does not help a gradient of
-zero. LSTM and GRU (next lesson) solve this with gated, additive updates.
+zero. LSTM and GRU (next lesson) solve this with gated, additive updates<FN n="2" />.
 
 ## Implementation
 
@@ -148,3 +149,8 @@ print(f"Loss: {next_token_loss(model, ids, V):.3f}")
 Vanilla RNNs are historical: they motivate the gated architectures that actually work.
 The next lesson derives LSTM's cell state, which maintains a direct gradient path
 over arbitrary lengths.
+
+<Footnotes>
+  <FNItem n="1">**Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C.** (2003). "A neural probabilistic language model". *JMLR*, 3, 1137-1155. The feedforward neural LM that distributed word representations grew from.</FNItem>
+  <FNItem n="2">**Hochreiter, S., & Schmidhuber, J.** (1997). "Long short-term memory". *Neural Computation*, 9(8), 1735-1780. [doi:10.1162/neco.1997.9.8.1735](https://doi.org/10.1162/neco.1997.9.8.1735). Analyzes the vanishing gradient and introduces the gated fix.</FNItem>
+</Footnotes>
