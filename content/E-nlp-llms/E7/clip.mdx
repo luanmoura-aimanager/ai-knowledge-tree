@@ -49,18 +49,18 @@ where $\tau$ is a learned temperature (initialized to $\log(1/0.07)$).
 
 Given $K$ class names, CLIP classifies an image without any labeled examples:
 
-1. Construct a text prompt for each class: "a photo of a {class}."
+1. Construct a text prompt for each class: "a photo of a \{class\}."
 2. Embed all $K$ prompts: $\mathbf{t}_1, \dots, \mathbf{t}_K$.
 3. Embed the image: $\mathbf{v}$.
 4. Compute cosine similarities: $s_k = \mathbf{v} \cdot \mathbf{t}_k$.
 5. Predict the class with the highest similarity: $\hat{k} = \arg\max_k s_k$.
 
-**Prompt engineering** matters significantly: "a photo of a {class}" outperforms just
-"{class}" because the training data contained many such captions. More elaborate prompts
-("a photo of a {class}, a type of food") improve fine-grained classification.
+**Prompt engineering** matters significantly: "a photo of a \{class\}" outperforms just
+"\{class\}" because the training data contained many such captions. More elaborate prompts
+("a photo of a \{class\}, a type of food") improve fine-grained classification.
 
 **Prompt ensembling:** average embeddings over multiple prompt templates:
-"a photo of a {class}", "a blurry photo of a {class}", "art of a {class}", etc.
+"a photo of a \{class\}", "a blurry photo of a \{class\}", "art of a \{class\}", etc.
 This reduces sensitivity to any single template and typically improves accuracy.
 
 ## Implementation (numpy)
