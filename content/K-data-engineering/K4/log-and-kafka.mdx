@@ -17,7 +17,7 @@ wants the ordered sequence of deposits and withdrawals that produced it, kept so
 that a new consumer (a fraud detector, an analytics job) can replay the whole
 history from the start. The data structure that serves this is the oldest one in
 systems: an **append-only log**. Kafka is the system that made the log a
-first-class piece of infrastructure, and its design is the vocabulary the rest of
+first-class piece of infrastructure<FN n="1" />, and its design is the vocabulary the rest of
 this subsection uses.
 
 ## The log: append-only, totally ordered, replayable
@@ -38,7 +38,7 @@ are the whole point:
 
 Storage stays cheap because appends are sequential disk writes, the fastest access
 pattern a disk has, and old records are aged out by a **retention** policy (drop
-records older than, say, seven days) rather than per-read deletion.
+records older than, say, seven days) rather than per-read deletion<FN n="2" />.
 
 ## Topics and partitions: ordering versus scale
 
@@ -113,3 +113,8 @@ This append-only, partitioned, offset-addressed log is the substrate every later
 lesson assumes. The next lesson takes the unbounded stream it delivers and asks the
 first hard question of stream processing: how do you compute an aggregate over data
 that never ends? That is [windowing](K4/windowing).
+
+<Footnotes>
+  <FNItem n="1">**Kreps, J., Narkhede, N., & Rao, J.** (2011). "Kafka: a distributed messaging system for log processing". *NetDB*. The original Kafka design: partitioned topics, offsets, and consumer pull.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 11 develops the log abstraction, partitioning for scale, consumer offsets, and log retention.</FNItem>
+</Footnotes>

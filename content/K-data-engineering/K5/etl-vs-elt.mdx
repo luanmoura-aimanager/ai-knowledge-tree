@@ -17,7 +17,7 @@ on a separate engine, then **l**oads the finished tables. **ELT** extracts, **l*
 the raw data first, then **t**ransforms it in place inside the warehouse. The letters
 look like a trivial reshuffle, but moving the transform step changes which machine
 does the heavy work, what you can recompute, and what you keep. The modern default
-flipped from ETL to ELT, and the reason is economic, not aesthetic.
+flipped from ETL to ELT, and the reason is economic, not aesthetic<FN n="1" />.
 
 ## ETL: transform before you land the data
 
@@ -67,7 +67,7 @@ run exactly these joins and aggregations at scale.
 
 Keeping the raw data invites a discipline for organizing the transforms that read it.
 ELT pipelines settle into three layers, each a set of tables built from the one
-before:
+before, the layering convention dbt's project structure encodes directly<FN n="2" />:
 
 - **Raw** (sometimes called the landing or bronze layer): source records loaded
   untouched, append-only, the faithful copy you can always reprocess from.
@@ -103,3 +103,8 @@ over a retained raw layer. Once transformation lives inside the warehouse as SQL
 next question is how to manage that SQL so it stays trustworthy, which the
 [next lesson](K5/transformation-as-code) answers by treating transformations as
 tested, version-controlled code.
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Chapters on the data-engineering lifecycle and ingestion lay out the ETL-to-ELT shift and its economic drivers.</FNItem>
+  <FNItem n="2">**dbt Labs.** (2024). "dbt documentation". [docs.getdbt.com](https://docs.getdbt.com). The staging, intermediate, and marts project structure formalizes the raw/staging/mart ELT layering.</FNItem>
+</Footnotes>

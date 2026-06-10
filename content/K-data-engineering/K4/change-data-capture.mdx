@@ -15,7 +15,7 @@ events to the [log](K4/log-and-kafka). But the system of record for most state i
 [transactional database](K1/oltp-vs-olap), and downstream consumers (a search index,
 a cache, an analytics warehouse) need to know every time a row changes. The question
 is how a row-level `INSERT`, `UPDATE`, or `DELETE` becomes an event on the stream.
-Two answers exist, and the gap between them is large enough to be worth a lesson.
+Two answers exist, and the gap between them is large enough to be worth a lesson<FN n="1" />.
 
 ## Query-based polling, and why it leaks
 
@@ -49,7 +49,7 @@ decodes each entry into a structured change event (`{op: UPDATE, table: orders, 
 fixes every leak of polling at once: deletes appear as `DELETE` entries, every
 intermediate update is its own entry, the events arrive in exact commit order, and
 the database does no extra query work because the connector reads a log it was
-writing anyway. This is the standard way databases feed streams.
+writing anyway. This is the standard way databases feed streams<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -121,3 +121,8 @@ With ingestion covered end to end, from the [log](K4/log-and-kafka) through wind
 watermarks, delivery, and CDC, the data is landing in the warehouse. The next
 subsection turns to scheduling and shaping it once it arrives, starting with
 [ETL versus ELT](K5/etl-vs-elt).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 11 contrasts query-based polling with log-based change data capture and motivates the transactional outbox.</FNItem>
+  <FNItem n="2">**Kreps, J., Narkhede, N., & Rao, J.** (2011). "Kafka: a distributed messaging system for log processing". *NetDB*. The log as the integration backbone that databases stream their committed changes onto.</FNItem>
+</Footnotes>

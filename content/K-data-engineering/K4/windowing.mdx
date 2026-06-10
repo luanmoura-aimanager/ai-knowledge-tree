@@ -15,7 +15,7 @@ and the stream never ends. Yet every useful metric ("requests per minute",
 sum over. You cannot wait for the stream to finish, because it never does. The
 resolution is to cut the timeline into finite chunks and aggregate within each
 chunk. A chunk is a **window**, and the three standard shapes (tumbling, sliding,
-session) differ only in how their boundaries are placed. The shape you pick changes
+session) differ only in how their boundaries are placed<FN n="1" />. The shape you pick changes
 the answer, so it is worth defining each precisely.
 
 Throughout, an event carries a timestamp $t$, and a window is a half-open interval
@@ -73,7 +73,7 @@ $$
 $$
 
 This models bursts of activity separated by idle periods (a user clicking around,
-then leaving). The boundary count follows directly from the rule: with $N$ sorted
+then leaving)<FN n="2" />. The boundary count follows directly from the rule: with $N$ sorted
 events there are $N-1$ consecutive gaps, and each gap that exceeds $g$ starts one
 new session. So if $m$ of the gaps exceed $g$, the stream splits into
 
@@ -135,3 +135,8 @@ $g=3$ split the stream into three sessions. Every window above is keyed off the
 event's *own* timestamp $t$, which quietly assumed events arrive in timestamp
 order. They do not, and the [next lesson](K4/watermarks-late-data) confronts what
 happens when an event for an already-closed window shows up late.
+
+<Footnotes>
+  <FNItem n="1">**Akidau, T., et al.** (2015). "The dataflow model: a practical approach to balancing correctness, latency, and cost in massive-scale, unbounded, out-of-order data processing". *VLDB*, 8(12), 1792-1803. [doi:10.14778/2824032.2824076](https://doi.org/10.14778/2824032.2824076). Formalizes fixed, sliding, and session windowing over unbounded streams.</FNItem>
+  <FNItem n="2">**Carbone, P., Katsifodimos, A., Ewen, S., Markl, V., Haridi, S., & Tzoumas, K.** (2015). "Apache Flink: stream and batch processing in a single engine". *IEEE Data Engineering Bulletin*, 38(4), 28-38. Flink's windowing API, including data-driven session windows.</FNItem>
+</Footnotes>

@@ -15,7 +15,7 @@ files is fast to query but it is not a *table*. It has no notion of a commit, so
 reader can catch a writer mid-update and see half-written data; no schema it
 enforces, so two files can disagree on columns; no history, so an overwrite is
 gone forever. The objects sit in cheap **object storage** (S3, GCS), which gives
-durability and scale but only single-object atomicity, no multi-file transaction.
+durability and scale but only single-object atomicity, no multi-file transaction<FN n="1" />.
 A **table format**, Apache Iceberg, Delta Lake, or Apache Hudi, is a thin
 **metadata layer** over those Parquet files that adds exactly the missing
 warehouse semantics: atomic commits, schema enforcement and evolution, and time
@@ -62,7 +62,7 @@ Because publishing is one atomic write, a reader sees either the entire old
 snapshot or the entire new one, never a half-applied mix: the table is
 transactional even though it is spread across thousands of files.
 
-**Optimistic concurrency** handles two writers at once. Each reads the current
+**Optimistic concurrency** handles two writers at once<FN n="2" />. Each reads the current
 snapshot $v$, prepares its commit, and tries to swap the pointer with the
 condition "only if the current snapshot is still $v$." The first writer wins; the
 second's compare-and-set fails because the pointer already moved, so it re-reads
@@ -100,3 +100,8 @@ the warehouse semantics, delivered on top of cheap object storage and open Parqu
 files: the lakehouse. With storage settled, the next subsection turns to
 processing that data at scale, starting with
 [MapReduce and the shuffle](K3/mapreduce).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Background on atomicity, consistency, and the transaction semantics a table format must reconstruct over object storage.</FNItem>
+  <FNItem n="2">**Armbrust, M., et al.** (2020). "Delta Lake: high-performance ACID table storage over cloud object stores". *VLDB*, 13(12), 3411-3424. [doi:10.14778/3415478.3415560](https://doi.org/10.14778/3415478.3415560). Describes atomic snapshot commits and optimistic concurrency over Parquet on object storage.</FNItem>
+</Footnotes>

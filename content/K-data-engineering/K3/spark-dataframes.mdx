@@ -13,7 +13,7 @@ codeExempt: true
 [MapReduce](mapreduce) forces every job into one rigid map-shuffle-reduce round, so a
 multi-step pipeline becomes a chain of separate jobs, each writing its output to disk for
 the next to read. Spark removes that overhead with two ideas: a **DataFrame**, a
-distributed table you describe with relational operations, and **lazy evaluation**, where
+distributed table you describe with relational operations<FN n="1" />, and **lazy evaluation**, where
 those operations build a plan instead of running immediately. Spark sees the whole
 pipeline before executing any of it, so it can fuse steps, skip needless disk writes, and
 shuffle only where the computation genuinely demands it.
@@ -24,7 +24,7 @@ Every DataFrame operation is one of two kinds.
 
 A **transformation** (`select`, `filter`, `groupBy`, `join`) returns a new DataFrame
 describing *what* to compute, but runs nothing. Calling it just appends a node to a
-**lineage**: a record of how this DataFrame derives from its parents back to the source.
+**lineage**: a record of how this DataFrame derives from its parents back to the source<FN n="2" />.
 
 An **action** (`count`, `collect`, `write`) asks for a concrete result. Only then does
 Spark look at the accumulated lineage, compile it, and run the cluster.
@@ -79,3 +79,8 @@ Reading a Spark plan is therefore mostly counting shuffle boundaries: each one i
 break and the expensive part of the job. The two transformations that most often force a
 shuffle are joins and group-bys, and the [next lesson](distributed-joins) shows that even
 a join can sometimes avoid the shuffle entirely by broadcasting the smaller side.
+
+<Footnotes>
+  <FNItem n="1">**Armbrust, M., et al.** (2015). "Spark SQL: relational data processing in Spark". *SIGMOD*. [doi:10.1145/2723372.2742797](https://doi.org/10.1145/2723372.2742797). Introduces the DataFrame API and the Catalyst optimizer that compiles the logical plan to a physical DAG.</FNItem>
+  <FNItem n="2">**Zaharia, M., et al.** (2012). "Resilient distributed datasets: a fault-tolerant abstraction for in-memory cluster computing". *NSDI*. RDDs and their lineage graph, the substrate DataFrames lower onto.</FNItem>
+</Footnotes>

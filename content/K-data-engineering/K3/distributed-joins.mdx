@@ -21,7 +21,7 @@ the bytes each moves across the network.
 The default strategy repartitions both tables by the join key. Each side is hash-partitioned
 with the same function $\operatorname{hash}(k) \bmod W$ over $W$ workers, so all rows of
 $A$ and all rows of $B$ that share a key land on the same worker, which then joins them
-locally.
+locally<FN n="1" />.
 
 The cost is the data moved. Let $|A|$ and $|B|$ be the sizes (in bytes) of the two tables.
 Both sides are reshuffled across the network, so the total moved is
@@ -37,7 +37,7 @@ one table is tiny and the other is huge: the shuffle still pays to move the huge
 ## The broadcast join
 
 When one side is small, a different plan avoids moving the large table at all. Spark
-**broadcasts** the small table: it ships a full copy to every worker. Each worker then
+**broadcasts** the small table: it ships a full copy to every worker<FN n="2" />. Each worker then
 streams its *local* partition of the large table past the in-memory copy of the small one
 and joins on the fly. The large table never moves.
 
@@ -118,3 +118,8 @@ The crossover here is $1000 / 7 \approx 143$ MB: a small table under that broadc
 over it shuffles. This whole analysis assumes keys spread evenly across workers; when one
 key dominates, the shuffle join's even-split assumption breaks and a single worker is
 swamped, which is the [skew problem](data-skew) the next lesson quantifies.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 10 lays out reduce-side (shuffle) and map-side (broadcast) joins and when each is cheaper.</FNItem>
+  <FNItem n="2">**Dean, J., & Ghemawat, S.** (2008). "MapReduce: simplified data processing on large clusters". *Communications of the ACM*, 51(1), 107-113. [doi:10.1145/1327452.1327492](https://doi.org/10.1145/1327452.1327492). The broadcast (map-side) join generalizes the small-table replication MapReduce already used.</FNItem>
+</Footnotes>

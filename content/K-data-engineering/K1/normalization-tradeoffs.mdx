@@ -11,8 +11,8 @@ prerequisites: ["dimensional-modeling"]
 
 The [relational model](K1/relational-model) made a strong case for normalization:
 store every fact once, and the update, insertion, and deletion anomalies all go
-away. The [star schema](K1/dimensional-modeling) already bent that rule by
-denormalizing its dimensions. This lesson makes the trade explicit and
+away<FN n="1" />. The [star schema](K1/dimensional-modeling) already bent that rule by
+denormalizing its dimensions<FN n="2" />. This lesson makes the trade explicit and
 quantitative, because "always normalize" is an OLTP instinct, and the analytical
 warehouse often does better with a **wide, pre-joined table** that violates it on
 purpose. The decision turns on one number: how read-heavy the workload is.
@@ -113,3 +113,8 @@ warehouse, almost all reads, leans toward wide denormalized tables, while an
 operational store leans toward the normalized form. How those wide tables are
 physically laid out on disk to make the scan cheap is the subject of the next
 subsection, starting with [row vs columnar](K2/row-vs-columnar) storage.
+
+<Footnotes>
+  <FNItem n="1">**Date, C. J.** (2003). *An Introduction to Database Systems* (8th ed.). Addison-Wesley. The case for normalization and the anomalies redundancy causes.</FNItem>
+  <FNItem n="2">**Kimball, R., & Ross, M.** (2013). *The Data Warehouse Toolkit: The Definitive Guide to Dimensional Modeling* (3rd ed.). Wiley. Argues for deliberate denormalization of dimensions in read-heavy analytical schemas.</FNItem>
+</Footnotes>

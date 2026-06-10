@@ -16,7 +16,7 @@ recomputes two years to add one day. The work per run grows with the *total* tab
 not with the *new* data, so a pipeline that started fast slowly chokes. The fix is to
 process only the rows that are new or changed, and to fold them into the existing
 table with a key-aware **merge** so a reprocessed batch updates the right row instead
-of appending a duplicate.
+of appending a duplicate<FN n="1" />.
 
 ## Full-refresh vs incremental
 
@@ -59,7 +59,9 @@ This gives the property that makes reprocessing safe. Reapplying a batch that ha
 already been merged changes nothing: every key in it is present, so every row is an
 update that overwrites a value with the identical value. A merge keyed on a stable id
 is **idempotent**, which is precisely what lets a [retry or backfill](K5/scheduling-backfills)
-rerun a batch without corrupting the table.
+rerun a batch without corrupting the table. Idempotent writes keyed on a stable id are
+the standard defense against the duplicate delivery that stream and batch systems
+cannot fully rule out<FN n="2" />.
 
 ![Rows processed per run: a full-refresh model reprocesses the entire accumulated table every run, so its per-run cost climbs with history (and its cumulative work grows quadratically), while an incremental model touches only each run's new or changed rows, keeping per-run cost flat.](/figures/K5/incremental-processing.svg)
 
@@ -126,3 +128,8 @@ no-op, and incremental touched 7 rows where full-rebuild touched 15. Idempotency
 was a property of one table's merge; the [next lesson](K5/scheduling-backfills) lifts
 it to the schedule, where time-partitioned runs and backfills demand that *every* task
 be safe to rerun.
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Covers incremental ingestion, change data capture, and merge/upsert patterns over a retained history.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Chapter 11 develops idempotence and exactly-once effects as the route to safe retries under at-least-once delivery.</FNItem>
+</Footnotes>

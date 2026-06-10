@@ -15,7 +15,7 @@ which to flatten the table onto disk, and that choice decides which queries are
 cheap. [Analytical workloads](K1/oltp-vs-olap) read a handful of columns across
 millions of rows (`SELECT region, SUM(amount) ... GROUP BY region`). The layout
 that lets such a query touch only the columns it asked for is the one that wins,
-and that layout is columnar.
+and that layout is columnar<FN n="1" />.
 
 ## Two ways to flatten a table
 
@@ -32,7 +32,7 @@ updating a whole record is one contiguous read.
 **Column-major (column store)** writes the table column by column: all $R$ values
 of column 1, then all $R$ values of column 2. Column $j$ occupies one contiguous
 block of $R \cdot w_j$ bytes. Reading one column is now a single contiguous scan,
-and the other columns are nowhere near it.
+and the other columns are nowhere near it<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -82,7 +82,7 @@ $$
 $$
 
 which is large exactly when the query reads few of many columns: the wide-table,
-narrow-projection shape of analytics. For a 50-byte row where the query wants two
+narrow-projection shape of analytics<FN n="3" />. For a 50-byte row where the query wants two
 4-byte columns, that ratio is about $50/8 \approx 6$: the row store moves roughly
 six times the data to answer the same question. (This is the I/O argument alone;
 columnar layout *also* makes each column compress far better, which the
@@ -127,3 +127,9 @@ all eight, a ratio fixed by the row width over the projected width. Storing one
 column contiguously also makes its values uniform and predictable, which is what
 lets the lightweight encodings of the [next lesson](compression-encoding) shrink
 it so aggressively.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Chapter 3 motivates column-oriented storage for analytical scans.</FNItem>
+  <FNItem n="2">**Abadi, D. J., Boncz, P., & Harizopoulos, S.** (2013). *The Design and Implementation of Modern Column-Oriented Database Systems.* Foundations and Trends in Databases. [doi:10.1561/1900000024](https://doi.org/10.1561/1900000024). A survey of columnar layout and its I/O advantages.</FNItem>
+  <FNItem n="3">**Stonebraker, M., et al.** (2005). "C-Store: a column-oriented DBMS". *VLDB*. The influential research prototype that established the column-store design.</FNItem>
+</Footnotes>

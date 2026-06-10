@@ -25,7 +25,7 @@ A query parses into a **logical plan**, a tree of operators. The query
 this literally, scan everything, then filter, then project, so it materializes the full
 table first.
 
-The optimizer rewrites the tree before running it. Two rewrites move work toward the leaf.
+The optimizer rewrites the tree before running it. Two rewrites move work toward the leaf<FN n="1" />.
 
 ## Projection pushdown
 
@@ -55,7 +55,7 @@ Second, **column statistics**. A [Parquet](K2/parquet-internals) file stores its
 reading a row group, the engine checks the predicate against those stats: if the filter is
 `c > 100` and a row group has $\max(c) = 80$, no row in it can match, so the whole group is
 skipped without decoding a single value. This is **min/max skipping**, and on
-range-filtered, roughly sorted data it discards most row groups.
+range-filtered, roughly sorted data it discards most row groups<FN n="2" />.
 
 What survives is governed by the **selectivity** $\sigma \in [0, 1]$, the fraction of rows
 the predicate keeps. After pushdown, the rows reaching the CPU are
@@ -130,3 +130,8 @@ and 5% of rows. This closes batch processing: data is partitioned, joined, and s
 with the minimum I/O. The [next subsection](K4/log-and-kafka) drops the assumption that
 the data sits still and turns to streaming, where records arrive continuously as an
 append-only log.
+
+<Footnotes>
+  <FNItem n="1">**Armbrust, M., et al.** (2015). "Spark SQL: relational data processing in Spark". *SIGMOD*. [doi:10.1145/2723372.2742797](https://doi.org/10.1145/2723372.2742797). The Catalyst optimizer's rule-based rewrites include predicate and projection pushdown toward the scan.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Ch. 3 covers columnar storage, projection of needed columns, and min/max-based block skipping.</FNItem>
+</Footnotes>

@@ -26,7 +26,7 @@ the **reader** (a consumer's expected schema). Compatibility names which
 combinations of writer-version and reader-version still work.
 
 **Backward compatible**: a *new* schema can read data written under the *old*
-schema. The classic safe change is **adding an optional field** (one with a
+schema<FN n="1" />. The classic safe change is **adding an optional field** (one with a
 default). A reader on the new schema meets old records that lack the field and
 fills the default, so old data still parses. Backward compatibility is what lets
 you upgrade *consumers first*.
@@ -75,7 +75,7 @@ A **data contract** is the agreed schema plus a validator that runs at the
 boundary where the producer hands data over. Before a payload is accepted it is
 checked against the contract: every required field present, every type matching.
 A payload that violates the contract is **rejected at the boundary**, so the
-producer's bad change surfaces as a failed publish, not as a corrupted consumer.
+producer's bad change surfaces as a failed publish, not as a corrupted consumer<FN n="2" />.
 This is the [validation-check](K6/data-quality-dimensions) idea raised one level:
 instead of scoring rows, the contract gates the whole payload on its structure.
 
@@ -147,3 +147,8 @@ The classifier labels the optional add `full`, the required-field drop `backward
 can reach a consumer. Knowing a change *is* breaking is half the problem; the next
 lesson tracks *who would be hit* by tracing a column through the pipeline as
 [data lineage](K6/data-lineage).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Chapter 4 develops backward and forward compatibility through schema evolution in Avro, Protocol Buffers, and Thrift.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Discusses data contracts and schema management at producer/consumer boundaries.</FNItem>
+</Footnotes>
