@@ -15,7 +15,7 @@ never measured. **Deployment strategies** are the patterns that expose a new mod
 to real requests *gradually*, so a regression is caught on a small slice of users
 and rolled back before it becomes an outage. The three workhorses, shadow, canary,
 and blue-green, trade off how much real traffic the new model touches against how
-quickly you learn whether it is safe.
+quickly you learn whether it is safe<FN n="1" />.
 
 ## Three patterns
 
@@ -31,7 +31,7 @@ new model and serves the rest from the old one. Now the new model's responses do
 reach users, so you can read real outcome metrics on the canary slice and compare
 them to the control slice. If the metric holds, you ramp the fraction up
 (5% → 25% → 100%); if it regresses, you route back to 0%. This is an
-[online A/B test](B/ab-testing) used as a release gate.
+[online A/B test](B/ab-testing) used as a release gate<FN n="2" />.
 
 **Blue-green** keeps two full production environments: *blue* (current) serves all
 traffic while *green* (new) is brought up and verified, then the router flips
@@ -100,3 +100,8 @@ threshold, never on a hunch, and the sample-size formula tells you in advance ho
 much traffic that decision needs. A model that survives the canary and ramps to
 100% is now the thing the [monitoring and retraining](I4/production-drift) lessons
 watch over its production lifetime.
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Deployment patterns, shadow/canary releases, and rollback (Ch. 7-9).</FNItem>
+  <FNItem n="2">**Kohavi, R., Tang, D., & Xu, Y.** (2020). *Trustworthy Online Controlled Experiments.* Cambridge University Press. [doi:10.1017/9781108653985](https://doi.org/10.1017/9781108653985) Sizing and reading online experiments used as release gates.</FNItem>
+</Footnotes>

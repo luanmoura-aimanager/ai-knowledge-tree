@@ -15,7 +15,7 @@ is not the parameters alone; it is everything training keeps *alongside* them, t
 gradients and the optimizer's state, which together are several times the size of
 the weights. **ZeRO** (Zero Redundancy Optimizer) attacks exactly this by noticing
 that data parallelism stores all of that redundantly on every worker, and sharding
-it instead. To see what it buys, first count the bytes.
+it instead<FN n="1" />. To see what it buys, first count the bytes.
 
 ## The memory of a training step
 
@@ -36,7 +36,7 @@ shards.)
 
 In plain data parallelism every one of the $K$ workers holds all $16P$ bytes. The
 parameters and optimizer state are *identical* across workers, so $K-1$ copies of
-them are pure redundancy. ZeRO removes that redundancy in three stages.
+them are pure redundancy<FN n="2" />. ZeRO removes that redundancy in three stages.
 
 ## The three ZeRO stages
 
@@ -102,3 +102,8 @@ does. Sharding is what makes training a model larger than one device possible at
 all. That closes the training-infrastructure subsection; the next subsection turns
 from training the model to [serving](I3/latency-throughput) it under a latency
 budget.
+
+<Footnotes>
+  <FNItem n="1">**Rajbhandari, S., Rasley, J., Ruwase, O., & He, Y.** (2020). "ZeRO: memory optimizations toward training trillion parameter models". *SC*. [arXiv:1910.02054](https://arxiv.org/abs/1910.02054) The $16P$ mixed-precision memory accounting and the three sharding stages.</FNItem>
+  <FNItem n="2">**Goyal, P., et al.** (2017). "Accurate, large minibatch SGD: training ImageNet in 1 hour". [arXiv:1706.02677](https://arxiv.org/abs/1706.02677) The data-parallel replica model whose per-worker redundancy ZeRO removes.</FNItem>
+</Footnotes>

@@ -13,7 +13,7 @@ In ordinary software, continuous integration runs a test suite on every change
 and refuses to merge if anything is red. ML breaks the assumption that code is the
 only input: a model's behavior is determined by **code, data, and the learned
 weights together**, so two of the three things that can regress are invisible to a
-normal test runner. **CI/CD for ML** closes that gap by adding tests on the data
+normal test runner<FN n="1" />. **CI/CD for ML** closes that gap by adding tests on the data
 and on the trained model to the usual tests on the code, then wiring them as gates
 a [registered model version](I2/model-registry) must clear before it is promoted.
 
@@ -31,7 +31,7 @@ graph LR
   M -->|"any fail"| X["block release"]
 ```
 
-**Data tests** run before training and assert that the inputs are sane: every
+**Data tests** run before training and assert that the inputs are sane<FN n="2" />: every
 expected column is present with the right type (a **schema** test), and the new
 batch has not drifted from the reference distribution using the
 [KS / PSI statistics](I1/drift-detection) from the data-engineering lessons. Bad
@@ -48,7 +48,7 @@ metric can average away: an **invariance** test says a prediction must not chang
 when an irrelevant feature is perturbed, and a **directional** test says it must
 move the right way when a meaningful one does. A model can hit its target accuracy
 and still fail these, which is exactly the kind of silent regression CI exists to
-stop.
+stop<FN n="3" />.
 
 ## Worked example: an invariance test as a gate
 
@@ -95,3 +95,9 @@ shipping the regression. These automated gates are what make the
 [deployment strategies](I3/deployment-strategies) of the next subsection safe to
 run on real traffic: by the time a model reaches a canary, it has already proven
 it does not break the invariants you wrote down.
+
+<Footnotes>
+  <FNItem n="1">**Sculley, D., et al.** (2015). "Hidden technical debt in machine learning systems". *NeurIPS*. Why data and model behavior, not just code, are the surfaces that silently regress.</FNItem>
+  <FNItem n="2">**Breck, E., Cai, S., Nielsen, E., Salib, M., & Sculley, D.** (2017). "The ML test score: a rubric for ML production readiness and technical debt reduction". *IEEE Big Data*. [doi:10.1109/BigData.2017.8258038](https://doi.org/10.1109/BigData.2017.8258038)</FNItem>
+  <FNItem n="3">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Behavioral and threshold tests as release gates in an ML CI/CD pipeline.</FNItem>
+</Footnotes>

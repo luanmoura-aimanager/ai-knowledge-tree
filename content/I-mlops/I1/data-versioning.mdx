@@ -31,7 +31,7 @@ properties that matter here:
   inputs with the same digest. So distinct data reliably gets distinct names, and
   a digest can be trusted as a unique fingerprint.
 
-Storing a file under its own digest is **content-addressed storage**. The digest
+Storing a file under its own digest is **content-addressed storage**<FN n="1" />. The digest
 becomes the address. A version of a dataset is then just a small **manifest** that
 lists the digests of its files; pinning a training run to that manifest pins it,
 immutably, to those exact bytes. Change one row and the file's digest changes, the
@@ -50,7 +50,7 @@ and only the changed or new chunks cost new storage.
 This is why versioning every daily snapshot of a slowly-growing dataset does not
 cost a full copy per day. The storage for $k$ snapshots is the size of the *union*
 of their chunks, not the sum of their sizes. Identical chunks, however many
-snapshots reference them, are paid for once.
+snapshots reference them, are paid for once<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -105,3 +105,8 @@ only the one chunk that actually changed. With each dataset version now a
 reproducible, immutable name, the remaining data-engineering job is noticing when
 *new* data stops looking like the data a model was trained on, which the next
 lesson measures as [drift](drift-detection).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Content-addressed, immutable storage and hashing for stable identity.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Dataset versioning, lineage, and reproducibility in the data lifecycle.</FNItem>
+</Footnotes>

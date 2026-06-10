@@ -16,7 +16,7 @@ This is **edge** or **on-device** deployment, and it is not just "the same model
 a smaller GPU." The whole objective function changes: in the cloud you optimize
 throughput per dollar; at the edge you optimize fitting inside a fixed, often tiny,
 device while respecting power, privacy, and connectivity constraints. The model
-choices that follow are downstream of those constraints.
+choices that follow are downstream of those constraints<FN n="1" />.
 
 ## Why move to the edge at all
 
@@ -44,7 +44,7 @@ On-device targets are bounded by resources the cloud treats as free:
 
 - **Memory.** A phone gives an app a few hundred megabytes, a microcontroller a few
   hundred *kilo*bytes. The model plus its working memory must fit, which makes
-  [quantization](quantization) and pruning prerequisites rather than refinements.
+  [quantization](quantization) and pruning prerequisites rather than refinements<FN n="2" />.
 - **Power and heat.** Inference drains the battery and heats the chip; a model that
   pins the CPU is unusable on a phone regardless of its accuracy.
 - **Heterogeneous hardware.** The same app runs on thousands of chip variants
@@ -88,3 +88,8 @@ into one that runs in a few hundred milliseconds on a phone. That closes the
 deployment subsection. The model is now trained, served, and shipped; the final
 subsection asks how to know it is still *working* once real traffic hits it, which
 is [monitoring](I4/slos-and-error-budgets).
+
+<Footnotes>
+  <FNItem n="1">**Howard, A. G., et al.** (2017). "MobileNets: efficient convolutional neural networks for mobile vision applications". [arXiv:1704.04861](https://arxiv.org/abs/1704.04861) Architecture designed for the on-device memory and power budget.</FNItem>
+  <FNItem n="2">**Gholami, A., Kim, S., Dong, Z., Yao, Z., Mahoney, M. W., & Keutzer, K.** (2021). "A survey of quantization methods for efficient neural network inference". [arXiv:2103.13630](https://arxiv.org/abs/2103.13630) Quantization as a prerequisite for fitting models on constrained hardware.</FNItem>
+</Footnotes>

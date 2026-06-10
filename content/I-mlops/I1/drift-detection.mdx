@@ -15,7 +15,7 @@ training data, the model is extrapolating, and its accuracy is no longer
 guaranteed. Catching that *at the input* (before labels arrive, which may take
 weeks) is the job of **data drift detection**: a test that compares a fresh batch
 of feature values against a fixed **reference** sample from training time and
-raises a number when they have moved apart. Two statistics cover most features:
+raises a number when they have moved apart<FN n="1" />. Two statistics cover most features:
 the Kolmogorov-Smirnov statistic for continuous values and the population
 stability index for binned ones.
 
@@ -49,7 +49,7 @@ supremum is attained at one of the pooled sample values, so you evaluate the gap
 there and take the max, no calculus needed. This is exactly the
 [two-sample test statistic](B/hypothesis-testing) from statistics, reused here as
 a monitoring signal: a common production rule is to flag the feature when $D$
-crosses a fixed threshold.
+crosses a fixed threshold<FN n="2" />.
 
 ## The population stability index
 
@@ -122,3 +122,8 @@ batch stays well under $0.1$. These are the same comparisons we will run *over
 time* on a live model in [production drift monitoring](I4/production-drift);
 first, the next subsection turns to the infrastructure that *trains* the models
 whose inputs we are now watching.
+
+<Footnotes>
+  <FNItem n="1">**Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M., & Bouchachia, A.** (2014). "A survey on concept drift adaptation". *ACM Computing Surveys*, 46(4), 1-37. [doi:10.1145/2523813](https://doi.org/10.1145/2523813)</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Monitoring input distributions and flagging drift in production.</FNItem>
+</Footnotes>

@@ -25,7 +25,7 @@ encoding** maps a column with $k$ distinct levels to $k$ indicator columns, wher
 row $i$ gets a $1$ in the column for its level and $0$ everywhere else. It assumes
 nothing about order or distance between levels, which is exactly right for
 unordered categories like country or device, and it costs one new dimension per
-level.
+level<FN n="1" />.
 
 A numeric column is already a number, but its *scale* is arbitrary: a price in
 dollars and an age in years live on wildly different ranges, and any model that
@@ -53,7 +53,7 @@ training row's standardized value depends on the mean of rows that are supposed
 to be in the future. That is **data leakage**: information from the evaluation set
 bleeds into training through the shared statistic, the offline score climbs, and
 none of that lift survives deployment, where genuinely unseen rows must be scaled
-by a $\mu, \sigma$ computed without them.
+by a $\mu, \sigma$ computed without them<FN n="2" />.
 
 ![Feature engineering fits a transform on the training split, then applies it unchanged to held-out data. Fitting on the full dataset before splitting leaks the held-out statistics into training, inflating the offline score above the honest accuracy the model reaches in production.](/figures/I1/feature-engineering.svg)
 
@@ -75,7 +75,7 @@ rng = np.random.default_rng(0)
 # A feature whose distribution shifts between the train era and the test era,
 # so the full-data mean/std differ from the train-only ones.
 x_train = rng.normal(0.0, 1.0, size=400)
-x_test  = rng.normal(0.8, 1.6, size=400)   # heavier, shifted — the "future"
+x_test  = rng.normal(0.8, 1.6, size=400)   # heavier, shifted: the "future"
 
 def standardize(x, mu, sigma):
     return (x - mu) / sigma
@@ -89,7 +89,7 @@ mu_tr, sd_tr = x_train.mean(), x_train.std()
 
 # A standardized feature should have ~unit std on the data the stats were fit on.
 # Under leakage the *test* block looks artificially well-scaled; done right it
-# reveals its true shift — which is the signal an honest pipeline must not hide.
+# reveals its true shift, which is the signal an honest pipeline must not hide.
 leaked_test_std = standardize(x_test, mu_all, sd_all).std()
 honest_test_std = standardize(x_test, mu_tr,  sd_tr ).std()
 
@@ -114,3 +114,8 @@ deviation well above one, which is information your
 need to see. With clean features defined, the next subsection moves from the data
 layer to the [infrastructure that trains](I2/experiment-tracking) the models that
 consume them.
+
+<Footnotes>
+  <FNItem n="1">**Zheng, A., & Casari, A.** (2018). *Feature Engineering for Machine Learning.* O'Reilly. Categorical encoding and numeric scaling for tabular features.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Data leakage from fitting transforms on the wrong split.</FNItem>
+</Footnotes>

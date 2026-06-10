@@ -41,7 +41,7 @@ $$
 This grows linearly with both sequence length and batch size, and on a large model
 it is enormous: it is the KV cache, not the weights, that runs the GPU out of
 memory first, and it is therefore the KV cache that caps how many requests can be
-served at once. Driving that cap up by storing the cache in non-contiguous pages
+served at once<FN n="1" />. Driving that cap up by storing the cache in non-contiguous pages
 is exactly what [paged attention](E/paged-attention) does.
 
 ## Continuous batching
@@ -66,7 +66,7 @@ Instead of holding the batch fixed for the whole loop, the scheduler revisits it
 waiting request is admitted into the freed slot. As long as there is a backlog,
 finished sequences never leave the GPU idle, so utilization stays near $1$ and
 throughput rises accordingly, with no change to any individual result. This is the
-single biggest reason a modern LLM server out-serves a naive one.
+single biggest reason a modern LLM server out-serves a naive one<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -114,3 +114,8 @@ sequences; and because requests finish at different lengths, static batching was
 roughly half the device while continuous batching keeps it full. When even the
 cached, full-precision model is too big or too slow for the budget, the next lever
 is to shrink the numbers themselves with [quantization](quantization).
+
+<Footnotes>
+  <FNItem n="1">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention". *SOSP*. [arXiv:2309.06180](https://arxiv.org/abs/2309.06180) Introduces vLLM and quantifies KV-cache memory as the binding serving constraint.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2022). *Designing Machine Learning Systems.* O'Reilly. Online serving, batching strategies, and accelerator utilization (Ch. 7).</FNItem>
+</Footnotes>

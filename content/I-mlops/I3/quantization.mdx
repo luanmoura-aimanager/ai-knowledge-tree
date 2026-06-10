@@ -17,7 +17,7 @@ from memory to the compute units, so halving or quartering the bytes per weight 
 close to a direct latency win. The price is precision: integers cannot represent
 the original values exactly, and the engineering question is how to map floats to
 integers so the error stays small and controlled. The standard answer is **affine
-quantization**.
+quantization**<FN n="1" />.
 
 ## The affine map
 
@@ -78,7 +78,7 @@ as the bit budget $b$ grows (more codes across the same range) or as the range
 $[\beta_{\min}, \beta_{\max}]$ tightens. This is why **outliers hurt**: one extreme
 weight stretches the range, inflating $s$ and therefore the error on *every* weight,
 which is the problem the LLM-specific [quantization](E/quantization) schemes
-(per-channel scales, outlier handling) are built to solve.
+(per-channel scales, outlier handling) are built to solve<FN n="2" />.
 
 ![Quantizing weights to fewer bits shrinks the model in direct proportion with little accuracy loss down to int8; below that, accuracy degrades unless more careful schemes are used.](/figures/I3/quantization.svg)
 
@@ -117,3 +117,8 @@ Every reconstructed weight lands within half a step of the original, exactly the
 bound, and the tensor shrinks fourfold from fp32 to int8. Quantization shrinks each
 weight; the next lesson shrinks the *number* of weights and the model's depth, with
 [distillation and pruning](distillation-pruning).
+
+<Footnotes>
+  <FNItem n="1">**Jacob, B., et al.** (2018). "Quantization and training of neural networks for efficient integer-arithmetic-only inference". *CVPR*. [arXiv:1712.05877](https://arxiv.org/abs/1712.05877) Introduces the affine scale/zero-point integer scheme used here.</FNItem>
+  <FNItem n="2">**Gholami, A., Kim, S., Dong, Z., Yao, Z., Mahoney, M. W., & Keutzer, K.** (2021). "A survey of quantization methods for efficient neural network inference". [arXiv:2103.13630](https://arxiv.org/abs/2103.13630) Surveys per-channel scales and outlier handling.</FNItem>
+</Footnotes>

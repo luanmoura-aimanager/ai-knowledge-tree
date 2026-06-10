@@ -24,7 +24,7 @@ epochs instead of all of them, on a subset of the data, at low resolution. Low
 fidelity is noisy but cheap; high fidelity is accurate but expensive. The bet is
 that **relative ranking is roughly preserved across fidelities**: a configuration
 that is much worse after a little training is unlikely to become the best after
-a lot. It is only roughly true, which is why you promote *several* survivors rather
+a lot<FN n="1" />. It is only roughly true, which is why you promote *several* survivors rather
 than committing to the single leader early.
 
 ## Successive halving
@@ -57,9 +57,9 @@ mediocre early can be cut before it would have shone. **Hyperband** hedges this 
 running several SHA brackets with different starting trade-offs (many configs cut
 aggressively, vs. fewer configs given more budget each), and **ASHA** makes the
 whole thing asynchronous so idle workers promote survivors without waiting for a
-rung to finish, which is what scales it to a real cluster.
+rung to finish, which is what scales it to a real cluster<FN n="2" />.
 
-![Multi-fidelity HPO (successive halving / Hyperband) starts many configurations on a small budget, then repeatedly keeps the top half and gives them more — concentrating compute on the promising configs instead of training every one to completion.](/figures/I2/multi-fidelity-hpo.svg)
+![Multi-fidelity HPO (successive halving / Hyperband) starts many configurations on a small budget, then repeatedly keeps the top half and gives them more, concentrating compute on the promising configs instead of training every one to completion.](/figures/I2/multi-fidelity-hpo.svg)
 
 ## Worked example
 
@@ -108,3 +108,8 @@ small fraction of what training all $27$ configurations to convergence would. Wi
 strong configuration chosen, the remaining infrastructure question is how to train
 *that* model when it is too big for one machine, which is
 [data-parallel training](data-parallel-training).
+
+<Footnotes>
+  <FNItem n="1">**Li, L., Jamieson, K., DeSalvo, G., Rostamizadeh, A., & Talwalkar, A.** (2017). "Hyperband: a novel bandit-based approach to hyperparameter optimization". *JMLR*, 18, 1-52. [arXiv:1603.06560](https://arxiv.org/abs/1603.06560) Successive halving and the Hyperband bracketing that hedges its early-cut risk.</FNItem>
+  <FNItem n="2">**Bergstra, J., & Bengio, Y.** (2012). "Random search for hyper-parameter optimization". *JMLR*, 13, 281-305. Random sampling of configurations, the base over which multi-fidelity scheduling allocates budget.</FNItem>
+</Footnotes>

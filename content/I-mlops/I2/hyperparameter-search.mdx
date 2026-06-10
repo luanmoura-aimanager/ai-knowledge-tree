@@ -38,7 +38,7 @@ that does not matter.
 
 Real hyperparameter landscapes have **low effective dimensionality**: out of many
 knobs, only a few strongly move the score. Bergstra and Bengio's 2012 result
-follows directly. **Random search** draws each of the $N$ configurations
+follows directly<FN n="1" />. **Random search** draws each of the $N$ configurations
 independently and uniformly from the search space. Project those $N$ points onto
 any single axis and you get $N$ *distinct* values of that hyperparameter, not
 $\sqrt{N}$ as a square grid gives, not $N^{1/d}$ as a $d$-dimensional grid gives.
@@ -48,8 +48,8 @@ different settings while a grid tries only $N^{1/d}$. The same budget buys far
 finer coverage of the dimensions that count, because random search never wastes
 resolution coordinating values across axes. The more irrelevant knobs there are,
 the bigger the gap, which is why random search is the standard baseline and the
-starting point for the smarter [Bayesian methods](A/bayesian-optimization) that
-spend the budget adaptively.
+starting point for the smarter [Bayesian methods](A/bayesian-optimization) and
+bandit-based schedulers that spend the budget adaptively<FN n="2" />.
 
 ![Random search beats grid search when only a few hyperparameters matter: a grid wastes trials on a coarse lattice (only 5 distinct values per axis), while random sampling tries a new value of the important parameter on every trial.](/figures/I2/hyperparameter-search.svg)
 
@@ -93,3 +93,8 @@ and never gets close to the peak at $0.3$, while random search, sampling nine
 distinct values of it, lands nearer on average. The next lesson stops paying for
 *full* runs at all: [multi-fidelity HPO](multi-fidelity-hpo) kills bad
 configurations early and reallocates their budget to the survivors.
+
+<Footnotes>
+  <FNItem n="1">**Bergstra, J., & Bengio, Y.** (2012). "Random search for hyper-parameter optimization". *JMLR*, 13, 281-305.</FNItem>
+  <FNItem n="2">**Li, L., Jamieson, K., DeSalvo, G., Rostamizadeh, A., & Talwalkar, A.** (2017). "Hyperband: a novel bandit-based approach to hyperparameter optimization". *JMLR*, 18, 1-52. [arXiv:1603.06560](https://arxiv.org/abs/1603.06560)</FNItem>
+</Footnotes>

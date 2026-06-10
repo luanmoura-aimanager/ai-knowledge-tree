@@ -73,7 +73,7 @@ $Km$ examples instead of $m$, so the gradient is averaged over $K$ times as many
 samples and its estimate of the true gradient has lower variance. To keep the size
 of each parameter step comparable, the **linear scaling rule** multiplies the
 learning rate by $K$ when the batch grows by $K$ (with a short warmup to stay
-stable early). The intuition: a $K\times$ larger, less noisy gradient can safely be
+stable early)<FN n="1" />. The intuition: a $K\times$ larger, less noisy gradient can safely be
 trusted with a $K\times$ larger step.
 
 ```mermaid
@@ -128,4 +128,9 @@ gradient to machine precision, which is the whole correctness argument, and the
 learning rate scales by the worker count to match the larger batch. Data
 parallelism replicates the model on every worker, so it breaks down once the model
 itself no longer fits in one device's memory, the constraint the next lesson
-attacks with [sharding](memory-and-sharding).
+attacks with [sharding](memory-and-sharding)<FN n="2" />.
+
+<Footnotes>
+  <FNItem n="1">**Goyal, P., et al.** (2017). "Accurate, large minibatch SGD: training ImageNet in 1 hour". [arXiv:1706.02677](https://arxiv.org/abs/1706.02677) The linear learning-rate scaling rule and gradual warmup for large synchronized batches.</FNItem>
+  <FNItem n="2">**Rajbhandari, S., Rasley, J., Ruwase, O., & He, Y.** (2020). "ZeRO: memory optimizations toward training trillion parameter models". *SC*. [arXiv:1910.02054](https://arxiv.org/abs/1910.02054) Data parallelism as the replicated-state baseline that sharding later removes.</FNItem>
+</Footnotes>
