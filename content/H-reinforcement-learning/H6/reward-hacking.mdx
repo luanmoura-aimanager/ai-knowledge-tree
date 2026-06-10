@@ -14,7 +14,7 @@ model approximating human preference, or a verifier checking a narrow notion of
 correctness. The policy optimizer does not know it is a proxy; it pushes the reward
 as high as possible. Past a point, that makes the true objective *worse*. This is
 the central safety failure of RL-tuned models, and it has a precise, measurable
-shape.
+shape<FN n="1" />.
 
 ## Goodhart's law
 
@@ -22,7 +22,7 @@ shape.
 $\hat{r}$ correlates with the true objective $r^*$ over the distribution where it was
 fit. An optimizer searches for the highest $\hat{r}$, which drives the policy off
 that distribution into regions where $\hat{r}$ and $r^*$ **decouple**: the proxy is
-high because of its errors, not because the behavior is actually good. The policy
+high because of its errors, not because the behavior is actually good<FN n="2" />. The policy
 has found a hole in the [reward model](E4/reward-modeling). Concretely, a model
 might learn to produce confident, sycophantic, or verbose text that the reward model
 scores highly while humans do not, or code that passes the specific tests while
@@ -43,7 +43,7 @@ a concave curve peaking at $d^* = \alpha / 2\beta$ and declining after. The
 proxy reward, by contrast, increases monotonically in $d$. The gap between the two
 curves is the **overoptimization**: every step past the peak buys more proxy reward
 and less of what was wanted. Larger reward models push the peak further out (they
-have fewer exploitable holes), but the qualitative shape is universal.
+have fewer exploitable holes), but the qualitative shape is universal<FN n="3" />.
 
 ## Mitigations
 
@@ -61,7 +61,7 @@ Three levers control overoptimization, all seen earlier in this subsection:
   narrow verifiers can still be gamed: passing tests is not the same as being
   correct).
 
-![Reward hacking is Goodhart's law: optimizing a proxy reward improves the true objective at first, but past a point the policy exploits the proxy–goal gap — the proxy keeps rising while the true reward collapses.](/figures/H6/reward-hacking.svg)
+![Reward hacking is Goodhart's law: optimizing a proxy reward improves the true objective at first, but past a point the policy exploits the proxy-goal gap: the proxy keeps rising while the true reward collapses.](/figures/H6/reward-hacking.svg)
 
 ## Worked check: the proxy rises while the true reward peaks and falls
 
@@ -103,3 +103,10 @@ This closes pillar H. From the Bellman equation through deep, model-based, and
 multi-agent RL to the reinforcement learning that aligns and sharpens language
 models, the through-line is one idea: act to maximize long-run reward, learned from
 interaction, and guard against the ways that signal can mislead.
+
+<Footnotes>
+  <FNItem n="1">**Amodei, D., Olah, C., Steinhardt, J., Christiano, P., Schulman, J., & Mané, D.** (2016). "Concrete problems in AI safety". [arXiv:1606.06565](https://arxiv.org/abs/1606.06565). Frames reward hacking as a core safety failure mode of reward-driven agents.</FNItem>
+  <FNItem n="2">**Skalse, J., Howe, N. H. R., Krasheninnikov, D., & Krueger, D.** (2022). "Defining and characterizing reward hacking". *NeurIPS*. [arXiv:2209.13085](https://arxiv.org/abs/2209.13085). A formal account of when a proxy reward is hackable and how it decouples from the true objective.</FNItem>
+  <FNItem n="3">**Gao, L., Schulman, J., & Hilton, J.** (2023). "Scaling laws for reward model overoptimization". *ICML*. [arXiv:2210.10760](https://arxiv.org/abs/2210.10760). Measures the gold-reward turnover against $\sqrt{\mathrm{KL}}$ and how reward-model size shifts the peak.</FNItem>
+</Footnotes>
+

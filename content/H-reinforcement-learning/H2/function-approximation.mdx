@@ -33,7 +33,7 @@ $y = r + \gamma V_w(S')$ and prediction $V_w(S)$, the per-step objective is
 $\tfrac12 (y - V_w(S))^2$. The honest gradient would differentiate both
 appearances of $w$, but the target $y$ is treated as a fixed regression label, not
 a function of $w$. Differentiating only the prediction gives the **semi-gradient**
-update:
+update<FN n="1" />:
 
 $$
 w \leftarrow w + \alpha\,\big(r + \gamma V_w(S') - V_w(S)\big)\,\nabla_w V_w(S).
@@ -49,7 +49,7 @@ is what deep Q-learning will optimize next lesson.
 ## The deadly triad
 
 Tabular TD always converges; semi-gradient TD with approximation does not, in
-general. Divergence requires three ingredients together, the **deadly triad**:
+general. Divergence requires three ingredients together, the **deadly triad**<FN n="1" />:
 
 1. **Function approximation**: $V_w$ ties states together, so an update at one
    state moves the value at others.
@@ -77,7 +77,7 @@ With $\gamma = 0.99$ the factor $2\gamma - 1 = 0.98$ is positive, so each update
 *multiplies* $w$ by a number above $1$ and the weight explodes, even though the
 true value of both states is zero. That is the triad in three lines.
 
-![When states are too many to tabulate, RL fits a parametric value function that generalizes across states — so a few sampled states pin down the value everywhere, including states never visited.](/figures/H2/function-approximation.svg)
+![When states are too many to tabulate, RL fits a parametric value function that generalizes across states, so a few sampled states pin down the value everywhere, including states never visited.](/figures/H2/function-approximation.svg)
 
 ## Worked check: divergence under the triad, stability without it
 
@@ -119,3 +119,7 @@ The next lesson tames exactly this instability for neural networks: deep
 Q-networks add experience replay and a target network, two tricks that
 re-engineer the bootstrap target so off-policy deep value learning becomes stable
 in practice.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Semi-gradient methods and the deadly triad (Ch. 9, 11).</FNItem>
+</Footnotes>

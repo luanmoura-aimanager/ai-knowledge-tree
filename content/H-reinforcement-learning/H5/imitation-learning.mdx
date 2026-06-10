@@ -11,7 +11,7 @@ prerequisites: ["H2/policy-gradient"]
 
 Designing a reward function is hard, and sometimes an expert can simply demonstrate
 the task: a human driving, a teleoperated robot. **Imitation learning** turns those
-demonstrations into a policy. The naive version is just supervised learning, and it
+demonstrations into a policy<FN n="1" />. The naive version is just supervised learning, and it
 fails in a way that is specific to the sequential setting and worth understanding
 precisely, because the fix is a small, clever change.
 
@@ -44,13 +44,13 @@ cloned policy has per-state error rate $\epsilon$ on its training distribution, 
 classification model over $T$ independent inputs would make about $\epsilon T$
 mistakes, linear in $T$. But in the sequential setting, a single mistake throws the
 agent into off-distribution states for the rest of the episode, so the expected
-number of mistakes grows like $\epsilon T^2$, **quadratic** in the horizon. Long
+number of mistakes grows like $\epsilon T^2$, **quadratic** in the horizon<FN n="2" />. Long
 tasks amplify small cloning errors dramatically.
 
 ## DAgger: label the learner's own states
 
 The fix addresses the shift directly: train on the states the learner actually
-visits, not just the expert's. **DAgger** (Dataset Aggregation) does this in a loop:
+visits, not just the expert's. **DAgger** (Dataset Aggregation) does this in a loop<FN n="2" />:
 
 1. Train a policy $\pi$ on the current dataset (start from the expert demos).
 2. Run $\pi$ in the environment to collect the states *it* visits.
@@ -114,3 +114,8 @@ that relabeling the learner's own states removes.
 Imitation learning copies the expert's actions. A deeper goal is to recover *why*
 the expert acts as it does, the reward function behind the behavior. The next lesson
 does that with inverse reinforcement learning.
+
+<Footnotes>
+  <FNItem n="1">**Ho, J., & Ermon, S.** (2016). "Generative adversarial imitation learning (GAIL)". *NeurIPS*. [arXiv:1606.03476](https://arxiv.org/abs/1606.03476). Surveys the imitation-learning setting and the limits of behavioral cloning.</FNItem>
+  <FNItem n="2">**Ross, S., Gordon, G., & Bagnell, D.** (2011). "A reduction of imitation learning and structured prediction to no-regret online learning (DAgger)". *AISTATS*. [arXiv:1011.0686](https://arxiv.org/abs/1011.0686). Proves the quadratic cloning bound and the DAgger correction.</FNItem>
+</Footnotes>

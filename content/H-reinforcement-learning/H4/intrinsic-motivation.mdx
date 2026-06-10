@@ -33,11 +33,11 @@ states intrinsically valuable. Two principled ways to define "novel":
   $r^i(s) = 1/\sqrt{N(s)}$ (with $N(s)$ the visit count) is the tabular form,
   directly echoing the UCB confidence bonus $\sqrt{\ln t / n_a}$ from the last
   lesson. In large or continuous state spaces exact counts are unavailable, so
-  pseudo-counts or the methods below approximate them.
+  pseudo-counts or the methods below approximate them<FN n="1" />.
 - **Prediction-error.** Train a model to predict something about the next state; the
   bonus is the model's error. States the agent understands well are predicted
   accurately (low bonus); novel states surprise the model (high bonus). Curiosity
-  methods use a learned forward dynamics model for this.
+  methods use a learned forward dynamics model for this<FN n="2" />.
 
 The hazard for forward-dynamics curiosity is the **noisy-TV problem**: inherently
 unpredictable transitions (a screen of static, a random number generator) keep
@@ -65,7 +65,7 @@ fails to match the random target and the error is large. Because the target is a
 deterministic function of the state, environment stochasticity does not inflate the
 bonus: revisiting the same novel state repeatedly drives its error down, which is
 exactly what the noisy-TV problem broke. RND is what let agents finally explore
-Montezuma's Revenge.
+Montezuma's Revenge<FN n="3" />.
 
 ![Intrinsic motivation rewards novelty: a curiosity bonus is large for rarely-visited states and decays as a state is seen more often, drawing the agent toward unexplored regions even without external reward.](/figures/H4/intrinsic-motivation.svg)
 
@@ -112,3 +112,9 @@ This closes the exploration subsection. The next subsection broadens the problem
 itself: learning when the reward is not given at all but must be inferred from
 demonstrations, and other settings beyond the standard RL loop, beginning with
 imitation learning.
+
+<Footnotes>
+  <FNItem n="1">**Bellemare, M. G., et al.** (2016). "Unifying count-based exploration and intrinsic motivation". *NeurIPS*. [arXiv:1606.01868](https://arxiv.org/abs/1606.01868) Derives pseudo-counts from a density model and connects them to the count-based bonus.</FNItem>
+  <FNItem n="2">**Pathak, D., Agrawal, P., Efros, A. A., & Darrell, T.** (2017). "Curiosity-driven exploration by self-supervised prediction". *ICML*. [arXiv:1705.05363](https://arxiv.org/abs/1705.05363) The ICM forward-dynamics prediction-error bonus.</FNItem>
+  <FNItem n="3">**Burda, Y., Edwards, H., Storkey, A., & Klimov, O.** (2019). "Exploration by random network distillation". *ICLR*. [arXiv:1810.12894](https://arxiv.org/abs/1810.12894) Introduces RND and its result on Montezuma's Revenge.</FNItem>
+</Footnotes>

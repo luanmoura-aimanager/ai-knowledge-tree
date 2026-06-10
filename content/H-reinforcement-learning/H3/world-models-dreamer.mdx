@@ -13,7 +13,7 @@ MuZero plans with an explicit tree search at decision time. A different model-ba
 strategy learns a **generative** model of the world, then trains a policy by
 *dreaming*: rolling the model forward in imagination and optimizing the policy on
 those synthetic trajectories, never touching the real environment during policy
-learning. This is the World Models / **Dreamer** line, and its defining trick is
+learning. This is the World Models<FN n="1" /> / **Dreamer**<FN n="2" /> line, and its defining trick is
 that the model is differentiable, so returns can be backpropagated straight into
 the policy.
 
@@ -42,7 +42,7 @@ every step of the rollout, the dynamics, the reward head, and the policy, is
 differentiable, the discounted imagined return is a differentiable function of the
 policy parameters. Dreamer optimizes the policy by **backpropagating the return
 through the rollout** (an analytic policy gradient), rather than by the
-score-function estimator REINFORCE uses. Gradients that flow through the dynamics
+score-function estimator REINFORCE uses<FN n="2" />. Gradients that flow through the dynamics
 carry much more information per sample than reward-weighted log-probabilities, so
 learning is dramatically more sample-efficient.
 
@@ -125,3 +125,8 @@ controlling a system it learned about purely by differentiating through a model.
 This closes model-based RL. The next subsection steps back to a problem every
 method so far has assumed away: how an agent should explore, starting from the
 clean setting of the multi-armed bandit.
+
+<Footnotes>
+  <FNItem n="1">**Ha, D., & Schmidhuber, J.** (2018). "World models". *NeurIPS*. [arXiv:1803.10122](https://arxiv.org/abs/1803.10122). Compresses pixels to a latent and trains a controller inside the learned dynamics.</FNItem>
+  <FNItem n="2">**Hafner, D., Lillicrap, T., Ba, J., & Norouzi, M.** (2020). "Dream to control: learning behaviors by latent imagination (Dreamer)". *ICLR*. [arXiv:1912.01603](https://arxiv.org/abs/1912.01603). Backpropagates imagined returns through a differentiable latent model.</FNItem>
+</Footnotes>

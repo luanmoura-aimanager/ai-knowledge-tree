@@ -14,7 +14,7 @@ expectation over an infinite future, which is not something you can compute
 directly. The way out is the one structural fact from the last lesson: the return
 unrolls one step, $G_t = r_{t+1} + \gamma G_{t+1}$. Pushing that recursion through
 the expectation turns an infinite sum into a finite equation relating each
-state's value to its neighbors. That equation is named after Richard Bellman.
+state's value to its neighbors. That equation is named after Richard Bellman<FN n="1" />.
 
 ## The Bellman expectation equation for $V^\pi$
 
@@ -95,7 +95,7 @@ $$
 An optimal policy never gains from randomizing: in each state it can put all its
 mass on an action of maximal $Q^*$. Replacing the policy-average
 $\sum_a \pi(a\mid s)(\cdot)$ in the expectation equation with a maximum over
-actions gives the **Bellman optimality equations**:
+actions gives the **Bellman optimality equations**<FN n="2" />:
 
 $$
 V^*(s) = \max_a \left[ R(s,a) + \gamma \sum_{s'} P(s' \mid s,a)\, V^*(s') \right],
@@ -160,3 +160,8 @@ expectation equation is an identity satisfied by $V^\pi$ and by nothing else.
 With the equations in hand, the next lesson turns them into algorithms: policy
 iteration and value iteration, each a contraction that converges to the optimal
 value function.
+
+<Footnotes>
+  <FNItem n="1">**Bellman, R.** (1957). *Dynamic Programming.* Princeton University Press. Introduces the principle of optimality and the recursive value equations that bear his name.</FNItem>
+  <FNItem n="2">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Chapters 3 and 4 develop the Bellman expectation and optimality equations.</FNItem>
+</Footnotes>

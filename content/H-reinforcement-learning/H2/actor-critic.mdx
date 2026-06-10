@@ -14,7 +14,7 @@ but high variance and needs the episode to finish. The previous lesson showed th
 subtracting a baseline helps, and that the best baseline is the state value
 $V(s)$. **Actor-critic** methods take that idea to its conclusion: learn $V$ with a
 second network and use it both to center the return and to bootstrap it. The result
-is the standard policy-gradient template behind A2C, A3C, and PPO.
+is the standard policy-gradient template behind A2C, A3C, and PPO<FN n="2" />.
 
 ## Two networks: actor and critic
 
@@ -48,7 +48,7 @@ $$
 $$
 
 The same TD error $\delta_t$ drives both: it tells the critic how to correct its
-value estimate and tells the actor which way to shift its action probabilities.
+value estimate and tells the actor which way to shift its action probabilities<FN ns="1, 2" />.
 
 ## The bias-variance dial, again
 
@@ -135,3 +135,8 @@ Actor-critic with GAE gives a low-variance gradient, but nothing stops a single
 update from changing the policy so much that performance collapses. The next lesson
 constrains the step size: trust-region methods and PPO keep each policy update
 close to the last.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Actor-critic methods (Ch. 13).</FNItem>
+  <FNItem n="2">**Mnih, V., et al.** (2016). "Asynchronous methods for deep reinforcement learning". *ICML*. Introduces A3C, the deep advantage actor-critic. [arXiv:1602.01783](https://arxiv.org/abs/1602.01783)</FNItem>
+</Footnotes>

@@ -13,7 +13,7 @@ Behavioral cloning copies *what* the expert does. **Inverse reinforcement learni
 (IRL) recovers *why*: the reward function the expert is optimizing. A reward
 generalizes far better than a copied policy, because it explains behavior in new
 states the demonstrations never visited. The catch is that the problem is badly
-underdetermined, and resolving that ambiguity is the whole technical content.
+underdetermined, and resolving that ambiguity is the whole technical content<FN n="1" />.
 
 ## The reward-ambiguity problem
 
@@ -55,7 +55,7 @@ feature-matching structure is the same in every case.
 Recovering a reward and then running RL on it is a slow two-step loop. **Generative
 adversarial imitation learning** (GAIL) collapses it. The state-action distribution
 a policy induces is its **occupancy measure**; imitation succeeds exactly when the
-learner's occupancy matches the expert's. GAIL drives that match with a GAN:
+learner's occupancy matches the expert's. GAIL drives that match with a GAN<FN n="2" />:
 
 - A **discriminator** $D$ is trained to tell expert state-action pairs from the
   learner's, outputting the probability that a pair came from the expert.
@@ -115,3 +115,8 @@ alone, the maximum-entropy resolution of the reward ambiguity.
 Imitation and IRL both assume an interactive environment or an online expert.
 Often neither is available: there is only a fixed, logged dataset and no way to
 collect more. The next lesson tackles that offline setting.
+
+<Footnotes>
+  <FNItem n="1">**Ng, A. Y., & Russell, S.** (2000). "Algorithms for inverse reinforcement learning". *ICML*. Formalizes IRL and the reward-ambiguity problem.</FNItem>
+  <FNItem n="2">**Ho, J., & Ermon, S.** (2016). "Generative adversarial imitation learning (GAIL)". *NeurIPS*. [arXiv:1606.03476](https://arxiv.org/abs/1606.03476). Matches occupancy measures with a GAN-style discriminator.</FNItem>
+</Footnotes>

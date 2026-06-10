@@ -14,7 +14,7 @@ Real steps are expensive (a robot moving, a game played), so squeezing more
 learning out of each is valuable. If the agent also builds a **model** of the
 environment, it can replay remembered transitions in its head, doing many extra
 value updates between real steps. **Dyna-Q** is the minimal architecture that does
-this, and it makes the model-based versus model-free split concrete.
+this, and it makes the model-based versus model-free split concrete<FN ns="1, 2" />.
 
 ## Learning a model from experience
 
@@ -37,7 +37,7 @@ The key realization is that a Q-learning update does not care whether its
 transition $(s, a, r, s')$ came from the real environment or from the model. Both
 produce the same kind of TD update. **Planning** in Dyna-Q is exactly this: sample
 a previously observed $(s, a)$, query the model for its $(r, s')$, and apply a
-standard Q-learning update as if the transition had just happened.
+standard Q-learning update as if the transition had just happened<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -124,3 +124,8 @@ Dyna-Q plans by replaying one-step model lookups. When the model is a perfect
 simulator and the action space is large, a smarter use of the model is to search
 forward through it. The next lesson does that with Monte Carlo tree search and the
 self-play loop of AlphaZero.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Chapter 8 develops Dyna and the unification of planning and learning.</FNItem>
+  <FNItem n="2">**Sutton, R. S.** (1990). "Integrated architectures for learning, planning, and reacting based on approximating dynamic programming (Dyna)". *ICML*. The original Dyna architecture.</FNItem>
+</Footnotes>

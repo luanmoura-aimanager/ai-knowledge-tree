@@ -13,7 +13,7 @@ Monte Carlo waits until an episode ends to learn anything, because it needs the
 full return $G_t$. Dynamic programming updates every step but needs the model to
 compute the expectation. **Temporal-difference** (TD) learning combines the best
 of each: it updates every step, like DP, but from sampled experience, like Monte
-Carlo. It is the central idea of modern reinforcement learning.
+Carlo. It is the central idea of modern reinforcement learning<FN n="1" />.
 
 ## The bootstrap: estimate from an estimate
 
@@ -60,7 +60,7 @@ noisy sample of how far the current estimate sits from satisfying the Bellman
 equation, and the running average implied by repeated small $\alpha$ steps drives
 the residual to zero. Under the usual Robbins-Monro conditions on $\alpha$
 ($\sum \alpha = \infty$, $\sum \alpha^2 < \infty$), TD(0) converges to $V^\pi$ for
-a fixed policy.
+a fixed policy<FN n="2" />.
 
 ## TD as sampled dynamic programming
 
@@ -151,3 +151,8 @@ return.
 TD(0) as written evaluates a *fixed* policy. The next lesson turns it into control
 by learning action-values: Q-learning and SARSA bootstrap the same way but over
 state-action pairs, and choose how to handle the action in the target.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S.** (1988). "Learning to predict by the methods of temporal differences". *Machine Learning*, 3(1), 9-44. [doi:10.1007/BF00115009](https://doi.org/10.1007/BF00115009)</FNItem>
+  <FNItem n="2">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Chapter 6 derives TD(0), the bias-variance comparison with Monte Carlo, and its convergence.</FNItem>
+</Footnotes>
