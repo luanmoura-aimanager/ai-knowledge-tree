@@ -13,7 +13,7 @@ Conjugate gradient relies on $A$ being symmetric positive definite. **GMRES**
 (Generalized Minimal Residual) drops both assumptions: it works for any invertible
 $A$. The price is that GMRES has to store the full basis of the Krylov subspace,
 giving a $O(km)$ memory cost at iteration $k$ for an $m$-dimensional problem, which is
-why it is restarted in practice.
+why it is restarted in practice<FN n="1" />.
 
 ## Krylov subspaces
 
@@ -61,7 +61,7 @@ $$
 where $\beta = \lVert r_0\rVert$ and the last step uses that $Q_{k+1}$ has
 orthonormal columns. The big residual minimization becomes a small
 $(k+1) \times k$ **least-squares problem** in $y$, solved by Givens rotations applied
-to $\tilde H_k$.
+to $\tilde H_k$<FN n="2" />.
 
 ## Memory and restarting
 
@@ -71,7 +71,7 @@ work. For large $k$ this is prohibitive, so practical implementations use
 Restarting trades a bounded memory cost for the loss of strict residual monotonicity
 across restart boundaries, and sometimes for slower convergence. Preconditioning is
 even more important for GMRES than for CG, because reducing $k$ reduces both work and
-memory.
+memory<FN n="3" />.
 
 ![GMRES minimizes the residual over a growing Krylov subspace, so its residual norm decreases monotonically until the nonsymmetric system is solved.](/figures/A4/gmres.svg)
 
@@ -126,3 +126,9 @@ print(f"residual monotone decrease: {all(residuals[i] >= residuals[i+1] for i in
 GMRES drives the residual down monotonically and converges in well under the
 ambient dimension. The final A4 lesson turns from algorithms to the precision they
 run in: mixed-precision arithmetic.
+
+<Footnotes>
+  <FNItem n="1">**Saad, Y., & Schultz, M. H.** (1986). "GMRES: A generalized minimal residual algorithm for solving nonsymmetric linear systems". *SIAM Journal on Scientific and Statistical Computing*, 7(3), 856-869. The original GMRES and restarting ([doi:10.1137/0907058](https://doi.org/10.1137/0907058)).</FNItem>
+  <FNItem n="2">**Trefethen, L. N., & Bau, D.** (1997). *Numerical Linear Algebra.* SIAM. Arnoldi, GMRES, and the least-squares formulation (Lectures 33-35).</FNItem>
+  <FNItem n="3">**Saad, Y.** (2003). *Iterative Methods for Sparse Linear Systems* (2nd ed.). SIAM. Krylov methods for nonsymmetric systems and preconditioning ([doi:10.1137/1.9780898718003](https://doi.org/10.1137/1.9780898718003)).</FNItem>
+</Footnotes>

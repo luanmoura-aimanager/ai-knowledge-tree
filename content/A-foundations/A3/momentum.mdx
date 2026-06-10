@@ -22,7 +22,7 @@ past gradients with a decay $\beta \in [0, 1)$:
 
 $$
 v_{t+1} = \beta v_t + \nabla f(x_t), \qquad x_{t+1} = x_t - \eta\, v_{t+1}.
-$$
+$$<FN n="1" />
 
 The velocity is an exponentially weighted sum of gradients:
 $v_{t+1} = \sum_{k=0}^{t}\beta^{t-k}\nabla f(x_k)$. A heavy ball rolling downhill keeps
@@ -64,9 +64,9 @@ $$
 needing only $O(\sqrt\kappa\log\frac{1}{\varepsilon})$ iterations. The dependence on
 the condition number drops from $\kappa$ to $\sqrt\kappa$, a large gain on
 ill-conditioned problems. This $\sqrt\kappa$ rate is **optimal** among methods that
-only use gradients: no first-order method can do better in the worst case.
+only use gradients: no first-order method can do better in the worst case<FN n="2" />.
 
-![On an ill-conditioned quadratic (κ = 100), Nesterov momentum drives the gap to the optimum down far faster than plain gradient descent — the √κ acceleration of the convergence rate.](/figures/A3/momentum.svg)
+![On an ill-conditioned quadratic (κ = 100), Nesterov momentum drives the gap to the optimum down far faster than plain gradient descent: the √κ acceleration of the convergence rate.](/figures/A3/momentum.svg)
 
 ## Check it on arrays
 
@@ -109,3 +109,8 @@ print("sqrt(kappa) =", round(np.sqrt(kappa), 1), " kappa =", kappa)
 Nesterov reaches the tolerance in far fewer steps than plain gradient descent, with
 the gap closing on the $\sqrt\kappa$ timescale rather than $\kappa$. The next lesson
 makes the step size adapt per coordinate, the idea behind Adam.
+
+<Footnotes>
+  <FNItem n="1">**Polyak, B. T.** (1964). "Some methods of speeding up the convergence of iteration methods". *USSR Computational Mathematics and Mathematical Physics*, 4(5), 1-17. The heavy-ball momentum method.</FNItem>
+  <FNItem n="2">**Nesterov, Y.** (2018). *Lectures on Convex Optimization* (2nd ed.), §2.2. Springer. The accelerated gradient method and the optimal $\sqrt\kappa$ first-order rate.</FNItem>
+</Footnotes>

@@ -11,7 +11,7 @@ prerequisites: ["floating-point"]
 
 The single most common way naive numerical code goes silently wrong is **catastrophic
 cancellation**: subtracting two nearly-equal floating-point numbers and losing most of
-the significant digits. The arithmetic operation is exact in IEEE-754, but the *input
+the significant digits<FN n="1" />. The arithmetic operation is exact in IEEE-754, but the *input
 error* gets amplified by the magnitude of the operands divided by the magnitude of
 the result.
 
@@ -60,7 +60,7 @@ Adding many positive numbers does not cancel, but adding numbers of *mixed sign*
 Computing a mean $\frac{1}{n}\sum (x_i - \mu)$ where $\mu = \frac{1}{n}\sum x_i$ is
 near zero by construction is a textbook case: the running sum is much larger than the
 final value. **Compensated summation** (Kahan summation) keeps a separate running
-error term and corrects it each step, recovering most of the lost precision.
+error term and corrects it each step, recovering most of the lost precision<FN n="2" />.
 
 ![Subtracting nearly-equal numbers destroys significant digits: 1 − cos(x) loses accuracy as x → 0, while the equivalent 2 sin²(x/2) stays exact.](/figures/A4/catastrophic-cancellation.svg)
 
@@ -103,3 +103,8 @@ The naive quadratic formula loses ~7 digits on the cancelling root; the half-ang
 identity preserves precision while $1 - \cos$ collapses to zero; and shifting the
 bulk out of the data restores significance. The next lesson tackles the most common
 cancellation problem in machine learning: exponentials in softmax.
+
+<Footnotes>
+  <FNItem n="1">**Higham, N. J.** (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. Cancellation and its repair by reformulation ([doi:10.1137/1.9780898718027](https://doi.org/10.1137/1.9780898718027)).</FNItem>
+  <FNItem n="2">**Goldberg, D.** (1991). "What every computer scientist should know about floating-point arithmetic". *ACM Computing Surveys*, 23(1), 5-48. Discusses cancellation and Kahan compensated summation ([doi:10.1145/103162.103163](https://doi.org/10.1145/103162.103163)).</FNItem>
+</Footnotes>

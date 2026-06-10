@@ -11,7 +11,7 @@ prerequisites: ["common-distributions"]
 
 Distributions come with parameters: the rate of a Poisson, the mean of a Gaussian.
 Given data and a chosen distribution family, **maximum likelihood** picks the
-parameter that makes the observed data as probable as possible. It is the default
+parameter that makes the observed data as probable as possible<FN n="1" />. It is the default
 estimator behind logistic regression, Gaussian fits, and the cross-entropy loss of
 classification.
 
@@ -19,7 +19,7 @@ classification.
 
 Suppose the data $x_1, \dots, x_n$ are i.i.d. from a distribution with PMF or PDF
 $p(x \mid \theta)$. The **likelihood** is the probability of the data viewed as a
-function of the parameter:
+function of the parameter<FN n="2" />:
 
 $$
 L(\theta) = \prod_{i=1}^n p(x_i \mid \theta).
@@ -117,3 +117,8 @@ print("grid argmax:", round(grid[np.argmax(ll)], 4))
 The closed-form Gaussian and Poisson estimators recover the true parameters, and the
 grid search confirms the Poisson MLE is the sample mean. The next lesson adds a prior
 on top of the likelihood, turning estimation into Bayesian inference.
+
+<Footnotes>
+  <FNItem n="1">**Casella, G., & Berger, R. L.** (2002). *Statistical Inference* (2nd ed.). Duxbury. §7.2, maximum likelihood estimators and their derivation.</FNItem>
+  <FNItem n="2">**Wasserman, L.** (2004). *All of Statistics.* Springer. Ch. 9, the likelihood function and MLE. [doi:10.1007/978-0-387-21736-9](https://doi.org/10.1007/978-0-387-21736-9)</FNItem>
+</Footnotes>

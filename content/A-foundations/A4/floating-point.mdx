@@ -12,7 +12,7 @@ prerequisites: []
 Every real number a computer manipulates is an approximation. Understanding *which*
 approximation, and how big the error is, is what separates code that quietly produces
 wrong answers from code that does not. Floating point follows a strict standard
-(IEEE-754) with an exactly characterized error floor: machine epsilon.
+(IEEE-754) with an exactly characterized error floor: machine epsilon<FN ns="1, 2" />.
 
 ## The representation
 
@@ -60,7 +60,7 @@ uncertainty of order $10^4$ even in double precision.
 
 A single arithmetic operation in IEEE-754 returns the exact result rounded to the
 nearest representable float. Each `+`, `*`, `/` introduces relative error of size at
-most $\varepsilon_{\text{machine}}/2$. Algorithms with many operations can accumulate
+most $\varepsilon_{\text{machine}}/2$<FN n="3" />. Algorithms with many operations can accumulate
 these errors; the next lesson on conditioning and stability formalizes how much.
 
 Two specific phenomena dominate practical problems:
@@ -107,3 +107,9 @@ Machine epsilon defines the relative precision floor, the spacing doubles every 
 of two, overflow and underflow happen at predictable thresholds, and addition is not
 even associative. With this representation in hand, the next lesson asks: when does
 rounding error matter, and when does it explode?
+
+<Footnotes>
+  <FNItem n="1">**IEEE.** (2019). *IEEE Standard for Floating-Point Arithmetic (IEEE 754-2019).* The normative definition of the formats, rounding, and special values ([doi:10.1109/IEEESTD.2019.8766229](https://doi.org/10.1109/IEEESTD.2019.8766229)).</FNItem>
+  <FNItem n="2">**Goldberg, D.** (1991). "What every computer scientist should know about floating-point arithmetic". *ACM Computing Surveys*, 23(1), 5-48 ([doi:10.1145/103162.103163](https://doi.org/10.1145/103162.103163)).</FNItem>
+  <FNItem n="3">**Higham, N. J.** (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. The standard-model rounding bound on each operation ([doi:10.1137/1.9780898718027](https://doi.org/10.1137/1.9780898718027)).</FNItem>
+</Footnotes>

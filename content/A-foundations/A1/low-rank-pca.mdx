@@ -25,7 +25,7 @@ $$
 using only the $k$ largest singular values and their associated vectors.
 $A_k$ is a rank-$k$ matrix (a sum of $k$ rank-1 outer products).
 
-**Eckart–Young theorem.** Among all rank-$k$ matrices $B$,
+**Eckart–Young theorem.** Among all rank-$k$ matrices $B$<FN n="1" />,
 
 $$
 \lVert A - A_k\rVert_F \;\le\; \lVert A - B\rVert_F,
@@ -70,7 +70,7 @@ more components yields diminishing returns is the natural choice of rank.
 ## PCA as truncated SVD
 
 Given a data matrix $X \in \mathbb{R}^{n \times d}$ (rows = samples, columns =
-features), **principal component analysis (PCA)** proceeds:
+features), **principal component analysis (PCA)** proceeds<FN ns="2, 3" />:
 
 1. **Center:** subtract the column means, obtaining $\tilde{X}$ with mean zero.
 2. **Compute SVD:** $\tilde{X} = U\Sigma V^\top$.
@@ -87,7 +87,7 @@ The covariance matrix is $\frac{1}{n}\tilde{X}^\top\tilde{X} = \frac{1}{n}V\Sigm
 so the principal directions are the eigenvectors of the sample covariance and the
 principal variances are its eigenvalues.
 
-![Scree plot (left): the first three components capture nearly all the variance, so the rank-k reconstruction error (right) collapses at rank 3 — the knee that reveals the true rank.](/figures/A1/low-rank-pca.svg)
+![Scree plot (left): the first three components capture nearly all the variance, so the rank-k reconstruction error (right) collapses at rank 3, the knee that reveals the true rank.](/figures/A1/low-rank-pca.svg)
 
 ## Check it on arrays
 
@@ -128,3 +128,9 @@ The first three components capture most of the variance; the rank-3 approximatio
 has low relative error; and the PCA score variance matches the expected formula.
 With the best low-rank approximation understood, the next lesson looks at the
 factorizations that solve linear systems efficiently without forming inverses.
+
+<Footnotes>
+  <FNItem n="1">**Eckart, C., & Young, G.** (1936). "The approximation of one matrix by another of lower rank". *Psychometrika*, 1, 211-218. [doi:10.1007/BF02288367](https://doi.org/10.1007/BF02288367). The original optimality proof for the truncated SVD.</FNItem>
+  <FNItem n="2">**Jolliffe, I. T.** (2002). *Principal Component Analysis* (2nd ed.). Springer. The standard reference for PCA and the variance-maximization view.</FNItem>
+  <FNItem n="3">**Strang, G.** (2016). *Introduction to Linear Algebra* (5th ed.). Wellesley-Cambridge Press. PCA as the SVD of the centered data matrix.</FNItem>
+</Footnotes>

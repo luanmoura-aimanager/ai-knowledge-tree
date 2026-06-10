@@ -22,7 +22,7 @@ squared gradient. With $g_t = \nabla f(x_t)$ and elementwise operations:
 
 $$
 G_t = G_{t-1} + g_t^2, \qquad x_{t+1} = x_t - \frac{\eta}{\sqrt{G_t} + \epsilon}\,g_t.
-$$
+$$<FN n="1" />
 
 Coordinates with large or frequent gradients get a shrinking step; rarely updated
 coordinates keep a large one. The $\epsilon$ (a tiny constant like $10^{-8}$) prevents
@@ -67,14 +67,14 @@ few steps when $\beta_1^t$ is not yet negligible. The final update is
 
 $$
 x_{t+1} = x_t - \frac{\eta}{\sqrt{\hat v_t} + \epsilon}\, \hat m_t.
-$$
+$$<FN ns="2, 3" />
 
 **AdamW** decouples weight decay from the adaptive step, applying the L2 penalty
 directly to the weights ($x_{t+1} \mathrel{-}= \eta\lambda x_t$) rather than folding it
 into the gradient, which interacts badly with the $\sqrt{\hat v_t}$ rescaling. AdamW
 is the standard for training transformers.
 
-![On a badly-scaled quadratic, per-coordinate adaptive methods (AdaGrad, RMSProp, Adam) drive the loss down by many orders of magnitude while plain gradient descent — capped by the steepest direction — barely moves.](/figures/A3/adaptive-methods.svg)
+![On a badly-scaled quadratic, per-coordinate adaptive methods (AdaGrad, RMSProp, Adam) drive the loss down by many orders of magnitude while plain gradient descent, capped by the steepest direction, barely moves.](/figures/A3/adaptive-methods.svg)
 
 ## Check it on arrays
 
@@ -112,3 +112,9 @@ print("plain GD final f:", f"{plain_gd():.3e}")   # crawls on the flat coordinat
 Adam drives every coordinate down despite the 1000x curvature spread, while plain
 gradient descent, capped by the steepest coordinate, barely moves the flattest one.
 The next lesson turns from unconstrained methods to optimization under constraints.
+
+<Footnotes>
+  <FNItem n="1">**Duchi, J., Hazan, E., & Singer, Y.** (2011). "Adaptive subgradient methods for online learning and stochastic optimization (AdaGrad)". *JMLR*, 12, 2121-2159. The per-coordinate accumulated-gradient step size.</FNItem>
+  <FNItem n="2">**Kingma, D. P., & Ba, J.** (2015). "Adam: A method for stochastic optimization". *ICLR*. The first/second-moment update with bias correction ([arXiv:1412.6980](https://arxiv.org/abs/1412.6980)).</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, ch. 8. MIT Press. A comparative treatment of RMSProp, Adam, and related adaptive optimizers.</FNItem>
+</Footnotes>

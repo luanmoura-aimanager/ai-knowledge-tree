@@ -11,14 +11,14 @@ prerequisites: ["kl-cross-entropy"]
 
 Covariance measures linear co-movement and misses everything nonlinear. **Mutual
 information** measures dependence of any kind: it is zero exactly when two variables
-are independent, and it counts the bits one variable reveals about the other. It
+are independent, and it counts the bits one variable reveals about the other<FN ns="1, 2" />. It
 underlies feature selection, the information bottleneck, and representation-learning
 objectives.
 
 ## Definition
 
 The **mutual information** between $X$ and $Y$ is the KL divergence between their
-joint distribution and the product of their marginals:
+joint distribution and the product of their marginals<FN n="3" />:
 
 $$
 I(X; Y) = D_{\mathrm{KL}}\big(p_{X,Y} \,\|\, p_X\, p_Y\big) = \sum_{x, y} p(x, y)\log\frac{p(x, y)}{p(x)\,p(y)}.
@@ -114,3 +114,9 @@ print("Cov(X, X^2):", round(cov, 4), " but MI:", round(mutual_info(joint), 4), "
 Independent variables score zero, $Y = X$ scores the full entropy, and the
 nonlinear $Y = X^2$ has zero covariance yet clearly positive mutual information.
 The next lesson moves from static dependence to dependence over time: Markov chains.
+
+<Footnotes>
+  <FNItem n="1">**Shannon, C. E.** (1948). "A mathematical theory of communication". *Bell System Technical Journal*, 27, 379-423. The origin of mutual information as the rate of information transmission. [doi:10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x)</FNItem>
+  <FNItem n="2">**MacKay, D. J. C.** (2003). *Information Theory, Inference, and Learning Algorithms.* Cambridge University Press. §8.1, mutual information and dependence.</FNItem>
+  <FNItem n="3">**Cover, T. M., & Thomas, J. A.** (2006). *Elements of Information Theory* (2nd ed.). Wiley. §2.4, mutual information as relative entropy between joint and product marginals. [doi:10.1002/047174882X](https://doi.org/10.1002/047174882X)</FNItem>
+</Footnotes>

@@ -12,7 +12,7 @@ prerequisites: ["iterative-methods", "A1/quadratic-forms"]
 For a large symmetric positive-definite system $Ax = b$, direct factorization costs
 $O(n^3)$ and stores a dense factor. **Conjugate gradient (CG)** solves it iteratively
 using only matrix-vector products, finishing in at most $n$ steps in exact arithmetic
-and far fewer in practice. It is the workhorse for sparse SPD systems and the
+and far fewer in practice<FN n="1" />. It is the workhorse for sparse SPD systems and the
 template for Krylov methods.
 
 ## CG as minimizing a quadratic
@@ -61,7 +61,7 @@ $A$ scales with the number of nonzeros.
 The space spanned by $\{r_0, A r_0, A^2 r_0, \dots, A^{k-1} r_0\}$ is the **Krylov
 subspace** $\mathcal{K}_k$. CG's $x_k$ minimizes $\phi$ over $x_0 + \mathcal{K}_k$. In
 exact arithmetic, the dimension of the Krylov subspace grows by one each step until it
-contains the true solution, so CG terminates in at most $n$ steps with $x_n = x^\star$.
+contains the true solution, so CG terminates in at most $n$ steps with $x_n = x^\star$<FN n="2" />.
 
 ## Convergence rate
 
@@ -74,7 +74,7 @@ $$
 
 a rate of $\sqrt\kappa$ like Nesterov's acceleration. **Preconditioning** (solving
 $M^{-1}A x = M^{-1}b$ for a cheap $M \approx A$) shrinks the effective condition
-number and is what makes CG practical for ill-conditioned systems.
+number and is what makes CG practical for ill-conditioned systems<FN n="3" />.
 
 ![Conjugate gradient builds A-orthogonal search directions and converges far faster than steepest descent on a symmetric positive-definite system.](/figures/A4/conjugate-gradient.svg)
 
@@ -122,3 +122,9 @@ print(f"finite-termination bound: <= n = {n}")
 CG reaches the solution in fewer iterations than the dimension when the spectrum is
 favorable, with residual decaying geometrically. The next lesson generalizes Krylov
 solvers to nonsymmetric systems with GMRES.
+
+<Footnotes>
+  <FNItem n="1">**Hestenes, M. R., & Stiefel, E.** (1952). "Methods of conjugate gradients for solving linear systems". *Journal of Research of the National Bureau of Standards*, 49(6), 409-436. The original conjugate-gradient algorithm.</FNItem>
+  <FNItem n="2">**Trefethen, L. N., & Bau, D.** (1997). *Numerical Linear Algebra.* SIAM. CG, Krylov subspaces, and finite termination (Lectures 38-40).</FNItem>
+  <FNItem n="3">**Saad, Y.** (2003). *Iterative Methods for Sparse Linear Systems* (2nd ed.). SIAM. Preconditioned CG and the $\sqrt\kappa$ convergence bound ([doi:10.1137/1.9780898718003](https://doi.org/10.1137/1.9780898718003)).</FNItem>
+</Footnotes>

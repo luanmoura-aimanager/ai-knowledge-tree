@@ -11,7 +11,7 @@ prerequisites: ["gram-schmidt", "quadratic-forms"]
 
 Inverting a matrix is expensive and numerically fragile. Instead, numerical linear
 algebra solves $Ax = b$ by **factoring** $A$ into simpler matrices, solving two
-easy triangular systems, and never forming $A^{-1}$.
+easy triangular systems, and never forming $A^{-1}$<FN n="1" />.
 
 ## Why triangular systems are cheap
 
@@ -77,7 +77,7 @@ $$
 
 where $L$ is lower triangular with positive diagonal. Cholesky exists if and only
 if $A$ is PD (converse: if Cholesky succeeds, every leading minor is positive,
-confirming PD by Sylvester's criterion).
+confirming PD by Sylvester's criterion)<FN n="2" />.
 
 **Cost:** $\approx n^3/3$, roughly half the cost of LU, exploiting symmetry.
 
@@ -160,3 +160,8 @@ print("cond(A):", np.linalg.cond(A))       # moderate -> solving is fine
 All three paths give the same solution; the Cholesky factorization halves the
 arithmetic. The next lesson uses QR and the SVD together to handle the case where
 $Ax = b$ has no exact solution.
+
+<Footnotes>
+  <FNItem n="1">**Trefethen, L. N., & Bau, D.** (1997). *Numerical Linear Algebra.* SIAM. LU, QR, and Cholesky factorizations and why factoring beats inverting (Lectures 7, 20, 23).</FNItem>
+  <FNItem n="2">**Golub, G. H., & Van Loan, C. F.** (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press. The canonical reference for matrix factorization algorithms and their costs ([doi:10.56021/9781421407944](https://doi.org/10.56021/9781421407944)).</FNItem>
+</Footnotes>

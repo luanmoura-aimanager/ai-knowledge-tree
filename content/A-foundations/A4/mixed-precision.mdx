@@ -12,7 +12,7 @@ prerequisites: ["floating-point"]
 GPUs and TPUs run several times faster on 16-bit floating point than on 32-bit, and
 modern hardware has dedicated tensor cores for it. **Mixed-precision** uses 16-bit
 storage and compute where possible and falls back to 32-bit only where stability
-demands it. Knowing which 16-bit format to use and where the failure modes hide is
+demands it<FN n="1" />. Knowing which 16-bit format to use and where the failure modes hide is
 the difference between a 2x speedup and silent training divergence.
 
 ## Three formats
@@ -63,7 +63,7 @@ $$
 The intermediate fp16 values stay in the representable range; the final unscaled
 gradient is recovered exactly modulo rounding. **Dynamic loss scaling** monitors for
 gradient overflow (any inf or NaN) and halves $S$ when it occurs, doubles $S$ after a
-clean run of steps: an automatic search for the largest safe scale.
+clean run of steps: an automatic search for the largest safe scale<FN n="2" />.
 
 ```mermaid
 graph TD
@@ -111,3 +111,8 @@ fp16 overflows above 65,504 and silently drops tiny updates, loss scaling rescue
 the underflowing gradients, and accumulating sums in fp32 fixes lossy reductions.
 This closes the A4 numerical-methods track; A5 turns from floating-point math to
 the data structures and algorithms the runtime is built on.
+
+<Footnotes>
+  <FNItem n="1">**Micikevicius, P., et al.** (2018). "Mixed precision training". *ICLR*. fp16 storage with fp32 master weights and tensor-core compute ([arXiv:1710.03740](https://arxiv.org/abs/1710.03740)).</FNItem>
+  <FNItem n="2">**Higham, N. J.** (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. Scaling, low-precision rounding, and accurate reductions ([doi:10.1137/1.9780898718027](https://doi.org/10.1137/1.9780898718027)).</FNItem>
+</Footnotes>

@@ -13,7 +13,7 @@ Many problems have no closed-form solution, but can be rewritten as
 $x = T(x)$ for some map $T$. **Iterative methods** start from a guess and apply $T$
 repeatedly until the sequence settles. The condition that makes this work, $T$ being a
 contraction, also gives an explicit error bound and convergence rate, which is the
-template used in everything from linear solvers to optimization to MCMC.
+template used in everything from linear solvers to optimization to MCMC<FN n="1" />.
 
 ## Fixed points
 
@@ -75,9 +75,9 @@ a fixed-point form of the linear system. The iteration matrix is $-D^{-1}R$, and
 iteration converges if the spectral radius (the largest eigenvalue magnitude) is
 less than 1, which holds for **strictly diagonally dominant** $A$
 ($|a_{ii}| > \sum_{j \neq i}|a_{ij}|$). Jacobi and its variant **Gauss-Seidel** are
-the original iterative linear solvers, the predecessors of conjugate gradient.
+the original iterative linear solvers, the predecessors of conjugate gradient<FN ns="2, 3" />.
 
-![Stationary iterations like Jacobi converge geometrically when the iteration matrix is a contraction — the error shrinks by a roughly constant factor per sweep.](/figures/A4/iterative-methods.svg)
+![Stationary iterations like Jacobi converge geometrically when the iteration matrix is a contraction: the error shrinks by a roughly constant factor per sweep.](/figures/A4/iterative-methods.svg)
 
 ## Check it on arrays
 
@@ -119,3 +119,9 @@ The cosine iteration settles on the Dottie number with $|T'| < 1$ confirming
 contraction, and Jacobi converges linearly on the diagonally dominant system. The
 next lesson specializes the iterative idea to symmetric positive-definite systems:
 conjugate gradient.
+
+<Footnotes>
+  <FNItem n="1">**Trefethen, L. N., & Bau, D.** (1997). *Numerical Linear Algebra.* SIAM. Iteration and convergence of stationary methods (Lectures 27-28).</FNItem>
+  <FNItem n="2">**Saad, Y.** (2003). *Iterative Methods for Sparse Linear Systems* (2nd ed.). SIAM. Jacobi, Gauss-Seidel, and spectral-radius convergence ([doi:10.1137/1.9780898718003](https://doi.org/10.1137/1.9780898718003)).</FNItem>
+  <FNItem n="3">**Golub, G. H., & Van Loan, C. F.** (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press. Classical stationary iterative methods.</FNItem>
+</Footnotes>

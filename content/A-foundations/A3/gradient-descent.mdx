@@ -23,7 +23,7 @@ x_{t+1} = x_t - \eta\, \nabla f(x_t),
 $$
 
 where $\eta > 0$ is the **step size** (learning rate). Each step moves opposite the
-gradient, downhill, by an amount scaled by $\eta$.
+gradient, downhill, by an amount scaled by $\eta$<FN n="1" />.
 
 ## Derivation from a local model
 
@@ -61,7 +61,7 @@ $$
 For any step size $0 < \eta < 2/L$ the bracket is positive, so $f(y) < f(x)$ whenever
 the gradient is nonzero: the objective strictly decreases. The largest guaranteed
 per-step decrease is at $\eta = 1/L$, giving
-$f(y) \le f(x) - \frac{1}{2L}\lVert\nabla f(x)\rVert^2$.
+$f(y) \le f(x) - \frac{1}{2L}\lVert\nabla f(x)\rVert^2$<FN n="2" />.
 
 ## The step-size tradeoff
 
@@ -114,3 +114,8 @@ print("eta>2/L diverges:", not np.all(np.isfinite(x)) or np.linalg.norm(x) > 1e6
 Gradient descent at $\eta = 1/L$ converges to the exact minimizer with a monotone
 decrease, and pushing past $2/L$ diverges, matching the descent lemma. The next
 lesson quantifies how fast convergence is, using smoothness and strong convexity.
+
+<Footnotes>
+  <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §2.2 and ch. 3. Springer. Steepest descent and the line-search framework ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>
+  <FNItem n="2">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §9.3. Cambridge University Press. The descent lemma and the step-size analysis for gradient descent.</FNItem>
+</Footnotes>

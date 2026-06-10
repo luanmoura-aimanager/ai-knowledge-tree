@@ -43,7 +43,7 @@ $\rho_t = 1/(y_t^\top s_t)$:
 
 $$
 H_{t+1} = (I - \rho_t s_t y_t^\top)\, H_t\, (I - \rho_t y_t s_t^\top) + \rho_t s_t s_t^\top.
-$$
+$$<FN n="1" />
 
 This is a rank-two correction to $H_t$ chosen to satisfy the secant condition while
 keeping $H_{t+1}$ symmetric. As long as the **curvature condition** $y_t^\top s_t > 0$
@@ -67,7 +67,7 @@ $m = 5$ to $20$) and computes the product $H_t \nabla f(x_t)$ on the fly with th
 $(I - \rho s y^\top)$ factors, a scaling by an estimate of the Hessian, then one
 forward pass. Cost and memory drop to $O(mn)$, linear in the dimension. L-BFGS is the
 default for medium-scale smooth problems and large-batch training where the gradients
-are clean enough to trust.
+are clean enough to trust<FN n="2" />.
 
 ![BFGS estimates curvature from successive gradients to converge superlinearly, far faster than gradient descent on an ill-conditioned quadratic.](/figures/A3/quasi-newton.svg)
 
@@ -117,3 +117,8 @@ BFGS reaches the minimizer of an ill-conditioned ($\kappa = 50$) quadratic in a 
 dozen steps using only gradients, with the inverse-Hessian estimate built from the
 secant pairs. The next lesson handles objectives that are not smooth, with proximal
 methods.
+
+<Footnotes>
+  <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §6.1. Springer. The secant condition and the BFGS inverse-Hessian update ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>
+  <FNItem n="2">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §7.2. Springer. Limited-memory L-BFGS and the two-loop recursion.</FNItem>
+</Footnotes>

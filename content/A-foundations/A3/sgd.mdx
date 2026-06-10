@@ -39,7 +39,7 @@ The key property is **unbiasedness**: averaging over the random draw,
 
 $$
 \mathbb{E}_{i_t}[\nabla f_{i_t}(x_t)] = \frac{1}{n}\sum_{i=1}^n \nabla f_i(x_t) = \nabla f(x_t).
-$$
+$$<FN n="1" />
 
 The stochastic gradient points in the right direction on average, but any single step
 is corrupted by **variance** $\sigma^2 = \mathbb{E}\lVert \nabla f_{i_t}(x) - \nabla f(x)\rVert^2$.
@@ -73,7 +73,7 @@ To reach the exact optimum, the step size must shrink so the noise term vanishes
 
 $$
 \sum_t \eta_t = \infty \quad (\text{steps large enough to travel any distance}), \qquad \sum_t \eta_t^2 < \infty \quad (\text{noise sums to finite}).
-$$
+$$<FN n="2" />
 
 A schedule like $\eta_t = \eta_0 / t$ satisfies both and gives $\mathbb{E}[\Delta_t] = O(1/t)$.
 In practice, step decay or cosine schedules implement the same idea: large steps early
@@ -126,3 +126,8 @@ print("decaying eta0=0.05  :", round(sgd(0.05, decay=True), 6))
 A smaller constant step and a larger batch both lower the noise floor, and the
 decaying schedule drives suboptimality further down. The next lesson speeds up the
 deterministic part with momentum.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, ch. 8. MIT Press. Minibatch stochastic gradient estimates and their unbiasedness.</FNItem>
+  <FNItem n="2">**Robbins, H., & Monro, S.** (1951). "A stochastic approximation method". *Annals of Mathematical Statistics*, 22, 400-407. The step-size conditions for convergence ([doi:10.1214/aoms/1177729586](https://doi.org/10.1214/aoms/1177729586)).</FNItem>
+</Footnotes>

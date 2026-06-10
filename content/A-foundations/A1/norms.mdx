@@ -16,7 +16,7 @@ geometry.
 
 ## The three axioms
 
-A **norm** on a vector space $V$ is a function $\lVert \cdot \rVert: V \to \mathbb{R}$ satisfying:
+A **norm** on a vector space $V$ is a function $\lVert \cdot \rVert: V \to \mathbb{R}$ satisfying<FN n="1" />:
 
 1. **Positivity:** $\lVert v\rVert \ge 0$, with $\lVert v\rVert = 0$ only when $v = 0$.
 2. **Absolute homogeneity:** $\lVert \alpha v\rVert = |\alpha|\,\lVert v\rVert$ for all
@@ -49,7 +49,7 @@ The unit ball is a diamond (hyperoctahedron). Minimizing $\lVert v\rVert_1$ in a
 optimization problem tends to push most coordinates to exactly zero: the corners
 of the diamond are where the constraint boundary meets objective-level sets, and
 corners have many zero coordinates. This is the geometric root of the sparsity
-effect in LASSO.
+effect in LASSO<FN n="2" />.
 
 **$\ell^\infty$ (max norm, $p \to \infty$):**
 $\lVert v\rVert_\infty = \max_i |v_i|$.
@@ -80,7 +80,7 @@ Equivalence means that convergence and continuity are norm-independent in finite
 dimensions; the choice of norm matters for *optimization* (it shapes solutions)
 but not for *analysis* (it does not change which sequences converge).
 
-![Different norms have different unit balls — L1 a diamond, L2 a circle, L∞ a square — so the same vector has a different length under each.](/figures/A1/norms.svg)
+![Different norms have different unit balls (L1 a diamond, L2 a circle, L∞ a square), so the same vector has a different length under each.](/figures/A1/norms.svg)
 
 ## Check it on arrays
 
@@ -117,3 +117,8 @@ print(f"L2 solution nonzeros: {np.sum(np.abs(x_l2) > 1e-8)}")  # likely 3 (full)
 The L2 solution typically uses all available coordinates; a proper L1 solve
 (requires a QP or LASSO solver not shown here) would produce a sparse vector.
 With a norm in hand, the inner-products lesson adds the angle between two vectors.
+
+<Footnotes>
+  <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2018). *Introduction to Applied Linear Algebra.* Cambridge University Press. Norms, distances, and their use in least-squares and regularization.</FNItem>
+  <FNItem n="2">**Tibshirani, R.** (1996). "Regression shrinkage and selection via the lasso". *Journal of the Royal Statistical Society: Series B*, 58, 267-288. [doi:10.1111/j.2517-6161.1996.tb02080.x](https://doi.org/10.1111/j.2517-6161.1996.tb02080.x). The origin of L1-induced sparsity.</FNItem>
+</Footnotes>

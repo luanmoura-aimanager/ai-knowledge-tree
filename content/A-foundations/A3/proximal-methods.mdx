@@ -33,7 +33,7 @@ The **proximal operator** of a function $g$ with step $\eta$ is
 
 $$
 \operatorname{prox}_{\eta g}(v) = \arg\min_x\left(g(x) + \frac{1}{2\eta}\lVert x - v\rVert^2\right).
-$$
+$$<FN n="1" />
 
 It returns the point that balances minimizing $g$ against staying near $v$. It
 generalizes projection: if $g$ is the indicator of a convex set (zero inside,
@@ -53,7 +53,7 @@ plus a proximity penalty, keep $g$ exact, and minimize. The minimizer of
 $f(x_t) + \nabla f(x_t)^\top(x - x_t) + \frac{1}{2\eta}\lVert x - x_t\rVert^2 + g(x)$
 is precisely the prox of $g$ applied to the gradient step. With $\eta \le 1/L$ it
 converges at the same $O(1/t)$ rate as smooth gradient descent, and an accelerated
-version (FISTA, Nesterov momentum on top) reaches $O(1/t^2)$.
+version (FISTA, Nesterov momentum on top) reaches $O(1/t^2)$<FN n="2" />.
 
 ## Soft-thresholding for the L1 penalty
 
@@ -71,7 +71,7 @@ mechanically: the prox step zeroes out small coordinates each iteration. Proxima
 gradient descent with this prox is **ISTA**, the iterative soft-thresholding algorithm
 for LASSO.
 
-![The proximal operator of the L1 norm is soft-thresholding — it shrinks each coordinate toward zero by λ and clamps small ones exactly to zero, creating sparsity.](/figures/A3/proximal-methods.svg)
+![The proximal operator of the L1 norm is soft-thresholding: it shrinks each coordinate toward zero by λ and clamps small ones exactly to zero, creating sparsity.](/figures/A3/proximal-methods.svg)
 
 ## Check it on arrays
 
@@ -107,3 +107,8 @@ print("reconstruction error:", round(np.linalg.norm(x - x_true), 4))
 ISTA recovers the correct sparse support through repeated soft-thresholding, with
 small coordinates driven to exact zero. The final A3 lesson optimizes functions with
 no gradient at all, using a probabilistic surrogate: Bayesian optimization.
+
+<Footnotes>
+  <FNItem n="1">**Parikh, N., & Boyd, S.** (2014). "Proximal algorithms". *Foundations and Trends in Optimization*, 1(3), 127-239. The proximal operator and proximal gradient method ([doi:10.1561/2400000003](https://doi.org/10.1561/2400000003)).</FNItem>
+  <FNItem n="2">**Beck, A., & Teboulle, M.** (2009). "A fast iterative shrinkage-thresholding algorithm for linear inverse problems". *SIAM Journal on Imaging Sciences*, 2(1), 183-202. ISTA, soft-thresholding, and the accelerated $O(1/t^2)$ FISTA rate ([doi:10.1137/080716542](https://doi.org/10.1137/080716542)).</FNItem>
+</Footnotes>
