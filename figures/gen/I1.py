@@ -41,9 +41,40 @@ def drift_detection() -> None:
     save(fig, SUB, "drift-detection")
 
 
+def feature_engineering() -> None:
+    """A transform fitted on the wrong data leaks held-out statistics into training,
+    so the offline score is inflated above the honest accuracy the model reaches in
+    production. The clean pipeline (fit on train only) reports an offline score that
+    matches production; the leaky one shows a large optimism gap. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    labels = ["leaky pipeline\n(fit on all data)", "clean pipeline\n(fit on train only)"]
+    offline = np.array([0.94, 0.86])      # reported offline score
+    production = np.array([0.82, 0.85])   # honest accuracy in production
+    x = np.arange(len(labels))
+    w = 0.36
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(x - w / 2, offline * 100, w, color=C, label="offline score (reported)")
+    ax.bar(x + w / 2, production * 100, w, color=FG_MUTE, label="production accuracy (actual)")
+    # Mark the optimism gap the leak opens.
+    ax.annotate("", (x[0] - w / 2, offline[0] * 100), (x[0] + w / 2, production[0] * 100),
+                arrowprops=dict(arrowstyle="<->", color=HOT, lw=1.8))
+    ax.text(x[0] + 0.05, (offline[0] + production[0]) / 2 * 100, "leakage\noptimism",
+            color=HOT, fontsize=9, va="center")
+    ax.set_xticks(x); ax.set_xticklabels(labels)
+    ax.set_ylim(60, 100)
+    ax.set_ylabel("accuracy (%)")
+    ax.set_title("Feature leakage inflates the offline score")
+    ax.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "feature-engineering")
+
+
 def main() -> None:
     apply_style()
     drift_detection()
+    feature_engineering()
 
 
 if __name__ == "__main__":

@@ -12,9 +12,6 @@ Last reviewed: 2026-06-09 (after the 100%-coverage figures campaign, PRs #43–#
   (curriculum in `src/lib/curriculum/`, lessons in `content/`) and a "Data
   Engineer" suggested path. Add the pillar-authoring pattern to `content/STYLE.md`.
 
-- [ ] **Rename/refactor the ML-engineer path.** Refactor and rename the existing
-  'Machine Learning Engineer' suggested path in `PATHS` (`src/lib/dag.ts`).
-
 - [ ] **Bibliography references — plan first.** Plan how to add
   bibliography/reference citations to lessons. Reuse the pattern from the parallel
   `../ai-math-theory/` project (inspect how it does references there before

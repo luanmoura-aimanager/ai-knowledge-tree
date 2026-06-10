@@ -92,8 +92,40 @@ def slos_and_error_budgets() -> None:
     save(fig, SUB, "slos-and-error-budgets")
 
 
+def automated_retraining() -> None:
+    """Average daily cost as a function of the retrain interval. Retraining too often
+    pays the fixed retrain cost K repeatedly (K/T falls); retraining too rarely lets
+    staleness cost pile up (rises). Their sum is U-shaped with a minimum at the optimal
+    cadence ~sqrt(2K/cr)."""
+    import matplotlib.pyplot as plt
+
+    K, c, r = 500.0, 1.0, 0.10
+    T = np.arange(1, 121)
+    amortized = K / T
+    staleness = c * r * (T + 1) / 2.0
+    total = amortized + staleness
+    t_opt = T[np.argmin(total)]
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(T, amortized, color=FG_MUTE, ls="--", lw=1.6, label="amortized retrain cost (K/T)")
+    ax.plot(T, staleness, color=ACCENT, ls=":", lw=1.8, label="average staleness cost")
+    ax.plot(T, total, color=C, lw=2.4, label="total daily cost")
+    ax.axvline(t_opt, color=HOT, lw=1.6)
+    ax.annotate(f"optimal cadence\n≈ {t_opt} days", (t_opt, total.min()),
+                color=HOT, fontsize=9, xytext=(t_opt + 14, total.min() + 6),
+                textcoords="data",
+                arrowprops=dict(arrowstyle="-|>", color=HOT, lw=1.6))
+    ax.set_title("Automated retraining: the optimal cadence")
+    ax.set_xlabel("retrain interval T (days)"); ax.set_ylabel("average daily cost ($)")
+    ax.set_ylim(0, total[T <= 120].max() * 0.6)
+    ax.legend(loc="upper center", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "automated-retraining")
+
+
 def main() -> None:
     apply_style()
+    automated_retraining()
     cost_monitoring()
     production_drift()
     slos_and_error_budgets()
