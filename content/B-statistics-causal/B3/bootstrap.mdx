@@ -13,7 +13,7 @@ The sampling distribution of the sample mean has a known formula ($\sigma/\sqrt{
 For the median, the trimmed mean, or a regression coefficient, no such formula
 exists in closed form. The **bootstrap** solves this by approximating the sampling
 distribution empirically: treat the observed data as a stand-in for the population
-and resample from it repeatedly.
+and resample from it repeatedly<FN n="1" />.
 
 ## The bootstrap principle
 
@@ -51,7 +51,7 @@ $$
 
 **BCa (bias-corrected and accelerated).** Adjusts both the center and the acceleration
 (the rate of change of SE with the parameter). Better coverage than the percentile
-interval at the cost of computing the acceleration via a jackknife.
+interval at the cost of computing the acceleration via a jackknife<FN n="2" />.
 
 For most purposes, the pivotal interval is a solid default with minimal overhead.
 
@@ -60,7 +60,7 @@ For most purposes, the pivotal interval is a solid default with minimal overhead
 - **Nonparametric bootstrap:** when the data distribution is unknown or non-Gaussian.
 - **Parametric bootstrap:** resample from the fitted parametric model (e.g., fit a
   Gaussian, bootstrap from it). Better than nonparametric when the model is correct.
-- **Residual bootstrap (regression):** resample residuals, not raw observations.
+- **Residual bootstrap (regression):** resample residuals, not raw observations<FN n="3" />.
 
 ![The bootstrap approximates a statistic's sampling distribution by resampling with replacement; here, 5000 bootstrap medians and the 95% percentile interval.](/figures/B3/bootstrap.svg)
 
@@ -115,3 +115,9 @@ this skewed distribution.
 
 The next lesson introduces the jackknife, which provides bias and variance estimates
 via leave-one-out resampling.
+
+<Footnotes>
+  <FNItem n="1">**Efron, B.** (1979). "Bootstrap methods: another look at the jackknife". *The Annals of Statistics*, 7(1), 1-26. The paper that introduced the bootstrap ([doi:10.1214/aos/1176344552](https://doi.org/10.1214/aos/1176344552)).</FNItem>
+  <FNItem n="2">**Efron, B., & Tibshirani, R. J.** (1993). *An Introduction to the Bootstrap.* Chapman & Hall/CRC. Standard reference for percentile, pivotal, and BCa intervals.</FNItem>
+  <FNItem n="3">**Davison, A. C., & Hinkley, D. V.** (1997). *Bootstrap Methods and Their Application.* Cambridge University Press. Covers parametric and residual resampling schemes.</FNItem>
+</Footnotes>

@@ -30,7 +30,7 @@ avoids dividing by zero.
 
 FWER is conservative: even one false positive is penalized. FDR is more lenient: it
 tolerates a controlled fraction of false positives, suitable for exploratory studies
-where many discoveries are expected.
+where many discoveries are expected<FN n="1" />.
 
 ## Bonferroni correction (FWER)
 
@@ -50,7 +50,7 @@ Its cost: power decreases as $m$ grows because the threshold $\alpha/m$ shrinks.
 Sort p-values $p_{(1)} \le p_{(2)} \le \cdots \le p_{(m)}$. Reject $H_{(i)}$ for
 all $i \le k^*$, where $k^*$ is the largest $k$ such that $p_{(j)} < \alpha/(m-j+1)$
 for all $j \le k$. Holm's controls FWER at $\alpha$ and is uniformly more powerful
-than Bonferroni.
+than Bonferroni<FN n="2" />.
 
 ## Benjamini-Hochberg (FDR)
 
@@ -63,7 +63,7 @@ $$
 Reject all $H_{(1)}, \ldots, H_{(k)}$.
 
 **Theorem (Benjamini and Hochberg, 1995).** For independent tests,
-$\mathrm{FDR} \le \frac{m_0}{m} \alpha \le \alpha$.
+$\mathrm{FDR} \le \frac{m_0}{m} \alpha \le \alpha$<FN n="3" />.
 
 BH is more powerful than Bonferroni when $m$ is large and many alternatives are
 true, because it only needs the top-ranked p-values to beat a less stringent
@@ -128,3 +128,9 @@ positives, while Bonferroni keeps FP near zero but misses more discoveries.
 
 With frequentist inference covered, B2 moves to the Bayesian perspective: starting
 from a prior and updating to a posterior via Bayes' rule.
+
+<Footnotes>
+  <FNItem n="1">**Wasserman, L.** (2004). *All of Statistics.* Springer. The multiple-testing problem and the FWER/FDR distinction (§10.7). [doi:10.1007/978-0-387-21736-9](https://doi.org/10.1007/978-0-387-21736-9)</FNItem>
+  <FNItem n="2">**Lehmann, E. L., & Romano, J. P.** (2005). *Testing Statistical Hypotheses* (3rd ed.). Springer. Bonferroni, Holm's step-down procedure, and family-wise error control (Ch. 9). [doi:10.1007/0-387-27605-X](https://doi.org/10.1007/0-387-27605-X)</FNItem>
+  <FNItem n="3">**Benjamini, Y., & Hochberg, Y.** (1995). "Controlling the false discovery rate". *Journal of the Royal Statistical Society: Series B*, 57(1), 289-300. The original step-up procedure and its FDR-control proof. [doi:10.1111/j.2517-6161.1995.tb02031.x](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x)</FNItem>
+</Footnotes>

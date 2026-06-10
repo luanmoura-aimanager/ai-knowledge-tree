@@ -34,7 +34,7 @@ where $\mu^* = \max_k \mu_k$.
 ## UCB1
 
 The **upper confidence bound** (UCB1; Auer et al., 2002) selects the arm with the
-highest upper confidence bound on its mean:
+highest upper confidence bound on its mean<FN n="1" />:
 
 $$
 A_t = \arg\max_k \left(\hat\mu_k + \sqrt{\frac{2\ln t}{n_k}}\right),
@@ -53,13 +53,13 @@ $$
 $$
 
 where $\Delta_k = \mu^* - \mu_k$. This is $O(\ln T)$, and the bound is tight: no
-algorithm can achieve $o(\ln T)$ regret for all bandit instances.
+algorithm can achieve $o(\ln T)$ regret for all bandit instances<FN n="3" />.
 
 ## Thompson sampling
 
 **Thompson sampling** is a Bayesian alternative. Maintain a posterior over each
 arm's mean; at each round, sample one value from each posterior and pull the arm
-with the highest sampled value.
+with the highest sampled value<FN n="2" />.
 
 For Bernoulli rewards with Beta priors:
 
@@ -135,3 +135,9 @@ growing logarithmically while random grows linearly.
 
 The next lesson adds context: each round an arm's payoff depends on observable
 features of the user, turning the bandit into a contextual bandit.
+
+<Footnotes>
+  <FNItem n="1">**Auer, P., Cesa-Bianchi, N., & Fischer, P.** (2002). "Finite-time analysis of the multiarmed bandit problem". *Machine Learning*, 47, 235-256. The UCB1 algorithm and its logarithmic regret bound ([doi:10.1023/A:1013689704352](https://doi.org/10.1023/A:1013689704352)).</FNItem>
+  <FNItem n="2">**Thompson, W. R.** (1933). "On the likelihood that one unknown probability exceeds another in view of the evidence of two samples". *Biometrika*, 25(3-4), 285-294. The original posterior-sampling heuristic now called Thompson sampling ([doi:10.1093/biomet/25.3-4.285](https://doi.org/10.1093/biomet/25.3-4.285)).</FNItem>
+  <FNItem n="3">**Lattimore, T., & Szepesvári, C.** (2020). *Bandit Algorithms.* Cambridge University Press. The modern reference for regret analysis and matching lower bounds ([doi:10.1017/9781108571401](https://doi.org/10.1017/9781108571401)).</FNItem>
+</Footnotes>

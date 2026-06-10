@@ -62,7 +62,7 @@ The X-learner is more efficient when treated and control group sizes are unbalan
 ## Causal forests (Wager and Athey, 2018)
 
 Random forests estimate means by averaging leaf values. **Causal forests** adapt
-this to CATE by replacing the outcome in each leaf with the local treatment effect.
+this to CATE by replacing the outcome in each leaf with the local treatment effect<FN n="1" />.
 
 **Honest splitting.** A tree is **honest** if the data used to determine splits are
 separate from the data used to estimate leaf values. This prevents the tree from
@@ -70,12 +70,12 @@ overfitting the treatment effect while searching for splits.
 
 Specifically, half the sample (the *splitting sample*) is used to build the tree;
 the other half (the *estimation sample*) is used to compute leaf means. The resulting
-estimator is asymptotically normal, enabling valid confidence intervals for CATE.
+estimator is asymptotically normal, enabling valid confidence intervals for CATE<FN n="1" />.
 
 **Algorithm sketch:**
 
 1. Build a forest of honest trees on the outcome residuals $\tilde Y = Y - \hat\ell(X)$
-   and treatment residuals $\tilde W = W - \hat m(X)$ (as in DML).
+   and treatment residuals $\tilde W = W - \hat m(X)$ (as in DML)<FN n="2" />.
 2. For a query point $x$, collect its leaf neighbors in each tree.
 3. CATE estimate: local weighted regression of $\tilde Y$ on $\tilde W$ using
    the forest's kernel weights.
@@ -141,3 +141,8 @@ often underestimates heterogeneity due to regularization.
 The next lesson connects causal reasoning to representation learning: when can
 observational data identify causal structure in the latent representations of
 neural networks?
+
+<Footnotes>
+  <FNItem n="1">**Wager, S., & Athey, S.** (2018). "Estimation and inference of heterogeneous treatment effects using random forests". *JASA*, 113(523), 1228-1242. Introduces honest splitting and proves asymptotic normality of the causal-forest CATE estimator ([doi:10.1080/01621459.2017.1319839](https://doi.org/10.1080/01621459.2017.1319839)).</FNItem>
+  <FNItem n="2">**Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W., & Robins, J.** (2018). "Double/debiased machine learning for treatment and structural parameters". *The Econometrics Journal*, 21(1), C1-C68. Source of the outcome/treatment residualization used inside the forest ([doi:10.1111/ectj.12097](https://doi.org/10.1111/ectj.12097)).</FNItem>
+</Footnotes>

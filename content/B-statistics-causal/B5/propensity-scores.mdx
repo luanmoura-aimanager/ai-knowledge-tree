@@ -23,7 +23,7 @@ e(X) = P(W = 1 \mid X).
 $$
 
 **Rosenbaum-Rubin theorem (1983).** Under strong ignorability
-$(Y(0), Y(1)) \perp W \mid X$, it also holds that $(Y(0), Y(1)) \perp W \mid e(X)$.
+$(Y(0), Y(1)) \perp W \mid X$, it also holds that $(Y(0), Y(1)) \perp W \mid e(X)$<FN n="1" />.
 
 Conditioning on the propensity score is sufficient to remove confounding, even
 though $e(X)$ is a scalar rather than the full vector $X$. This is the balancing
@@ -71,14 +71,14 @@ $$
 **Intuition.** A treated unit with $\hat e(X) = 0.2$ (unlikely to be treated) is
 upweighted by $1/0.2 = 5$ to represent the population of similar units in the
 counterfactual. The weighting creates pseudo-populations where treatment is
-independent of covariates.
+independent of covariates<FN n="3" />.
 
 IPW is unbiased when the propensity model is correct. **Normalized IPW** divides
 by the sum of weights to reduce variance (Hajek estimator). **Doubly robust**
 estimators combine IPW with an outcome model; they are consistent if either model
-is correctly specified.
+is correctly specified<FN n="2" />.
 
-![The propensity score collapses confounders into one number; valid causal contrasts need overlap — both groups present across the score range.](/figures/B5/propensity-scores.svg)
+![The propensity score collapses confounders into one number; valid causal contrasts need overlap, both groups present across the score range.](/figures/B5/propensity-scores.svg)
 
 ## Implementation
 
@@ -139,3 +139,9 @@ treated group, confirming that the propensity score successfully balanced the co
 The next lesson addresses a setting where all confounders are unobserved but a
 valid **instrument** is available: a variable that affects treatment but has no
 direct effect on the outcome.
+
+<Footnotes>
+  <FNItem n="1">**Rosenbaum, P. R., & Rubin, D. B.** (1983). "The central role of the propensity score in observational studies for causal effects". *Biometrika*, 70(1), 41-55. The original balancing-score theorem ([doi:10.1093/biomet/70.1.41](https://doi.org/10.1093/biomet/70.1.41)).</FNItem>
+  <FNItem n="2">**Imbens, G. W., & Rubin, D. B.** (2015). *Causal Inference for Statistics, Social, and Biomedical Sciences.* Cambridge University Press. Matching, inverse-probability weighting, and doubly robust estimation ([doi:10.1017/CBO9781139025751](https://doi.org/10.1017/CBO9781139025751)).</FNItem>
+  <FNItem n="3">**Hernán, M. A., & Robins, J. M.** (2020). *Causal Inference: What If.* Chapman & Hall/CRC. Practical treatment of IPW, positivity, and the structure of weighted pseudo-populations.</FNItem>
+</Footnotes>

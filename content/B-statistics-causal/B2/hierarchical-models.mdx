@@ -14,7 +14,7 @@ students alone is noisy for small schools. Using the grand mean for all schools
 ignores real differences. **Hierarchical (multilevel) models** find the middle ground:
 each school has its own parameter, but those parameters are drawn from a common
 population-level distribution. This allows small groups to borrow strength from the
-rest.
+rest<FN n="1" />.
 
 ## Three estimators and the pooling spectrum
 
@@ -74,10 +74,10 @@ $$
 
 The shrinkage weight $\lambda_j$ is large (shrink toward $\mu$) when the group is
 small ($n_j$ small) or the between-group variance $\tau^2$ is large relative to
-within-group variance. When $n_j \to \infty$, $\lambda_j \to 0$ and the estimate
+within-group variance<FN n="2" />. When $n_j \to \infty$, $\lambda_j \to 0$ and the estimate
 is the group mean.
 
-![Partial pooling shrinks each group's estimate toward the global mean by an amount set by its sample size — small groups borrow the most strength.](/figures/B2/hierarchical-models.svg)
+![Partial pooling shrinks each group's estimate toward the global mean by an amount set by its sample size: small groups borrow the most strength.](/figures/B2/hierarchical-models.svg)
 
 ## Implementation
 
@@ -118,3 +118,8 @@ estimate while large groups retain their own data.
 
 The next lesson uses the posterior over $\theta$ to make predictions about new data
 by integrating out the uncertainty in the parameters.
+
+<Footnotes>
+  <FNItem n="1">**Gelman, A., & Hill, J.** (2006). *Data Analysis Using Regression and Multilevel/Hierarchical Models.* Cambridge University Press. The standard applied treatment of partial pooling.</FNItem>
+  <FNItem n="2">**Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., & Rubin, D. B.** (2013). *Bayesian Data Analysis* (3rd ed.). CRC Press. Ch. 5 derives the shrinkage estimator and the eight-schools model.</FNItem>
+</Footnotes>
