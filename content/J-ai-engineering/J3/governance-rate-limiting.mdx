@@ -15,14 +15,14 @@ exhaust your capacity, and one expensive tenant can run up a bill nobody can tra
 enforces three things, *who* may call (auth), *how much* they may call (rate limiting),
 and *what it cost* whom (attribution). Auth is standard web practice; the two pieces
 specific to a metered, expensive resource like an LLM are rate limiting and cost
-attribution.
+attribution<FN n="1" />.
 
 ## Rate limiting with a token bucket
 
 You need to cap how fast a client can call, both to protect capacity and to enforce
 plan tiers. A good limiter must allow short **bursts** (real traffic is bursty) while
 holding the **long-run average** below a ceiling. The **token-bucket** algorithm does
-exactly this:
+exactly this<FN n="2" />:
 
 - A bucket holds up to **capacity** $C$ tokens and starts full.
 - Tokens refill at a steady **rate** $r$ per second, up to the cap $C$.
@@ -99,3 +99,8 @@ same instant, and lets requests through again as tokens refill, while the attrib
 tally rolls each tenant's tokens into a defensible bill. Auth, limits, and attribution
 make the service safe to expose; getting it *running* reproducibly across environments
 is [deployment](deployment-cicd).
+
+<Footnotes>
+  <FNItem n="1">**OWASP.** (2025). "OWASP Top 10 for Large Language Model Applications". [owasp.org](https://owasp.org/www-project-top-10-for-large-language-model-applications/). Unbounded consumption and excessive agency as governance risks.</FNItem>
+  <FNItem n="2">**Tanenbaum, A. S., & Wetherall, D. J.** (2011). *Computer Networks* (5th ed.). Pearson. The token-bucket traffic-shaping algorithm (§5.4).</FNItem>
+</Footnotes>

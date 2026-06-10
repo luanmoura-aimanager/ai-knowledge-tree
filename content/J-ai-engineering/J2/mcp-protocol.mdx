@@ -14,7 +14,7 @@ Once you have [tool use](J1/tool-use), every new capability means writing anothe
 integration: this model, talking to that database, with bespoke glue. Do it for $N$
 AI applications and $M$ data sources and you write $N \times M$ integrations, each one
 custom, each one maintained forever. The **Model Context Protocol** (MCP) is a standard
-that collapses this. By agreeing on *one* way for AI applications to talk to external
+that collapses this<FN n="1" />. By agreeing on *one* way for AI applications to talk to external
 capabilities, it turns the $N \times M$ problem into $N + M$: each application speaks
 MCP once, each source exposes MCP once, and they all interoperate.
 
@@ -50,7 +50,7 @@ server someone else wrote becomes usable by *your* application for free.
 MCP is a **client-server** protocol. The **host** is the AI application (an IDE
 assistant, a chat app); inside it an MCP **client** maintains a connection to each MCP
 **server**, a separate process that wraps some capability (a filesystem, an API, a
-database). Servers expose three kinds of things:
+database)<FN n="2" />. Servers expose three kinds of things:
 
 - **Tools.** Functions the model can call to take an action, the [tool use](J1/tool-use)
   concept, now discovered over the protocol instead of hard-coded.
@@ -75,3 +75,8 @@ needs no change to the assistant's code.
 
 That is the consumer's view of MCP. Building a *good* server, one that a model can use
 correctly, is a design discipline of its own, which is the [next lesson](designing-mcp-servers).
+
+<Footnotes>
+  <FNItem n="1">**Anthropic.** (2024). "Model Context Protocol". [modelcontextprotocol.io](https://modelcontextprotocol.io). The open standard for connecting AI applications to external capabilities.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. The integration surface between models and external systems.</FNItem>
+</Footnotes>

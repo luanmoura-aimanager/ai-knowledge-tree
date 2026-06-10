@@ -15,7 +15,7 @@ from how the models work. A language model reads one undifferentiated stream of 
 cannot reliably tell *instructions* from *data*. When your application builds a prompt by
 concatenating a trusted system instruction with untrusted content, a web page, an email,
 a retrieved document, any instructions hidden in that content are read by the model with
-the same authority as yours. This is the same class of bug as SQL injection, where data
+the same authority as yours<FN n="1" />. This is the same class of bug as SQL injection, where data
 is mistaken for code, but it is harder to fix, because for an LLM there is no clean syntax
 that separates the two.
 
@@ -41,7 +41,7 @@ private data to the attacker), unauthorized actions, or using the model as a con
 deputy to reach systems the attacker could not. **Indirect** prompt injection, where the
 malicious instruction is planted in content the model will later retrieve (a poisoned
 web page or document), is especially dangerous because the attacker never talks to your
-system directly.
+system directly<FN n="2" />.
 
 ## Defenses: assume injection will happen
 
@@ -67,3 +67,8 @@ The mental model is: treat every token of untrusted content as potentially adver
 and design so that the worst it can do is bounded. Securing *what the model can do* leads
 naturally to securing *who and what can reach it*, which spans the data sources feeding it
 ([ingestion](multi-source-ingestion)) and the cloud identity around it.
+
+<Footnotes>
+  <FNItem n="1">**OWASP.** (2025). "OWASP Top 10 for Large Language Model Applications". [owasp.org](https://owasp.org/www-project-top-10-for-large-language-model-applications/). Prompt injection ranked the top LLM application risk.</FNItem>
+  <FNItem n="2">**Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., & Fritz, M.** (2023). "Not what you've signed up for: compromising real-world LLM-integrated applications with indirect prompt injection". *AISec.* [arXiv:2302.12173](https://arxiv.org/abs/2302.12173)</FNItem>
+</Footnotes>

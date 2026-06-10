@@ -13,7 +13,7 @@ prerequisites: ["J4/cost-latency-routing"]
 each call. **FinOps** (financial operations) zooms out to the *capacity* bill: AI runs on
 expensive GPUs, and how you buy them, on demand versus committed, plus how much work you avoid with
 caching, swings the monthly invoice as much as any per-call optimization. Two levers dominate: the
-commitment model and the caching tier.
+commitment model and the caching tier<FN n="1" />.
 
 ## On-demand versus reserved capacity
 
@@ -51,10 +51,10 @@ $$
 
 the $(1-h)$ misses paying full price and the $h$ hits paying only $f$. A realistic hit rate (many
 queries repeat or paraphrase, especially the [semantic cache](J4/cost-latency-routing) from earlier)
-takes a meaningful bite out of the bill before any capacity decision. Caching and commitment stack:
+takes a meaningful bite out of the bill before any capacity decision<FN n="2" />. Caching and commitment stack:
 caching lowers the load, which lowers the baseline you reserve for.
 
-![FinOps drives down the unit cost of AI: successive levers — prompt caching, request batching, a smaller distilled model, quantized serving — each step the cost-per-request down, so total spend can fall even as traffic grows.](/figures/J6/finops-for-ai.svg)
+![FinOps drives down the unit cost of AI: successive levers (prompt caching, request batching, a smaller distilled model, quantized serving) each step the cost-per-request down, so total spend can fall even as traffic grows.](/figures/J6/finops-for-ai.svg)
 
 ## Worked example
 
@@ -89,3 +89,8 @@ $40\%$ cache hit rate trims the request bill by nearly the same fraction, levers
 closes the cloud subsection. The final subsection steps up to the architect's view, where these cost
 models become one input to whole-[system design](J7/system-design-for-ai), beginning with
 [AI governance](J7/ai-governance-compliance).
+
+<Footnotes>
+  <FNItem n="1">**Storment, J. R., & Fuller, M.** (2023). *Cloud FinOps* (2nd ed.). O'Reilly. The commitment model (on-demand versus reserved) and FinOps practice of covering baseline with reservations.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Caching tiers and inference-cost reduction for foundation-model applications.</FNItem>
+</Footnotes>

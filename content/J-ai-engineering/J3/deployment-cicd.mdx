@@ -25,7 +25,7 @@ same anywhere a container runtime exists. The image is built once from a `Docker
 and is **immutable**: the exact bytes that passed testing are the exact bytes that run
 in production. For AI, this is what tames the notoriously fragile dependency stack;
 multi-gigabyte model weights are usually mounted or pulled at startup rather than baked
-in, to keep images lean.
+in, to keep images lean<FN n="1" />.
 
 ```mermaid
 graph LR
@@ -42,7 +42,7 @@ on every code change, so a regression is caught in minutes rather than discovere
 production. **Continuous delivery/deployment** (CD) takes the image that passed CI and
 promotes it through environments, dev, staging, production, on a button press or
 automatically. The pipeline is the *only* path to production, which means every change
-is tested and every deploy is reproducible from a commit. For models, the same pipeline
+is tested and every deploy is reproducible from a commit<FN n="2" />. For models, the same pipeline
 gates on an [evaluation suite](J2/llm-as-judge): a build whose quality regressed never
 reaches users.
 
@@ -62,3 +62,8 @@ Together, an immutable image, an automated pipeline, and externalized config giv
 deployments that are reproducible and safe to repeat, the [idempotent](I1/orchestration-dags)
 discipline applied to shipping. Once it is running, you need to *see inside* it, which is
 [observability](observability-tracing).
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Packaging, deployment, and inference infrastructure for foundation-model apps.</FNItem>
+  <FNItem n="2">**Humble, J., & Farley, D.** (2010). *Continuous Delivery: Reliable Software Releases through Build, Test, and Deployment Automation.* Addison-Wesley. The deployment-pipeline discipline.</FNItem>
+</Footnotes>

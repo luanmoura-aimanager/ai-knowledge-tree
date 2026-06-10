@@ -15,7 +15,7 @@ $O(N)$ brute-force scan. With a few thousand vectors that is instant; with a hun
 it is hopeless at interactive latency. Every vector database (pgvector, Pinecone, Weaviate,
 FAISS) is built around the same escape: give up *exactly* the right neighbors for *almost*
 the right neighbors, computed far faster. This is **approximate nearest neighbor** (ANN)
-search, and the central object is the recall-versus-speed tradeoff it exposes.
+search, and the central object is the recall-versus-speed tradeoff it exposes<FN n="1" />.
 
 ## Why exact search does not scale
 
@@ -47,7 +47,7 @@ graph LR
 The comparison count drops from $N$ to roughly $C + N \cdot (\texttt{n\_probe} / C)$: the
 centroid scan plus the members of a few buckets. The approximation: a true neighbor sitting
 in a bucket you did not probe is *missed*. (Production indexes like HNSW use a navigable
-graph rather than buckets, but the same tradeoff governs them; the idea here is the
+graph rather than buckets<FN n="2" />, but the same tradeoff governs them; the idea here is the
 [probabilistic-structure](A/probabilistic-structures) instinct of trading exactness for
 speed.)
 
@@ -105,6 +105,12 @@ print(f"exact search: {N} comparisons per query (recall 1.000 by definition)")
 
 Probing one bucket finds under half the true neighbors but scans only $\sim 160$ of $6000$
 vectors; probing sixteen recovers $99\%$ of them while still scanning a quarter of the
-corpus. That curve, recall climbing with comparisons, *is* the vector-database tuning knob.
+corpus. That curve, recall climbing with comparisons, *is* the vector-database tuning knob<FN n="3" />.
 A single index answers one query type; combining a vector index with keyword search is
 [hybrid search](hybrid-search-rrf).
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Vector search infrastructure and the recall-versus-latency tradeoff in retrieval.</FNItem>
+  <FNItem n="2">**Malkov, Y. A., & Yashunin, D. A.** (2018). "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs". *IEEE TPAMI*. [arXiv:1603.09320](https://arxiv.org/abs/1603.09320)</FNItem>
+  <FNItem n="3">**Johnson, J., Douze, M., & Jégou, H.** (2019). "Billion-scale similarity search with GPUs". *IEEE Transactions on Big Data*. [arXiv:1702.08734](https://arxiv.org/abs/1702.08734). The FAISS library and its IVF / quantization indexes.</FNItem>
+</Footnotes>

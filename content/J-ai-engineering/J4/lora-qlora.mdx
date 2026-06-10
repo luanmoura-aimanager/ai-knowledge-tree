@@ -22,7 +22,7 @@ the numbers are what make the technique worth using.
 Fine-tuning adapts a weight matrix $W$ of shape $d \times d$ by learning an update
 $\Delta W$. Full fine-tuning lets $\Delta W$ be an arbitrary $d \times d$ matrix, $d^2$
 trainable parameters. LoRA's bet is that the *useful* update is **low-rank**: it can be
-written as a product of two thin matrices,
+written as a product of two thin matrices<FN n="1" />,
 
 $$
 \Delta W = A B, \qquad A \in \mathbb{R}^{d \times r}, \quad B \in \mathbb{R}^{r \times d},
@@ -50,12 +50,12 @@ memory to compute the forward pass, and for a large model that alone can exceed 
 GPU. **QLoRA** removes that obstacle by storing the frozen base in **4-bit**
 [quantized](I3/quantization) form instead of 16-bit. Since $W$ is never updated, the
 precision loss from quantizing it is tolerable, and the memory for the base drops
-fourfold ($16$ bits to $4$). The small LoRA adapters stay in full precision (they *are*
+fourfold ($16$ bits to $4$)<FN n="2" />. The small LoRA adapters stay in full precision (they *are*
 trained), and gradients flow through the quantized base to update them. The combination,
 4-bit frozen base plus tiny full-precision adapters, is what lets a model that would need
 multiple GPUs for full fine-tuning be tuned on a single one.
 
-![Full fine-tuning must store gradients and Adam optimizer states for every weight, dwarfing the model itself; LoRA trains only small adapters (so gradients and optimizer state nearly vanish) and QLoRA also 4-bit-quantizes the frozen base — turning a multi-GPU job into a single-GPU one. (7B model.)](/figures/J4/lora-qlora.svg)
+![Full fine-tuning must store gradients and Adam optimizer states for every weight, dwarfing the model itself; LoRA trains only small adapters (so gradients and optimizer state nearly vanish) and QLoRA also 4-bit-quantizes the frozen base, turning a multi-GPU job into a single-GPU one. (7B model.)](/figures/J4/lora-qlora.svg)
 
 ## Worked example
 
@@ -92,3 +92,8 @@ $r$, and QLoRA's 4-bit base cuts the frozen-weight memory fourfold, the three nu
 that together put fine-tuning a large model within reach of one GPU. Adapting the weights
 is one lever on quality; optimizing the *prompt* programmatically is another, which is
 [DSPy](dspy-context-engineering).
+
+<Footnotes>
+  <FNItem n="1">**Hu, E. J., et al.** (2021). "LoRA: low-rank adaptation of large language models". *ICLR.* [arXiv:2106.09685](https://arxiv.org/abs/2106.09685)</FNItem>
+  <FNItem n="2">**Dettmers, T., Pagnoni, A., Holtzman, A., & Zettlemoyer, L.** (2023). "QLoRA: efficient finetuning of quantized LLMs". *NeurIPS.* [arXiv:2305.14314](https://arxiv.org/abs/2305.14314)</FNItem>
+</Footnotes>

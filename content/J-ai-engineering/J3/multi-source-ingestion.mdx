@@ -38,12 +38,12 @@ The modern default is to **extract and load first, transform later** (ELT): land
 data from every source in the warehouse or lake essentially as-is, then transform it
 *there*. Landing raw keeps the original around so a new requirement can be served by a new
 transformation rather than a re-extraction, the same reason ELT beat ETL for analytics
-and ML.
+and ML<FN n="1" />.
 
 ## The dbt mental model
 
 Once the raw data has landed, the transformations themselves need structure, and **dbt**
-(data build tool) provides the mental model that has become standard. Its core idea: a
+(data build tool) provides the mental model that has become standard<FN n="2" />. Its core idea: a
 transformation is just a `SELECT` statement, and a data model is a named query that other
 queries can build on. From that, three properties follow that connect directly to ideas
 already covered:
@@ -64,3 +64,8 @@ subsection later. Ingestion plus transformation gives you trustworthy data; this
 production-grade subsection. The next subsection turns to the advanced patterns that get
 more out of the models themselves, starting with the discipline of knowing
 [when not to fine-tune](J4/when-not-to-finetune).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Batch and streaming data integration, raw landing, and derived-data pipelines.</FNItem>
+  <FNItem n="2">**dbt Labs.** (2025). *dbt Documentation: About dbt projects.* [docs.getdbt.com](https://docs.getdbt.com/docs/build/projects). Models as `SELECT` statements, the transformation DAG, tests, and lineage.</FNItem>
+</Footnotes>

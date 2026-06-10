@@ -14,13 +14,13 @@ A single [agent](J1/react-loop) with many tools eventually strains: its context 
 dozens of tool schemas, its reasoning has to juggle unrelated concerns, and one long loop
 becomes hard to steer. The **multi-agent** pattern splits the work across several
 specialized agents that coordinate, the software-engineering instinct of decomposition
-applied to agents. The [concept](E/multi-agent) was sketched from the model side; here it
+applied to agents<FN n="1" />. The [concept](E/multi-agent) was sketched from the model side; here it
 is an [orchestration](J1/langgraph-state-machines) problem, and the main lesson is when the
 extra complexity is worth it.
 
 ## Supervisor, workers, handoffs, shared memory
 
-The dominant structure is **supervisor-worker**:
+The dominant structure is **supervisor-worker**<FN n="2" />:
 
 ```mermaid
 graph TD
@@ -64,3 +64,8 @@ If a single well-prompted agent with a reasonable tool set does the job, that is
 answer, simpler, cheaper, and easier to observe. Add agents to solve a *demonstrated*
 problem, not in anticipation of one. Whether one agent or many, each call costs tokens and
 time; the next lesson attacks that bill directly with [routing and caching](cost-latency-routing).
+
+<Footnotes>
+  <FNItem n="1">**Wu, Q., et al.** (2023). "AutoGen: enabling next-gen LLM applications via multi-agent conversation". [arXiv:2308.08155](https://arxiv.org/abs/2308.08155). Conversable agents, roles, and handoffs.</FNItem>
+  <FNItem n="2">**Wooldridge, M.** (2009). *An Introduction to MultiAgent Systems* (2nd ed.). Wiley. Foundations of agent coordination and decomposition.</FNItem>
+</Footnotes>

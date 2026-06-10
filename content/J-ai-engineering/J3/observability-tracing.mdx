@@ -16,7 +16,7 @@ rerank, call the model, maybe call a tool and loop, and the problem lives in *on
 them. **Observability** is the practice of instrumenting the system so you can see that
 internal structure after the fact. For AI systems the right tool is distributed
 **tracing**, because the unit of work is a multi-step pipeline, not a single function
-call.
+call<FN n="1" />.
 
 ## Spans and traces
 
@@ -48,7 +48,7 @@ Traditional monitoring leans on aggregate **metrics** (p99 latency, error rate) 
 not *which step* caused it. Logs record events but lose the causal structure, which log
 line belongs to which request, and which step produced it, is guesswork once requests
 interleave. Tracing keeps the structure: every span is tagged with its trace id, so the
-full causal path of one request is reconstructable even under heavy concurrency.
+full causal path of one request is reconstructable even under heavy concurrency<FN n="2" />.
 
 AI adds a further demand: you usually need to see the **actual inputs and outputs** of
 each step, the exact prompt sent, the documents retrieved, the raw model response,
@@ -60,3 +60,8 @@ user data, which is one more reason [security](prompt-injection-security) and go
 run through every layer. With the service observable, the next lesson confronts the
 threat unique to giving a model instructions and untrusted data in the same context:
 [prompt injection](prompt-injection-security).
+
+<Footnotes>
+  <FNItem n="1">**OpenTelemetry Authors.** (2025). *OpenTelemetry Specification: Traces.* CNCF. [opentelemetry.io](https://opentelemetry.io/docs/specs/otel/trace/). The span/trace data model behind modern tracing stacks.</FNItem>
+  <FNItem n="2">**Sigelman, B. H., et al.** (2010). "Dapper, a large-scale distributed systems tracing infrastructure". *Google Technical Report.* [research.google](https://research.google/pubs/pub36356/). The seminal distributed-tracing design.</FNItem>
+</Footnotes>
