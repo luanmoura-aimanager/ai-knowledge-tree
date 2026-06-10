@@ -1,0 +1,137 @@
+---
+title: "Windowing: tumbling, sliding, and session windows"
+pillar: K
+subId: K4
+lessonId: windowing
+order: 2
+estimatedMinutes: 22
+goal: "Aggregate an unbounded stream by cutting it into tumbling, sliding, and session windows, and compute the same metric under each to see how the window choice changes the answer."
+prerequisites: ["log-and-kafka"]
+---
+
+The [log](K4/log-and-kafka) hands you an *unbounded* sequence: events keep arriving
+and the stream never ends. Yet every useful metric ("requests per minute",
+"average session length") is an aggregate, and an aggregate needs a finite set to
+sum over. You cannot wait for the stream to finish, because it never does. The
+resolution is to cut the timeline into finite chunks and aggregate within each
+chunk. A chunk is a **window**, and the three standard shapes (tumbling, sliding,
+session) differ only in how their boundaries are placed. The shape you pick changes
+the answer, so it is worth defining each precisely.
+
+Throughout, an event carries a timestamp $t$, and a window is a half-open interval
+$[a, b)$ on the time axis: an event belongs to it when $a \le t < b$. Half-open so
+that an event exactly on a boundary lands in one window, not two.
+
+## Tumbling windows
+
+A **tumbling window** of width $w$ tiles the time axis with fixed, non-overlapping,
+gap-free intervals:
+
+$$
+W_k = [\,k w,\ (k+1) w\,), \qquad k = 0, 1, 2, \dots
+$$
+
+Each event falls into exactly one window, the one with index
+
+$$
+k = \left\lfloor \frac{t}{w} \right\rfloor,
+$$
+
+where $\lfloor \cdot \rfloor$ is the floor (round down). Because the windows
+partition the axis, with no overlap and no gap, the windows form a **partition** of
+the events: every event is counted once and only once. That gives the defining
+invariant: the per-window counts sum to the total number of events. "Requests per
+5-minute bucket" is a tumbling aggregate.
+
+## Sliding windows
+
+A **sliding window** keeps a fixed width $w$ but advances its start by a **slide**
+$s < w$ rather than by the full width:
+
+$$
+W_k = [\,k s,\ k s + w\,), \qquad k = 0, 1, 2, \dots
+$$
+
+Because $s < w$, consecutive windows overlap by $w - s$, so an event near a boundary
+is counted in **several** windows at once. This is what you want for a *rolling*
+metric: "average over the last 5 minutes, recomputed every 1 minute" is a sliding
+window with $w = 5$, $s = 1$. The trade is that the counts no longer sum to the
+total; an event in the overlap is counted once per window it touches, so
+$\sum_k |W_k| \ge N$. Setting $s = w$ recovers the tumbling case as the boundary
+between the two.
+
+## Session windows
+
+Tumbling and sliding windows are *fixed* in placement: their boundaries are decided
+by the clock, independent of the data. A **session window** is **data-driven**.
+Sort the events by time and walk them in order; a session continues while
+consecutive events are close, and a new session begins whenever the gap between two
+consecutive events exceeds a threshold $g$:
+
+$$
+\text{new session at } t_{i+1} \iff t_{i+1} - t_i > g.
+$$
+
+This models bursts of activity separated by idle periods (a user clicking around,
+then leaving). The boundary count follows directly from the rule: with $N$ sorted
+events there are $N-1$ consecutive gaps, and each gap that exceeds $g$ starts one
+new session. So if $m$ of the gaps exceed $g$, the stream splits into
+
+$$
+\#\text{sessions} = m + 1
+$$
+
+sessions (the first session needs no preceding gap, hence the $+1$). The window
+widths are whatever the data make them.
+
+![The same 12-event stream cut two ways. Tumbling windows tile the axis with no overlap, so each event lands in exactly one window and the per-window counts sum to 12. Sliding windows (width 5, slide 2.5) overlap, so events near a boundary are counted in more than one window and the counts no longer sum to the total.](/figures/K4/windowing.svg)
+
+## Worked example
+
+Take twelve event timestamps and assign them to tumbling windows (width 5), to
+sliding windows (width 5, slide 2.5), and segment them into sessions (gap threshold
+3). The two invariants from above are checked at the end: tumbling counts sum to the
+event total, and the session count equals (gaps over threshold) $+ 1$.
+
+```python
+import numpy as np
+
+events = np.array([0.5, 1.2, 2.0, 3.7, 6.1, 6.4, 9.9, 10.2, 13.0, 18.5, 18.9, 19.4])
+events = np.sort(events)
+N = events.size
+
+# --- Tumbling: width 5, non-overlapping. Each event -> floor(t / w). ---
+w = 5.0
+idx = np.floor(events / w).astype(int)
+n_windows = idx.max() + 1
+tumbling = np.array([np.sum(idx == k) for k in range(n_windows)])
+print("tumbling counts :", tumbling.tolist())
+
+# --- Sliding: width 5, slide 2.5, overlapping. Count per window start. ---
+w, s = 5.0, 2.5
+starts = np.arange(0.0, events.max() - w + 1e-9, s)
+sliding = np.array([np.sum((events >= a) & (events < a + w)) for a in starts])
+print("sliding counts  :", sliding.tolist())
+
+# --- Sessions: new session whenever a consecutive gap exceeds g. ---
+g = 3.0
+gaps = np.diff(events)                 # the N-1 consecutive gaps
+m = int(np.sum(gaps > g))             # gaps exceeding the threshold
+n_sessions = m + 1
+print("gaps over g     :", m, "-> sessions:", n_sessions)
+
+# Invariant 1: tumbling windows partition the events, so counts sum to N.
+assert tumbling.sum() == N
+# Sliding overlaps, so it counts at least as many (strictly more here).
+assert sliding.sum() >= N
+# Invariant 2: number of sessions = (gaps over threshold) + 1.
+assert n_sessions == m + 1
+print("tumbling sum =", int(tumbling.sum()), "= N =", N, "| sessions =", n_sessions)
+```
+
+The tumbling counts `[4, 3, 2, 3]` sum to the twelve events, the sliding counts sum
+higher because the overlap double-counts boundary events, and the two gaps over
+$g=3$ split the stream into three sessions. Every window above is keyed off the
+event's *own* timestamp $t$, which quietly assumed events arrive in timestamp
+order. They do not, and the [next lesson](K4/watermarks-late-data) confronts what
+happens when an event for an already-closed window shows up late.

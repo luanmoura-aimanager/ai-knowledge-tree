@@ -1,0 +1,149 @@
+---
+title: "Lightweight encodings: dictionary, run-length, and delta"
+pillar: K
+subId: K2
+lessonId: compression-encoding
+order: 2
+estimatedMinutes: 24
+goal: "Shrink a column with dictionary, run-length, and delta encoding, compute the compression ratio each gives on real data, and see why columnar layout makes these encodings so effective."
+prerequisites: ["row-vs-columnar"]
+---
+
+Once a column is stored [contiguously](row-vs-columnar), every value in the block
+has the same type and usually comes from the same narrow world: a country code, a
+sorted timestamp, a status flag repeated for thousands of rows. That uniformity is
+exactly what a general-purpose compressor cannot exploit on an interleaved row,
+but a column store can, with three encodings so cheap they decode at memory speed.
+Each targets one shape of data; together they explain why columnar files are often
+several times smaller than the raw bytes, on top of the I/O win from reading fewer
+columns.
+
+The yardstick throughout is the **compression ratio**
+
+$$
+\rho = \frac{\text{raw bytes}}{\text{encoded bytes}} ,
+$$
+
+the factor by which the encoding shrinks the column. $\rho > 1$ means a win;
+$\rho = 4$ means the encoded column is a quarter of the size.
+
+## Dictionary encoding
+
+A column with few *distinct* values but many rows (a country code over a million
+sales) wastes space storing the same wide value over and over. **Dictionary
+encoding** builds a table of the $d$ distinct values, the **dictionary**, and
+replaces each value in the column with its small integer **code** (its index into
+the dictionary).
+
+If the raw values are $w$ bytes each and there are $R$ rows, the raw column is
+$R \cdot w$ bytes. The codes need $\lceil \log_2 d \rceil$ bits each; rounding to a
+practical $b$ bytes per code, the encoded size is the codes plus the dictionary
+itself:
+
+$$
+S_{\text{dict}} = R \cdot b + d \cdot w , \qquad
+\rho_{\text{dict}} = \frac{R \cdot w}{R \cdot b + d \cdot w} .
+$$
+
+When $d \ll R$ the dictionary term is negligible and $\rho_{\text{dict}} \approx
+w / b$: a 2-byte code for an 8-byte string is a $4\times$ win, independent of how
+many rows there are.
+
+## Run-length encoding
+
+A sorted or repetitive column contains long **runs** of an identical value. A
+status column that is `active` for the first 50,000 rows then `closed` for the
+next 50,000 stores 100,000 values to express two facts. **Run-length encoding
+(RLE)** replaces each maximal run by a single $(\text{value}, \text{count})$ pair.
+
+Let the column have $r$ runs (a run is a maximal stretch of equal consecutive
+values). Each pair costs the value width $w$ plus a count of $c$ bytes, so
+
+$$
+S_{\text{rle}} = r \,(w + c) , \qquad
+\rho_{\text{rle}} = \frac{R \cdot w}{r \,(w + c)} .
+$$
+
+The ratio is governed by the **average run length** $R / r$: long runs (few $r$)
+give a large ratio, and a column with no repeats ($r = R$) gives
+$\rho_{\text{rle}} = w/(w+c) < 1$, an anti-compression that is why RLE is applied
+only where the data sorts into runs. Columnar layout helps here too: an engine can
+sort the whole file by one column, lengthening its runs before encoding.
+
+## Delta encoding
+
+A monotonic column, an auto-increment id, an ordered timestamp, stores large
+absolute values whose *differences* are tiny. **Delta encoding** keeps the first
+value as a **base** and stores each subsequent value as its gap from the previous
+one,
+
+$$
+\Delta_i = x_i - x_{i-1}, \qquad i = 2, \dots, R ,
+$$
+
+so the column is reconstructed by the prefix sum
+$x_i = x_1 + \sum_{k=2}^{i} \Delta_k$. The win is that the deltas are small enough
+to fit in far fewer bytes than the originals. If each original needs $w$ bytes but
+every delta fits in $w' < w$ bytes, the encoded size is one base plus $R-1$
+deltas:
+
+$$
+S_{\text{delta}} = w + (R-1)\, w' , \qquad
+\rho_{\text{delta}} \approx \frac{R \cdot w}{R \cdot w'} = \frac{w}{w'}
+$$
+
+for large $R$. Eight-byte timestamps whose deltas all fit in one byte give
+$\rho_{\text{delta}} \approx 8$.
+
+![Compression ratio (raw bytes over encoded bytes) for each lightweight encoding on a column it suits: dictionary on a low-cardinality column, run-length on a run-heavy column, delta on a monotonic one. The dashed line marks ratio 1, where an encoding would not help.](/figures/K2/compression-encoding.svg)
+
+## Worked example
+
+Build one column suited to each encoding, implement the three encoders in numpy,
+and compute the compression ratio of each.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+n = 100_000
+
+# --- Dictionary: low-cardinality 2-char codes -> 1-byte integer codes -----------
+cats = np.array(["US", "BR", "DE", "JP"])
+dict_col = cats[rng.integers(0, cats.size, n)]
+raw_dict = n * 2                                   # 2 bytes per 2-char string
+enc_dict = n * 1 + cats.size * 2                   # 1-byte code/row + the dictionary
+rho_dict = raw_dict / enc_dict
+
+# --- Run-length: a sorted/repetitive int32 column -> (value, count) runs ---------
+rle_col = np.repeat(np.arange(200), n // 200)      # 200 runs of equal length
+n_runs = 1 + int(np.count_nonzero(np.diff(rle_col)))
+raw_rle = rle_col.size * 4
+enc_rle = n_runs * 8                               # 4-byte value + 4-byte count
+rho_rle = raw_rle / enc_rle
+
+# --- Delta: monotonic int64 timestamps -> 1-byte gaps ---------------------------
+delta_col = np.cumsum(rng.integers(1, 60, n)).astype(np.int64)
+gaps = np.diff(delta_col)
+assert gaps.min() >= 1 and gaps.max() < 256         # every gap fits in one byte
+raw_delta = delta_col.size * 8
+enc_delta = 8 + gaps.size * 1                        # one 8-byte base + 1-byte deltas
+rho_delta = raw_delta / enc_delta
+
+# Decoders round-trip exactly (correctness, not just size).
+assert np.array_equal(delta_col, np.r_[delta_col[0], delta_col[0] + np.cumsum(gaps)])
+
+print(f"dictionary ratio = {rho_dict:.1f}x  ({n} rows, {cats.size} distinct)")
+print(f"run-length ratio = {rho_rle:.1f}x  ({n_runs} runs)")
+print(f"delta      ratio = {rho_delta:.1f}x")
+
+assert rho_dict > 1
+assert rho_rle > 1
+assert rho_delta > 1
+print("each encoding compresses the column it was built for:", True)
+```
+
+Each encoder beats the raw column on the shape it targets, with ratios that the
+formulas above predict from cardinality, run length, and delta width. A real
+columnar file (Parquet) stacks these encodings inside every column chunk and
+records per-chunk statistics on top; the [next lesson](parquet-internals) opens
+that file format up.

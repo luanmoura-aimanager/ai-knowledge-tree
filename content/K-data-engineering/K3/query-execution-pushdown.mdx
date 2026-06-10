@@ -1,0 +1,127 @@
+---
+title: "Query execution: predicate pushdown and vectorization"
+pillar: K
+subId: K3
+lessonId: query-execution-pushdown
+order: 5
+estimatedMinutes: 24
+goal: "Trace how a query planner pushes filters and column projections down to the scan and processes data in vectorized batches, cutting the rows and bytes that reach the CPU."
+prerequisites: ["K2/partitioning-pruning", "distributed-joins"]
+---
+
+The cheapest data to process is the data you never read. A naive engine reads the whole
+table into memory, then filters and projects; a modern one rewrites the plan so the
+filtering and column selection happen **at the scan**, before the bytes ever leave
+storage. Combined with reading data in batches rather than one row at a time, this is what
+lets a columnar engine answer a query touching three columns and 5% of the rows by reading
+a tiny fraction of a terabyte table. Three mechanisms do the work: **predicate pushdown**,
+**projection pushdown**, and **vectorized execution**.
+
+## The logical plan is a tree to rewrite
+
+A query parses into a **logical plan**, a tree of operators. The query
+`SELECT a, b FROM t WHERE c > 100` becomes, read bottom-up: a **scan** of `t`, then a
+**filter** on `c > 100`, then a **project** to columns `a, b`. The naive execution runs
+this literally, scan everything, then filter, then project, so it materializes the full
+table first.
+
+The optimizer rewrites the tree before running it. Two rewrites move work toward the leaf.
+
+## Projection pushdown
+
+**Projection pushdown** pushes the column selection into the scan, so the scan reads only
+the columns the query references, not the whole row. This is only cheap on a
+[columnar layout](K2/row-vs-columnar), where each column is stored contiguously and an
+unread column costs zero I/O. If a table has $C$ columns of equal width and the query
+needs $c$ of them, projection pushdown cuts the bytes read by a factor of $c / C$:
+
+$$
+\text{bytes}_{\text{proj}} = \text{bytes}_{\text{full}} \cdot \frac{c}{C}.
+$$
+
+For a 20-column table touching 3 columns, that is reading 15% of the data before any
+filtering.
+
+## Predicate pushdown
+
+**Predicate pushdown** moves the `WHERE` filter down to the scan so rows are discarded as
+early as possible. Two storage features make this skip data without reading it.
+
+First, [partition pruning](K2/partitioning-pruning): if the table is partitioned on the
+filtered column, entire partitions that cannot match are skipped at the directory level.
+
+Second, **column statistics**. A [Parquet](K2/parquet-internals) file stores its rows in
+**row groups**, and each row group records the **min and max** of every column. Before
+reading a row group, the engine checks the predicate against those stats: if the filter is
+`c > 100` and a row group has $\max(c) = 80$, no row in it can match, so the whole group is
+skipped without decoding a single value. This is **min/max skipping**, and on
+range-filtered, roughly sorted data it discards most row groups.
+
+What survives is governed by the **selectivity** $\sigma \in [0, 1]$, the fraction of rows
+the predicate keeps. After pushdown, the rows reaching the CPU are
+
+$$
+\text{rows}_{\text{out}} = \sigma \cdot N,
+$$
+
+for an input of $N$ rows. Stacked with projection, the bytes the CPU actually processes
+are $\sigma \cdot N \cdot c \cdot w$ (with $w$ the per-value width), versus $N \cdot C
+\cdot w$ for the naive plan, a reduction by $\sigma \cdot (c / C)$.
+
+## Vectorized execution
+
+Having minimized *what* is read, vectorization minimizes the per-row overhead of
+processing it. A **row-at-a-time** engine calls each operator once per row through a chain
+of virtual function calls; the interpreter overhead can dwarf the actual arithmetic. A
+**vectorized** engine instead passes **batches** of values (a column slice of, say, 1024
+values) through each operator at once. One function call now does 1024 comparisons in a
+tight loop over a contiguous array, which the CPU runs with predictable branches and SIMD
+instructions. The bytes are the same; the per-byte cost collapses because the loop
+overhead is amortized over the whole batch. Columnar storage and vectorization fit
+together: a column is already a contiguous array, which is exactly the batch the vectorized
+operator wants.
+
+![Bytes reaching the CPU at each plan stage. A naive plan reads the whole table; projection pushdown drops the unread columns; predicate pushdown skips the row groups that cannot match. Each stage reads strictly less.](/figures/K3/query-execution-pushdown.svg)
+
+## Worked example
+
+Simulate a scan of $N$ rows by $C$ columns. Compute the bytes a naive full-materialize
+plan reads, then apply projection (keep $c$ columns) and a pushed-down predicate (keep a
+fraction $\sigma$ of rows). The pushed-down plan must read strictly fewer bytes and rows
+than the naive one.
+
+```python
+N, C = 10_000_000, 20           # rows, columns
+bytes_per_value = 8
+
+# Naive plan: read every cell of the table, then filter in memory.
+bytes_full = N * C * bytes_per_value
+
+# Projection pushdown: read only the columns the query references.
+cols_kept = 3
+bytes_proj = N * cols_kept * bytes_per_value
+
+# Predicate pushdown: min/max skipping + pruning keep only matching rows.
+selectivity = 0.05              # the WHERE clause keeps 5% of rows
+rows_kept = int(N * selectivity)
+bytes_pushed = rows_kept * cols_kept * bytes_per_value
+
+for name, b in [("full scan", bytes_full),
+                ("+ projection", bytes_proj),
+                ("+ predicate", bytes_pushed)]:
+    print(f"{name:14s}: {b/1e9:6.3f} GB")
+
+reduction = bytes_pushed / bytes_full
+print(f"pushed plan reads {reduction*100:.2f}% of the naive bytes")
+
+assert bytes_proj   < bytes_full     # projection reads fewer bytes than full scan
+assert bytes_pushed < bytes_proj     # predicate reads fewer still
+assert rows_kept    < N              # fewer rows reach the CPU
+print("ok: pushdown + projection strictly cut the bytes and rows read")
+```
+
+The pushed plan reads 0.75% of the naive bytes here, the product of keeping 15% of columns
+and 5% of rows. This closes batch processing: data is partitioned, joined, and scanned
+with the minimum I/O. The [next subsection](K4/log-and-kafka) drops the assumption that
+the data sits still and turns to streaming, where records arrive continuously as an
+append-only log.

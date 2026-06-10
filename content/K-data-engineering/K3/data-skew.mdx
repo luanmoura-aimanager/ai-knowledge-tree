@@ -1,0 +1,108 @@
+---
+title: "Data skew and the straggler problem"
+pillar: K
+subId: K3
+lessonId: data-skew
+order: 4
+estimatedMinutes: 22
+goal: "Quantify how a skewed key distribution overloads one reducer, making job time track the largest partition rather than the average, and fix it with salting."
+prerequisites: ["distributed-joins"]
+---
+
+The [shuffle](mapreduce) and the [shuffle join](distributed-joins) both rest on the same
+hope: that hash-partitioning keys spreads work evenly across reducers. Real keys rarely
+oblige. User IDs, country codes, and event types follow power laws, where a handful of
+keys account for most of the rows. When one key is far heavier than the rest, the reducer
+that owns it gets buried while the others sit idle, and the job waits on that one machine.
+That lagging machine is the **straggler**, and it is the dominant failure mode of large
+distributed aggregations.
+
+## Job time tracks the maximum, not the mean
+
+After the shuffle, reducer $j$ holds some number of records $L_j$, its **load**. The
+reducers run in parallel, so the aggregation phase is not finished until the **slowest**
+reducer is finished. With roughly equal per-record cost, the wall-clock time of the phase
+is set by the largest load:
+
+$$
+T \;\propto\; \max_{j} L_j,
+$$
+
+not by the average load $\bar L = \frac{1}{R}\sum_j L_j$. The gap between them is the
+**straggler ratio** $\max_j L_j / \bar L$. With a balanced partition this ratio is near
+$1$ and adding machines genuinely speeds the job up. With a skewed key, the ratio blows
+up: doubling the cluster does nothing, because the hot reducer's load is unchanged and the
+job still waits on it. This is why a job that "should" be fast on a big cluster instead
+crawls; the bottleneck is one partition, and more workers cannot split it.
+
+## Why skew concentrates on one reducer
+
+Recall the partition rule $\text{partition}(k) = \operatorname{hash}(k) \bmod R$. Every
+row with key $k$ lands on the **same** reducer, by design: that is what lets the reducer
+see all of $k$'s values at once. But it means a single hot key cannot be spread. If key
+$k^\star$ owns 40% of all rows, then one reducer receives at least 40% of the rows no
+matter how large $R$ is. The hash function spreads *distinct keys* evenly; it does nothing
+about an imbalance *within* a single key.
+
+## Salting splits the hot key
+
+The fix is to make the hot key look like several keys. **Salting** appends a random
+integer **salt** $s \in \{0, 1, \dots, m-1\}$ to the key, turning $k^\star$ into $m$
+distinct synthetic keys $(k^\star, 0), \dots, (k^\star, m-1)$. The hash now scatters these
+across up to $m$ reducers, so the hot key's load splits roughly $m$ ways:
+
+$$
+L_{\text{hot}} \;\longrightarrow\; \frac{L_{\text{hot}}}{m}\ \text{(per salted bucket)}.
+$$
+
+The cost is a second pass: each salted bucket produces a **partial** aggregate, and a
+final step re-combines the $m$ partials for $k^\star$ into its true total. For an
+associative reduction (sum, count, max) this is exact, since $\sum$ over the whole is the
+$\sum$ of the partial $\sum$s. Salting trades one extra small aggregation for cutting the
+straggler down, and the heaviest reducer's load drops accordingly.
+
+![Per-reducer load before and after salting a skewed key distribution. Before, a power-law key piles onto one reducer and the max bar towers over the mean; salting splits the hot key across reducers, dropping the maximum toward the average.](/figures/K3/data-skew.svg)
+
+## Worked example
+
+Draw a power-law key set, hash it to $R$ reducers, and measure the straggler: the maximum
+load against the mean. Then salt the hottest reducer's load across all reducers and show
+the maximum drops. The maximum must exceed the mean before salting, and salting must lower
+the maximum.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+R = 8
+n_keys = 200
+counts = (rng.pareto(1.2, n_keys) + 1) * 10     # power-law key sizes (heavy tail)
+assign = rng.integers(0, R, n_keys)              # hash each key to a reducer
+
+load = np.zeros(R)
+for k in range(n_keys):
+    load[assign[k]] += counts[k]
+
+max_before, mean_load = load.max(), load.mean()
+straggler_ratio = max_before / mean_load
+print(f"per-reducer load  : {np.round(load).astype(int)}")
+print(f"max={max_before:.0f}  mean={mean_load:.0f}  straggler ratio={straggler_ratio:.2f}x")
+
+# Salting: split the hottest reducer's load evenly across all R reducers.
+hot = int(np.argmax(load))
+after = load.copy()
+spill = after[hot] * (1 - 1.0 / R)               # everything beyond its fair 1/R share
+after[hot] -= spill
+after += spill / R                               # redistribute the spill across reducers
+max_after = after.max()
+print(f"max after salting : {max_after:.0f}  (was {max_before:.0f})")
+
+assert max_before > mean_load          # the unsalted job is straggler-bound
+assert max_after  < max_before         # salting lowered the heaviest reducer
+print(f"ok: straggler cut from {max_before:.0f} to {max_after:.0f} records")
+```
+
+The straggler ratio here is about $2.3\times$, so before salting the job runs more than
+twice as long as a balanced one would; salting brings the peak down toward the mean.
+Skew is the last of the runtime costs; the [next lesson](query-execution-pushdown) turns
+to how the query planner avoids reading data it does not need in the first place.

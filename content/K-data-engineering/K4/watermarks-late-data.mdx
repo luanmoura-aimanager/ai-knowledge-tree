@@ -1,0 +1,125 @@
+---
+title: "Event time, watermarks, and late data"
+pillar: K
+subId: K4
+lessonId: watermarks-late-data
+order: 3
+estimatedMinutes: 24
+goal: "Separate event time from processing time, track progress with a watermark that bounds how late data can be, and reason about the completeness-versus-latency tradeoff it sets."
+prerequisites: ["windowing"]
+---
+
+[Windowing](K4/windowing) assigned every event to a window using the event's own
+timestamp, and quietly assumed events arrive in timestamp order. In a real stream
+they do not. A phone goes through a tunnel, buffers its events, and uploads them
+five minutes later; a [partition](K4/log-and-kafka) is briefly slow. So an event
+that *happened* at 12:00 can *arrive* at 12:05, after the noon window looked done
+and was already aggregated. The system needs a principled answer to one question:
+when is it safe to declare a window complete and emit its result, knowing a
+straggler might still be in flight? The **watermark** is that answer.
+
+## Two clocks: event time and processing time
+
+Every event has two timestamps, and keeping them apart is the whole game.
+
+- **Event time** $t_e$: when the event actually occurred, stamped at the source
+  (the moment the user clicked). This is the time the *windows* are defined in,
+  because the metric ("clicks in the noon hour") is about when things happened.
+- **Processing time** $t_p$: when the event arrived at the stream processor and got
+  handled. This is the clock on the server doing the work.
+
+If the network were instant and ordered, $t_p = t_e$ for every event and the two
+clocks would coincide. They never do. The delay $t_p - t_e \ge 0$ varies per event,
+and because it varies, events arrive **out of order in event time**: the processor
+can see an event with $t_e = 12:05$ and then, later in processing time, an event
+with $t_e = 12:00$. A window keyed on event time therefore cannot close just because
+the wall clock passed its end; some of its events may not have arrived yet.
+
+## The watermark
+
+A **watermark** is the processor's running assertion: *"I believe I have now seen
+every event with event time at or before $W$."* It is a value on the event-time axis
+that only moves forward, and the standard way to compute it is to take the largest
+event time seen so far and subtract a fixed **allowed lateness** $L \ge 0$:
+
+$$
+W(t_p) = \max_{\text{events seen by } t_p} t_e \;-\; L.
+$$
+
+Read it as a heuristic with a safety margin. The largest event time seen,
+$\max t_e$, is the front of the stream; subtracting $L$ pulls the watermark back so
+that an event arriving up to $L$ behind the front is still considered on time. Two
+rules hang off the watermark:
+
+- **A window $[a, b)$ fires when $W(t_p) \ge b$.** Once the watermark passes the
+  window's end, the processor declares the window complete, computes its aggregate,
+  and emits it. The window stops accepting input.
+- **An event is late, and dropped, when $t_e < W(t_p)$ at arrival.** Its window has
+  already fired (the watermark is past $t_e$, hence past that window's end), so the
+  result was already emitted. Production systems either drop such events or route
+  them to a **side output** for separate, slower reconciliation.
+
+This is purely a bound, not a guarantee: $\max t_e - L$ is a guess that no event is
+more than $L$ behind the front. A truly pathological straggler still violates it,
+which is exactly why genuinely late events exist and have to be handled.
+
+## The tradeoff that $L$ sets
+
+The allowed lateness $L$ is the one knob, and it trades **completeness against
+latency** directly.
+
+- **Larger $L$** pulls the watermark further back, so windows wait longer before
+  firing and catch more stragglers. More events are counted (higher completeness),
+  but every result is delayed by up to $L$ (higher latency).
+- **Smaller $L$** fires windows sooner, so results are fresh, but any event slower
+  than $L$ misses its window and is dropped (lower completeness).
+
+So the count of dropped-late events is **monotonically non-increasing in $L$**:
+raising $L$ can only rescue events that a smaller $L$ would have dropped, never
+create new late ones. That monotonicity is the property the worked example checks.
+
+![Each point is an event: its event time (x) against its processing time (y); points above the dashed proc = event line arrived after they happened. The step line is the watermark, max event time seen minus the allowed lateness. The three X-marked events arrived after the watermark had already passed their event time, so they are late and dropped.](/figures/K4/watermarks-late-data.svg)
+
+## Worked example
+
+Build a stream of 40 events with random processing delays (a few badly delayed), sort
+them into arrival order, and track the watermark as each arrives. For a given allowed
+lateness $L$, an event is late when its event time is already below the watermark at
+the moment it arrives. The assert confirms the monotonic tradeoff: increasing $L$
+never increases the number of dropped-late events.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n = 40
+event_time = np.sort(rng.uniform(0, 20, n))   # when each event happened
+delay = rng.exponential(1.2, n)               # network/processing delay
+delay[[7, 19, 31]] += 6.0                     # three badly delayed stragglers
+proc_time = event_time + delay                # when it arrived
+
+order = np.argsort(proc_time)                 # replay in arrival order
+et = event_time[order]
+# Watermark just before each arrival = max event time among already-arrived events,
+# minus L. max(event_time) over arrivals is a running max in arrival order.
+running_max = np.maximum.accumulate(et)
+
+def dropped_late(L):
+    watermark = running_max - L               # watermark at each arrival
+    return int(np.sum(et < watermark))        # events older than the watermark
+
+for L in [0.0, 1.0, 2.0, 5.0]:
+    print(f"L = {L:>3}  ->  dropped late = {dropped_late(L)}")
+
+counts = [dropped_late(L) for L in [0.0, 1.0, 2.0, 3.0, 5.0, 8.0]]
+# Completeness vs latency: more allowed lateness can only drop fewer (never more).
+assert all(counts[i] >= counts[i + 1] for i in range(len(counts) - 1))
+assert dropped_late(0.0) > dropped_late(5.0)
+print("dropped counts by L:", counts, "-> monotonically non-increasing")
+```
+
+With $L = 0$ the watermark hugs the front of the stream and many out-of-order events
+are dropped; raising $L$ widens the grace period and the dropped count falls to a
+handful and then to zero. Even at-least-counted events can still arrive twice, which
+raises the orthogonal question of how many times each event is *delivered* in the
+first place. That is [delivery semantics](K4/delivery-semantics).

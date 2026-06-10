@@ -1,0 +1,115 @@
+---
+title: "The log abstraction and Kafka"
+pillar: K
+subId: K4
+lessonId: log-and-kafka
+order: 1
+estimatedMinutes: 20
+goal: "Model a stream as an append-only partitioned log with per-consumer offsets, and see how partitioning by key gives ordered, replayable, horizontally scalable ingestion."
+prerequisites: ["K1/oltp-vs-olap"]
+codeExempt: true
+---
+
+A [transactional database](K1/oltp-vs-olap) answers "what is the current state of
+row 42?". A stream of events asks a different question: "what *happened*, in order,
+and let me read it again later?". A bank does not just want the current balance; it
+wants the ordered sequence of deposits and withdrawals that produced it, kept so
+that a new consumer (a fraud detector, an analytics job) can replay the whole
+history from the start. The data structure that serves this is the oldest one in
+systems: an **append-only log**. Kafka is the system that made the log a
+first-class piece of infrastructure, and its design is the vocabulary the rest of
+this subsection uses.
+
+## The log: append-only, totally ordered, replayable
+
+A **log** is a sequence of records where the only write operation is *append to the
+end*. Records are never updated in place and never deleted out of order; a record's
+position in the sequence is its **offset**, a monotonically increasing integer
+$0, 1, 2, \dots$ assigned when it lands. Three properties fall out of this and they
+are the whole point:
+
+- **Total order.** Within one log, record at offset $i$ provably happened before
+  record at offset $i+1$. There is no ambiguity about sequence.
+- **Immutability.** A record at offset $i$ never changes, so any number of readers
+  can read it concurrently without locks; there is nothing to contend over.
+- **Replayability.** A reader is just a cursor holding an offset. Reading does not
+  consume the record (unlike a queue, where a `pop` removes it), so a new reader can
+  start at offset $0$ and replay all of history, and an existing reader can rewind.
+
+Storage stays cheap because appends are sequential disk writes, the fastest access
+pattern a disk has, and old records are aged out by a **retention** policy (drop
+records older than, say, seven days) rather than per-read deletion.
+
+## Topics and partitions: ordering versus scale
+
+A single log on a single machine has a ceiling: every record passes through one
+disk, so throughput is bounded by that one disk. To scale horizontally you must
+split the log across machines, but splitting breaks total order, because two
+records on two different machines have no shared clock. Kafka resolves the tension
+by giving up *global* order and keeping *per-key* order.
+
+A **topic** is a named stream (`payments`, `clicks`). Each topic is split into a
+fixed number of **partitions**, and each partition is itself an independent
+append-only log with its own offset sequence, hosted on a broker. A **producer**
+writing a record supplies a **key**; the partition is chosen by hashing it,
+
+$$
+\text{partition} = \operatorname{hash}(\text{key}) \bmod P,
+$$
+
+where $P$ is the partition count. Two consequences follow directly from this one
+formula:
+
+- **All records with the same key land in the same partition**, so they share that
+  partition's single offset sequence and are therefore totally ordered with respect
+  to each other. Every event for `account=42` is ordered; events for `account=42`
+  and `account=99` may interleave arbitrarily, which is fine because they are
+  independent.
+- **Throughput scales with $P$.** Different keys spread across partitions, so $P$
+  partitions on $P$ brokers give $P$ times the single-log throughput. Order is
+  preserved exactly where it is needed (per key) and relaxed exactly where relaxing
+  it buys scale (across keys).
+
+The key choice is therefore a modeling decision: pick the field whose ordering you
+must preserve. Key by `account_id` and per-account history is ordered; key randomly
+and you get maximum spread but no ordering guarantee finer than "within a
+partition".
+
+## Consumer groups and offsets: who has read how far
+
+A **consumer** reads a partition by holding an offset and asking for "everything at
+or after offset $c$". The broker is stateless about this; it stores the records,
+the consumer stores its position. Because the position is just an integer the
+consumer **commits** back, two readers of the same partition are fully independent,
+which is what makes replay free.
+
+Readers are organized into **consumer groups**. A group is a set of consumer
+processes that cooperate to read a topic exactly once *as a group*: Kafka assigns
+each partition to one member of the group, so the $P$ partitions are divided among
+the group's members and the work parallelizes up to $P$ ways. Crucially, each group
+keeps its *own* committed offset per partition. The fraud-detection group and the
+analytics group both read `payments` from their own positions and neither sees the
+other; one can be live at the tip while the other replays last week.
+
+```mermaid
+graph LR
+  P1["producer<br/>key=acct-42"] -->|"hash mod P"| T
+  P2["producer<br/>key=acct-99"] -->|"hash mod P"| T
+  subgraph T["topic: payments"]
+    PA["partition 0<br/>offsets 0,1,2,3,4 →"]
+    PB["partition 1<br/>offsets 0,1,2 →"]
+  end
+  PA --> GA["group: fraud<br/>committed offset 3"]
+  PB --> GA
+  PA --> GB["group: analytics<br/>committed offset 0 (replaying)"]
+  PB --> GB
+```
+
+The producers route by key into partitions; each partition is an ordered offset
+sequence; each consumer group tracks its own offset per partition and so reads the
+same data independently and at its own pace.
+
+This append-only, partitioned, offset-addressed log is the substrate every later
+lesson assumes. The next lesson takes the unbounded stream it delivers and asks the
+first hard question of stream processing: how do you compute an aggregate over data
+that never ends? That is [windowing](K4/windowing).

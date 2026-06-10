@@ -1,0 +1,129 @@
+---
+title: "Row vs columnar storage"
+pillar: K
+subId: K2
+lessonId: row-vs-columnar
+order: 1
+estimatedMinutes: 20
+goal: "Lay the same table out by row or by column and compute the bytes an analytical query must scan in each, the I/O argument that makes columnar the default for analytics."
+prerequisites: ["K1/oltp-vs-olap"]
+---
+
+A table is a two-dimensional thing: rows and columns. Storage is one-dimensional:
+a file is a sequence of bytes. So a storage engine has to choose an *order* in
+which to flatten the table onto disk, and that choice decides which queries are
+cheap. [Analytical workloads](K1/oltp-vs-olap) read a handful of columns across
+millions of rows (`SELECT region, SUM(amount) ... GROUP BY region`). The layout
+that lets such a query touch only the columns it asked for is the one that wins,
+and that layout is columnar.
+
+## Two ways to flatten a table
+
+Take a table with $R$ rows and $C$ columns, where column $j$ stores values of a
+fixed byte width $w_j$. The size of one row is $W = \sum_{j=1}^{C} w_j$ bytes, and
+the whole table is $R \cdot W$ bytes either way. What differs is the *order* on
+disk.
+
+**Row-major (row store)** writes the table row by row: all $C$ fields of row 1,
+then all $C$ fields of row 2, and so on. Row $i$ occupies one contiguous block of
+$W$ bytes. This is how an [OLTP](K1/oltp-vs-olap) engine likes it: fetching or
+updating a whole record is one contiguous read.
+
+**Column-major (column store)** writes the table column by column: all $R$ values
+of column 1, then all $R$ values of column 2. Column $j$ occupies one contiguous
+block of $R \cdot w_j$ bytes. Reading one column is now a single contiguous scan,
+and the other columns are nowhere near it.
+
+```mermaid
+graph LR
+  subgraph Row["row-major on disk"]
+    direction LR
+    r1["r1.c1 r1.c2 r1.c3"] --> r2["r2.c1 r2.c2 r2.c3"] --> r3["r3.c1 r3.c2 r3.c3"]
+  end
+  subgraph Col["column-major on disk"]
+    direction LR
+    c1["c1: r1 r2 r3"] --> c2["c2: r1 r2 r3"] --> c3["c3: r1 r2 r3"]
+  end
+```
+
+## The bytes an analytical query must scan
+
+A query that reads a subset $S \subseteq \{1, \dots, C\}$ of the columns has to
+pull some number of bytes off disk before it can compute anything. The disk reads
+in contiguous blocks, and the smallest unit it can skip is a contiguous run of
+bytes belonging entirely to columns outside $S$. Count the bytes each layout
+forces it to scan.
+
+**Step 1: row-major.** The values of a wanted column are scattered: column $j$'s
+value in row $i$ sits at offset $i \cdot W + \sum_{k<j} w_k$, so consecutive
+values of one column are $W$ bytes apart, interleaved with every other column. To
+read even one column you must stream past all the others. There is no contiguous
+run that belongs only to unwanted columns, so the engine scans the entire table:
+
+$$
+B_{\text{row}} = R \cdot W = R \sum_{j=1}^{C} w_j .
+$$
+
+The cost does not depend on $|S|$ at all; reading 1 column costs the same as
+reading every column.
+
+**Step 2: column-major.** Each column is its own contiguous block, so the engine
+seeks to the blocks of the columns in $S$ and reads only those. The bytes scanned
+are
+
+$$
+B_{\text{col}} = R \sum_{j \in S} w_j .
+$$
+
+**Step 3: the ratio.** Dividing the two,
+
+$$
+\frac{B_{\text{row}}}{B_{\text{col}}} = \frac{\sum_{j=1}^{C} w_j}{\sum_{j \in S} w_j} ,
+$$
+
+which is large exactly when the query reads few of many columns: the wide-table,
+narrow-projection shape of analytics. For a 50-byte row where the query wants two
+4-byte columns, that ratio is about $50/8 \approx 6$: the row store moves roughly
+six times the data to answer the same question. (This is the I/O argument alone;
+columnar layout *also* makes each column compress far better, which the
+[next lesson](compression-encoding) develops.)
+
+![Bytes a 2-of-8-column analytical query must scan: a row store reads every column of every row, while a columnar store reads only the two projected columns.](/figures/K2/row-vs-columnar.svg)
+
+## Worked example
+
+Lay out a million-row, eight-column table and count the bytes a 2-column query
+scans under each physical order.
+
+```python
+import numpy as np
+
+n_rows = 1_000_000
+# Byte width of each of the 8 columns (mixed types: two int64, two int32, ...).
+widths = np.array([8, 8, 4, 4, 2, 1, 16, 8])     # bytes per value, per column
+selected = np.array([0, 6])                       # the query reads columns 0 and 6
+
+row_width = widths.sum()                           # bytes per full row
+bytes_row = n_rows * row_width                     # row store: must scan everything
+bytes_col = n_rows * widths[selected].sum()        # column store: only 2 columns
+
+ratio = bytes_row / bytes_col
+print(f"row width            = {row_width} bytes")
+print(f"row-store  scanned   = {bytes_row/1e6:,.1f} MB")
+print(f"column-store scanned = {bytes_col/1e6:,.1f} MB")
+print(f"row / column ratio   = {ratio:.2f}x")
+
+# Row store reads the whole table; column store reads only the projected columns.
+assert bytes_row == n_rows * widths.sum()
+assert bytes_col == n_rows * (widths[0] + widths[6])
+assert bytes_col < bytes_row
+assert np.isclose(ratio, widths.sum() / widths[selected].sum())
+assert ratio > 2.0
+print("columnar scans far fewer bytes for a narrow projection:", bytes_col < bytes_row)
+```
+
+The column store scans only the two requested columns while the row store scans
+all eight, a ratio fixed by the row width over the projected width. Storing one
+column contiguously also makes its values uniform and predictable, which is what
+lets the lightweight encodings of the [next lesson](compression-encoding) shrink
+it so aggressively.

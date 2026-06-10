@@ -1,0 +1,126 @@
+---
+title: "Scheduling, backfills, and idempotent reruns"
+pillar: K
+subId: K5
+lessonId: scheduling-backfills
+order: 4
+estimatedMinutes: 24
+goal: "Schedule a pipeline as dependency-driven runs partitioned by time, and design each task to be idempotent so a backfill or retry recomputes a partition cleanly without double-counting."
+prerequisites: ["incremental-processing", "A5/graph-traversal"]
+---
+
+The [incremental model](K5/incremental-processing) answered how to update one table
+cheaply. A pipeline is many such tables on a recurring schedule, and the schedule
+introduces two hard requirements. First, the tables have dependencies, so the runs
+must respect an order. Second, real pipelines reprocess the past: a bug fixed today
+must be applied to last month's data, and a task that died mid-run must be retried.
+Both mean a unit of work runs *more than once on the same logical slice of data*, and
+unless each task is built to tolerate that, reruns corrupt the table. The design that
+makes reruns safe is time partitioning plus idempotent partition overwrite.
+
+## Runs partitioned by time
+
+Most pipelines are anchored to time: "compute yesterday's revenue", "aggregate last
+hour's events". The clean model is to slice the output into **partitions**, one per
+time interval, and treat each scheduled run as responsible for exactly one partition.
+A daily pipeline has one partition per calendar day; the run for `2026-01-02` reads
+that day's source rows and writes that day's output partition. Partitioning gives a
+unit of recomputation: to fix one day you recompute one partition, independent of all
+the others.
+
+## Dependency-driven scheduling
+
+Within a single run, the tasks form a [directed acyclic graph](I1/orchestration-dags):
+an edge $u \to v$ means $v$ reads what $u$ produces, so $u$ must finish first. The
+scheduler runs the tasks in a **topological order** of that DAG, a linear order in
+which every task appears after all its dependencies. Computing one is a
+[graph traversal](A5/graph-traversal): repeatedly run any task whose dependencies are
+all complete. The schedule is therefore *derived* from the declared dependencies, not
+written by hand, and the same machinery decides what is ready to run next when a task
+finishes or fails.
+
+## Idempotent partition overwrite
+
+The property that makes reruns safe is **idempotency**: running a task twice on the
+same partition leaves the same result as running it once. The naive write, **append**
+the run's rows to the table, is not idempotent. A retry, or a backfill that touches a
+date already processed, appends a second copy and double-counts. The fix is to make
+the unit of write the *whole partition*: the task **deletes the target partition and
+writes it fresh** (a delete-insert), or equivalently overwrites it. Whether it runs
+once or five times, the partition ends with exactly the rows that one clean run
+produces.
+
+Formally, let $T$ be the table and $W_d$ the operation that writes partition $d$.
+Append gives $W_d \circ W_d \ne W_d$: the partition's row count grows with each
+application. Overwrite gives
+
+$$
+W_d \circ W_d = W_d,
+$$
+
+the defining equation of an idempotent operation. With overwrite, a **backfill** of a
+date range is just "run $W_d$ for each $d$ in the range", and running that backfill
+twice is harmless because each $W_d$ is idempotent. A **retry** of a failed run is the
+same $W_d$ again, also harmless. Idempotent partition overwrite is what turns "just
+rerun it" into a safe instruction.
+
+![Backfilling a three-day range twice. The non-idempotent append doubles every partition's row count (a silent double-count on any rerun), while idempotent overwrite holds the correct per-day counts no matter how many times the backfill runs.](/figures/K5/scheduling-backfills.svg)
+
+## Worked example
+
+A table is partitioned by date. Two write strategies are compared: a buggy `append`
+and an idempotent `overwrite`. A three-day range is backfilled **twice** (modeling a
+backfill that re-touched dates, or a retry). The append strategy doubles every
+partition; the overwrite strategy holds the correct per-day counts.
+
+```python
+import numpy as np
+
+dates = ["2026-01-01", "2026-01-02", "2026-01-03"]
+# Deterministic source rows per partition (the day's events).
+source = {
+    "2026-01-01": np.array([1.0, 2.0, 3.0]),
+    "2026-01-02": np.array([4.0, 5.0]),
+    "2026-01-03": np.array([6.0, 7.0, 8.0, 9.0]),
+}
+
+def write_append(table, date, rows):
+    # NOT idempotent: tack the run's rows onto whatever the partition already holds.
+    table = dict(table)
+    table[date] = table.get(date, []) + list(rows)
+    return table
+
+def write_overwrite(table, date, rows):
+    # Idempotent: replace the whole partition with this run's rows.
+    table = dict(table)
+    table[date] = list(rows)
+    return table
+
+# Backfill the full range TWICE (a re-run / retry of every partition).
+tbl_append, tbl_overwrite = {}, {}
+for _pass in range(2):
+    for d in dates:
+        tbl_append = write_append(tbl_append, d, source[d])
+        tbl_overwrite = write_overwrite(tbl_overwrite, d, source[d])
+
+correct = {d: source[d].size for d in dates}
+counts_append = {d: len(tbl_append[d]) for d in dates}
+counts_overwrite = {d: len(tbl_overwrite[d]) for d in dates}
+print("correct per-partition counts:", correct)
+print("append after double run     :", counts_append)
+print("overwrite after double run   :", counts_overwrite)
+
+# Overwrite is correct partition-by-partition after a double run.
+assert counts_overwrite == correct
+# Append double-counts: every partition is exactly twice its true size.
+assert all(counts_append[d] == 2 * correct[d] for d in dates)
+assert sum(counts_append.values()) == 18 and sum(counts_overwrite.values()) == 9
+print("idempotent overwrite survives the re-run; append double-counts:", True)
+```
+
+After the double backfill the overwrite table holds the correct 3, 2, 4 rows per day
+(9 total) while the append table holds a doubled 6, 4, 8 (18 total). Idempotent
+partition overwrite is the rule every well-built task follows. The
+[next lesson](K5/orchestrators-compared) steps up to the systems that run these
+schedules, contrasting orchestrators that think in tasks with those that think in the
+data assets the tasks produce.

@@ -1,0 +1,129 @@
+---
+title: "Data observability: freshness, volume, and anomalies"
+pillar: K
+subId: K6
+lessonId: data-observability
+order: 4
+estimatedMinutes: 23
+goal: "Monitor the operational health of a pipeline, freshness, row volume, and null rates, and flag a broken upstream feed with a robust z-score before it reaches a dashboard."
+prerequisites: ["data-quality-dimensions"]
+---
+
+The [quality checks](K6/data-quality-dimensions) of the first lesson score a
+single load. But pipelines fail in ways that no single-load check catches: a feed
+stops updating and the table goes stale, an upstream API returns half the usual
+rows, a join starts producing nulls it never did before. These are *operational*
+failures, and catching them needs a view *over time*: today's numbers compared
+against what this pipeline normally does. **Data observability** is that view, the
+continuous monitoring of a pipeline's operational signals so a broken upstream
+feed is flagged before its output reaches a dashboard.
+
+## The operational signals
+
+Four signals cover most pipeline failures, each a number you can record per run
+and watch over time:
+
+- **Freshness** (or lag): how long since the dataset last updated. A feed that
+  should refresh hourly but has not in six hours is stale, even if its last load
+  was clean.
+- **Volume**: rows ingested per run. A sudden drop means an upstream feed is
+  truncated; a sudden spike means a duplicate load or a runaway producer.
+- **Null rate**: the share of nulls per column, the [completeness](K6/data-quality-dimensions)
+  dimension tracked as a time series. A column that was 1% null jumping to 40%
+  signals a broken join or a renamed source field.
+- **Schema**: the structure itself, watched for the
+  [breaking changes](K6/schema-evolution-contracts) of the previous lesson.
+
+Each is a series $x_1, x_2, \dots, x_t$, and "is today abnormal" is an anomaly
+question against the recent baseline.
+
+## A robust z-score
+
+The textbook anomaly score is the **z-score**: how many standard deviations a
+point sits from the mean,
+
+$$
+z = \frac{x - \mu}{\sigma},
+$$
+
+where $\mu$ is the sample mean and $\sigma$ the sample standard deviation. The
+problem is that $\mu$ and $\sigma$ are themselves computed *including* the
+anomaly. A single huge spike inflates $\sigma$ and drags $\mu$ toward itself, so
+the very point you want to flag shrinks its own z-score: the baseline is poisoned
+by the outlier it is supposed to expose.
+
+The fix is to build the baseline from statistics that ignore extreme values. The
+**median** $\tilde{x}$ replaces the mean, and the **median absolute deviation**
+(MAD) replaces the standard deviation:
+
+$$
+\text{MAD} = \operatorname{median}_i \big| x_i - \tilde{x} \big| .
+$$
+
+The MAD is the typical distance from the center, measured with a median so one
+spike cannot inflate it. To make the MAD comparable to a standard deviation on
+normal data, scale it: for a Gaussian, $\sigma \approx \text{MAD} / 0.6745$
+(because $0.6745$ is the $0.75$ quantile of the standard normal, the half-width
+that contains the middle half of the mass). Substituting that estimate of
+$\sigma$ into the z-score gives the **robust z-score**:
+
+$$
+z_{\text{robust}} = \frac{x - \tilde{x}}{\text{MAD} / 0.6745}
+= 0.6745 \cdot \frac{x - \tilde{x}}{\text{MAD}} .
+$$
+
+A common alert rule is $|z_{\text{robust}}| > 3.5$: on clean Gaussian data almost
+no point clears it, while a genuine break, a feed that drops to half its volume,
+produces a $z$ many multiples past it. Because the median and MAD are computed
+from the *other* days, the anomaly cannot hide itself.
+
+![Daily row volume with a stable baseline and one injected drop; the robust band (median plus or minus 3.5 MAD) frames normal variation and the broken-feed day falls far outside it, flagged as an anomaly.](/figures/K6/data-observability.svg)
+
+This is operational *data health*, not model behavior. The
+[drift detection](I1/drift-detection) of MLOps asks whether a model's *input
+distribution* has moved relative to training; here the question is whether the
+*pipeline* delivered its usual rows on time. A feed can be perfectly fresh and
+full while its distribution drifts (a job for [production drift](I4/production-drift)),
+and it can stop entirely while its last good distribution still matches training.
+Observability guards the first; drift detection guards the second.
+
+## Worked example
+
+A 30-day row-volume series with a stable baseline and one injected drop. Compute
+the robust z-score for every day and confirm the broken day clears the threshold
+while every normal day stays under it.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n = 30
+volume = 10000 + rng.normal(0, 250, n)   # stable daily row count
+volume[21] = 4200                         # a broken upstream feed: volume halves
+
+median = np.median(volume)
+mad = np.median(np.abs(volume - median))           # median absolute deviation
+robust_z = 0.6745 * (volume - median) / mad
+thr = 3.5
+flagged = np.abs(robust_z) > thr
+
+print(f"MAD            = {mad:.1f}")
+print(f"robust z @ day21 = {robust_z[21]:.2f}")
+normal = np.ones(n, dtype=bool); normal[21] = False
+print(f"max |z| normal   = {np.max(np.abs(robust_z[normal])):.2f}")
+print(f"flagged days     = {np.where(flagged)[0].tolist()}")
+
+# the injected anomaly clears the threshold
+assert np.abs(robust_z[21]) > thr
+# every normal day stays under it
+assert np.all(np.abs(robust_z[normal]) < thr)
+# exactly the broken day is flagged
+assert flagged.sum() == 1 and flagged[21]
+```
+
+The broken day's robust z-score lands near $-29$, far past the $3.5$ alert line,
+while the worst normal day sits under $3$; the median-and-MAD baseline stayed
+honest because the drop never entered its own reference. The final lesson closes
+the discipline by protecting the data the pipeline carries, classifying and
+masking sensitive fields and meeting compliance regimes, in
+[governance](K6/governance-pii).

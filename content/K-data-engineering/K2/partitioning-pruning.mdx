@@ -1,0 +1,139 @@
+---
+title: "Partitioning and partition pruning"
+pillar: K
+subId: K2
+lessonId: partitioning-pruning
+order: 4
+estimatedMinutes: 24
+goal: "Lay data out in directories keyed by a column and compute how a predicate prunes the files an engine must open, plus why over-partitioning into tiny files destroys the gain."
+prerequisites: ["parquet-internals"]
+---
+
+[Row-group skipping](parquet-internals) prunes *inside* one Parquet file. The same
+idea works one level up, across files, and it is even cheaper because the engine
+can decide what to read from the directory names alone, before opening a single
+file. That is **partitioning**: splitting a table's files into directories keyed by
+a column's value so that a filter on that column reads only the matching
+directories. The catch is that slicing finer is not free: each file carries a
+fixed overhead, and past a point the overhead of opening thousands of tiny files
+costs more than the data you saved. This lesson computes both halves and finds the
+sweet spot between them.
+
+## Directory partitioning
+
+A **partitioned** table stores its files in a directory tree whose path encodes a
+column value. Partitioning a sales table by date gives
+
+```
+sales/date=2026-06-08/part-0.parquet
+sales/date=2026-06-09/part-0.parquet
+sales/date=2026-06-10/part-0.parquet
+```
+
+The **partition key** (`date`) is not stored inside the files at all; it lives in
+the path. A query planner lists the directories, reads each key straight off the
+path, and keeps only the directories whose key satisfies the filter. This is
+**partition pruning**: a filter `WHERE date = '2026-06-09'` opens one directory
+out of however many exist, and never touches the rest.
+
+## How much a predicate prunes
+
+Set up the cost. Let a table of $N$ total rows, $\beta$ bytes per row, be split
+evenly into $P$ partitions, so each partition holds $N/P$ rows. A query with
+**selectivity** $s \in (0, 1]$ (the fraction of the key range it asks for) touches
+$P_{\text{touched}} = \lceil s P \rceil$ partitions, at least one.
+
+**Data scanned.** Only the touched partitions are read, so the bytes pulled off
+disk are
+
+$$
+B_{\text{data}}(P) = \underbrace{\frac{N}{P}}_{\text{rows per partition}} \cdot\; P_{\text{touched}} \cdot \beta
+\;\approx\; s \, N \, \beta ,
+$$
+
+using $P_{\text{touched}} \approx sP$. The $P$ cancels: pruning a selective query
+down to its $s$-fraction of the data is the whole point, and it works at any
+partition count. Against a **full scan** of $N\beta$ bytes, pruning saves a factor
+$\approx 1/s$.
+
+**The small-file problem.** Opening a file is not free. Listing it, reading its
+[footer](parquet-internals), and issuing the request cost a fixed $\omega$ bytes-
+equivalent of overhead **per file touched**, independent of the file's size. With
+$P_{\text{touched}}$ files opened, the overhead is
+
+$$
+B_{\text{over}}(P) = P_{\text{touched}} \cdot \omega \approx s P \, \omega ,
+$$
+
+which *grows* with $P$. More partitions means each touched partition is smaller,
+so the same query opens more of them, paying $\omega$ each time.
+
+**The total and its sweet spot.** The query's cost is the sum,
+
+$$
+B(P) = B_{\text{data}}(P) + B_{\text{over}}(P) \approx s N \beta + s P \omega .
+$$
+
+In this clean approximation the data term is flat in $P$ and the overhead term
+rises, so cost is non-decreasing in $P$ and the message is plain: do not slice
+finer than you must. Keeping the discrete ceiling $\lceil sP \rceil$ (a query
+always opens at least one partition, and partitions come in whole files) sharpens
+this into a genuine minimum. At very low $P$ each partition is coarse and a
+selective query still drags in a whole large partition it mostly discards; at very
+high $P$ the $sP\omega$ overhead dominates. The minimum sits where the marginal
+data saved from one more split equals the marginal overhead it adds, a U-shaped
+curve with a clear best partition count.
+
+![Total query cost as a function of partition count for a selective predicate. Data scanned falls as finer partitions let the query skip more, while per-file overhead rises; their sum is U-shaped with a marked sweet spot, past which tiny-file overhead dominates.](/figures/K2/partitioning-pruning.svg)
+
+## Worked example
+
+Model the two cost terms across a sweep of partition counts, confirm pruning beats
+a full scan for a selective query, and confirm the total cost is non-monotonic
+(too many tiny files is worse than the optimum).
+
+```python
+import numpy as np
+
+total_rows   = 6_000_000
+bytes_per_row = 64
+selectivity  = 0.05            # query asks for 5% of the key range
+overhead     = 3_000_000.0     # fixed bytes-equiv to open one file
+full_scan    = total_rows * bytes_per_row
+
+def cost(P):
+    P = np.asarray(P, dtype=float)
+    touched   = np.maximum(1.0, np.ceil(selectivity * P))   # files opened (>= 1)
+    data      = (total_rows / P) * touched * bytes_per_row  # bytes actually read
+    over_head = touched * overhead                          # per-file overhead
+    return data + over_head
+
+P = np.arange(1, 4001)
+total = cost(P)
+p_opt = int(P[np.argmin(total)])
+
+# 1) Pruning beats a full scan for a selective query at a sensible partition count.
+pruned = float(cost(p_opt))
+print(f"full scan          = {full_scan/1e6:,.0f} MB")
+print(f"pruned @ P={p_opt:<4d}  = {pruned/1e6:,.0f} MB-equiv")
+print(f"speedup over scan  = {full_scan/pruned:.1f}x")
+assert pruned < full_scan
+
+# 2) Cost is non-monotonic in P: an interior minimum, with tiny files much worse.
+cost_few  = float(cost(50))      # too coarse
+cost_many = float(cost(4000))    # too many tiny files
+print(f"cost @ P=50        = {cost_few/1e6:,.0f} MB-equiv")
+print(f"cost @ P={p_opt:<4d}  = {pruned/1e6:,.0f} MB-equiv  (minimum)")
+print(f"cost @ P=4000      = {cost_many/1e6:,.0f} MB-equiv")
+assert 1 < p_opt < 4000          # the optimum is interior, not an endpoint
+assert pruned < cost_few         # better than too-coarse
+assert pruned < cost_many        # better than too-fine (small-file problem)
+print("pruning helps, but over-partitioning hurts:", True)
+```
+
+Pruning gives a large speedup over a full scan, yet the total cost bottoms out at
+an interior partition count and climbs again as files shrink toward the
+per-file overhead, the small-file problem made quantitative. Partitioning gets a
+pile of Parquet files to the right granularity; the
+[next lesson](table-formats-lakehouse) adds the metadata layer that turns that
+pile into a transactional table.

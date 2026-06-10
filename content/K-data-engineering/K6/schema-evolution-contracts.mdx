@@ -1,0 +1,149 @@
+---
+title: "Schema evolution and data contracts"
+pillar: K
+subId: K6
+lessonId: schema-evolution-contracts
+order: 2
+estimatedMinutes: 24
+goal: "Classify a schema change as backward-, forward-, or full-compatible, and enforce a data contract so a producer's breaking change fails fast at the boundary instead of corrupting consumers."
+prerequisites: ["data-quality-dimensions"]
+---
+
+A dataset's schema is the contract between the team that produces it and every
+team that reads it. Schemas are not frozen: a producer adds a field, renames a
+column, changes a type. The danger is that the producer ships the change
+unilaterally and a downstream consumer, written against the *old* schema, silently
+breaks or, worse, keeps running on garbage. The fix is to classify each change by
+*who can still read what* and to enforce that classification at the boundary, so a
+breaking change fails loudly at the producer instead of corrupting consumers
+hours later. This lesson defines the compatibility classes and the **data
+contract** that enforces them.
+
+## Compatibility, defined by which reader survives
+
+A schema change happens between two parties: the **writer** (producing data) and
+the **reader** (a consumer's expected schema). Compatibility names which
+combinations of writer-version and reader-version still work.
+
+**Backward compatible**: a *new* schema can read data written under the *old*
+schema. The classic safe change is **adding an optional field** (one with a
+default). A reader on the new schema meets old records that lack the field and
+fills the default, so old data still parses. Backward compatibility is what lets
+you upgrade *consumers first*.
+
+**Forward compatible**: an *old* schema can read data written under the *new*
+schema. This holds when the new data still contains everything the old reader
+requires and the reader ignores fields it does not know. Forward compatibility is
+what lets you upgrade *producers first* without breaking lagging consumers.
+
+**Full compatible**: both directions hold at once. Adding an optional field that
+old readers ignore is the canonical full-compatible change.
+
+The dangerous changes are the ones that remove information a reader requires:
+**dropping or renaming a required field**, or **retyping** a field (string to
+int). After a required field is dropped, a reader that needs it has no value to
+read; that is a **breaking** change, and it breaks in both directions.
+
+## A small model of compatibility
+
+Model a schema as a set of **required fields**, each with a **type**. A change is
+a triple (old schema, new schema, kind). The classification rule for the two
+directions follows from the definitions:
+
+$$
+\text{backward} \iff \text{every required field of the new schema is present in old data with a matching type},
+$$
+
+$$
+\text{forward} \iff \text{every required field of the old schema is present in new data with a matching type}.
+$$
+
+Read the rows of the matrix below. Adding an optional field $f$: new readers do
+not *require* $f$ (it has a default), so backward holds; old readers ignore $f$,
+so forward holds too, which is why an optional add is full-compatible. Dropping a
+required field $f$: a reader on the new schema no longer requires $f$, so it reads
+old data fine (backward holds), but an old reader that still requires $f$ finds it
+gone from new data (forward fails), so the drop is unsafe to ship to consumers
+that have not upgraded. Retyping breaks both directions because the bytes a reader
+decodes no longer match the type it expects.
+
+![Compatibility matrix: adding an optional field is safe both ways; dropping a required field keeps backward compatibility but breaks forward; retyping breaks both, and a data contract must reject the breaking cells.](/figures/K6/schema-evolution-contracts.svg)
+
+## The data contract
+
+A **data contract** is the agreed schema plus a validator that runs at the
+boundary where the producer hands data over. Before a payload is accepted it is
+checked against the contract: every required field present, every type matching.
+A payload that violates the contract is **rejected at the boundary**, so the
+producer's bad change surfaces as a failed publish, not as a corrupted consumer.
+This is the [validation-check](K6/data-quality-dimensions) idea raised one level:
+instead of scoring rows, the contract gates the whole payload on its structure.
+
+## Worked example
+
+Represent a schema as a `{field: type}` dict of required fields. Classify three
+changes against a base schema, then validate two payloads against a contract.
+
+```python
+import numpy as np  # required by the runner; logic below is pure-python schema work
+
+base = {"id": "int", "email": "str", "amount": "float"}
+
+def backward_ok(old, new):
+    # new schema reads old data: every required field of `new` must exist in `old`
+    # with a matching type (old data only carries old fields).
+    return all(f in old and old[f] == t for f, t in new.items())
+
+def forward_ok(old, new):
+    # old schema reads new data: every required field of `old` must survive in `new`.
+    return all(f in new and new[f] == t for f, t in old.items())
+
+def classify(old, new):
+    b, f = backward_ok(old, new), forward_ok(old, new)
+    if b and f:
+        return "full"
+    if b:
+        return "backward"
+    if f:
+        return "forward"
+    return "breaking"
+
+# add an optional field: it is NOT in the required set, so required-sets are equal
+add_optional = dict(base)                      # optional `phone` not added to required
+# drop a required field
+drop_required = {"id": "int", "email": "str"}  # `amount` removed from required
+# retype a required field
+retype = {"id": "int", "email": "str", "amount": "int"}  # float -> int
+
+print("add optional ->", classify(base, add_optional))
+print("drop required ->", classify(base, drop_required))
+print("retype       ->", classify(base, retype))
+
+assert classify(base, add_optional) == "full"
+assert classify(base, drop_required) == "backward"  # new reader survives; an old reader needing `amount` does not
+assert classify(base, retype) == "breaking"
+
+def validate(payload, contract):
+    # a contract rejects any payload missing a required field or with a wrong type
+    for f, t in contract.items():
+        if f not in payload or type(payload[f]).__name__ != t:
+            return False
+    return True
+
+good = {"id": 7, "email": "a@b.co", "amount": 9.5}
+missing = {"id": 7, "email": "a@b.co"}             # no `amount`
+
+print("good payload accepted:", validate(good, base))
+print("missing-field payload accepted:", validate(missing, base))
+
+assert validate(good, base) is True
+assert validate(missing, base) is False
+```
+
+The classifier labels the optional add `full`, the required-field drop `backward`
+(a reader on the new schema is fine, but any old consumer that still requires
+`amount` is not, which is why the drop is unsafe to ship to them), and the retype
+`breaking`; the contract then rejects the payload that omits `amount` before it
+can reach a consumer. Knowing a change *is* breaking is half the problem; the next
+lesson tracks *who would be hit* by tracing a column through the pipeline as
+[data lineage](K6/data-lineage).

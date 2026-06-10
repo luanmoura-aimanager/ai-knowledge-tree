@@ -1,0 +1,145 @@
+---
+title: "Data quality dimensions and validation checks"
+pillar: K
+subId: K6
+lessonId: data-quality-dimensions
+order: 1
+estimatedMinutes: 22
+goal: "Make data quality measurable along completeness, validity, uniqueness, and consistency, and turn each into an automated check with a pass rate you can alert on."
+prerequisites: ["K5/transformation-as-code"]
+---
+
+A pipeline that runs to completion has not necessarily produced *good* data. The
+job succeeded, rows landed in the warehouse, and yet a quarter of the email
+addresses are null, a price column holds a few negative numbers, and one customer
+id appears twice. "Quality" is too vague to act on until it is split into
+**dimensions**, each a property you can compute a number for. Once every
+dimension is a number, a check is a comparison against a threshold, and a
+threshold is something you can alert on. This lesson defines four load-bearing
+dimensions and turns each into an automated check with a pass rate.
+
+## The four dimensions
+
+Each dimension below is defined as a **pass rate**: the fraction of rows (or of
+the relevant pairs) that satisfy a rule. A pass rate lives in $[0, 1]$, so the
+same alert logic, "page when the rate drops below $\tau$", applies to all of them.
+
+**Completeness** asks whether required values are present. For a column with $N$
+rows of which $m$ are null, the completeness rate is the non-null fraction:
+
+$$
+c = \frac{N - m}{N} = 1 - \frac{m}{N}.
+$$
+
+If you injected exactly $m$ nulls into a clean column, $c$ recovers $1 - m/N$ by
+construction; that identity is what the worked block checks.
+
+**Validity** asks whether present values fall in their allowed set: a range
+(`age` in $[0, 120]$), a format (an email matching a pattern), or an enumeration.
+For a column of $N$ values of which $k$ violate the rule, the validity rate is
+
+$$
+v = \frac{N - k}{N}.
+$$
+
+Validity is evaluated only on the present values; a null is an absence, scored by
+completeness, not a wrong value.
+
+**Uniqueness** asks whether a key column has no duplicates. With $N$ rows and $u$
+distinct key values, the duplicate count is $N - u$ and the uniqueness rate is
+
+$$
+q = \frac{u}{N}.
+$$
+
+A perfect key has $u = N$ and $q = 1$; every repeated id pulls $u$ below $N$.
+
+**Consistency** asks whether values agree across columns or across tables: a
+cross-field rule (`ship_date` $\ge$ `order_date`) or a foreign-key rule (every
+`customer_id` in `orders` exists in `customers`). It is a pass rate over the
+*pairs* or *references* checked, $(\text{satisfying}) / (\text{total})$, so it
+slots into the same alert.
+
+## From a dimension to an alert
+
+A **check** is a dimension's rate plus a threshold $\tau$ and a verdict:
+
+$$
+\text{pass} \iff \text{rate} \ge \tau .
+$$
+
+The threshold is a policy choice. A primary-key uniqueness check is usually
+$\tau = 1.0$ (any duplicate is a defect); a completeness check on an
+optional-but-expected field might sit at $\tau = 0.95$. Running every check on
+each load gives a vector of pass rates; the load is healthy when all of them
+clear their thresholds, and the first to drop tells you which dimension broke.
+This is the same "compute a number, compare to a threshold" shape as
+[transformation tests](K5/transformation-as-code), now pointed at the data rather
+than the code.
+
+![Each quality dimension becomes a check with a pass rate in zero-to-one; bars below the alert threshold (here validity) trip an alert, the rest pass.](/figures/K6/data-quality-dimensions.svg)
+
+## Worked example
+
+Build a small table as numpy arrays, inject a *known* number of defects into each
+dimension, then compute the four rates and confirm they match the injected defect
+rates exactly. The final check shows a sub-threshold rate failing.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+N = 1000
+
+# completeness: inject exactly m nulls (NaN) into an otherwise full column
+m = 80
+amount = rng.normal(50.0, 10.0, size=N)
+null_idx = rng.choice(N, size=m, replace=False)
+amount[null_idx] = np.nan
+
+# validity: a price column where exactly k values are out of range (negative)
+k = 30
+price = rng.uniform(1.0, 99.0, size=N)
+bad_idx = rng.choice(N, size=k, replace=False)
+price[bad_idx] = -1.0
+
+# uniqueness: a key column with exactly d duplicate rows (d distinct ids reused)
+d = 12
+key = np.arange(N)
+key[-d:] = key[:d]                      # last d rows duplicate the first d ids
+
+def completeness(col):
+    return np.mean(~np.isnan(col))
+
+def validity(col, lo, hi):
+    present = col[~np.isnan(col)]
+    return np.mean((present >= lo) & (present <= hi))
+
+def uniqueness(col):
+    return np.unique(col).size / col.size
+
+c = completeness(amount)
+v = validity(price, 0.0, 100.0)
+q = uniqueness(key)
+
+print(f"completeness = {c:.3f}  (expect {1 - m/N:.3f})")
+print(f"validity     = {v:.3f}  (expect {(N - k)/N:.3f})")
+print(f"uniqueness   = {q:.3f}  (expect {(N - d)/N:.3f})")
+
+# rates match the injected defect rates exactly
+assert np.isclose(c, 1 - m / N)
+assert np.isclose(v, (N - k) / N)
+assert np.isclose(q, (N - d) / N)
+
+# a check is a rate-vs-threshold verdict; uniqueness here fails tau = 1.0
+tau = 1.0
+passed = q >= tau
+print(f"uniqueness check at tau={tau}: {'pass' if passed else 'FAIL'}")
+assert passed is False
+```
+
+The four rates land on $1 - m/N$, $(N-k)/N$, and $(N-d)/N$ to the digit, which is
+why a quality report is auditable: each number is a defect count divided by a row
+count, nothing hidden. The next lesson moves from "is today's data clean" to "did
+the *shape* of the data change", where a producer alters the
+[schema](K6/schema-evolution-contracts) out from under its consumers.

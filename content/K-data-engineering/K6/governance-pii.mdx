@@ -1,0 +1,107 @@
+---
+title: "Governance: PII, access control, and compliance"
+pillar: K
+subId: K6
+lessonId: governance-pii
+order: 5
+estimatedMinutes: 22
+goal: "Classify and protect sensitive data with masking, tokenization, and role-based access, and meet regimes like GDPR (purpose limitation, the right to deletion) with an auditable trail."
+prerequisites: ["data-lineage"]
+codeExempt: true
+---
+
+The data a pipeline moves is not all equal. A product catalog is public; an
+internal sales forecast is confidential; an email address, a national id, or a
+health record is **personal data**, and mishandling it is not just a quality
+problem but a legal one. **Data governance** is the layer that classifies data by
+sensitivity and enforces who may see it, in what form, and for what purpose, with
+a record an auditor can read. This lesson covers the classification, the
+protection techniques, and the compliance regimes that make governance a
+requirement rather than a courtesy.
+
+## Classify first
+
+Every protection decision starts from a **classification** of the data. A common
+four-level scheme:
+
+- **Public**: safe to disclose freely (a published price list).
+- **Internal**: not secret but not for outsiders (org charts, internal metrics).
+- **PII** (personally identifiable information): identifies a person, name,
+  email, phone, address, account id.
+- **Sensitive**: PII whose exposure carries heightened risk, health, financial,
+  biometric, or government-id data, often under stricter legal rules.
+
+Classification is a property of a *column*, and it rides on the
+[lineage graph](K6/data-lineage): once a source column is tagged PII, every
+downstream column derived from it inherits the tag, so a single classification at
+the source propagates protection through the pipeline.
+
+## Protection techniques
+
+Classification drives which technique applies:
+
+- **Masking**: replace part or all of a value with a placeholder for display, e.g.
+  `j•••@example.com`. The underlying value is unchanged; only what a low-privilege
+  reader *sees* is obscured.
+- **Tokenization / pseudonymization**: replace a PII value with a surrogate
+  **token** through a reversible mapping held in a separate, guarded vault. Joins
+  and analytics still work on the stable token, but the token carries no personal
+  information on its own, so a leaked analytics table does not leak identities.
+- **Encryption**: store the value as ciphertext so that without the key it is
+  unreadable, protecting data at rest and in transit.
+- **Role-based access control** (RBAC): grant a **role** access to specific rows
+  or columns, and assign users to roles. Column-level RBAC hides the PII columns
+  from an analyst role; row-level RBAC restricts a regional team to its own rows.
+
+## A request through the governance boundary
+
+A read request does not touch raw data directly. It passes through
+classification, an access policy that decides what the requester's role may see,
+and the masking or tokenization that enforces it, and the whole transaction is
+written to an **audit log**.
+
+```mermaid
+graph LR
+  REQ["request: analyst reads customers"] --> CLS["classify columns: email = PII"]
+  CLS --> POL["access policy: role = analyst"]
+  POL -->|"RBAC: no raw-PII grant"| MASK["mask / tokenize email"]
+  MASK --> OUT["result: j•••@example.com"]
+  REQ --> LOG["audit log: who, what, when, why"]
+  POL --> LOG
+  MASK --> LOG
+```
+
+The audit log is the governance artifact: it records who requested what, under
+which role, when, and for what stated purpose, the same immutable transition
+record a [model registry](I2/model-registry) keeps for promotions.
+
+## Compliance regimes
+
+Regulations such as the EU's **GDPR** and Brazil's **LGPD** turn these techniques
+into obligations. The load-bearing principles:
+
+- **Purpose limitation**: personal data may be used only for the specific purpose
+  the subject consented to, so the audit log records *why* each access happened,
+  not only that it did.
+- **Data minimization**: collect and retain only the personal data a purpose
+  actually needs; a field with no purpose should not be stored.
+- **Right to deletion (erasure)**: a data subject can demand that their personal
+  data be removed. Satisfying it means finding *every* copy of that person's data
+  across raw, staging, and marts, which is exactly a downstream
+  [lineage traversal](K6/data-lineage) from the source records: lineage is what
+  makes deletion-by-tracing tractable instead of a manual hunt through every
+  table.
+- **Audit trail**: an immutable, queryable record of access and processing, the
+  evidence a regulator asks for.
+
+Lineage is the thread that ties governance together: it propagates classification
+from source to dashboard and it scopes a deletion request to the exact set of
+downstream records, so the [traversal](A5/graph-traversal) machinery does double
+duty as a compliance tool.
+
+This closes pillar K. The Data Engineer path threads the whole discipline, from
+[data modeling](K1/relational-model) through transformation and orchestration to
+the quality, lineage, and governance of this subsection, and it feeds the pillars
+downstream: the clean, contracted, observable datasets built here are the inputs
+that pillar I's [ML pipelines](I1/drift-detection) train on and that pillar J's AI
+data platform serves.
