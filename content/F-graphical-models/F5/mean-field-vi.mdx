@@ -13,7 +13,7 @@ Exact posterior inference is intractable when the normalizing constant $P(\mathb
 requires integrating over a high-dimensional latent space.
 **Variational inference** (VI) turns this integration problem into an optimization:
 find the distribution $q(\mathbf{Z})$ in a tractable family that is closest to
-the true posterior $P(\mathbf{Z} \mid \mathbf{X})$ in KL divergence.
+the true posterior $P(\mathbf{Z} \mid \mathbf{X})$ in KL divergence<FN n="1" />.
 
 ## Evidence lower bound (ELBO)
 
@@ -65,7 +65,7 @@ where $\mathbb{E}_{q_{-j}}$ averages over all variables except $Z_j$.
 Exponentiating and normalizing gives the optimal $q_j^*$.
 
 This is the **coordinate ascent VI (CAVI)** update: cycle through factors, updating
-each with the expectation of the joint under the current approximation of the others.
+each with the expectation of the joint under the current approximation of the others<FN n="2" />.
 
 ## Example: Bayesian linear regression
 
@@ -137,3 +137,8 @@ The approximation bites in models where the posterior has correlations between l
 groups, which the factorized family cannot represent.
 
 The next lesson scales VI to large datasets with stochastic gradient updates.
+
+<Footnotes>
+  <FNItem n="1">**Blei, D. M., Kucukelbir, A., & McAuliffe, J. D.** (2017). "Variational inference: a review for statisticians". *JASA*, 112(518), 859-877. [arXiv:1601.00670](https://arxiv.org/abs/1601.00670). Frames VI as optimization and reviews the ELBO.</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 10. Springer. Derives the mean-field factorization and the CAVI update.</FNItem>
+</Footnotes>

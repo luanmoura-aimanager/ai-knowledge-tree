@@ -11,7 +11,7 @@ prerequisites: ["metropolis-hastings"]
 
 Metropolis-Hastings requires choosing and tuning a proposal distribution.
 **Gibbs sampling** avoids this by sampling each variable from its **full conditional**:
-the distribution of that variable given all others at their current values.
+the distribution of that variable given all others at their current values<FN n="1" />.
 The full conditional is automatically a valid Markov chain proposal that always accepts.
 
 ## Gibbs as MH with acceptance rate 1
@@ -42,7 +42,7 @@ Iterate through the variables $X_1, \ldots, X_d$:
 
 The full conditional for a variable in a graphical model depends only on its Markov blanket
 (parents, children, and co-parents in the directed case; neighbors in the undirected case).
-This is what makes Gibbs tractable for large models.
+This is what makes Gibbs tractable for large models<FN n="2" />.
 
 ## Full conditionals for conjugate models
 
@@ -64,7 +64,7 @@ $$
 
 Both are standard distributions, so sampling is exact.
 
-![Gibbs sampling updates one coordinate at a time from its exact conditional, moving in axis-aligned steps — the characteristic zigzag, which mixes slowly along a strong correlation.](/figures/F6/gibbs-sampling.svg)
+![Gibbs sampling updates one coordinate at a time from its exact conditional, moving in axis-aligned steps: the characteristic zigzag, which mixes slowly along a strong correlation.](/figures/F6/gibbs-sampling.svg)
 
 ## Implementation
 
@@ -108,3 +108,8 @@ autocorrelation between successive samples, reducing the effective sample size.
 
 The next lesson introduces Hamiltonian Monte Carlo, which uses gradient information
 to make large, accepted proposals even in high dimensions.
+
+<Footnotes>
+  <FNItem n="1">**Geman, S., & Geman, D.** (1984). "Stochastic relaxation, Gibbs distributions, and the Bayesian restoration of images". *IEEE TPAMI*, 6(6), 721-741. [doi:10.1109/TPAMI.1984.4767596](https://doi.org/10.1109/TPAMI.1984.4767596). Introduces the Gibbs sampler.</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 11. Springer. Casts Gibbs as Metropolis-Hastings and uses the Markov blanket.</FNItem>
+</Footnotes>

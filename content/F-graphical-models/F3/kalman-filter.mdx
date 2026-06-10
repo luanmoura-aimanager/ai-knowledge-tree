@@ -11,7 +11,7 @@ prerequisites: ["hidden-markov-models"]
 
 The HMM handles discrete states. When the hidden state is continuous and all
 distributions are Gaussian, exact inference closes in Gaussian form at every step.
-This is the **Kalman filter**: the continuous-state analogue of the forward algorithm.
+This is the **Kalman filter**: the continuous-state analogue of the forward algorithm<FN n="1" />.
 
 ## The linear-Gaussian state-space model
 
@@ -81,7 +81,7 @@ $$
 \right).
 $$
 
-Step 2: the conditional $P(z_t \mid x_t, x_{1:t-1})$ is the conditional of a joint Gaussian.
+Step 2: the conditional $P(z_t \mid x_t, x_{1:t-1})$ is the conditional of a joint Gaussian<FN n="2" />.
 The standard formula gives mean $\hat{\mu}_t + \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1}(x_t - H\hat{\mu}_t)$
 and covariance $\hat{\Sigma}_t - \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1} H\hat{\Sigma}_t$.
 
@@ -142,3 +142,8 @@ blending the physics-based prediction with the measurement.
 
 The next lesson handles non-Gaussian and nonlinear systems where the Kalman filter's
 closed-form breaks down, using particle filters instead.
+
+<Footnotes>
+  <FNItem n="1">**Kalman, R. E.** (1960). "A new approach to linear filtering and prediction problems". *Journal of Basic Engineering*, 82(1), 35-45. [doi:10.1115/1.3662552](https://doi.org/10.1115/1.3662552)</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 13. Springer. Derives the predict-update recursion via Gaussian conditioning.</FNItem>
+</Footnotes>

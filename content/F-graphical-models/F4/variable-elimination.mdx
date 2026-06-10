@@ -13,7 +13,7 @@ Given a joint distribution expressed as a product of factors, computing the marg
 of a single variable requires summing out all others.
 Naively, this sum is exponential in the number of variables.
 **Variable elimination** (VE) performs that sum in the most efficient order:
-eliminate one variable at a time, each time fusing only the factors that mention it.
+eliminate one variable at a time, each time fusing only the factors that mention it<FN n="1" />.
 
 ## The elimination operation
 
@@ -41,7 +41,7 @@ variable cardinality and $S_i$ is the set of variables in $\tau$
 
 Different elimination orders produce different sets $S_i$.
 The optimal order minimizes the maximum $|S_i|$, and that maximum minus one is the
-**induced width** (an upper bound on the treewidth of the graph).
+**induced width** (an upper bound on the treewidth of the graph)<FN n="2" />.
 
 On a tree-structured graph, the optimal width is 1: each elimination fuses at most
 two variables, giving $O(n k^2)$ total cost.
@@ -118,3 +118,8 @@ for k_test in [2, 4, 8, 16]:
 Variable elimination is exact on any graph but becomes exponential in the treewidth.
 The next lesson reframes the same computation as message passing, revealing how
 to compute all marginals simultaneously.
+
+<Footnotes>
+  <FNItem n="1">**Koller, D., & Friedman, N.** (2009). *Probabilistic Graphical Models: Principles and Techniques.* MIT Press. The variable-elimination algorithm and factor operations.</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 8. Springer. Exact inference and the role of graph structure in its complexity.</FNItem>
+</Footnotes>

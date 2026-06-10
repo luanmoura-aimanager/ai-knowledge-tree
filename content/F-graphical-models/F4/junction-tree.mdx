@@ -11,7 +11,7 @@ prerequisites: ["belief-propagation"]
 
 Belief propagation is exact on trees but only approximate on graphs with cycles.
 The **junction tree** algorithm converts an arbitrary graph into a tree of cliques,
-runs exact BP on that tree, and recovers exact marginals for the original graph.
+runs exact BP on that tree, and recovers exact marginals for the original graph<FN n="1" />.
 
 ## Step 1: moralization
 
@@ -44,7 +44,7 @@ the intersection $C_i \cap C_j$ must appear in every clique on the unique path
 between $C_i$ and $C_j$ in the tree.
 
 The RIP is what makes BP on the clique tree exact: it prevents information about
-shared variables from being inconsistently duplicated.
+shared variables from being inconsistently duplicated<FN n="2" />.
 
 Build the maximum-weight spanning tree of the complete clique graph,
 where edge weights equal $|C_i \cap C_j|$.
@@ -128,3 +128,8 @@ the original graph, with complexity exponential only in the clique size (the tre
 
 The next subsection turns to approximate inference, which scales to problems where the
 treewidth makes exact methods infeasible.
+
+<Footnotes>
+  <FNItem n="1">**Lauritzen, S. L., & Spiegelhalter, D. J.** (1988). "Local computations with probabilities on graphical structures and their application to expert systems". *Journal of the Royal Statistical Society: Series B*, 50(2), 157-224. [doi:10.1111/j.2517-6161.1988.tb01721.x](https://doi.org/10.1111/j.2517-6161.1988.tb01721.x)</FNItem>
+  <FNItem n="2">**Koller, D., & Friedman, N.** (2009). *Probabilistic Graphical Models: Principles and Techniques.* MIT Press. Triangulation, the running intersection property, and clique-tree calibration.</FNItem>
+</Footnotes>

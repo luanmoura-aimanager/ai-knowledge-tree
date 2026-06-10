@@ -11,7 +11,7 @@ prerequisites: ["bayesian-networks"]
 
 A Bayesian network encodes independence assumptions graphically.
 Reading those assumptions without computing marginals requires a
-purely graphical criterion: **d-separation**.
+purely graphical criterion: **d-separation**<FN n="1" />.
 Two nodes $A$ and $B$ are d-separated by a set $\mathbf{E}$ (the observed evidence)
 if every path between them is blocked by $\mathbf{E}$.
 
@@ -48,11 +48,11 @@ A path $p$ between $A$ and $B$ is **blocked** by $\mathbf{E}$ if it contains:
 
 $A$ and $B$ are **d-separated** by $\mathbf{E}$ if **all** paths between them are blocked.
 D-separation implies conditional independence under any distribution that is faithful
-to $\mathcal{G}$.
+to $\mathcal{G}$<FN n="2" />.
 
 ## The Bayes-ball algorithm
 
-The Bayes-ball algorithm checks d-separation in $O(n + e)$ (nodes + edges):
+The Bayes-ball algorithm checks d-separation in $O(n + e)$ (nodes + edges)<FN n="3" />:
 
 1. Shade every node in $\mathbf{E}$.
 2. For each node $A$ in the query, activate it and propagate "balls" along edges.
@@ -120,3 +120,9 @@ once their common effect $C$ is conditioned on.
 
 D-separation in F1 governs the independence structure of directed models.
 The next lesson shifts to undirected graphical models, where independence is encoded differently.
+
+<Footnotes>
+  <FNItem n="1">**Pearl, J.** (1988). *Probabilistic Reasoning in Intelligent Systems: Networks of Plausible Inference.* Morgan Kaufmann. The original definition of d-separation and its three motifs.</FNItem>
+  <FNItem n="2">**Koller, D., & Friedman, N.** (2009). *Probabilistic Graphical Models: Principles and Techniques.* MIT Press. The soundness of d-separation for distributions faithful to the graph.</FNItem>
+  <FNItem n="3">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 8 (Graphical Models). Springer. The conditional-independence reading of chains, forks, and colliders.</FNItem>
+</Footnotes>

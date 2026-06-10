@@ -12,7 +12,7 @@ prerequisites: ["markov-random-fields", "F1/d-separation"]
 Both Bayesian networks and MRFs factor a joint distribution into local functions.
 A **factor graph** makes that factorization explicit as a bipartite graph: one type
 of node for variables, another for factors.
-The sum-product algorithm on a factor graph computes marginals in a single, unified framework.
+The sum-product algorithm on a factor graph computes marginals in a single, unified framework<FN n="1" />.
 
 ## Factor graph definition
 
@@ -38,7 +38,7 @@ to all variables in the clique.
 ## Sum-product message passing
 
 On a **tree-structured** factor graph, the sum-product algorithm computes exact marginals
-in $O(n \cdot k^2)$ for $k$-state variables.
+in $O(n \cdot k^2)$ for $k$-state variables<FN n="2" />.
 
 Two message types pass between the two node types.
 
@@ -63,7 +63,7 @@ $$
 ## Why factor graphs unify the picture
 
 The forward-backward algorithm for HMMs, belief propagation for BNs, and the
-sum-product decoder for LDPC codes are all instances of sum-product on a factor graph.
+sum-product decoder for LDPC codes are all instances of sum-product on a factor graph<FN n="3" />.
 The bipartite structure makes it easy to see which summations can be done in parallel
 and where loops in the graph would break exactness.
 
@@ -114,3 +114,9 @@ The sum-product result matches the brute-force marginalization exactly on the tr
 
 The next subsection moves to temporal graphical models, where the chain structure models
 dynamics over time.
+
+<Footnotes>
+  <FNItem n="1">**Kschischang, F. R., Frey, B. J., & Loeliger, H.-A.** (2001). "Factor graphs and the sum-product algorithm". *IEEE Transactions on Information Theory*, 47(2), 498-519. The defining paper for factor graphs and message passing ([doi:10.1109/18.910572](https://doi.org/10.1109/18.910572)).</FNItem>
+  <FNItem n="2">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, ch. 8 (Graphical Models). Springer. Sum-product on tree-structured factor graphs and its cost.</FNItem>
+  <FNItem n="3">**Koller, D., & Friedman, N.** (2009). *Probabilistic Graphical Models: Principles and Techniques.* MIT Press. Factor graphs as a unifying view of BN and MRF inference.</FNItem>
+</Footnotes>

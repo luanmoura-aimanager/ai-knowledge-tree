@@ -25,7 +25,7 @@ where $W_t$ is standard Brownian motion.
 
 The Fokker-Planck equation shows that $\pi(q)$ is the unique stationary distribution
 of this SDE: the drift $-\nabla U$ pushes toward high-probability regions, while the
-noise $\sqrt{2} dW_t$ prevents the chain from collapsing to a mode.
+noise $\sqrt{2} dW_t$ prevents the chain from collapsing to a mode<FN n="2" />.
 
 ## Unadjusted Langevin algorithm (ULA)
 
@@ -48,7 +48,7 @@ For a posterior $\pi(\theta) \propto p(\theta) \prod_n p(x_n \mid \theta)$ over 
 the full gradient $\nabla \log \pi(\theta) = \nabla \log p(\theta) + \sum_n \nabla \log p(x_n \mid \theta)$
 costs $O(N)$ per step.
 
-SGLD replaces the full gradient with a mini-batch estimate and no MH correction:
+SGLD replaces the full gradient with a mini-batch estimate and no MH correction<FN n="1" />:
 
 $$
 \theta_{t+1} = \theta_t + \frac{\varepsilon_t}{2}\!\left(\nabla \log p(\theta_t)
@@ -128,3 +128,8 @@ into approximate Bayesian posterior sampling.
 
 The next subsection introduces latent variable models, starting with the EM algorithm
 that maximizes the marginal likelihood when the latent structure is not directly observed.
+
+<Footnotes>
+  <FNItem n="1">**Welling, M., & Teh, Y. W.** (2011). "Bayesian learning via stochastic gradient Langevin dynamics". *ICML*. Introduces SGLD as mini-batch posterior sampling.</FNItem>
+  <FNItem n="2">**Neal, R. M.** (2011). "MCMC using Hamiltonian dynamics". In *Handbook of Markov Chain Monte Carlo*. [arXiv:1206.1901](https://arxiv.org/abs/1206.1901). Background on gradient-based MCMC and Langevin diffusion.</FNItem>
+</Footnotes>

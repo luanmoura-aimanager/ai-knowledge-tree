@@ -12,7 +12,7 @@ prerequisites: ["F5/amortized-vi", "A2/kl-cross-entropy"]
 Probabilistic PCA uses a linear decoder and Gaussian noise.
 The **Variational Autoencoder** (VAE) replaces both the encoder and decoder with neural
 networks while preserving the latent variable structure, enabling the model to learn
-complex, nonlinear data distributions.
+complex, nonlinear data distributions<FN n="1" />.
 
 This lesson focuses on the mathematical core: the ELBO objective and the reparameterization
 trick that makes it differentiable.
@@ -47,7 +47,7 @@ $$
 The ELBO contains $\mathbb{E}_{q_\phi}[\cdot]$, which requires sampling from $q_\phi(z \mid x)$.
 Sampling is non-differentiable in $\phi$, blocking backpropagation.
 
-The reparameterization trick rewrites the sample as:
+The reparameterization trick rewrites the sample as<FN n="1" />:
 
 $$
 z = \mu_\phi(x) + \sigma_\phi(x) \odot \epsilon, \qquad \epsilon \sim \mathcal{N}(0, I).
@@ -149,3 +149,7 @@ the latent distribution close to the prior throughout.
 
 The next lesson covers how to estimate uncertainty in neural networks without
 a full variational treatment, using MC dropout and deep ensembles.
+
+<Footnotes>
+  <FNItem n="1">**Kingma, D. P., & Welling, M.** (2014). "Auto-encoding variational Bayes". *ICLR*. Introduces the VAE, the amortized ELBO, and the reparameterization trick for low-variance gradients through a stochastic latent ([arXiv:1312.6114](https://arxiv.org/abs/1312.6114)).</FNItem>
+</Footnotes>

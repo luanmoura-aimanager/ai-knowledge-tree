@@ -12,7 +12,7 @@ prerequisites: ["mc-dropout-ensembles", "F5/mean-field-vi"]
 MC dropout and ensembles approximate Bayesian uncertainty without explicitly
 maintaining a distribution over weights.
 A **Bayesian neural network** (BNN) does maintain one: a prior $p(\theta)$ over
-all network parameters, updated to a posterior $p(\theta \mid \mathcal{D})$ given data.
+all network parameters, updated to a posterior $p(\theta \mid \mathcal{D})$ given data<FN n="1" />.
 
 The core challenge is that the weight space has millions of dimensions, making
 exact posterior inference impossible. Two tractable approximations are the Laplace
@@ -58,7 +58,7 @@ $$
 where $q_\phi(\theta) = \prod_j \mathcal{N}(\mu_j, \sigma_j^2)$ factorizes over all weights.
 
 **Bayes by Backprop** (Blundell et al., 2015) optimizes this ELBO using the
-reparameterization trick: $\theta_j = \mu_j + \sigma_j \epsilon_j$ with $\epsilon_j \sim \mathcal{N}(0,1)$.
+reparameterization trick: $\theta_j = \mu_j + \sigma_j \epsilon_j$ with $\epsilon_j \sim \mathcal{N}(0,1)$<FN n="2" />.
 All gradients flow through the reparameterized samples.
 
 The local reparameterization trick further reduces variance by perturbing activations
@@ -76,7 +76,7 @@ $$
 where $\theta^{(s)} \sim q_\phi(\theta)$.
 This Monte Carlo average provides both a point estimate and a measure of predictive uncertainty.
 
-![A Bayesian neural network places a distribution over weights, so predictions carry uncertainty — the band is tight where data is dense and widens in the gaps and beyond the data. (Shown with a GP, the infinite-width limit.)](/figures/F8/bayesian-neural-networks.svg)
+![A Bayesian neural network places a distribution over weights, so predictions carry uncertainty: the band is tight where data is dense and widens in the gaps and beyond the data. (Shown with a GP, the infinite-width limit.)](/figures/F8/bayesian-neural-networks.svg)
 
 ## Implementation
 
@@ -135,3 +135,8 @@ sample size.
 
 The next lesson covers conformal prediction, a distribution-free approach to
 uncertainty that provides guaranteed coverage without any model of the weights.
+
+<Footnotes>
+  <FNItem n="1">**Neal, R. M.** (1996). *Bayesian Learning for Neural Networks.* Springer. The foundational treatment of priors over network weights and the infinite-width Gaussian-process limit ([doi:10.1007/978-1-4612-0745-0](https://doi.org/10.1007/978-1-4612-0745-0)).</FNItem>
+  <FNItem n="2">**Blundell, C., Cornebise, J., Kavukcuoglu, K., & Wierstra, D.** (2015). "Weight uncertainty in neural networks". *ICML*. Introduces Bayes by Backprop, the mean-field variational BNN trained via the reparameterization trick ([arXiv:1505.05424](https://arxiv.org/abs/1505.05424)).</FNItem>
+</Footnotes>
