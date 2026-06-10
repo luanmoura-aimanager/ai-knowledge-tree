@@ -28,7 +28,7 @@ statistics as taking the maximum of several sample means.
 one set of weights to pick the maximizing action and a *different* set to evaluate
 its value, so the noise in selection is independent of the noise in evaluation. In
 DQN the two networks already exist, so **Double DQN** reuses them: the online
-network $w$ selects, the target network $w^-$ evaluates,
+network $w$ selects, the target network $w^-$ evaluates<FN n="1" />,
 
 $$
 y = r + \gamma\, Q_{w^-}\!\big(s', \arg\max_{a'} Q_w(s', a')\big).
@@ -46,7 +46,7 @@ $Q(s,a)$ head must relearn the state's overall value separately for every action
 
 The **dueling** network splits the final layers into two streams from a shared
 trunk: a scalar **state value** $V(s)$ and a per-action **advantage** $A(s,a)$,
-recombined as
+recombined as<FN n="2" />
 
 $$
 Q(s,a) = V(s) + \Big(A(s,a) - \tfrac{1}{|\mathcal{A}|}\sum_{a'} A(s,a')\Big).
@@ -63,7 +63,7 @@ action's experience in a state at once, so state values sharpen faster.
 Uniform replay samples a transition the agent already predicts perfectly as often
 as one it gets badly wrong. **Prioritized experience replay** samples in
 proportion to the magnitude of the TD error $|\delta|$, so surprising transitions
-are revisited more. Priorities are $p_i = |\delta_i| + \epsilon$, and a transition
+are revisited more<FN n="3" />. Priorities are $p_i = |\delta_i| + \epsilon$, and a transition
 is drawn with probability $P(i) \propto p_i^{\alpha}$ ($\alpha$ interpolating
 between uniform at $0$ and greedy at $1$).
 
@@ -73,7 +73,7 @@ to each update, which removes the bias introduced by the skewed sampling. The ne
 effect is the same data, ordered to spend gradient steps where the error is
 largest.
 
-![Each DQN trick targets a specific failure — target networks and replay stabilize the moving target, Double DQN removes overestimation, prioritized replay speeds learning — and stacking them lifts the learning curve.](/figures/H2/dqn-improvements.svg)
+![Each DQN trick targets a specific failure: target networks and replay stabilize the moving target, Double DQN removes overestimation, prioritized replay speeds learning, and stacking them lifts the learning curve.](/figures/H2/dqn-improvements.svg)
 
 ## Worked check: the max estimator is biased, the double estimator is not
 
@@ -111,3 +111,9 @@ These value-based methods learn $Q$ then act greedily, which struggles with
 continuous actions (the $\max_a$ becomes an optimization) and stochastic optimal
 policies. The next lesson takes the other route: parameterize and optimize the
 policy directly, starting from the policy gradient theorem.
+
+<Footnotes>
+  <FNItem n="1">**van Hasselt, H., Guez, A., & Silver, D.** (2016). "Deep reinforcement learning with double Q-learning". *AAAI*. [arXiv:1509.06461](https://arxiv.org/abs/1509.06461)</FNItem>
+  <FNItem n="2">**Wang, Z., et al.** (2016). "Dueling network architectures for deep reinforcement learning". *ICML*. [arXiv:1511.06581](https://arxiv.org/abs/1511.06581)</FNItem>
+  <FNItem n="3">**Schaul, T., Quan, J., Antonoglou, I., & Silver, D.** (2016). "Prioritized experience replay". *ICLR*. [arXiv:1511.05952](https://arxiv.org/abs/1511.05952)</FNItem>
+</Footnotes>

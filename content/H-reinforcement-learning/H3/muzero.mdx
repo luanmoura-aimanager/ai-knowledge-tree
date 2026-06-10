@@ -13,7 +13,7 @@ AlphaZero plans with MCTS, but its search needs the true rules as a simulator: i
 must know that this move leads to that board. In Atari, or any environment where
 the agent only sees pixels and rewards, those rules are not available. **MuZero**
 keeps AlphaZero's search and self-play but learns its own model, and the surprising
-design choice is *what* that model is trained to get right.
+design choice is *what* that model is trained to get right<FN n="1" />.
 
 ## Three learned functions
 
@@ -123,8 +123,12 @@ print("optimal policy matches:", np.array_equal(pi_true, pi_abs[np.arange(nS) //
 The compact four-state model reproduces the eight-state environment's optimal
 values and policy exactly, despite being half the size and never representing
 individual observations, which is the value-equivalence that justifies planning in
-MuZero's learned latent.
+MuZero's learned latent<FN n="1" />.
 
 MuZero still plans with an explicit tree search. The next lesson learns a model of
 quite different character: a generative world model of pixels that an agent can
 dream inside, training its policy on imagined rollouts.
+
+<Footnotes>
+  <FNItem n="1">**Schrittwieser, J., et al.** (2020). "Mastering Atari, Go, chess and shogi by planning with a learned model (MuZero)". *Nature*, 588, 604-609. [arXiv:1911.08265](https://arxiv.org/abs/1911.08265). Introduces the learned latent model and value-equivalent planning.</FNItem>
+</Footnotes>

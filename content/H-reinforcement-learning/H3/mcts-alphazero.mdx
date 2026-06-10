@@ -53,7 +53,7 @@ without ever fully abandoning the rest. The constant $c$ sets the trade-off.
 
 MCTS with random rollouts is strong but slow: random play is a noisy value
 estimate. **AlphaZero** replaces the two heuristic pieces of MCTS with a single
-neural network $f_\theta(s) = (\mathbf{p}, v)$ that outputs a **policy prior**
+neural network $f_\theta(s) = (\mathbf{p}, v)$<FN n="1" /> that outputs a **policy prior**
 $\mathbf{p}$ over moves and a **value** $v \in [-1, 1]$ estimating the game outcome
 from $s$. Two changes follow:
 
@@ -75,7 +75,7 @@ $$
 This is policy iteration in disguise: MCTS is the policy-improvement operator (it
 turns the current network into a stronger search policy), and the network training
 is the policy-evaluation-and-distillation step that folds the improvement back in.
-The two reinforce each other from random initialization up to superhuman play.
+The two reinforce each other from random initialization up to superhuman play<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -163,3 +163,8 @@ knowledge beyond the rules.
 MCTS and AlphaZero need the true rules as a simulator. The next lesson removes even
 that: MuZero learns its own latent model of the dynamics and plans inside it,
 searching a game whose rules it was never told.
+
+<Footnotes>
+  <FNItem n="1">**Silver, D., et al.** (2017). "Mastering the game of Go without human knowledge (AlphaGo Zero)". *Nature*, 550, 354-359. [doi:10.1038/nature24270](https://doi.org/10.1038/nature24270). Introduces the single policy-value network and tabula-rasa self-play.</FNItem>
+  <FNItem n="2">**Silver, D., et al.** (2018). "A general reinforcement learning algorithm that masters chess, shogi, and Go through self-play (AlphaZero)". *Science*, 362(6419), 1140-1144. [doi:10.1126/science.aar6404](https://doi.org/10.1126/science.aar6404). Generalizes the self-play loop across games.</FNItem>
+</Footnotes>

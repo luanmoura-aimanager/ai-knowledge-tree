@@ -14,7 +14,7 @@ building, then open a door, then fetch an object) that means propagating reward 
 across thousands of steps, which is slow and brittle. Humans plan with **temporal
 abstraction**: "go to the kitchen" is one decision that unfolds into hundreds of
 muscle commands. **Hierarchical RL** gives agents the same abstraction, and the
-options framework makes it precise.
+options framework makes it precise<FN ns="1, 2" />.
 
 ## Options: temporally-extended actions
 
@@ -37,7 +37,7 @@ rather than primitive actions, deciding far less often.
 Because options take variable amounts of time, the high-level decision process is no
 longer an MDP but a **semi-Markov decision process** (SMDP): the time between
 decisions is itself random. The Bellman equation generalizes to discount by the
-option's actual duration. If an option started in $s$ runs for $k$ steps,
+option's actual duration<FN n="1" />. If an option started in $s$ runs for $k$ steps,
 collecting rewards $r_1, \dots, r_k$ and landing in $s'$, its value backup is
 
 $$
@@ -123,3 +123,8 @@ semi-MDP backup buy.
 This closes the "beyond standard RL" subsection. The final subsection turns to where
 reinforcement learning meets large language models: the RL framing of fine-tuning,
 verifier rewards, and reward hacking.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., Precup, D., & Singh, S.** (1999). "Between MDPs and semi-MDPs: a framework for temporal abstraction in reinforcement learning (options)". *Artificial Intelligence*, 112(1-2), 181-211. [doi:10.1016/S0004-3702(99)00052-1](https://doi.org/10.1016/S0004-3702(99)00052-1). The options and semi-MDP framework.</FNItem>
+  <FNItem n="2">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Background on temporal abstraction and hierarchical methods.</FNItem>
+</Footnotes>

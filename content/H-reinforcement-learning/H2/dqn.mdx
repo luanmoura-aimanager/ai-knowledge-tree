@@ -15,7 +15,7 @@ it naively on Atari pixels and the weights diverge. The 2015 **deep Q-network**
 (DQN) made it work, not by removing any leg of the triad but by re-engineering the
 two things that make the triad dangerous: correlated data and a moving target. Two
 mechanisms, experience replay and a target network, were enough to learn Atari
-from raw pixels.
+from raw pixels<FN n="1" />.
 
 ## The DQN objective
 
@@ -52,7 +52,7 @@ the target together, a feedback loop that amplifies errors, the moving-target
 problem.
 
 The fix is a **target network**: a second copy of the weights $w^-$ used only to
-compute the target. It is held fixed for $C$ steps, then refreshed to the current
+compute the target<FN n="1" />. It is held fixed for $C$ steps, then refreshed to the current
 $w$. The notation $Q_{w^-}$ in the loss is exactly this: the bootstrap target is
 computed against frozen weights, so over each window of $C$ steps the regression
 has a stationary label and behaves like supervised learning. Slowing the target
@@ -143,3 +143,7 @@ DQN learns good policies but systematically overestimates action values, and its
 single value head wastes effort in states where the action barely matters. The
 next lesson fixes both with Double, Dueling, and Prioritized DQN, the components
 that compose Rainbow.
+
+<Footnotes>
+  <FNItem n="1">**Mnih, V., et al.** (2015). "Human-level control through deep reinforcement learning". *Nature*, 518, 529-533. The DQN paper: experience replay and the target network. [doi:10.1038/nature14236](https://doi.org/10.1038/nature14236)</FNItem>
+</Footnotes>

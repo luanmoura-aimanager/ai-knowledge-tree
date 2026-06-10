@@ -45,7 +45,7 @@ oversized step.
 The importance-sampling surrogate only approximates the true objective near
 $\theta_{\text{old}}$; far away the approximation is worthless. **TRPO** makes this
 precise by maximizing $L^{\text{IS}}$ subject to a **trust-region** constraint that
-the new policy stay close to the old one in KL divergence:
+the new policy stay close to the old one in KL divergence<FN n="1" />:
 
 $$
 \max_\theta\; \mathbb{E}_t\big[\rho_t(\theta)\,\hat{A}_t\big] \quad \text{subject to} \quad \mathbb{E}_t\big[\mathrm{KL}(\pi_{\theta_{\text{old}}}(\cdot\mid s_t)\,\|\,\pi_\theta(\cdot\mid s_t))\big] \le \delta.
@@ -59,7 +59,7 @@ monotonic improvement, but it requires a constrained optimization with second-or
 
 PPO keeps the trust-region intent and throws away the constrained optimization. It
 replaces the hard KL constraint with a **clipped** surrogate that simply removes
-the incentive to move the ratio outside $[1-\epsilon, 1+\epsilon]$:
+the incentive to move the ratio outside $[1-\epsilon, 1+\epsilon]$<FN n="2" />:
 
 $$
 L^{\text{CLIP}}(\theta) = \mathbb{E}_t\Big[ \min\big(\rho_t \hat{A}_t,\; \mathrm{clip}(\rho_t, 1-\epsilon, 1+\epsilon)\, \hat{A}_t\big) \Big].
@@ -120,3 +120,8 @@ PPO handles discrete and continuous actions through a stochastic policy. When th
 optimal policy is deterministic and actions are continuous, a different family is
 more sample-efficient: the next lesson develops DDPG, TD3, and SAC for continuous
 control.
+
+<Footnotes>
+  <FNItem n="1">**Schulman, J., Levine, S., Abbeel, P., Jordan, M., & Moritz, P.** (2015). "Trust region policy optimization". *ICML*. [arXiv:1502.05477](https://arxiv.org/abs/1502.05477)</FNItem>
+  <FNItem n="2">**Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O.** (2017). "Proximal policy optimization algorithms". The clipped surrogate objective. [arXiv:1707.06347](https://arxiv.org/abs/1707.06347)</FNItem>
+</Footnotes>

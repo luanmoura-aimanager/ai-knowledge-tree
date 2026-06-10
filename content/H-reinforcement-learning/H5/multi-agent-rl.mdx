@@ -46,7 +46,7 @@ sees the full joint state and all agents' actions, so it evaluates each agent
 against a stationary, fully-observed picture. At execution time, each agent acts
 through a **decentralized actor** that uses only its own local observation. Methods
 like MADDPG put one centralized critic per agent over the joint action and a local
-actor for each; the critic stabilizes learning (it is not fooled by the others'
+actor for each<FN n="1" />; the critic stabilizes learning (it is not fooled by the others'
 changes because it observes them), while the actors remain independently deployable.
 
 ## Self-play
@@ -103,3 +103,7 @@ despite the nonstationarity that adaptation creates.
 These extensions all keep one flat policy choosing primitive actions. The last
 lesson of the subsection adds temporal structure: hierarchical RL, where high-level
 policies select among lower-level skills that run for many steps.
+
+<Footnotes>
+  <FNItem n="1">**Lowe, R., et al.** (2017). "Multi-agent actor-critic for mixed cooperative-competitive environments (MADDPG)". *NeurIPS*. [arXiv:1706.02275](https://arxiv.org/abs/1706.02275). Introduces centralized-critic, decentralized-actor training.</FNItem>
+</Footnotes>

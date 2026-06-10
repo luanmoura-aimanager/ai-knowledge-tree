@@ -20,7 +20,7 @@ overestimation and exploration problems that arise.
 
 **Deep deterministic policy gradient** (DDPG) keeps a critic $Q_\phi(s,a)$ and adds
 a deterministic actor $\mu_\theta(s)$ whose job is to produce the action that
-maximizes the critic. Then $\max_{a'} Q(s',a')$ is approximated by
+maximizes the critic<FN n="1" />. Then $\max_{a'} Q(s',a')$ is approximated by
 $Q_\phi(s', \mu_\theta(s'))$, no search needed. The critic trains by the usual
 DQN-style bootstrap with target networks; the actor trains to maximize the critic's
 value at its own action via the **deterministic policy gradient**, the chain rule
@@ -39,7 +39,7 @@ Double-DQN lesson, now feeding the actor.
 
 ## TD3: three fixes for a stable critic
 
-**Twin delayed DDPG** (TD3) adds three corrections:
+**Twin delayed DDPG** (TD3) adds three corrections<FN n="2" />:
 
 1. **Clipped double Q-learning.** Keep two critics $Q_{\phi_1}, Q_{\phi_2}$ and use
    the **smaller** of the two in the target,
@@ -61,7 +61,7 @@ overestimation into a mild, harmless underestimation.
 **Soft actor-critic** (SAC) takes a different angle on exploration. Instead of
 injecting external action noise, it changes the objective to reward **entropy**, so
 a high-entropy (more random, more exploratory) policy is intrinsically preferred
-whenever it does not cost return:
+whenever it does not cost return<FN n="3" />:
 
 $$
 J(\pi) = \mathbb{E}\Big[ \sum_t \gamma^t \big( r_{t+1} + \alpha\, \mathcal{H}(\pi(\cdot \mid s_t)) \big) \Big],
@@ -117,3 +117,9 @@ This closes the model-free toolbox: value-based, policy-gradient, and continuous
 control methods all learn purely from sampled transitions. The next subsection asks
 whether learning a *model* of the environment can make the agent far more
 sample-efficient, starting with Dyna-Q.
+
+<Footnotes>
+  <FNItem n="1">**Lillicrap, T. P., et al.** (2016). "Continuous control with deep reinforcement learning". *ICLR*. Introduces DDPG. [arXiv:1509.02971](https://arxiv.org/abs/1509.02971)</FNItem>
+  <FNItem n="2">**Fujimoto, S., van Hoof, H., & Meger, D.** (2018). "Addressing function approximation error in actor-critic methods". *ICML*. The TD3 fixes. [arXiv:1802.09477](https://arxiv.org/abs/1802.09477)</FNItem>
+  <FNItem n="3">**Haarnoja, T., Zhou, A., Abbeel, P., & Levine, S.** (2018). "Soft actor-critic". *ICML*. Entropy-regularized off-policy RL. [arXiv:1801.01290](https://arxiv.org/abs/1801.01290)</FNItem>
+</Footnotes>

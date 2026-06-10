@@ -63,7 +63,7 @@ $$
 $$
 
 The unknown dynamics dropped out. Substituting back gives the **policy gradient
-theorem**:
+theorem**<FN ns="1, 2" />:
 
 $$
 \nabla_\theta J(\theta) = \mathbb{E}_{\tau}\Big[ \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)\, G_t \Big],
@@ -76,7 +76,7 @@ return-to-go $G_t$ rather than the full-episode return).
 ## REINFORCE
 
 Estimating that expectation with sampled episodes and stepping uphill is the
-**REINFORCE** algorithm. For each episode, compute returns-to-go $G_t$ and update
+**REINFORCE** algorithm<FN n="3" />. For each episode, compute returns-to-go $G_t$ and update
 
 $$
 \theta \leftarrow \theta + \alpha \sum_t G_t\, \nabla_\theta \log \pi_\theta(a_t \mid s_t).
@@ -161,3 +161,9 @@ The baseline that best reduces variance is the state value $V(s)$, which is not
 known in advance. Learning it with a second network and using it both as the
 baseline and to bootstrap the return gives the actor-critic methods of the next
 lesson.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., McAllester, D., Singh, S., & Mansour, Y.** (2000). "Policy gradient methods for reinforcement learning with function approximation". *NeurIPS*.</FNItem>
+  <FNItem n="2">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Policy gradient methods and the baseline (Ch. 13).</FNItem>
+  <FNItem n="3">**Williams, R. J.** (1992). "Simple statistical gradient-following algorithms for connectionist reinforcement learning". *Machine Learning*, 8, 229-256. The REINFORCE estimator. [doi:10.1007/BF00992696](https://doi.org/10.1007/BF00992696)</FNItem>
+</Footnotes>

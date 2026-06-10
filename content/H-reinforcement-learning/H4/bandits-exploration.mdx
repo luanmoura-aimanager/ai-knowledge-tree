@@ -14,7 +14,7 @@ fraction of the time. That is crude. The **multi-armed bandit** strips RL down t
 exploration alone (one state, no transitions) so the question can be studied
 cleanly: with a fixed budget of pulls, how should an agent balance trying arms it
 is unsure about against pulling the arm it currently believes is best? The good
-answers here, confidence bounds and posterior sampling, carry back into full RL.
+answers here, confidence bounds and posterior sampling, carry back into full RL<FN n="1" />.
 
 ## The bandit and regret
 
@@ -55,7 +55,7 @@ Read the two terms: $\hat{\mu}_a$ exploits, and the bonus $\sqrt{2\ln t / n_a}$
 explores, large for rarely pulled arms ($n_a$ small) and slowly growing in $t$ so
 neglected arms eventually get revisited. As an arm is pulled its bonus shrinks, so
 exploration self-extinguishes. UCB achieves regret growing like $\ln T$, which is
-sublinear and in fact optimal in its dependence on $T$.
+sublinear and in fact optimal in its dependence on $T$<FN n="2" />.
 
 ## Thompson sampling: posterior matching
 
@@ -128,3 +128,8 @@ These strategies assume every pull gives an informative reward. In a sparse-rewa
 MDP the agent may wander for a long time seeing nothing, and undirected exploration
 stalls. The next lesson adds **intrinsic** rewards that turn novelty itself into a
 signal to explore.
+
+<Footnotes>
+  <FNItem n="1">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Chapter 2 sets up the multi-armed bandit, regret, and the exploration-exploitation tradeoff.</FNItem>
+  <FNItem n="2">**Auer, P., Cesa-Bianchi, N., & Fischer, P.** (2002). "Finite-time analysis of the multiarmed bandit problem". *Machine Learning*, 47(2-3), 235-256. [doi:10.1023/A:1013689704352](https://doi.org/10.1023/A:1013689704352) Introduces UCB1 and its logarithmic regret bound.</FNItem>
+</Footnotes>

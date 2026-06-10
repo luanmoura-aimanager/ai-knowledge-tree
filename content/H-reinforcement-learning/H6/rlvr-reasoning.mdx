@@ -13,7 +13,7 @@ RLHF's reward comes from a learned model of human preference, which is a proxy t
 can be gamed. For tasks with a checkable answer, math problems, code, formal proofs,
 there is something better: a **verifier** that says, with certainty, whether the
 answer is right. **Reinforcement learning from verifiable rewards** (RLVR) optimizes
-against that ground truth, and it is what produced the recent jump in LLM reasoning.
+against that ground truth, and it is what produced the recent jump in LLM reasoning<FN n="2" />.
 
 ## Verifiable rewards
 
@@ -35,7 +35,7 @@ of the terminal reward differs.
 PPO needs a value network (the critic) to compute advantages, which for a large LM
 means training a second model of comparable size. **Group relative policy
 optimization** (GRPO) removes the critic by building the baseline from a *group* of
-sampled answers to the same prompt. For each prompt, sample $G$ completions
+sampled answers to the same prompt<FN n="1" />. For each prompt, sample $G$ completions
 $y_1, \dots, y_G$, score each with the verifier to get $r_1, \dots, r_G$, and compute
 a **group-relative advantage** by standardizing within the group:
 
@@ -59,7 +59,7 @@ Given only "the final answer must be right," the model discovers on its own that
 generating intermediate steps, checking its work, and backtracking raises its
 probability of a correct answer, so RL reinforces those behaviors. Response lengths
 grow over training and reflection-like patterns appear, none of it explicitly
-rewarded. The reasoning is instrumental: it is selected because it pays off at the
+rewarded<FN n="2" />. The reasoning is instrumental: it is selected because it pays off at the
 verifier, the clearest demonstration that capability can come from reward signal
 alone rather than demonstrations.
 
@@ -111,3 +111,9 @@ critic-free signal that GRPO uses to turn verifier rewards into a better policy.
 A verifier is a sharper reward than a learned model, but no reward is perfect, and
 optimizing any proxy hard enough eventually corrupts the true objective. The last
 lesson confronts that: reward hacking and overoptimization.
+
+<Footnotes>
+  <FNItem n="1">**Shao, Z., et al.** (2024). "DeepSeekMath: pushing the limits of mathematical reasoning in open language models". [arXiv:2402.03300](https://arxiv.org/abs/2402.03300). Introduces GRPO, the critic-free group-relative policy optimizer.</FNItem>
+  <FNItem n="2">**DeepSeek-AI.** (2025). "DeepSeek-R1: incentivizing reasoning capability in LLMs via reinforcement learning". [arXiv:2501.12948](https://arxiv.org/abs/2501.12948). Long reasoning chains emerge from a terminal correctness reward alone.</FNItem>
+</Footnotes>
+

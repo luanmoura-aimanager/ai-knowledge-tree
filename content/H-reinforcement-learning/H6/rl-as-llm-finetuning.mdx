@@ -13,7 +13,7 @@ The [RLHF pipeline](E4/ppo-rlhf) was introduced from the language-modeling side:
 fit a reward model to human preferences, then optimize the policy with PPO. This
 lesson re-reads that pipeline through the RL formalism of this pillar, which makes
 precise what the state, action, and reward actually are, and why a KL penalty to a
-reference model is not a heuristic add-on but the defining feature of the objective.
+reference model is not a heuristic add-on but the defining feature of the objective<FN ns="1, 2" />.
 
 ## Generation as a token-level MDP
 
@@ -32,7 +32,7 @@ MDP:
 
 So a completion is an episode, the LM is the policy, and the reward is **sparse**:
 one scalar at the end of generation. This is why PPO, built for exactly this
-sparse-reward policy-optimization setting, is the natural optimizer.
+sparse-reward policy-optimization setting, is the natural optimizer<FN n="3" />.
 
 ## The KL-to-reference penalty
 
@@ -126,3 +126,9 @@ token," which is exactly the knob the KL coefficient turns during RLHF.
 This frames RLHF where the reward comes from a learned model of human preference. The
 next lesson swaps that learned reward for a programmatic verifier, the setup behind
 recent reasoning models.
+
+<Footnotes>
+  <FNItem n="1">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback". *NeurIPS*. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155). The InstructGPT recipe: SFT, reward model, then PPO with a KL-to-reference penalty.</FNItem>
+  <FNItem n="2">**Christiano, P., et al.** (2017). "Deep reinforcement learning from human preferences". *NeurIPS*. [arXiv:1706.03741](https://arxiv.org/abs/1706.03741). The original learn-a-reward-from-comparisons framework underlying RLHF.</FNItem>
+  <FNItem n="3">**Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O.** (2017). "Proximal policy optimization algorithms". [arXiv:1707.06347](https://arxiv.org/abs/1707.06347). The clipped trust-region policy optimizer used to maximize the KL-regularized reward.</FNItem>
+</Footnotes>

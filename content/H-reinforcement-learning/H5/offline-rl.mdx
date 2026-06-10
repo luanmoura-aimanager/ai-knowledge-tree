@@ -14,7 +14,7 @@ sees the truth, and corrects. **Offline RL** learns from a fixed, logged dataset
 with no further interaction, the realistic setting for medicine, robotics with
 expensive trials, or any domain where exploration is unsafe. Removing interaction
 breaks the self-correcting loop, and standard Q-learning fails in a specific,
-diagnosable way.
+diagnosable way<FN n="1" />.
 
 ## Why off-the-shelf Q-learning breaks offline
 
@@ -46,7 +46,7 @@ $\mathcal{D}$ is the dataset. Minimizing it deflates the high $Q$ values that th
 $\max$ would chase (the OOD overestimates) and inflates the values of actions
 actually observed. The result is a **lower bound** on the true value, so the greedy
 policy can no longer be fooled by an unsupported action: conservatism by
-construction.
+construction<FN n="2" />.
 
 ## Implicit Q-learning
 
@@ -111,3 +111,8 @@ overestimation, controlled by staying near the data.
 
 Single-agent offline RL still assumes one decision-maker. The next lesson adds
 others: multi-agent RL, where the environment itself contains adapting agents.
+
+<Footnotes>
+  <FNItem n="1">**Levine, S., Kumar, A., Tucker, G., & Fu, J.** (2020). "Offline reinforcement learning: tutorial, review, and perspectives on open problems". [arXiv:2005.01643](https://arxiv.org/abs/2005.01643). Diagnoses distribution shift and out-of-distribution overestimation offline.</FNItem>
+  <FNItem n="2">**Kumar, A., Zhou, A., Tucker, G., & Levine, S.** (2020). "Conservative Q-learning for offline reinforcement learning (CQL)". *NeurIPS*. [arXiv:2006.04779](https://arxiv.org/abs/2006.04779). Introduces the conservative lower-bound penalty.</FNItem>
+</Footnotes>

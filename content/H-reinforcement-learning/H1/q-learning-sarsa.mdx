@@ -46,7 +46,7 @@ The $\max_{a'}$ is a sampled version of the optimality operator $T^*$ from the
 dynamic-programming lesson. Q-learning is **off-policy**: the target evaluates the
 greedy policy while the agent may behave by some other (exploratory) policy. It
 learns $Q^*$ even while exploring, because the target never references the
-exploratory action.
+exploratory action<FN n="1" />.
 
 Both updates assume the same $\varepsilon$-greedy behavior to ensure every
 state-action pair keeps being visited, and both converge under Robbins-Monro step
@@ -70,7 +70,7 @@ $\varepsilon$-greedy exploration:
 
 Neither is wrong: Q-learning finds the optimal policy of the *greedy* agent; SARSA
 finds the best policy for the agent that *keeps exploring*. The difference is
-entirely the next-action choice in the target.
+entirely the next-action choice in the target<FN n="2" />.
 
 ![On cliff-walking, off-policy Q-learning learns the optimal but risky edge path, so its returns swing low when ε-exploration steps off the cliff; on-policy SARSA prefers a safer path and earns higher returns during training.](/figures/H1/q-learning-sarsa.svg)
 
@@ -131,3 +131,8 @@ Tabular Q-learning stores one number per state-action pair, which is impossible
 when states are images or continuous vectors. The next subsection replaces the
 table with a function approximator, opening deep reinforcement learning, and
 exposes the new instability that comes with it.
+
+<Footnotes>
+  <FNItem n="1">**Watkins, C. J. C. H., & Dayan, P.** (1992). "Q-learning". *Machine Learning*, 8(3), 279-292. [doi:10.1007/BF00992698](https://doi.org/10.1007/BF00992698)</FNItem>
+  <FNItem n="2">**Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. Chapter 6 contrasts on-policy SARSA with off-policy Q-learning, including the cliff-walking example.</FNItem>
+</Footnotes>
