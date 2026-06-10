@@ -1,0 +1,100 @@
+---
+title: "Automated retraining and continual learning"
+pillar: I
+subId: I4
+lessonId: automated-retraining
+order: 3
+estimatedMinutes: 22
+goal: "Decide when a decaying model is worth retraining by weighing accuracy loss against retrain cost, choose a trigger (scheduled vs drift-based), and guard the new model behind a champion-challenger gate."
+prerequisites: ["production-drift", "I1/drift-detection"]
+---
+
+[Production drift monitoring](I4/production-drift) tells you a model is decaying;
+it does not tell you what to do about it. The answer is **retraining**, fitting a
+fresh model on recent data, but retraining is not free, and retraining blindly is
+its own failure mode. This lesson treats retraining as a *decision*: when the
+accumulated cost of a stale model exceeds the cost of refreshing it, you retrain,
+and you choose the **trigger** that fires that decision automatically.
+
+## When is retraining worth it?
+
+Let a model decay at a roughly constant rate: each day in production it loses
+$r$ units of accuracy as the world drifts away from its training distribution.
+Over $t$ days since the last retrain it has lost $r\,t$, and if each lost unit
+costs the business $c$ per day, the cumulative **staleness cost** between retrains
+grows like
+
+$$
+\text{staleness}(T) \;=\; \sum_{t=1}^{T} c\,r\,t \;=\; c\,r\,\frac{T(T+1)}{2},
+$$
+
+quadratic in the retrain interval $T$. Against it stands a fixed retraining cost
+$K$ (compute, validation, the [deployment](I3/deployment-strategies) of the new
+model) paid once per cycle. The **average daily cost** over a cycle of length $T$
+is the retrain cost amortized plus the mean staleness,
+
+$$
+\bar{C}(T) \;=\; \frac{K}{T} + c\,r\,\frac{T+1}{2}.
+$$
+
+The first term falls as you retrain less often; the second rises as the model sits
+stale longer. Minimizing their sum gives an optimal cadence near
+$T^\star \approx \sqrt{2K/(c\,r)}$, the classic square-root tradeoff: a model that
+decays faster (large $r$) or whose errors are costlier (large $c$) earns a shorter
+interval, while an expensive retrain (large $K$) earns a longer one.
+
+![Retraining too often pays the fixed retrain cost repeatedly (the amortized K/T term falls); retraining too rarely lets the average staleness cost climb. Their sum is U-shaped with a minimum at the optimal cadence, the interval that balances amortized retrain cost against average staleness.](/figures/I4/automated-retraining.svg)
+
+## Triggers: schedule vs drift
+
+The cadence $T^\star$ above is a **scheduled** trigger, retrain every $T^\star$
+days regardless. It is simple and predictable but blind: it retrains on a quiet
+week and misses a sudden shift. A **drift-based** trigger instead fires when the
+[drift statistic](I1/drift-detection) (KS or PSI) or a monitored performance
+metric crosses a threshold, adapting to *when the world actually moves*. Mature
+pipelines combine both: a drift trigger for shocks plus a scheduled floor so the
+model never goes stale during a long, low-drift stretch.
+
+## Don't trust the challenger blindly
+
+A retrain can make the model *worse*, on a bad data batch, a leak, or
+[catastrophic forgetting](D/regularization) if you fine-tune continually instead
+of refitting. So the new model is never promoted on faith. It enters as a
+**challenger** and must beat the **champion** (the incumbent) on a held-out
+comparison before it is allowed through the [CI gate](I2/ml-cicd) and onto a
+[canary](I3/deployment-strategies). Retraining proposes; the champion-challenger
+test disposes.
+
+## Worked example
+
+We sweep the retrain interval, compute the average daily cost, and confirm the
+minimizer lands near the square-root rule.
+
+```python
+import numpy as np
+
+K  = 500.0    # fixed cost of one retrain (compute + validation + deploy)
+c  = 1.0      # business cost per unit of lost accuracy per day
+r  = 0.10     # accuracy lost per day of staleness
+
+T = np.arange(1, 121)                       # candidate intervals (days)
+avg_cost = K / T + c * r * (T + 1) / 2.0    # amortized retrain + mean staleness
+
+T_opt = T[np.argmin(avg_cost)]
+T_sqrt = np.sqrt(2 * K / (c * r))
+print(f"grid-optimal interval     = {T_opt} days")
+print(f"sqrt(2K/cr) approximation = {T_sqrt:.1f} days")
+print(f"min average daily cost    = {avg_cost.min():.2f}")
+
+# Retraining daily (T=1) wastes K every day; retraining yearly lets staleness pile up.
+print(f"cost at T=1   (too often) = {(K/1 + c*r*(1+1)/2):.2f}")
+print(f"cost at T=120 (too rare)  = {(K/120 + c*r*(120+1)/2):.2f}")
+
+assert abs(T_opt - T_sqrt) <= 2   # closed form matches the grid minimizer
+print("optimal cadence balances retrain cost against staleness:", True)
+```
+
+The same machinery that *detected* decay now *schedules* the response and the
+[champion-challenger gate](I2/ml-cicd) keeps a bad refresh from reaching users.
+That closes the production loop, data → training → serving → monitoring →
+retraining, that the whole [Machine Learning Engineer path](/) is built around.

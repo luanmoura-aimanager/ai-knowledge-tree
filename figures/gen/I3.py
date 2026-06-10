@@ -81,8 +81,39 @@ def quantization() -> None:
     save(fig, SUB, "quantization")
 
 
+def deployment_strategies() -> None:
+    """Three rollout patterns as fraction of USER traffic served by the new model over
+    time. Shadow keeps users at 0% (it only mirrors traffic, zero user risk); canary
+    ramps a small live fraction up in steps while watching a metric; blue-green flips
+    all traffic at once for an atomic cutover."""
+    import matplotlib.pyplot as plt
+
+    t = np.arange(0, 60)
+    shadow = np.zeros_like(t, dtype=float)                 # users never see the new model
+    canary = np.piecewise(
+        t.astype(float),
+        [t < 10, (t >= 10) & (t < 25), (t >= 25) & (t < 40), t >= 40],
+        [0.0, 5.0, 25.0, 100.0],
+    )
+    blue_green = np.where(t < 35, 0.0, 100.0)
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(t, canary, color=C, lw=2.4, label="canary (stepped ramp)")
+    ax.plot(t, blue_green, color=ACCENT, lw=2.0, ls="-.", label="blue-green (atomic flip)")
+    ax.plot(t, shadow, color=FG_MUTE, lw=2.0, ls="--", label="shadow (0% user traffic)")
+    ax.fill_between(t, shadow, 4, color=FG_MUTE, alpha=0.12)
+    ax.text(2, 8, "shadow mirrors\ntraffic, users at 0%", color=FG_MUTE, fontsize=8)
+    ax.set_title("Deployment strategies: traffic to the new model")
+    ax.set_xlabel("time"); ax.set_ylabel("% of user traffic on new model")
+    ax.set_ylim(-5, 110)
+    ax.legend(loc="center left", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "deployment-strategies")
+
+
 def main() -> None:
     apply_style()
+    deployment_strategies()
     distillation_pruning()
     latency_throughput()
     quantization()

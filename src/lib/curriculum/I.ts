@@ -33,6 +33,12 @@ export const I_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: ["orchestration-dags"],
     },
     {
+      id: "feature-engineering",
+      title: "Feature engineering: encoding, scaling, and leakage",
+      goal: "Turn raw columns into model-ready features by encoding categoricals and standardizing numerics, fit every transform on the training split only, and see how a leaked statistic silently inflates offline accuracy.",
+      prerequisites: ["feature-stores", "A2/expectation"],
+    },
+    {
       id: "data-versioning",
       title: "Data versioning and content-addressed storage",
       goal: "Make a dataset reproducible by addressing its contents with a hash, deduplicating shared chunks, and pinning a training run to an immutable data snapshot.",
@@ -51,6 +57,19 @@ export const I_CURRICULUM: Record<string, Lesson[]> = {
       title: "Experiment tracking, lineage, and reproducibility",
       goal: "Log the inputs (code, data, config, seed) and outputs (metrics, artifacts) of every run so results are comparable and reproducible, and see why fixing the seed alone is not enough.",
       prerequisites: ["I1/data-versioning", "A3/sgd"],
+    },
+    {
+      id: "model-registry",
+      title: "Model registry and staged promotion",
+      goal: "Track every trained model as an immutable, versioned artifact and move it through staging gates to production, so a deploy is a pointer swap you can audit and roll back rather than a rebuild.",
+      prerequisites: ["experiment-tracking"],
+      codeExempt: true,
+    },
+    {
+      id: "ml-cicd",
+      title: "CI/CD for ML: data, model, and pipeline tests",
+      goal: "Gate a model release behind automated checks the way code is gated, schema and distribution tests on the data, behavioral and threshold tests on the model, so a regression fails the pipeline instead of reaching users.",
+      prerequisites: ["model-registry", "I1/drift-detection"],
     },
     {
       id: "hyperparameter-search",
@@ -85,10 +104,20 @@ export const I_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: ["A2/expectation"],
     },
     {
+      id: "deployment-strategies",
+      title: "Deployment strategies: shadow, canary, and blue-green",
+      goal: "Release a new model behind shadow, canary, and blue-green patterns, and size a canary as a two-proportion test so you ship on evidence and roll back on a metric, not a hunch.",
+      prerequisites: ["latency-throughput", "B4/ab-testing"],
+    },
+    {
       id: "llm-serving",
       title: "Serving LLMs: KV cache and continuous batching",
       goal: "Size the KV-cache memory that bounds autoregressive serving and explain why continuous batching keeps the GPU saturated when requests finish at different lengths.",
-      prerequisites: ["latency-throughput", "E5/kv-cache", "E5/paged-attention"],
+      prerequisites: [
+        "latency-throughput",
+        "E5/kv-cache",
+        "E5/paged-attention",
+      ],
     },
     {
       id: "quantization",
@@ -122,6 +151,12 @@ export const I_CURRICULUM: Record<string, Lesson[]> = {
       title: "Concept drift vs data drift under label delay",
       goal: "Separate a shift in the inputs P(x) from a shift in the labelling rule P(y|x), and monitor each in production when ground-truth labels arrive late or never.",
       prerequisites: ["I1/drift-detection"],
+    },
+    {
+      id: "automated-retraining",
+      title: "Automated retraining and continual learning",
+      goal: "Decide when a decaying model is worth retraining by weighing accuracy loss against retrain cost, choose a trigger (scheduled vs drift-based), and guard the new model behind a champion-challenger gate.",
+      prerequisites: ["production-drift", "I1/drift-detection"],
     },
     {
       id: "llm-evaluation",

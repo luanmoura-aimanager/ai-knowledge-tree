@@ -1,0 +1,116 @@
+---
+title: "Feature engineering: encoding, scaling, and leakage"
+pillar: I
+subId: I1
+lessonId: feature-engineering
+order: 4
+estimatedMinutes: 22
+goal: "Turn raw columns into model-ready features by encoding categoricals and standardizing numerics, fit every transform on the training split only, and see how a leaked statistic silently inflates offline accuracy."
+prerequisites: ["feature-stores", "A2/expectation"]
+---
+
+A model never sees raw rows. Between the table and the optimizer sits a layer of
+**feature engineering**: the deterministic transforms that turn a heterogeneous
+record (a country string, a price in dollars, a timestamp) into the fixed-width
+numeric vector a model consumes. The [feature store](I1/feature-stores) is where
+those vectors live and how they reach training and serving; this lesson is about
+what the transforms themselves *are*, and the one rule that decides whether your
+offline numbers mean anything: **every transform is a function fitted on training
+data, and fitting it on anything else leaks the future into your score.**
+
+## Two transforms that cover most tabular features
+
+A categorical column has no numeric meaning, so we encode it. **One-hot
+encoding** maps a column with $k$ distinct levels to $k$ indicator columns, where
+row $i$ gets a $1$ in the column for its level and $0$ everywhere else. It assumes
+nothing about order or distance between levels, which is exactly right for
+unordered categories like country or device, and it costs one new dimension per
+level.
+
+A numeric column is already a number, but its *scale* is arbitrary: a price in
+dollars and an age in years live on wildly different ranges, and any model that
+sums weighted features (or measures distances) lets the large-range feature
+dominate purely by units. **Standardization** removes that by centering and
+rescaling each feature to zero mean and unit variance,
+
+$$
+z = \frac{x - \mu}{\sigma},
+$$
+
+where $\mu = \mathbb{E}[x]$ and $\sigma = \sqrt{\operatorname{Var}(x)}$ are the
+feature's [mean and standard deviation](A/expectation). After the transform every
+feature contributes on the same footing. The crucial detail is hiding in plain
+sight: $\mu$ and $\sigma$ are **estimated from data**. Which data you estimate
+them from is the whole game.
+
+## The leakage rule
+
+A transform with fitted parameters (the $\mu, \sigma$ above, the level vocabulary
+for one-hot, a target-mean for target encoding) is a tiny model. It must be
+**fit on the training split only**, then *applied* unchanged to validation, test,
+and production. If you instead fit on the full dataset before splitting, every
+training row's standardized value depends on the mean of rows that are supposed
+to be in the future. That is **data leakage**: information from the evaluation set
+bleeds into training through the shared statistic, the offline score climbs, and
+none of that lift survives deployment, where genuinely unseen rows must be scaled
+by a $\mu, \sigma$ computed without them.
+
+![Feature engineering fits a transform on the training split, then applies it unchanged to held-out data. Fitting on the full dataset before splitting leaks the held-out statistics into training, inflating the offline score above the honest accuracy the model reaches in production.](/figures/I1/feature-engineering.svg)
+
+The discipline is the same one a [feature store enforces across time with
+point-in-time joins](I1/feature-stores): a feature value may only depend on data
+available at or before the moment it describes. Leakage is just that rule violated
+along the train/test axis instead of the time axis.
+
+## Worked example
+
+We standardize one numeric feature two ways, the wrong way (fit on all data) and
+the right way (fit on train only), and measure the gap the leak opens between the
+offline estimate and the honest test error.
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+# A feature whose distribution shifts between the train era and the test era,
+# so the full-data mean/std differ from the train-only ones.
+x_train = rng.normal(0.0, 1.0, size=400)
+x_test  = rng.normal(0.8, 1.6, size=400)   # heavier, shifted — the "future"
+
+def standardize(x, mu, sigma):
+    return (x - mu) / sigma
+
+# WRONG: fit mu, sigma on train + test pooled (the future leaks in)
+pool = np.concatenate([x_train, x_test])
+mu_all, sd_all = pool.mean(), pool.std()
+
+# RIGHT: fit on train only, apply unchanged to test
+mu_tr, sd_tr = x_train.mean(), x_train.std()
+
+# A standardized feature should have ~unit std on the data the stats were fit on.
+# Under leakage the *test* block looks artificially well-scaled; done right it
+# reveals its true shift — which is the signal an honest pipeline must not hide.
+leaked_test_std = standardize(x_test, mu_all, sd_all).std()
+honest_test_std = standardize(x_test, mu_tr,  sd_tr ).std()
+
+print(f"train-fit mu, sigma     = {mu_tr:+.3f}, {sd_tr:.3f}")
+print(f"pooled   mu, sigma      = {mu_all:+.3f}, {sd_all:.3f}")
+print(f"test std, leaked fit    = {leaked_test_std:.3f}  (pulled toward 1: shift understated)")
+print(f"test std, honest fit    = {honest_test_std:.3f}  (full shift exposed)")
+
+assert honest_test_std > leaked_test_std
+print("leakage understates the distribution shift the model will actually face:", True)
+```
+
+The pooled fit folds the test block's own spread into $\sigma$, so the leaked
+standardization pulls the test era's apparent scale back toward one (here $1.15$
+instead of the true $1.62$), understating how far it has moved, exactly the
+optimism that evaporates in production. This scaler leak is a deliberately mild,
+easy-to-see instance of the general mechanism, a statistic fit on held-out data;
+target and temporal leaks distort the offline *score* far more, but all share this
+one cause. The train-only fit refuses to peek, so the shift shows up as a standard
+deviation well above one, which is information your
+[drift detector](I1/drift-detection) and [production monitor](I4/production-drift)
+need to see. With clean features defined, the next subsection moves from the data
+layer to the [infrastructure that trains](I2/experiment-tracking) the models that
+consume them.
