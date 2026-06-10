@@ -1,0 +1,121 @@
+---
+title: "Slowly changing dimensions"
+pillar: K
+subId: K1
+lessonId: slowly-changing-dimensions
+order: 4
+estimatedMinutes: 24
+goal: "Track how a dimension's attributes change over time with Type 1 (overwrite), Type 2 (new versioned row), and Type 3 (prior-value column), and reconstruct the state as of any past date."
+prerequisites: ["dimensional-modeling"]
+---
+
+A [dimension table](K1/dimensional-modeling) describes the context of a fact:
+this customer's region, that product's category. But context drifts. A customer
+moves from the West region to the South; a product is recategorized. The question
+is what the warehouse does with the old value, and the answer is not obvious,
+because a report run today about *last year's* sales should arguably attribute
+them to last year's region, not today's. **Slowly changing dimensions** (SCDs)
+are the standard patterns for handling that drift, and they differ precisely in
+how much history they keep.
+
+## Type 1: overwrite
+
+The simplest policy keeps no history at all. When an attribute changes, you
+**overwrite** it in place: the customer's `region` column is updated from `West`
+to `South`, and the old value is gone. Type 1 is correct when the old value was
+simply wrong (a typo) or when nobody will ever ask "what was it before?". It costs
+one column and one row, but it silently rewrites the past: every historical fact
+now joins to the *current* region, so last year's sales appear to have come from
+South. Use it only when that rewrite is what you want.
+
+## Type 2: new versioned row
+
+When history matters, **Type 2** keeps it by adding a **new row** for each change
+instead of overwriting. The dimension stops having one row per natural key and
+starts having one row per *version* of that key. Three bookkeeping columns make
+this work:
+
+- `effective_from`: the date this version became valid.
+- `effective_to`: the date it stopped (the start of the *next* version, or a
+  sentinel far-future date like `9999-12-31` for the live one).
+- `is_current`: a boolean flag marking the one live version, so the common "give
+  me the current value" query needs no date arithmetic.
+
+Each version is a **half-open interval** $[\text{effective\_from}, \text{effective\_to})$
+on the time axis, closed on the left and open on the right so that consecutive
+intervals tile the timeline without overlap or gap: the row that ends on a date
+hands off to the row that begins on that same date, and no instant belongs to
+two versions. A customer with two region changes becomes three rows:
+
+![A Type-2 dimension keeps one row per version of a natural key, each a half-open effective-date interval carrying the value that held then; an as-of lookup is the version whose interval contains the query date.](/figures/K1/slowly-changing-dimensions.svg)
+
+## The as-of lookup
+
+The payoff of Type 2 is the **point-in-time** or **as-of** query: reconstruct the
+attribute as it stood on any past date $d$. Because the versions tile the timeline
+without overlap, exactly one row of a given key satisfies
+
+$$
+\text{effective\_from} \le d < \text{effective\_to},
+$$
+
+and its attribute value is the answer. The strict inequality on the right is what
+makes the boundary unambiguous: a fact dated exactly on a change date belongs to
+the new version, never both. To attribute a historical fact correctly, you join it
+to the dimension version whose interval contains the fact's date, not to the
+current row.
+
+## Type 3: prior-value column
+
+**Type 3** is the middle ground for when you need only the *previous* value, not
+the full history. You keep one row per key but add a `previous_region` column
+alongside `region`. On a change, the old value slides into `previous_region` and
+the new value lands in `region`. This answers "what was the region just before
+this one?" cheaply, but it remembers only one step back and keeps no dates, so it
+cannot do a general as-of lookup. It suits attributes that change rarely and where
+only the immediately prior value carries meaning (a previous account tier, say).
+
+## Worked example
+
+Build a small Type-2 region dimension as numpy arrays, implement the as-of lookup
+as an interval containment test, and confirm it returns the right historical value
+for past dates and the current value for the present.
+
+```python
+import numpy as np
+
+# A Type-2 dimension for one customer (natural key = 1), three versions.
+cust_key = np.array([1, 1, 1])
+region   = np.array(["North", "West", "South"])
+eff_from = np.array(["2021-01-01", "2022-06-01", "2023-09-01"], dtype="datetime64[D]")
+eff_to   = np.array(["2022-06-01", "2023-09-01", "9999-12-31"], dtype="datetime64[D]")
+is_current = eff_to == np.datetime64("9999-12-31")   # the one live version
+
+def as_of(key, date):
+    # Return the attribute value valid on `date`: the version whose half-open
+    # interval [effective_from, effective_to) contains it.
+    d = np.datetime64(date)
+    mask = (cust_key == key) & (eff_from <= d) & (d < eff_to)
+    idx = np.flatnonzero(mask)
+    return region[idx[0]]
+
+for d in ["2022-01-01", "2022-12-01", "2025-01-01"]:
+    print(f"region as of {d}: {as_of(1, d)}")
+print("current region:", region[is_current][0])
+
+# Each past date resolves to the version that was live then.
+assert as_of(1, "2022-01-01") == "North"    # before the first change
+assert as_of(1, "2022-12-01") == "West"     # between the two changes
+assert as_of(1, "2025-01-01") == "South"    # after the second change
+# A fact dated exactly on a change date belongs to the new version (right-open).
+assert as_of(1, "2022-06-01") == "West"
+# The is_current flag points at the same row a present-day as-of returns.
+assert region[is_current][0] == "South"
+print("as-of lookups resolve to the correct version:", True)
+```
+
+Every past date lands inside exactly one version's interval and returns the value
+that was live then, while the current flag and a present-day lookup agree. The next
+lesson steps back to weigh this kind of careful, normalized history-keeping against
+the flat, redundant tables analytics often prefers, in
+[normalization vs denormalization](K1/normalization-tradeoffs).

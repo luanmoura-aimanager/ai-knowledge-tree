@@ -1,0 +1,120 @@
+---
+title: "Distributed joins: shuffle vs broadcast"
+pillar: K
+subId: K3
+lessonId: distributed-joins
+order: 3
+estimatedMinutes: 22
+goal: "Choose between a shuffle join and a broadcast join by comparing the bytes each moves across the network, and see why broadcasting a small table avoids the shuffle entirely."
+prerequisites: ["spark-dataframes"]
+---
+
+A join matches rows from two tables on a key. On a single machine it is a hash lookup;
+across a cluster it is a data-movement problem, because the matching rows from table $A$
+and table $B$ almost never start on the same machine. As the [last lesson](spark-dataframes)
+noted, a join is a **wide** transformation, so it normally forces a shuffle. But there is
+a second strategy that skips the shuffle, and which one is cheaper comes down to counting
+the bytes each moves across the network.
+
+## The shuffle join
+
+The default strategy repartitions both tables by the join key. Each side is hash-partitioned
+with the same function $\operatorname{hash}(k) \bmod W$ over $W$ workers, so all rows of
+$A$ and all rows of $B$ that share a key land on the same worker, which then joins them
+locally.
+
+The cost is the data moved. Let $|A|$ and $|B|$ be the sizes (in bytes) of the two tables.
+Both sides are reshuffled across the network, so the total moved is
+
+$$
+N_{\text{shuffle}} = |A| + |B|.
+$$
+
+This is independent of $W$: every byte of both tables crosses the network exactly once.
+For two large tables this is unavoidable and is the right plan. The problem case is when
+one table is tiny and the other is huge: the shuffle still pays to move the huge one.
+
+## The broadcast join
+
+When one side is small, a different plan avoids moving the large table at all. Spark
+**broadcasts** the small table: it ships a full copy to every worker. Each worker then
+streams its *local* partition of the large table past the in-memory copy of the small one
+and joins on the fly. The large table never moves.
+
+The cost now scales with the number of workers, not the large table. Let the small table
+have size $|S|$ and let there be $W$ workers. Broadcasting sends one copy of $S$ to each:
+
+$$
+N_{\text{broadcast}} = W \cdot |S|.
+$$
+
+The large table contributes nothing to the network cost; it is read from local disk where
+it already sits.
+
+## The crossover
+
+Broadcast wins when it moves fewer bytes than the shuffle. Writing the large table as $L$
+(so $|A| = L$, the small side as $S$):
+
+$$
+N_{\text{broadcast}} < N_{\text{shuffle}}
+\;\Longleftrightarrow\;
+W \cdot S < L + S.
+$$
+
+Solving for the small-table size gives the crossover
+
+$$
+S < \frac{L}{W - 1}.
+$$
+
+Below this size, broadcasting is cheaper; above it, the per-worker copies overtake the
+one-time cost of shuffling both tables, and the shuffle join wins. This is why query
+engines keep a **broadcast threshold** (a configurable size, often tens of megabytes):
+a table under it is broadcast, a table over it is shuffled. The threshold is a proxy for
+the inequality above at the cluster's typical $W$.
+
+![Network bytes moved by a shuffle join versus a broadcast join as the small table grows, with W workers. The shuffle cost is flat in the large table; the broadcast cost rises with slope W. They cross at small ≈ L/(W−1); below it, broadcast wins.](/figures/K3/distributed-joins.svg)
+
+## Worked example
+
+Given the sizes of a large and a small table and the worker count, compute the network
+bytes for each strategy and pick the cheaper. Broadcast must win when the small table is
+small enough that $W\cdot S < L + S$, and the shuffle must win once it is large.
+
+```python
+def join_network_bytes(large, small, workers):
+    shuffle   = large + small        # both sides repartitioned by key
+    broadcast = workers * small      # ship the small side to every worker
+    return shuffle, broadcast
+
+def pick(large, small, workers):
+    shuffle, broadcast = join_network_bytes(large, small, workers)
+    return ("broadcast", broadcast) if broadcast < shuffle else ("shuffle", shuffle)
+
+large, workers = 1000.0, 8          # large table 1000 MB, 8 workers
+
+# Case 1: a tiny dimension table → broadcast should win.
+small_cheap = 50.0
+sh1, bc1 = join_network_bytes(large, small_cheap, workers)
+print(f"small=50 MB : shuffle={sh1:.0f}  broadcast={bc1:.0f}  →  {pick(large, small_cheap, workers)[0]}")
+
+# Case 2: a large second table → shuffle should win.
+small_big = 400.0
+sh2, bc2 = join_network_bytes(large, small_big, workers)
+print(f"small=400 MB: shuffle={sh2:.0f}  broadcast={bc2:.0f}  →  {pick(large, small_big, workers)[0]}")
+
+# Crossover size where the two strategies tie: S = L / (W - 1).
+crossover = large / (workers - 1)
+print(f"crossover small-table size = {crossover:.1f} MB")
+
+assert workers * small_cheap < large + small_cheap   # broadcast genuinely cheaper
+assert pick(large, small_cheap, workers)[0] == "broadcast"
+assert pick(large, small_big,   workers)[0] == "shuffle"
+print("ok: broadcast below the crossover, shuffle above it")
+```
+
+The crossover here is $1000 / 7 \approx 143$ MB: a small table under that broadcasts, one
+over it shuffles. This whole analysis assumes keys spread evenly across workers; when one
+key dominates, the shuffle join's even-split assumption breaks and a single worker is
+swamped, which is the [skew problem](data-skew) the next lesson quantifies.

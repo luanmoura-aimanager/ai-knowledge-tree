@@ -1613,6 +1613,162 @@ export const PILLARS: Pillar[] = [
       },
     ],
   },
+  {
+    letter: "K",
+    slug: "K-data-engineering",
+    name: "Data Engineering",
+    shortName: "Data Eng",
+    tagline:
+      "Modeling, storage, batch & stream processing, orchestration, governance",
+    color: "#b48ead",
+    intro:
+      "Data engineering is the discipline that gets data from where it is produced to where it can be used, correctly, reliably, and at scale. Every model, dashboard, and AI feature in this tree sits on top of a data platform someone had to design: how the data is modeled, how it is physically stored, how it is processed in bulk and in motion, how the pipelines are scheduled, and how the whole thing is kept trustworthy. This pillar is that foundation, taught on its own terms rather than as an appendage to machine learning.\n\nYou will start with modeling, the relational model and normal forms, OLTP versus OLAP, and dimensional (star-schema) design for analytics. Then physical storage: row versus columnar layout, the encodings and compression that make columnar fast, Parquet internals, partition pruning, and the table formats (Iceberg, Delta, Hudi) that turn a file dump into a transactional lakehouse. From there, distributed processing, MapReduce and the shuffle, Spark's lazy execution DAG, distributed joins, and data skew, then streaming, the log abstraction and Kafka, windowing, watermarks and late data, delivery semantics, and change data capture. The pillar closes with the operational layer: ETL versus ELT and transformation-as-code, scheduling and idempotent backfills, orchestrators, and the data-quality, lineage, observability, and governance that keep a platform honest.\n\nThis is the substrate the rest of the stack depends on: pillar I builds ML feature pipelines on these primitives, and pillar J's data platform for AI applies them to vector and retrieval systems. Get the data layer right and everything downstream gets easier; get it wrong and no model can save you.",
+    prerequisites: [
+      "Pillar A5 data structures: hashing, graph traversal, and complexity analysis underpin partitioning, DAGs, and cost reasoning.",
+      "Working SQL and Python, plus comfort reading distributed-systems tradeoffs (latency, throughput, consistency).",
+      "No machine learning required; this pillar is upstream of pillars I and J.",
+    ],
+    subs: [
+      {
+        id: "K1",
+        name: "Data modeling & warehousing",
+        intro:
+          "Before any byte is stored, someone decides how the data is shaped, and that decision governs how easy or painful every later query will be. This discipline is about modeling: capturing entities and their relationships so the data is consistent to write and legible to read. The two worlds it spans are transactional systems, where correctness under concurrent writes is everything, and analytical warehouses, where fast aggregation over huge scans is everything.\n\nYou will learn the relational model and how functional dependencies drive normalization to 3NF and BCNF, eliminating the update, insertion, and deletion anomalies that redundancy causes; why transactional (OLTP) and analytical (OLAP) workloads pull schema design in opposite directions; how dimensional modeling arranges analytics data into fact tables of measurements surrounded by dimension tables of context (the star schema); how slowly changing dimensions preserve history so you can ask what a customer's segment was last March; and when deliberately denormalizing into wide tables beats a normalized star.\n\nThis is the layer that makes a warehouse usable. A clean dimensional model is what lets an analyst answer a question in one obvious join instead of ten; a muddled one taxes every query and report built on top of it.",
+        prerequisites: [
+          "Working SQL: joins, group-by, primary and foreign keys",
+          "Set basics and functional-dependency notation (pillar A foundations)",
+          "No prior warehousing experience assumed",
+        ],
+        topics: [
+          {
+            name: "Relational model & normal forms (3NF, BCNF)",
+            status: "gap",
+          },
+          { name: "OLTP vs OLAP workloads", status: "gap" },
+          {
+            name: "Dimensional modeling (Kimball star schemas)",
+            status: "gap",
+          },
+          { name: "Slowly changing dimensions (Type 1/2/3)", status: "gap" },
+          { name: "Normalization vs denormalization", status: "gap" },
+        ],
+      },
+      {
+        id: "K2",
+        name: "Storage & file formats",
+        intro:
+          "Once the logical model is fixed, the physical layout decides performance. This discipline is about how bytes actually sit on disk and why that choice can make an analytical query a hundred times cheaper. The central idea is that analytics reads a few columns over many rows, so storing data by column, then compressing and indexing it, turns a full scan into a tiny one.\n\nYou will be able to reason about row versus columnar storage by counting the bytes a query must scan in each; shrink columns with dictionary, run-length, and delta encodings and compute the compression ratios they achieve; read the Parquet file layout (row groups, column chunks, and the min/max statistics that let an engine skip data it does not need); lay data out in partitioned directories and compute how a predicate prunes the files an engine opens, while avoiding the small-file trap; and turn a directory of Parquet files into a transactional table with a metadata layer (Iceberg, Delta, Hudi) that adds atomic snapshots, schema evolution, and time travel over cheap object storage.\n\nThis is where the lakehouse comes from: the marriage of cheap object storage with warehouse-grade table semantics. Understanding the format is what lets you explain why one query is instant and another scans a terabyte.",
+        prerequisites: [
+          "K1 OLTP vs OLAP and dimensional modeling",
+          "Bytes, encodings, and basic complexity (pillar A foundations)",
+          "Familiarity with files and directories on object storage",
+        ],
+        topics: [
+          { name: "Row vs columnar storage", status: "gap" },
+          {
+            name: "Encodings & compression (dictionary, RLE, delta)",
+            status: "gap",
+          },
+          { name: "Parquet internals (row groups, statistics)", status: "gap" },
+          { name: "Partitioning & partition pruning", status: "gap" },
+          {
+            name: "Table formats & lakehouse (Iceberg, Delta, Hudi)",
+            status: "gap",
+            hot: true,
+          },
+        ],
+      },
+      {
+        id: "K3",
+        name: "Batch & distributed processing",
+        intro:
+          "When data outgrows one machine, processing it becomes a distributed-systems problem, and the costs change shape. This discipline is about moving and transforming data in bulk across a cluster, where the dominant cost is rarely CPU but the network shuffle that redistributes data between machines. Master the shuffle and you can predict and control the cost of almost any big job.\n\nYou will express a distributed aggregation as map, shuffle, and reduce and see why the all-to-all shuffle dominates; build transformations as lazy Spark DataFrames that compile to a DAG of stages, distinguishing narrow transformations that pipeline from wide ones that force a shuffle; choose between shuffle joins and broadcast joins by comparing the bytes each moves; quantify how a skewed key distribution overloads one reducer so job time tracks the largest partition, and fix it with salting; and trace how a query planner pushes filters and projections down to the scan and processes data in vectorized batches.\n\nThis is the engine room of large-scale data work. The difference between a pipeline that finishes in minutes and one that runs all night is usually a shuffle or a skewed key, and these lessons teach you to see them.",
+        prerequisites: [
+          "K1 OLTP vs OLAP; K2 partitioning and file formats",
+          "Pillar A5 complexity analysis and hashing",
+          "Comfort reasoning about network and memory as the scarce resource",
+        ],
+        topics: [
+          { name: "MapReduce & the shuffle", status: "gap" },
+          { name: "Spark: lazy DataFrames & the execution DAG", status: "gap" },
+          { name: "Distributed joins (shuffle vs broadcast)", status: "gap" },
+          { name: "Data skew & stragglers", status: "gap" },
+          {
+            name: "Query execution (pushdown, vectorization)",
+            status: "gap",
+          },
+        ],
+      },
+      {
+        id: "K4",
+        name: "Streaming & ingestion",
+        intro:
+          "Not all data can wait for a nightly batch. This discipline is about processing data in motion: unbounded streams that must be aggregated, joined, and acted on continuously, where the hard problems are time, ordering, and what to do about data that arrives late. The unifying abstraction is the log, an append-only, partitioned, replayable sequence of events.\n\nYou will model a stream as a partitioned log with per-consumer offsets (the Kafka model) that gives ordered, replayable, horizontally scalable ingestion; aggregate an unbounded stream by cutting it into tumbling, sliding, and session windows and see how the window choice changes the answer; separate event time from processing time and track progress with a watermark that bounds lateness, trading completeness against latency; distinguish at-most-once, at-least-once, and exactly-once delivery and see why an idempotent consumer makes cheap at-least-once delivery effectively-once; and stream a database's row-level changes off its write-ahead log with change data capture, using the transactional outbox to publish events without dual-write inconsistency.\n\nThis is what powers real-time dashboards, fraud checks, and event-driven pipelines. Streaming is where the subtle correctness bugs live, late data, duplicate events, out-of-order arrivals, and these lessons give you the vocabulary to reason about them.",
+        prerequisites: [
+          "K1 OLTP vs OLAP and the relational model",
+          "Pillar A5 hashing (for partitioning) and queues",
+          "Basic probability for reasoning about lateness and ordering",
+        ],
+        topics: [
+          { name: "The log abstraction & Kafka", status: "gap" },
+          { name: "Windowing (tumbling, sliding, session)", status: "gap" },
+          { name: "Event time, watermarks & late data", status: "gap" },
+          { name: "Delivery semantics & idempotency", status: "gap" },
+          {
+            name: "Change data capture & the outbox pattern",
+            status: "gap",
+            hot: true,
+          },
+        ],
+      },
+      {
+        id: "K5",
+        name: "Orchestration & ELT",
+        intro:
+          "A data platform is a web of interdependent pipelines, and this discipline is about running that web reliably. The problem it solves is operational: which transformations run, in what order, on which slice of time, and how a failed or late run is recovered without corrupting the result. The modern answer pushes transformation into the warehouse (ELT) and treats the transformation layer as tested, version-controlled code.\n\nYou will contrast ETL with ELT and see why cheap storage and scalable warehouses made load-then-transform the default; define warehouse transformations as dependency-linked, tested models (the dbt mental model) so the layer becomes a DAG with lineage rather than ad hoc SQL; process only new or changed rows with incremental merge/upsert keyed on a stable id; schedule pipelines as dependency-driven, time-partitioned runs whose tasks are idempotent so a backfill or retry recomputes a partition cleanly without double-counting; and compare task-based orchestration (Airflow) with asset-based orchestration (Dagster).\n\nThis is the discipline that keeps a platform from rotting into a tangle of cron jobs no one understands. Idempotency and lineage are what let you rerun history with confidence instead of fear.",
+        prerequisites: [
+          "K1 dimensional modeling; K3 batch processing",
+          "Pillar A5 graph traversal and topological sort (for DAGs)",
+          "Solid SQL; the idea of a transformation as a query",
+        ],
+        topics: [
+          { name: "ETL vs ELT & pushdown transformation", status: "gap" },
+          { name: "Transformation-as-code (dbt mental model)", status: "gap" },
+          { name: "Incremental models (merge/upsert)", status: "gap" },
+          { name: "Scheduling, backfills & idempotent reruns", status: "gap" },
+          {
+            name: "Orchestrators (Airflow task vs Dagster asset)",
+            status: "gap",
+          },
+        ],
+      },
+      {
+        id: "K6",
+        name: "Data quality & governance",
+        intro:
+          "A pipeline that runs is not the same as a pipeline you can trust, and this discipline is about the difference. It covers making data quality measurable, catching breaking changes at the boundary, tracing where a value came from, watching a platform's operational health, and meeting the legal and ethical obligations that come with holding data about people.\n\nYou will make quality measurable along completeness, validity, uniqueness, and consistency and turn each into an automated check with a pass rate you can alert on; classify a schema change as backward-, forward-, or full-compatible and enforce a data contract so a producer's breaking change fails fast instead of silently corrupting consumers; trace a column end to end as a lineage graph to scope a change's blast radius and debug where a bad value entered; monitor freshness, row volume, and null rates and flag a broken feed with a robust z-score before it reaches a dashboard; and protect sensitive data with masking, tokenization, and role-based access while meeting regimes like GDPR (purpose limitation, the right to deletion) with an auditable trail.\n\nThis is the layer that turns a data platform from a liability into an asset. Quality, lineage, and governance are invisible when they work and catastrophic when they do not, and they are what separate a platform a business can bet on from one it merely tolerates.",
+        prerequisites: [
+          "K5 transformation-as-code and scheduling",
+          "Pillar A5 graph traversal (for lineage); B1 basic statistics (for anomaly z-scores)",
+          "Awareness of privacy regimes (GDPR/LGPD) at a high level",
+        ],
+        topics: [
+          { name: "Data quality dimensions & checks", status: "gap" },
+          { name: "Schema evolution & data contracts", status: "gap" },
+          { name: "Data lineage & provenance", status: "gap" },
+          {
+            name: "Data observability (freshness, volume, anomalies)",
+            status: "gap",
+          },
+          {
+            name: "Governance: PII, access control, GDPR",
+            status: "gap",
+            hot: true,
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -1837,6 +1993,50 @@ export const CONNECTIONS: Connection[] = [
   { from: "J3", to: "J5", label: "Production → data platform", kind: "uses" },
   { from: "J5", to: "J6", label: "Data platform → Cloud AI", kind: "uses" },
   { from: "J6", to: "J7", label: "Cloud → architect", kind: "uses" },
+
+  // ---- K. Data Engineering ↔ foundations, MLOps, AI Engineering ----
+  {
+    from: "A5",
+    to: "K2",
+    label: "Hashing & complexity ⇒ storage layout",
+    kind: "uses",
+  },
+  {
+    from: "A5",
+    to: "K5",
+    label: "Topological sort ⇒ pipeline DAGs",
+    kind: "uses",
+  },
+  {
+    from: "K1",
+    to: "I1",
+    label: "Data modeling ⇒ feature pipelines",
+    kind: "uses",
+  },
+  {
+    from: "K2",
+    to: "J5",
+    label: "Lakehouse storage ⇒ AI data platform",
+    kind: "shared-concept",
+  },
+  {
+    from: "K4",
+    to: "J5",
+    label: "Streaming & CDC for AI data",
+    kind: "shared-concept",
+  },
+  {
+    from: "K5",
+    to: "I1",
+    label: "ELT & orchestration ⇒ ML pipelines",
+    kind: "uses",
+  },
+  {
+    from: "K6",
+    to: "I4",
+    label: "Data observability ↔ model monitoring",
+    kind: "shared-concept",
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -2648,6 +2848,130 @@ export const PATHS: Path[] = [
         section: "Ensembles & evaluation",
       },
       { subId: "C10", lessonId: "hpo", section: "Ensembles & evaluation" },
+    ],
+  },
+  {
+    name: "🛢️ Data Engineer",
+    desc: "The data-platform foundation: modeling, columnar storage, batch & stream processing, ELT, and governance, feeding the ML and AI stack.",
+    pillars: ["K1", "K2", "K3", "K4", "K5", "K6", "I1", "J5"],
+    color: "var(--pk)",
+    steps: [
+      {
+        subId: "K1",
+        lessonId: "relational-model",
+        section: "Modeling & warehousing",
+      },
+      {
+        subId: "K1",
+        lessonId: "oltp-vs-olap",
+        section: "Modeling & warehousing",
+      },
+      {
+        subId: "K1",
+        lessonId: "dimensional-modeling",
+        section: "Modeling & warehousing",
+      },
+      {
+        subId: "K1",
+        lessonId: "slowly-changing-dimensions",
+        section: "Modeling & warehousing",
+      },
+      {
+        subId: "K2",
+        lessonId: "row-vs-columnar",
+        section: "Storage & formats",
+      },
+      {
+        subId: "K2",
+        lessonId: "compression-encoding",
+        section: "Storage & formats",
+      },
+      {
+        subId: "K2",
+        lessonId: "partitioning-pruning",
+        section: "Storage & formats",
+      },
+      {
+        subId: "K2",
+        lessonId: "table-formats-lakehouse",
+        section: "Storage & formats",
+      },
+      { subId: "K3", lessonId: "mapreduce", section: "Batch processing" },
+      {
+        subId: "K3",
+        lessonId: "spark-dataframes",
+        section: "Batch processing",
+      },
+      {
+        subId: "K3",
+        lessonId: "distributed-joins",
+        section: "Batch processing",
+      },
+      { subId: "K3", lessonId: "data-skew", section: "Batch processing" },
+      { subId: "K4", lessonId: "log-and-kafka", section: "Streaming" },
+      { subId: "K4", lessonId: "windowing", section: "Streaming" },
+      {
+        subId: "K4",
+        lessonId: "watermarks-late-data",
+        section: "Streaming",
+      },
+      {
+        subId: "K4",
+        lessonId: "change-data-capture",
+        section: "Streaming",
+      },
+      {
+        subId: "K5",
+        lessonId: "etl-vs-elt",
+        section: "Orchestration & ELT",
+      },
+      {
+        subId: "K5",
+        lessonId: "transformation-as-code",
+        section: "Orchestration & ELT",
+      },
+      {
+        subId: "K5",
+        lessonId: "incremental-processing",
+        section: "Orchestration & ELT",
+      },
+      {
+        subId: "K5",
+        lessonId: "scheduling-backfills",
+        section: "Orchestration & ELT",
+      },
+      {
+        subId: "K6",
+        lessonId: "data-quality-dimensions",
+        section: "Quality & governance",
+      },
+      {
+        subId: "K6",
+        lessonId: "schema-evolution-contracts",
+        section: "Quality & governance",
+      },
+      {
+        subId: "K6",
+        lessonId: "data-observability",
+        section: "Quality & governance",
+      },
+      {
+        subId: "K6",
+        lessonId: "governance-pii",
+        section: "Quality & governance",
+      },
+      {
+        subId: "I1",
+        lessonId: "feature-stores",
+        section: "Feeds the AI stack",
+        note: "ML pipelines build on K",
+      },
+      {
+        subId: "J5",
+        lessonId: "streaming-embeddings",
+        section: "Feeds the AI stack",
+        note: "AI data platform builds on K",
+      },
     ],
   },
 ];

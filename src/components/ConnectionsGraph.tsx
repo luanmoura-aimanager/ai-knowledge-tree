@@ -108,10 +108,10 @@ export function ConnectionsGraph() {
     }));
     const links: Link[] = [...withinLinks, ...crossLinks];
 
-    // ----- pillar home positions (5 cols × 2 rows) ------------------------
+    // ----- pillar home positions (6 cols × 2 rows) ------------------------
     // Top row sits a bit lower than a centered grid so the pillar labels have
     // breathing room above; bottom row anchors near the lower edge.
-    const cols = 5;
+    const cols = 6;
     const colW = width / cols;
     const topRowY = 240;
     const bottomRowY = height - 180;

@@ -262,3 +262,49 @@ Suggested learning paths are app data, not lesson prose, so they live in
 `steps[]` + `section` dropdown convention in **`CLAUDE.md` → "Add a suggested
 path"**: every path carries a hand-curated, phase-grouped lesson sequence with
 `pillars[]` synced to its step subsections.
+
+## 8. Authoring a complete pillar
+
+A *pillar* (the A–K top-level columns) is more than its lessons; it is a set of
+structural touchpoints that must all change together. The high-level workflow is
+in **`CLAUDE.md` → "Author a complete pillar"**; this section is the concrete
+checklist of files, validated by the pillar-K (Data Engineering) build. Work
+**curriculum-first**: lay the whole structure down so every lesson resolves (as
+"coming soon") and the build is green *before* writing a word of prose.
+
+### 8.1 Structural touchpoints (a new Nth pillar)
+
+1. **`src/lib/dag.ts`** — append a `Pillar` object to `PILLARS`: `letter`,
+   `slug` (`<Letter>-<kebab-name>`), `name`, `shortName` (compact graph-pill
+   label), `tagline`, `color` (a new hex, see below), `intro`, `prerequisites`,
+   and `subs[]` (each subsection: `id`, `name`, `intro`, `prerequisites`,
+   `topics[]` of `{ name, status, hot? }`). Add cross-pillar `CONNECTIONS`
+   edges so the new pillar is not an island in the graph.
+2. **`src/lib/curriculum/<Letter>.ts`** — export `<LETTER>_CURRICULUM:
+   Record<string, Lesson[]>`, the ordered `Lesson[]` per subsection (id, title,
+   goal, prerequisites, `codeExempt?`). Import + spread it in
+   `src/lib/curriculum/index.ts`.
+3. **`src/app/globals.css`** — add the `--p<letter>` pillar color token
+   (mirrors the `color` hex in `dag.ts`).
+4. **`figures/gen/_style.py`** — add the letter→hex entry to the `PILLAR` dict
+   so `color("<Letter>1")` resolves for that pillar's figure scripts.
+5. **`src/components/ConnectionsGraph.tsx`** — the home-position grid assumes a
+   fixed column count (`const cols = …`). Bump it when the pillar count exceeds
+   `cols × 2` (e.g. 5→6 at 11 pillars) so the new row of pills lays out.
+
+Everything else (routes, `pillarStats`, `globalStats`, filters) is driven off
+the `PILLARS` array and needs no change. Pick a `color` visibly distinct from
+its grid neighbours; the palette is Tokyo-Night-ish, so check it against the
+existing `--pa…` tokens.
+
+### 8.2 Then author the lessons
+
+Per subsection, write each `content/<slug>/<subId>/<lessonId>.mdx` to the §6
+pedagogy with its mandatory §6.6 image. Keep the conceptual/infra lessons
+`codeExempt` with a `mermaid` diagram as the image; give the quantitative
+lessons a runnable `python` block (ending in a **true** `assert`) and a
+committed matplotlib figure via `figures/gen/<subId>.py` (`apply_style()` /
+`save(fig, subId, name)`; `npm run figures`). Position the new pillar so it does
+not duplicate neighbours: pillar K is the general data-systems foundation that
+pillar I (ML feature pipelines) and J5 (AI data platform) build on, linked by
+`CONNECTIONS` rather than repeated lessons.

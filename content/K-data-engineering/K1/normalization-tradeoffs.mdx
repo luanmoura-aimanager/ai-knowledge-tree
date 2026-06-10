@@ -1,0 +1,115 @@
+---
+title: "Normalization vs denormalization for analytics"
+pillar: K
+subId: K1
+lessonId: normalization-tradeoffs
+order: 5
+estimatedMinutes: 22
+goal: "Weigh the storage and update cost of denormalization against the join cost it removes, and decide when a wide pre-joined table beats a normalized star for read-heavy analytics."
+prerequisites: ["dimensional-modeling"]
+---
+
+The [relational model](K1/relational-model) made a strong case for normalization:
+store every fact once, and the update, insertion, and deletion anomalies all go
+away. The [star schema](K1/dimensional-modeling) already bent that rule by
+denormalizing its dimensions. This lesson makes the trade explicit and
+quantitative, because "always normalize" is an OLTP instinct, and the analytical
+warehouse often does better with a **wide, pre-joined table** that violates it on
+purpose. The decision turns on one number: how read-heavy the workload is.
+
+## The two costs in tension
+
+Every layout choice trades two costs against each other:
+
+- **Join cost** is paid on **reads**. A normalized schema spreads a logical record
+  across tables, so reading it back means joining them, and a join touches more
+  rows than the answer alone (it must scan and match keys across each table). A
+  denormalized table stores the joined result already, so a read is a single scan.
+- **Storage and update cost** is paid on **writes**. Denormalization repeats a
+  fact across many rows, so it costs more disk, and worse, an update to that fact
+  must **fan out** to every copy. One logical change becomes many physical writes,
+  the [update anomaly](K1/relational-model) returning as a performance cost rather
+  than a correctness bug (the pipeline rewrites all copies, so they stay
+  consistent, but it pays for each).
+
+Normalization minimizes the write cost and pays it back on every read; denormalization
+minimizes the read cost and pays it back on every write. Which wins depends entirely
+on the read/write mix.
+
+## A cost model
+
+Model the cost of an operation as **rows touched**, the dominant term for a
+scan-based engine. Let a fraction $f$ of operations be reads and $1 - f$ be
+writes. Assign each layout a per-read and per-write cost:
+
+$$
+\text{cost}_{\text{norm}}(f) = f\,R_{\text{norm}} + (1 - f)\,W_{\text{norm}},
+\qquad
+\text{cost}_{\text{denorm}}(f) = f\,R_{\text{denorm}} + (1 - f)\,W_{\text{denorm}}.
+$$
+
+The normalized layout has the cheaper write ($W_{\text{norm}} < W_{\text{denorm}}$,
+no fan-out) but the dearer read ($R_{\text{norm}} > R_{\text{denorm}}$, it joins).
+Both costs are linear in $f$, so the two lines cross exactly once. Setting
+$\text{cost}_{\text{norm}}(f^\ast) = \text{cost}_{\text{denorm}}(f^\ast)$ and
+solving,
+
+$$
+f^\ast = \frac{W_{\text{norm}} - W_{\text{denorm}}}
+              {(R_{\text{denorm}} - R_{\text{norm}}) - (W_{\text{denorm}} - W_{\text{norm}})}.
+$$
+
+For $f > f^\ast$ the denormalized table is cheaper; below it, the normalized one
+is. With a read-per-join cost of $3$ against a wide-scan cost of $1$, and a write
+cost of $1$ normalized against $4$ denormalized (the fan-out), the crossover sits
+at $f^\ast = 0.6$: once more than $60\%$ of the workload is reads, the wide table
+wins.
+
+![Total cost per operation versus the read fraction of the workload, for a normalized (join-per-read) layout and a denormalized (single-scan, fan-out-per-write) layout. The lines cross at a read fraction near 0.6; past it the denormalized table is cheaper.](/figures/K1/normalization-tradeoffs.svg)
+
+## Worked example
+
+Compute the total cost of each layout across the read fraction and confirm the
+denormalized table wins when reads dominate, loses when writes do, and that the
+crossover sits where the formula predicts.
+
+```python
+import numpy as np
+
+R_norm, R_denorm = 3.0, 1.0   # per-read rows touched: join scans 3x, wide table 1x
+W_norm, W_denorm = 1.0, 4.0   # per-write rows touched: wide table fans out 4x
+
+def cost(read_frac, n_ops=100_000):
+    reads, writes = read_frac, 1.0 - read_frac
+    norm   = (reads * R_norm   + writes * W_norm)   * n_ops
+    denorm = (reads * R_denorm + writes * W_denorm) * n_ops
+    return norm, denorm
+
+# Closed-form crossover read fraction.
+cross = (W_norm - W_denorm) / ((R_denorm - R_norm) - (W_denorm - W_norm))
+print(f"crossover read fraction = {cross:.2f}")
+
+n_heavy, d_heavy = cost(0.9)   # read-heavy analytics
+n_light, d_light = cost(0.1)   # write-heavy operational
+print(f"read-heavy (f=0.9): normalized={n_heavy:.0f}  denormalized={d_heavy:.0f}")
+print(f"write-heavy (f=0.1): normalized={n_light:.0f}  denormalized={d_light:.0f}")
+
+# Read-heavy: the pre-joined wide table is cheaper.
+assert d_heavy < n_heavy
+# Write-heavy: normalization's cheap writes win.
+assert d_light > n_light
+# The crossover predicted by the formula is a genuine read fraction.
+assert 0.0 < cross < 1.0 and np.isclose(cross, 0.6)
+# At the crossover the two layouts cost the same.
+n_x, d_x = cost(cross)
+assert np.isclose(n_x, d_x)
+print("denormalization wins for read-heavy, loses for write-heavy:", True)
+```
+
+The denormalized layout costs $130{,}000$ against $280{,}000$ when $90\%$ of
+operations are reads, and $370{,}000$ against $120{,}000$ when only $10\%$ are,
+with the two meeting exactly at $f = 0.6$. The lesson generalizes: an analytical
+warehouse, almost all reads, leans toward wide denormalized tables, while an
+operational store leans toward the normalized form. How those wide tables are
+physically laid out on disk to make the scan cheap is the subject of the next
+subsection, starting with [row vs columnar](K2/row-vs-columnar) storage.
