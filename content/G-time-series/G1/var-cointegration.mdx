@@ -18,7 +18,7 @@ a stable long-run relationship.
 ## The vector autoregression
 
 Let $\mathbf{x}_t \in \mathbb{R}^k$ collect $k$ series. A **VAR(p)** regresses the
-vector on its own lagged vectors:
+vector on its own lagged vectors<FN n="1" />:
 
 $$
 \mathbf{x}_t = A_1 \mathbf{x}_{t-1} + \dots + A_p \mathbf{x}_{t-p} + \boldsymbol{\varepsilon}_t,
@@ -41,7 +41,7 @@ condition $|\phi| < 1$.
 Suppose each series is individually $I(1)$: nonstationary, with a unit root. Their
 levels wander. Yet a particular linear combination can still be stationary. That is
 **cointegration**: vectors $\mathbf{x}_t$ are cointegrated if there is a nonzero
-$\boldsymbol{\beta}$ with
+$\boldsymbol{\beta}$ with<FN n="2" />
 
 $$
 \boldsymbol{\beta}^\top \mathbf{x}_t \sim I(0) \quad (\text{stationary}),
@@ -57,7 +57,7 @@ Differencing each series to make it stationary and then fitting a VAR would dest
 this information: it removes the level relationship $\boldsymbol{\beta}^\top \mathbf{x}_t$
 entirely. The error-correction form keeps it.
 
-![Two cointegrated series share a common stochastic trend, so although each wanders, a linear combination (their spread) is stationary and mean-reverting — the basis of pairs trading.](/figures/G1/var-cointegration.svg)
+![Two cointegrated series share a common stochastic trend, so although each wanders, a linear combination (their spread) is stationary and mean-reverting, the basis of pairs trading.](/figures/G1/var-cointegration.svg)
 
 ## The vector error-correction model
 
@@ -85,7 +85,7 @@ $$
 with $\boldsymbol{\alpha}, \boldsymbol{\beta}$ each $k \times r$. The columns of
 $\boldsymbol{\beta}$ are the cointegrating vectors (the stationary combinations);
 $\boldsymbol{\alpha}$ holds the **adjustment speeds**, how fast each series corrects
-back toward equilibrium. The full **VECM** is
+back toward equilibrium. The full **VECM** is<FN n="3" />
 
 $$
 \Delta \mathbf{x}_t = \boldsymbol{\alpha} \boldsymbol{\beta}^\top \mathbf{x}_{t-1} + \sum_{i=1}^{p-1} \Gamma_i \Delta \mathbf{x}_{t-i} + \boldsymbol{\varepsilon}_t.
@@ -126,3 +126,9 @@ cointegrating vector.
 VAR and VECM model the conditional mean across series. The next lesson turns to the
 conditional *variance* of a single series with GARCH, where the volatility itself
 is the thing that clusters and persists.
+
+<Footnotes>
+  <FNItem n="1">**Sims, C. A.** (1980). "Macroeconomics and reality". *Econometrica*, 48(1), 1-48. [doi:10.2307/1912017](https://doi.org/10.2307/1912017)</FNItem>
+  <FNItem n="2">**Engle, R. F., & Granger, C. W. J.** (1987). "Co-integration and error correction: representation, estimation, and testing". *Econometrica*, 55(2), 251-276. [doi:10.2307/1913236](https://doi.org/10.2307/1913236)</FNItem>
+  <FNItem n="3">**Hamilton, J. D.** (1994). *Time Series Analysis.* Princeton University Press. Cointegration and the vector error-correction representation (Ch. 19-20).</FNItem>
+</Footnotes>

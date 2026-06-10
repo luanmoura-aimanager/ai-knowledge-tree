@@ -32,7 +32,7 @@ r_t = \sigma_t z_t, \qquad z_t \sim \mathcal{N}(0, 1) \text{ i.i.d.}
 $$
 
 The **ARCH(q)** model (autoregressive conditional heteroskedasticity) makes the
-conditional variance a linear function of recent squared returns:
+conditional variance a linear function of recent squared returns<FN n="1" />:
 
 $$
 \sigma_t^2 = \omega + \alpha_1 r_{t-1}^2 + \dots + \alpha_q r_{t-q}^2,
@@ -45,7 +45,7 @@ distribution: clustering by construction.
 ## GARCH: adding variance persistence
 
 ARCH needs many lags to capture slow-decaying volatility. **GARCH(1,1)** adds a
-lag of the variance itself, giving long memory with two parameters:
+lag of the variance itself, giving long memory with two parameters<FN n="2" />:
 
 $$
 \sigma_t^2 = \omega + \alpha\, r_{t-1}^2 + \beta\, \sigma_{t-1}^2.
@@ -64,11 +64,11 @@ $$
 $$
 
 This is finite and positive only when $\alpha + \beta < 1$, the **stationarity
-condition**. The sum $\alpha + \beta$ measures persistence: values near one (common
+condition**<FN n="3" />. The sum $\alpha + \beta$ measures persistence: values near one (common
 for daily equity data, around 0.99) mean shocks to volatility decay slowly. When
 $\alpha + \beta = 1$ the unconditional variance is infinite, the IGARCH boundary.
 
-![GARCH captures volatility clustering — large moves beget large moves — so the conditional band ±2σₜ widens in turbulent stretches and contracts in calm ones.](/figures/G1/garch-volatility.svg)
+![GARCH captures volatility clustering (large moves beget large moves), so the conditional band ±2σₜ widens in turbulent stretches and contracts in calm ones.](/figures/G1/garch-volatility.svg)
 
 ## Forecasting volatility
 
@@ -120,3 +120,9 @@ fingerprints of GARCH volatility clustering.
 GARCH works in the time domain. The next lesson views a series in the frequency
 domain, where periodicities that are invisible in the ACF stand out as spectral
 peaks.
+
+<Footnotes>
+  <FNItem n="1">**Engle, R. F.** (1982). "Autoregressive conditional heteroscedasticity with estimates of the variance of United Kingdom inflation". *Econometrica*, 50(4), 987-1007. [doi:10.2307/1912773](https://doi.org/10.2307/1912773)</FNItem>
+  <FNItem n="2">**Bollerslev, T.** (1986). "Generalized autoregressive conditional heteroskedasticity". *Journal of Econometrics*, 31(3), 307-327. [doi:10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1)</FNItem>
+  <FNItem n="3">**Hamilton, J. D.** (1994). *Time Series Analysis.* Princeton University Press. Conditional heteroskedasticity, unconditional variance, and ML estimation of GARCH (Ch. 21).</FNItem>
+</Footnotes>

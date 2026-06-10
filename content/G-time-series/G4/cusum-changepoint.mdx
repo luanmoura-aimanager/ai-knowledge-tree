@@ -25,7 +25,7 @@ batch.
 
 ## CUSUM from the likelihood ratio
 
-The cumulative sum (CUSUM) chart comes from a sequential likelihood-ratio argument.
+The cumulative sum (CUSUM) chart comes from a sequential likelihood-ratio argument<FN n="1" />.
 For each observation $x_t$, the log-likelihood ratio between the post-change and
 pre-change models is
 
@@ -70,7 +70,7 @@ target minus the slack $k$: while the process is on target the increment is
 negative and the chart stays near zero; once the mean shifts past $k$ the increments
 turn positive and the chart ramps to the threshold $h$.
 
-![CUSUM accumulates how far each point sits above the expected mean; it hovers near zero while in control, then drifts steadily after a mean shift until it crosses a threshold — flagging the change.](/figures/G4/cusum-changepoint.svg)
+![CUSUM accumulates how far each point sits above the expected mean; it hovers near zero while in control, then drifts steadily after a mean shift until it crosses a threshold, flagging the change.](/figures/G4/cusum-changepoint.svg)
 
 ## Tuning the trade-off
 
@@ -87,7 +87,7 @@ Beyond CUSUM, **offline** change-point detection (when the whole series is
 available) searches for the segmentation that best fits piecewise-constant models,
 penalizing the number of segments. The PELT algorithm solves this exactly in linear
 time via dynamic programming; Bayesian online change-point detection maintains a
-posterior over the time since the last change.
+posterior over the time since the last change<FN n="2" />.
 
 ```python
 import numpy as np
@@ -120,3 +120,8 @@ shift that no single-point test would catch.
 Statistical detectors assume a simple parametric notion of normal. The next lesson
 learns "normal" from data with a sequence autoencoder and scores anomalies by
 reconstruction error.
+
+<Footnotes>
+  <FNItem n="1">**Page, E. S.** (1954). "Continuous inspection schemes". *Biometrika*, 41(1-2), 100-115. The original CUSUM ([doi:10.1093/biomet/41.1-2.100](https://doi.org/10.1093/biomet/41.1-2.100)).</FNItem>
+  <FNItem n="2">**Truong, C., Oudre, L., & Vayatis, N.** (2020). "Selective review of offline change point detection methods". *Signal Processing*, 167, 107299 ([doi:10.1016/j.sigpro.2019.107299](https://doi.org/10.1016/j.sigpro.2019.107299)).</FNItem>
+</Footnotes>

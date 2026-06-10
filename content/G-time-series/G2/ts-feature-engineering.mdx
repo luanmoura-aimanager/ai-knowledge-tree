@@ -13,7 +13,7 @@ Classical models like ARIMA are written directly in the language of time. The ot
 route is to reshape forecasting into ordinary supervised learning: build a table
 where each row is a time point, the target is the future value, and the columns are
 features computed from the past. Then any regressor, gradient-boosted trees most
-commonly, can forecast. The whole craft is in building those features without
+commonly, can forecast<FN n="1" />. The whole craft is in building those features without
 peeking at the future.
 
 ## The supervised reframing
@@ -89,7 +89,8 @@ classic leaks:
 Validation must respect time too: a random shuffle lets the model train on
 future rows and test on past ones, which inflates the score and collapses in
 production. Use forward-chaining (expanding-window) splits where each fold trains on
-the past and tests on the immediately following block.
+the past and tests on the immediately following block, the protocol that made the
+M4 competition's massive cross-method comparison fair<FN n="2" />.
 
 ```python
 import numpy as np
@@ -126,3 +127,8 @@ timestamp, the precondition for an honest forecast.
 With the problem now a supervised table, the next lesson hands it to gradient-
 boosted trees and confronts the choice between recursive and direct multi-step
 forecasting.
+
+<Footnotes>
+  <FNItem n="1">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Lag, rolling, and Fourier/calendar features for the regression reframing of forecasting.</FNItem>
+  <FNItem n="2">**Makridakis, S., Spiliotis, E., & Assimakopoulos, V.** (2020). "The M4 competition: 100,000 time series and 61 forecasting methods". *International Journal of Forecasting*, 36(1), 54-74. [doi:10.1016/j.ijforecast.2019.04.014](https://doi.org/10.1016/j.ijforecast.2019.04.014). Establishes rolling-origin evaluation as the standard protocol.</FNItem>
+</Footnotes>

@@ -47,13 +47,13 @@ state); a decoder LSTM expands that vector back into the reconstructed window. T
 score is the reconstruction error over the window. Because the encoder must
 summarize the whole window into one vector, it learns temporal dependencies, so an
 anomaly that is a *broken pattern* (a normal value at the wrong phase) reconstructs
-poorly even though each individual value is in range.
+poorly even though each individual value is in range<FN n="1" />.
 
 A **transformer autoencoder** replaces the LSTMs with self-attention, which handles
 long windows and multivariate cross-sensor structure better; the anomaly score is
 the same reconstruction error. A common refinement (the Anomaly Transformer)
 combines reconstruction with an attention-based discrepancy criterion, but the
-reconstruction principle is the core.
+reconstruction principle is the core<FN n="3" />.
 
 ## Setting the threshold
 
@@ -63,7 +63,7 @@ fit a simple distribution to the normal scores and threshold at a chosen
 false-positive rate. The robust statistics from the first G4 lesson apply directly
 to the score series: a robust z-score on the reconstruction errors gives a
 principled, masking-resistant cut-off. Picking the threshold on normal-only data
-keeps the false-positive rate controlled.
+keeps the false-positive rate controlled<FN n="2" />.
 
 ![A deep detector learns to reconstruct normal patterns, so its reconstruction error stays low on routine data and spikes wherever the signal departs from what it has seen.](/figures/G4/deep-anomaly-detection.svg)
 
@@ -121,3 +121,9 @@ error separates off-manifold anomalies from normal behaviour with few false alar
 Detecting *that* something changed is one task; explaining *why* one series moves
 another is causal. The next subsection turns to causal time series, beginning with
 Granger causality.
+
+<Footnotes>
+  <FNItem n="1">**Malhotra, P., Vig, L., Shroff, G., & Agarwal, P.** (2015). "Long short term memory networks for anomaly detection in time series". *ESANN*. Stacked-LSTM prediction-error model for sequence anomalies.</FNItem>
+  <FNItem n="2">**Hundman, K., Constantinou, V., Laporte, C., Colwell, I., & Soderstrom, T.** (2018). "Detecting spacecraft anomalies using LSTMs and nonparametric dynamic thresholding". *KDD*. [arXiv:1802.04431](https://arxiv.org/abs/1802.04431)</FNItem>
+  <FNItem n="3">**Blázquez-García, A., Conde, A., Mori, U., & Lozano, J. A.** (2021). "A review on outlier/anomaly detection in time series data". *ACM Computing Surveys*, 54(3), 1-33. [arXiv:2002.04236](https://arxiv.org/abs/2002.04236)</FNItem>
+</Footnotes>

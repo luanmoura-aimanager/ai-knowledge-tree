@@ -10,7 +10,7 @@ prerequisites: ["ts-feature-engineering", "C1/linear-regression-mle"]
 ---
 
 Prophet was built for a specific situation: many business series, each needing a
-forecast, with analysts rather than time-series specialists turning the knobs. Its
+forecast, with analysts rather than time-series specialists turning the knobs<FN n="1" />. Its
 design choice is to model a series as a sum of interpretable components fit as a
 curve-fitting regression, not as an autoregressive process. That makes it robust to
 missing data, easy to tune in human terms, and transparent about why it forecasts
@@ -18,7 +18,8 @@ what it does.
 
 ## The decomposable model
 
-Prophet writes the series as an additive sum of three components plus noise:
+Prophet writes the series as an additive sum of three components plus noise, the
+classical decomposition view of a series<FN n="2" />:
 
 $$
 y(t) = g(t) + s(t) + h(t) + \varepsilon_t,
@@ -61,7 +62,7 @@ The coefficients $a_n, b_n$ are learned. More harmonics fit a wigglier seasonal
 shape; yearly seasonality typically uses $N = 10$, weekly $N = 3$. Multiple
 seasonalities add as separate $s(t)$ terms with their own $P$.
 
-![Prophet models a series as an additive sum of interpretable components — a piecewise-linear trend plus periodic seasonality (and holidays) — that recombine into the series, making the forecast easy to read.](/figures/G2/prophet.svg)
+![Prophet models a series as an additive sum of interpretable components: a piecewise-linear trend plus periodic seasonality (and holidays) that recombine into the series, making the forecast easy to read.](/figures/G2/prophet.svg)
 
 ## Holidays and fitting
 
@@ -111,3 +112,8 @@ reads a series as a sum of named, inspectable components.
 Classical and tree-based methods rely on hand-built features. The next subsection
 turns to deep learning, where the model learns its own representation of the
 series, beginning with the probabilistic RNN forecaster DeepAR.
+
+<Footnotes>
+  <FNItem n="1">**Taylor, S. J., & Letham, B.** (2018). "Forecasting at scale (Prophet)". *The American Statistician*, 72(1), 37-45. [doi:10.1080/00031305.2017.1380080](https://doi.org/10.1080/00031305.2017.1380080). The decomposable trend/seasonality/holiday model, changepoint priors, and analyst-in-the-loop fitting.</FNItem>
+  <FNItem n="2">**Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. Additive decomposition of a series into trend, seasonal, and remainder components.</FNItem>
+</Footnotes>

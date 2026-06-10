@@ -36,7 +36,7 @@ a lot is informative). It keeps only the top $u = O(\log L)$ most informative
 queries for full attention and approximates the rest by the mean of the values.
 This drops attention to $O(L \log L)$ time and memory. Informer also uses a
 **generative decoder** that outputs the whole horizon in one forward pass instead
-of step-by-step, removing the slow autoregressive rollout.
+of step-by-step, removing the slow autoregressive rollout<FN n="1" />.
 
 ## Autoformer: decomposition plus auto-correlation
 
@@ -58,7 +58,7 @@ spectral-analysis connection) to find the lags with the strongest periodic
 dependency, then aggregates information by rolling the series to those lags and
 weighting by correlation strength. This operates on sub-series at the period level,
 which is both $O(L \log L)$ and better matched to seasonal data than pointwise
-attention.
+attention<FN n="2" />.
 
 ## FEDformer: mixing in the frequency domain
 
@@ -125,3 +125,8 @@ operations Autoformer puts inside the network in place of raw attention.
 These models keep elaborate attention machinery. The next lesson covers PatchTST
 and iTransformer, which strip it back and ask what the minimal effective transformer
 for forecasting looks like.
+
+<Footnotes>
+  <FNItem n="1">**Zhou, H., et al.** (2021). "Informer: beyond efficient transformer for long sequence time-series forecasting". *AAAI*. [arXiv:2012.07436](https://arxiv.org/abs/2012.07436). ProbSparse attention and the one-pass generative decoder.</FNItem>
+  <FNItem n="2">**Wu, H., Xu, J., Wang, J., & Long, M.** (2021). "Autoformer: decomposition transformers with auto-correlation for long-term series forecasting". *NeurIPS*. [arXiv:2106.13008](https://arxiv.org/abs/2106.13008). Series-decomposition blocks and the FFT-based auto-correlation mechanism.</FNItem>
+</Footnotes>
