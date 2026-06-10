@@ -4,6 +4,7 @@ import rehypeKatex from "rehype-katex";
 import rehypeUnwrapImages from "rehype-unwrap-images";
 import type { MDXComponents } from "mdx/types";
 import { MdxPre } from "./MdxPre";
+import { FN, FNItem, Footnotes } from "./Footnotes";
 
 /**
  * Renders a markdown image as a captioned `<figure>`. Lesson figures are static
@@ -30,6 +31,10 @@ function MdxImage({ src, alt }: { src?: string; alt?: string }) {
 const components: MDXComponents = {
   pre: MdxPre as MDXComponents["pre"],
   img: MdxImage as MDXComponents["img"],
+  // Paper-style citations (see Footnotes.tsx + content/STYLE.md §9).
+  FN: FN as unknown as MDXComponents["a"],
+  FNItem: FNItem as unknown as MDXComponents["li"],
+  Footnotes: Footnotes as unknown as MDXComponents["section"],
 };
 
 /** Compiles and renders a subsection's MDX body (math via KaTeX, code via MdxPre). */

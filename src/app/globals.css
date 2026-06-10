@@ -294,6 +294,107 @@ body {
   margin-top: 0.5rem;
 }
 
+/* ----- Paper-style citations (Footnotes.tsx; see content/STYLE.md §9) ------ */
+/* Inline marker: a bracketed "[k]" at body size that links to the References
+   section. The bottom block is a 'References' list whose numerals are drawn
+   explicitly (matching the inline "[k]"), not via an <ol> counter. */
+.mdx-fn-ref a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+}
+.mdx-fn-ref--multi {
+  color: var(--accent);
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+}
+.mdx-fn-ref a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mdx-footnotes {
+  margin-top: 3.2em;
+  font-size: 0.92rem;
+  color: var(--fg);
+  line-height: 1.55;
+}
+.mdx-footnotes__rule {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  margin: 0 0 1.2em 0;
+}
+.mdx-footnotes__heading {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  margin: 0 0 0.9em 0;
+}
+.mdx-footnotes__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.mdx-fn-item {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto;
+  column-gap: 0.4em;
+  margin: 0.5em 0;
+  color: var(--fg-dim);
+}
+.mdx-fn-item__num {
+  color: var(--accent);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: right;
+}
+.mdx-fn-item strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.mdx-fn-item em {
+  font-style: italic;
+}
+.mdx-fn-item a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.mdx-fn-backref {
+  text-decoration: none;
+  color: var(--fg-mute);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  align-self: start;
+  padding-left: 0.4em;
+}
+.mdx-fn-item:hover .mdx-fn-backref,
+.mdx-fn-item:target .mdx-fn-backref {
+  opacity: 0.6;
+}
+.mdx-fn-item:target {
+  background: var(--card-2);
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  margin-left: -0.4em;
+  margin-right: -0.4em;
+}
+/* Smooth scroll + headroom when jumping to a reference and back. */
+html {
+  scroll-behavior: smooth;
+}
+.mdx-footnotes [id^="fn-"] {
+  scroll-margin-top: 4rem;
+}
+.mdx-fn-ref [id^="fn-ref-"] {
+  scroll-margin-top: 4rem;
+}
+
 /* Lesson sidebar scroll area: a light, high-contrast thumb against the
    dark-blue card (the default thumb is near-black and barely visible). */
 .lesson-scroll {

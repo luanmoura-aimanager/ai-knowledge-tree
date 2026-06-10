@@ -308,3 +308,50 @@ committed matplotlib figure via `figures/gen/<subId>.py` (`apply_style()` /
 not duplicate neighbours: pillar K is the general data-systems foundation that
 pillar I (ML feature pipelines) and J5 (AI data platform) build on, linked by
 `CONNECTIONS` rather than repeated lessons.
+
+## 9. Citations & references
+
+Lessons cite their sources with paper-style footnotes. Three MDX components
+(registered globally in `src/components/mdx/MdxContent.tsx`, defined in
+`Footnotes.tsx`) are available in any `.mdx` with no import:
+
+- **`<FN n="k" />`** an inline marker rendering `[k]`, placed immediately after
+  the claim, definition, derivation, or named result it supports. Group stacked
+  citations with **`<FN ns="1, 3" />`** → `[1, 3]`.
+- **`<Footnotes>`** the references block, placed **last** (after the
+  one-sentence handoff), containing the entries.
+- **`<FNItem n="k">…</FNItem>`** one reference entry inside `<Footnotes>`.
+
+> **Use string attributes (`n="1"`), never `{number}` expressions.** Lessons are
+> rendered with `next-mdx-remote/rsc`, which does **not** evaluate numeric JSX
+> expression attributes in MDX — `n={1}` arrives as `undefined` and the citation
+> silently breaks. String attributes are passed through literally and parsed by
+> the component.
+
+```mdx
+The scaled dot-product is the similarity score attention uses<FN n="1" />.
+
+... one-sentence handoff to the next lesson.
+
+<Footnotes>
+  <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need".
+    *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762)</FNItem>
+</Footnotes>
+```
+
+Rules:
+
+- **Numbering is local to the lesson** and starts at `[1]`. Every `<FN n>` must
+  have a matching `<FNItem n>` and vice versa (no dangling marker, no orphan
+  entry, no duplicate `n`).
+- **Entry format:** `**Authors** (Year). "Paper title"` or `*Book title*`,
+  optional `§`. `Venue.` then a link: `[arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX)`
+  or `[doi:10.…](https://doi.org/10.…)`. A short trailing context note is
+  optional. Authors render bold, book/journal titles italic.
+- **2–5 references per lesson** is the norm: a canonical textbook plus the
+  seminal paper(s) for the concept. `codeExempt`/infra lessons may cite
+  standards, official docs, or books.
+- **References must be real and verifiable** — correct author/year/title/venue
+  and a working arXiv id or DOI. Never invent a citation. When unsure, cite a
+  well-established textbook (easy to verify) rather than an obscure paper. The
+  arXiv id must match `XXXX.XXXXX` (4-digit `YYMM` + 4–5 digit number).

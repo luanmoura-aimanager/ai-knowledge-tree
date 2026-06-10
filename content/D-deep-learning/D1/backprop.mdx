@@ -14,7 +14,7 @@ needs the derivative of the loss with respect to every parameter. The
 naive approach (finite differences, or one chain-rule application per
 parameter) is $O(P)$ forward passes for $P$ parameters: infeasible at
 modern scale. **Backpropagation** computes all $P$ gradients with a
-single backward pass, by reusing partial derivatives.
+single backward pass, by reusing partial derivatives<FN ns="1, 2" />.
 
 ## The setup: a computational graph
 
@@ -182,3 +182,8 @@ print(f"max |analytic - finite diff| for W2: {np.max(np.abs(dW2 - fd_W2)):.2e}")
 The analytic gradients match finite differences to floating-point
 precision, confirming the backward pass. The next lesson generalizes this
 hand-derived routine into an automatic differentiation engine.
+
+<Footnotes>
+  <FNItem n="1">**Rumelhart, D. E., Hinton, G. E., & Williams, R. J.** (1986). "Learning representations by back-propagating errors". *Nature*, 323, 533-536. [doi:10.1038/323533a0](https://doi.org/10.1038/323533a0) — The paper that popularized backpropagation for neural networks.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, §6.5 (Back-Propagation and Other Differentiation Algorithms). MIT Press. — Backprop as reverse-mode differentiation on the computational graph.</FNItem>
+</Footnotes>
