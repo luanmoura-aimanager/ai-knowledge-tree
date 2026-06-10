@@ -74,15 +74,16 @@ $$
 B(P) = B_{\text{data}}(P) + B_{\text{over}}(P) \approx s N \beta + s P \omega .
 $$
 
-In this clean approximation the data term is flat in $P$ and the overhead term
-rises, so cost is non-decreasing in $P$ and the message is plain: do not slice
-finer than you must. Keeping the discrete ceiling $\lceil sP \rceil$ (a query
-always opens at least one partition, and partitions come in whole files) sharpens
-this into a genuine minimum. At very low $P$ each partition is coarse and a
-selective query still drags in a whole large partition it mostly discards; at very
-high $P$ the $sP\omega$ overhead dominates. The minimum sits where the marginal
-data saved from one more split equals the marginal overhead it adds, a U-shaped
-curve with a clear best partition count.
+This continuous approximation smooths the data term to a flat $s N \beta$, but
+that smoothing hides what happens at low $P$: when partitions are few and coarse,
+a selective query still drags in a whole large partition it mostly discards, so
+the data it actually scans *falls* as finer partitions let it prune more.
+Restoring the discrete ceiling $\lceil sP \rceil$ (a query always opens at least
+one whole partition) brings that effect back, and the total becomes a genuine
+U-shape: the falling data term dominates at low $P$, the rising $sP\omega$
+overhead dominates at high $P$, and the minimum sits where the marginal data saved
+from one more split equals the marginal overhead it adds. The lesson is not "never
+partition" but "partition to that sweet spot, not past it."
 
 ![Total query cost as a function of partition count for a selective predicate. Data scanned falls as finer partitions let the query skip more, while per-file overhead rises; their sum is U-shaped with a marked sweet spot, past which tiny-file overhead dominates.](/figures/K2/partitioning-pruning.svg)
 

@@ -88,12 +88,13 @@ straggler_ratio = max_before / mean_load
 print(f"per-reducer load  : {np.round(load).astype(int)}")
 print(f"max={max_before:.0f}  mean={mean_load:.0f}  straggler ratio={straggler_ratio:.2f}x")
 
-# Salting: split the hottest reducer's load evenly across all R reducers.
+# Salting models the net effect: the hot key is split into many sub-keys, so the
+# excess piled on its reducer no longer lands in one place but spreads across all R.
 hot = int(np.argmax(load))
 after = load.copy()
 spill = after[hot] * (1 - 1.0 / R)               # everything beyond its fair 1/R share
 after[hot] -= spill
-after += spill / R                               # redistribute the spill across reducers
+after += spill / R                               # the split sub-keys land across reducers
 max_after = after.max()
 print(f"max after salting : {max_after:.0f}  (was {max_before:.0f})")
 
@@ -103,6 +104,9 @@ print(f"ok: straggler cut from {max_before:.0f} to {max_after:.0f} records")
 ```
 
 The straggler ratio here is about $2.3\times$, so before salting the job runs more than
-twice as long as a balanced one would; salting brings the peak down toward the mean.
+twice as long as a balanced one would; salting brings the peak down toward the mean. The
+simulation is an idealization, it spreads the hot key's excess evenly across every
+reducer, where real salting splits that key into $m$ explicit sub-keys; both share the
+same point, that breaking up the one heavy key is what removes the straggler.
 Skew is the last of the runtime costs; the [next lesson](query-execution-pushdown) turns
 to how the query planner avoids reading data it does not need in the first place.

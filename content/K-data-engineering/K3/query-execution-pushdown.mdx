@@ -66,7 +66,12 @@ $$
 
 for an input of $N$ rows. Stacked with projection, the bytes the CPU actually processes
 are $\sigma \cdot N \cdot c \cdot w$ (with $w$ the per-value width), versus $N \cdot C
-\cdot w$ for the naive plan, a reduction by $\sigma \cdot (c / C)$.
+\cdot w$ for the naive plan, a reduction by $\sigma \cdot (c / C)$. This $\sigma \cdot N$
+is the best case, where the predicate column is clustered so the surviving rows sit in
+a few row groups the engine can isolate. Row-group skipping is coarse, all or nothing
+per group, so on unsorted data a group whose min/max straddles the predicate cannot be
+skipped at all and the rows read are an upper bound above $\sigma \cdot N$; clustering on
+the filter column is what makes pruning approach the ideal.
 
 ## Vectorized execution
 
