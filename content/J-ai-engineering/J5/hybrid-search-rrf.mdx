@@ -23,7 +23,7 @@ The two retrieval families fail in complementary ways:
 
 - **Dense (semantic).** Embeds query and documents and ranks by [similarity](vector-infra-ann).
   Strong on meaning and paraphrase ("car" matches "automobile"); weak on exact, rare tokens
-  it never learned a good embedding for.
+  it never learned a good embedding for<FN n="1" />.
 - **Sparse (lexical, BM25).** Ranks by weighted term overlap. Strong on exact matches and
   rare keywords; blind to synonyms and to meaning.
 
@@ -46,7 +46,7 @@ $$
 where $\text{rank}_r(d)$ is $d$'s position in retriever $r$ (or effectively infinite if $d$ is
 absent), and $K$ is a constant (commonly $60$) that damps the influence of the very top
 ranks so a single first-place finish cannot dominate. The final ranking sorts documents by
-$\text{RRF}(d)$ descending.
+$\text{RRF}(d)$ descending<FN n="2" />.
 
 The reason fusion *wins* is statistical: the two retrievers are largely **independent** error
 sources, so a relevant document is unlikely to rank poorly in *both*. A document that lands
@@ -95,3 +95,8 @@ Each retriever alone lands the relevant document at an MRR around $0.46$; fusing
 lifts it to $0.59$, because the document rarely ranks badly in *both* independent lists. The
 index has to stay fresh as documents and embedding models change, which is the
 [streaming and embedding-lifecycle](streaming-embeddings) problem that closes the subsection.
+
+<Footnotes>
+  <FNItem n="1">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). The dense-retrieval half of the hybrid pair.</FNItem>
+  <FNItem n="2">**Cormack, G. V., Clarke, C. L. A., & Buettcher, S.** (2009). "Reciprocal rank fusion outperforms Condorcet and individual rank learning methods". *SIGIR*. [doi:10.1145/1571941.1572114](https://doi.org/10.1145/1571941.1572114)</FNItem>
+</Footnotes>

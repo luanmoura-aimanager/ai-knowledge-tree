@@ -12,8 +12,8 @@ prerequisites: ["I4/llm-evaluation", "B4/ab-testing"]
 When a model's output is a paragraph, a summary, a chatbot reply, there is no gold
 label to match against, so [exact-match metrics](I4/llm-evaluation) do not apply. The
 practical answer is **LLM-as-judge**: use a strong model to score the outputs against a
-rubric ("is this answer helpful and correct? yes/no"). It is fast and cheap enough to
-run on every build. But a judge is only useful if it agrees with human judgment, and
+rubric ("is this answer helpful and correct? yes/no")<FN n="1" />. It is fast and cheap enough to
+run on every build<FN n="2" />. But a judge is only useful if it agrees with human judgment, and
 that agreement has to be *measured*, not assumed, before the judge can gate releases.
 
 ## Why raw agreement is not enough
@@ -49,7 +49,7 @@ relying on it.
 
 ## The regression suite
 
-Once the judge is validated, it becomes a **regression gate**. Keep a fixed evaluation
+Once the judge is validated, it becomes a **regression gate**<FN n="3" />. Keep a fixed evaluation
 dataset and a baseline pass rate. Every new build (a prompt change, a model upgrade, a
 new retrieval setup) is scored by the judge on that dataset, and the new pass rate is
 compared against the baseline. Because the pass rate is a proportion estimated on a
@@ -103,3 +103,9 @@ is trustworthy enough to gate on; and the regression check catches the degraded 
 whose pass rate fell far enough below baseline to clear the noise threshold. Evaluation
 tells you *whether* the system works; the next lesson improves the part most often
 responsible when it does not, the [retrieval pipeline](production-rag).
+
+<Footnotes>
+  <FNItem n="1">**Zheng, L., et al.** (2023). "Judging LLM-as-a-judge with MT-Bench and Chatbot Arena". *NeurIPS*. [arXiv:2306.05685](https://arxiv.org/abs/2306.05685). Establishes and validates the LLM-as-judge methodology against human preferences.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. AI-as-judge evaluation and gating builds on a regression dataset.</FNItem>
+  <FNItem n="3">**Es, S., James, J., Espinosa-Anke, L., & Schockaert, S.** (2024). "RAGAS: automated evaluation of retrieval augmented generation". *EACL*. [arXiv:2309.15217](https://arxiv.org/abs/2309.15217). Reference-free, model-scored metrics run automatically over a fixed set.</FNItem>
+</Footnotes>

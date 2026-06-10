@@ -13,7 +13,7 @@ A language model only knows what was in its training data, frozen at its cutoff,
 and it cannot cite a source. **Retrieval-augmented generation** (RAG) fixes both by
 putting the relevant text *into the prompt* at query time: find the passages in your
 own documents that bear on the question, paste them in, and ask the model to answer
-from them. The [concept](E/rag-fundamentals) was covered from the NLP side; here we
+from them<FN n="1" />. The [concept](E/rag-fundamentals) was covered from the NLP side; here we
 build the engineering loop from scratch, because every production RAG system is this
 loop with more careful parts.
 
@@ -32,7 +32,7 @@ graph LR
   passages of a few hundred tokens. Chunk too coarsely and a passage mixes
   unrelated topics; too finely and it loses the context that makes it meaningful.
 - **Embed.** Run each chunk through an [embedding model](E/dense-retrieval) that maps
-  text to a vector, positioned so that *semantically similar* text lands nearby.
+  text to a vector, positioned so that *semantically similar* text lands nearby<FN n="2" />.
 - **Index.** Store the chunk vectors so they can be searched. At small scale this is
   a plain array; at large scale it is a vector database.
 - **Retrieve and generate.** Embed the query the same way, find the $k$ nearest
@@ -99,4 +99,10 @@ print("\noff-topic chunk excluded; top-k grounds the answer:", True)
 The two energy-metabolism chunks score above $0.99$ and are retrieved, while the
 off-topic Everest chunk scores near zero and is left out, so the model is handed only
 relevant context. That hands one capability to the model; the next lesson hands it
-another, the ability to *act* by calling [tools](tool-use).
+another, the ability to *act* by calling [tools](tool-use)<FN n="3" />.
+
+<Footnotes>
+  <FNItem n="1">**Lewis, P., et al.** (2020). "Retrieval-augmented generation for knowledge-intensive NLP tasks". *NeurIPS*. [arXiv:2005.11401](https://arxiv.org/abs/2005.11401). The paper that named the retrieve-then-generate pattern.</FNItem>
+  <FNItem n="2">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). Dense embeddings retrieved by inner product, the embed-and-rank core of this loop.</FNItem>
+  <FNItem n="3">**Gao, Y., et al.** (2023). "Retrieval-augmented generation for large language models: a survey". [arXiv:2312.10997](https://arxiv.org/abs/2312.10997). Surveys the chunk-embed-retrieve-generate stages and their variants.</FNItem>
+</Footnotes>

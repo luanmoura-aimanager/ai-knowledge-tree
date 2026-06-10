@@ -13,7 +13,7 @@ codeExempt: true
 An [MCP server](mcp-protocol) is only as good as the tools it exposes, and "good" here
 means *good for a model to use*, which is not the same as good for a human. A model
 discovers your tools from their schemas and decides which to call based on their names
-and descriptions, with no documentation to read and no engineer to ask. Three design
+and descriptions, with no documentation to read and no engineer to ask<FN n="1" />. Three design
 choices determine whether it succeeds: granularity, description, and versioning.
 
 ## Granularity: how much each tool does
@@ -44,7 +44,7 @@ each argument means, in plain language. `query` is a worse parameter name than
 `search_terms`; "Get data" is a worse description than "Search the support knowledge
 base by keyword; returns the top 5 articles." Writing tool descriptions is prompt
 engineering: every word is read by the model on every call, and vague wording shows up
-directly as wrong tool calls.
+directly as wrong tool calls<FN n="2" />.
 
 ```mermaid
 graph TD
@@ -70,3 +70,8 @@ Get these three right, sensible granularity, model-facing descriptions, compatib
 evolution, and your server is one a model can use correctly and that keeps working as
 it grows. Building tools is one half of systems thinking; knowing whether the whole
 system actually *works* is the other half, which is [evaluation](llm-as-judge).
+
+<Footnotes>
+  <FNItem n="1">**Anthropic.** (2024). "Model Context Protocol". [modelcontextprotocol.io](https://modelcontextprotocol.io). Server-side tool, resource, and prompt specifications a model discovers from schemas.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Tool descriptions as prompt engineering and the design of model-facing interfaces.</FNItem>
+</Footnotes>

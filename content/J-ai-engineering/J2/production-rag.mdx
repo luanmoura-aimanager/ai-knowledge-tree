@@ -10,9 +10,9 @@ prerequisites: ["J1/rag-from-scratch", "E6/advanced-rag"]
 ---
 
 [Naive RAG](J1/rag-from-scratch), chunk, embed, take the top-k by cosine, gets you a
-demo. Production RAG is the same skeleton with two parts done carefully, because
+demo<FN n="1" />. Production RAG is the same skeleton with two parts done carefully, because
 retrieval quality is usually the ceiling on the whole system's quality: the model can
-only answer from what you put in front of it. The two parts are how you **chunk** the
+only answer from what you put in front of it<FN n="2" />. The two parts are how you **chunk** the
 documents and how you **rank** the candidates, and the ranking improvement is something
 you can measure.
 
@@ -51,7 +51,7 @@ graph LR
   shortlist of, say, $50$ candidates. Optimized for recall (don't miss good docs), not
   precise ordering.
 - **Stage 2, rerank.** Run a **cross-encoder**, a model that reads the query and a
-  candidate *jointly* and outputs a relevance score, over just those $50$. It is far
+  candidate *jointly* and outputs a relevance score, over just those $50$<FN n="3" />. It is far
   more accurate but only affordable because the shortlist is small. Its scores reorder
   the candidates, and the true top $5$ go to the prompt.
 
@@ -62,7 +62,7 @@ cheap to, on the shortlist, getting most of its accuracy at a fraction of its co
 
 To show reranking helps, you need a ranking metric that rewards putting the *most*
 relevant documents *highest*. **Normalized discounted cumulative gain** (nDCG) does
-exactly that. Give each document a relevance grade; the discounted cumulative gain of a
+exactly that<FN n="4" />. Give each document a relevance grade; the discounted cumulative gain of a
 ranking discounts each document's grade by its position,
 
 $$
@@ -110,3 +110,10 @@ documents to the top where the model will actually use them, for the cost of sco
 only a short shortlist. RAG, agents, evaluation, and retrieval are the application
 layer; where the documents and vectors physically *live* is the platform question,
 which the last lesson of this subsection frames as the [lakehouse](lakehouse-architecture).
+
+<Footnotes>
+  <FNItem n="1">**Lewis, P., et al.** (2020). "Retrieval-augmented generation for knowledge-intensive NLP tasks". *NeurIPS*. [arXiv:2005.11401](https://arxiv.org/abs/2005.11401). The base RAG architecture this lesson hardens.</FNItem>
+  <FNItem n="2">**Gao, Y., et al.** (2023). "Retrieval-augmented generation for large language models: a survey". [arXiv:2312.10997](https://arxiv.org/abs/2312.10997). Surveys advanced RAG: chunking strategies, two-stage retrieval, and reranking.</FNItem>
+  <FNItem n="3">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). The dense first-stage retriever the reranker refines.</FNItem>
+  <FNItem n="4">**Es, S., James, J., Espinosa-Anke, L., & Schockaert, S.** (2024). "RAGAS: automated evaluation of retrieval augmented generation". *EACL*. [arXiv:2309.15217](https://arxiv.org/abs/2309.15217). Measuring retrieval and answer quality in a RAG pipeline.</FNItem>
+</Footnotes>

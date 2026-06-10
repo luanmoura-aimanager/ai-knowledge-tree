@@ -14,7 +14,7 @@ A model behind an [inference engine](I3/llm-serving) still needs a front door: a
 API that applications call. AI APIs differ from ordinary CRUD APIs in three ways that
 all trace back to one fact, generation is slow and produces output incrementally. That
 single property drives the case for streaming, for async concurrency, and for taking
-versioning seriously from day one.
+versioning seriously from day one<FN n="1" />.
 
 ## Streaming: send tokens as they arrive
 
@@ -23,7 +23,7 @@ returns it in one shot, the user stares at a blank screen the whole time. **Stre
 sends each token (or small group) the instant the model produces it, so text appears
 progressively, the experience every chat UI has. The standard transport is
 **server-sent events** (SSE): the server holds the HTTP connection open and pushes a
-sequence of events down it until the generation ends.
+sequence of events down it until the generation ends<FN n="2" />.
 
 ```mermaid
 graph LR
@@ -73,3 +73,8 @@ removals and semantic changes are not. This is the same evolution discipline as
 Streaming for perceived latency, async for concurrency, versioning for stability: these
 make the API usable. What sits *in front* of it, deciding who may call and how much,
 is the [governance layer](governance-rate-limiting).
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Inference API design, streaming, and serving tradeoffs.</FNItem>
+  <FNItem n="2">**WHATWG.** (2025). *HTML Living Standard*, §9.2 "Server-sent events". [html.spec.whatwg.org](https://html.spec.whatwg.org/multipage/server-sent-events.html). The `text/event-stream` transport spec.</FNItem>
+</Footnotes>

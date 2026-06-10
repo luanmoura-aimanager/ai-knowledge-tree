@@ -15,7 +15,7 @@ field that was never null, or shipped ages as strings. Downstream, a [feature](I
 silently goes missing or a model trains on garbage, and the failure surfaces days later, far
 from its cause. A **data contract** is the fix: a schema that producers and consumers agree
 on and that is *enforced at the boundary*, so a violation is caught the moment bad data
-arrives, not after it has propagated.
+arrives, not after it has propagated<FN n="1" />.
 
 ## A schema as an enforced agreement
 
@@ -38,7 +38,7 @@ at the door and an alert fires, so the failure happens *where the bad data enter
 clear message, instead of as a mysterious metric drift a week later. It complements the
 statistical view of [data quality](I1/drift-detection): drift detection asks "has the
 *distribution* shifted?"; a contract asks "is this record even *shaped* right?", structural
-validation versus distributional monitoring.
+validation versus distributional monitoring<FN n="2" />.
 
 ## Worked example
 
@@ -94,3 +94,8 @@ mistyped id are each caught at the boundary with a precise reason, instead of sl
 through to corrupt a downstream model. Contracts keep the data *correct*; the rest of the
 subsection makes the retrieval *fast at scale*, starting with
 [approximate nearest neighbors](vector-infra-ann).
+
+<Footnotes>
+  <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Data contracts and schema enforcement between producers and consumers.</FNItem>
+  <FNItem n="2">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Schema evolution, encoding, and the compatibility guarantees a contract enforces (Ch. 4).</FNItem>
+</Footnotes>

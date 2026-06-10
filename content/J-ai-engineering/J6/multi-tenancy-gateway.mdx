@@ -23,7 +23,7 @@ must not degrade B's service. Two dimensions:
 
 - **Data isolation.** Every query, retrieval, and cache lookup must be scoped to the calling
   tenant. The standard mechanisms are a tenant id partitioning the data (every row, every vector,
-  tagged and filtered by tenant) or, for stricter needs, a separate database per tenant. A bug here
+  tagged and filtered by tenant) or, for stricter needs, a separate database per tenant<FN n="1" />. A bug here
   is a [data breach](J6/cloud-identity-security), so tenant scoping is enforced at the data layer,
   not left to application code to remember.
 - **Performance isolation.** One tenant's spike must not starve the others, the **noisy neighbor**
@@ -59,5 +59,10 @@ arriving has already been authenticated and tagged with its tenant. A **service 
 same idea to service-to-service traffic *inside* the system (mutual TLS, observability, retries
 between internal services), but the tenant-facing control plane is the gateway.
 
-Isolation plus a gateway control plane let one system safely serve many customers. Serving them is
+Isolation plus a gateway control plane let one system safely serve many customers<FN n="2" />. Serving them is
 one thing; understanding and controlling what they *cost* at scale is [FinOps for AI](finops-for-ai).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Partitioning and the data-isolation mechanisms multi-tenant scoping rests on (Ch. 6).</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. The gateway as the control plane for auth, routing, and per-tenant rate limiting in front of model services.</FNItem>
+</Footnotes>

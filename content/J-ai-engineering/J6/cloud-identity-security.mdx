@@ -14,7 +14,7 @@ codeExempt: true
 turned against you, and the best defense was least privilege: bound what a compromised model can
 *reach*. That defense is enforced not in the prompt but in the **cloud identity and security**
 layer, the same primitives that secure any enterprise system, applied with AI's particular risks
-in mind. The organizing principle is least privilege, and four primitives implement it.
+in mind. The organizing principle is least privilege, and four primitives implement it<FN n="1" />.
 
 ## The primitives
 
@@ -47,7 +47,7 @@ graph TD
 
 These primitives are standard, but AI sharpens why they matter. An AI agent is an identity that
 acts *autonomously* and can be *manipulated* through its inputs, a combination ordinary services do
-not have. So the **blast radius** of a compromise is whatever that identity was permitted to do,
+not have<FN n="2" />. So the **blast radius** of a compromise is whatever that identity was permitted to do,
 and [prompt injection](J3/prompt-injection-security) is a live path to triggering it. The
 consequences chain directly:
 
@@ -59,3 +59,8 @@ The mental model is **defense in depth around an identity you must assume is fal
 controls so that no single failure, a successful injection, a leaked token, a buggy tool, gives an
 attacker the whole system. Securing one identity is the per-component view; serving *many*
 customers from one system safely is the [multi-tenancy](multi-tenancy-gateway) problem.
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Trust boundaries, isolation, and the reliability/security properties this layer enforces.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Why an autonomous, input-manipulable AI identity sharpens the least-privilege and blast-radius argument.</FNItem>
+</Footnotes>

@@ -36,7 +36,7 @@ The mechanism that turns database changes into events is **change data capture**
 than polling the database for "what changed," CDC taps the database's own write-ahead log and
 emits each row change as an event onto a stream (Kafka). This is the [streaming](I1/pipeline-paradigms)
 paradigm applied to the index: the index becomes a continuously-maintained materialized view of
-the source data, lagging it by seconds instead of a batch cycle. A subtlety that matters:
+the source data, lagging it by seconds instead of a batch cycle<FN n="1" />. A subtlety that matters:
 **deletes must propagate**, a document removed at the source but left in the index will keep
 being retrieved, surfacing content that should be gone.
 
@@ -45,7 +45,7 @@ being retrieved, surfacing content that should be gone.
 The harder, and more often botched, problem is changing the **embedding model**. Embeddings
 from two different models (or two versions of one) are **not comparable**: they live in
 different vector spaces, so a query embedded with the new model and a document embedded with
-the old one have a meaningless similarity. The instant you upgrade the embedding model, every
+the old one have a meaningless similarity<FN n="2" />. The instant you upgrade the embedding model, every
 existing vector in the index is stale in this deeper sense.
 
 The consequence is a hard operational rule: **upgrading the embedding model requires
@@ -62,3 +62,8 @@ Fresh content via streaming, coherent vectors via lifecycle management: together
 retrieval layer trustworthy in production. That closes the data-platform subsection. The next
 one moves up to the cloud platforms and enterprise concerns that wrap all of this, starting with
 [managed AI platforms](J6/managed-ai-platforms).
+
+<Footnotes>
+  <FNItem n="1">**Kleppmann, M.** (2017). *Designing Data-Intensive Applications.* O'Reilly. Change data capture, event logs, and derived data as continuously-maintained materialized views (Ch. 11).</FNItem>
+  <FNItem n="2">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). Query and passage encoders share a learned space, so re-embedding must use one consistent model.</FNItem>
+</Footnotes>

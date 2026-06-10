@@ -13,9 +13,9 @@ One [tool call](tool-use) answers one self-contained question. Real tasks need
 several, and crucially the *next* call depends on what the *last* one returned: look
 up a user's account, then, based on what you find, issue a refund or escalate. An
 **agent** is what you get when you put the model in a loop, letting it call a tool,
-see the result, and decide what to do next, until it has an answer. The
+see the result, and decide what to do next, until it has an answer<FN n="1" />. The
 [ReAct pattern](E/react-agents) (reason + act) is the simplest such loop, and writing
-it by hand demystifies every agent framework.
+it by hand demystifies every agent framework<FN n="2" />.
 
 ## Thought, Action, Observation
 
@@ -87,3 +87,8 @@ The agent chains two tool calls, each using the previous observation, and stops 
 its own once it can answer, all inside a `for` loop with a step cap. This hand-written
 loop is exactly what production frameworks wrap in nicer abstractions; the next lesson
 asks what [those frameworks](agent-frameworks) actually add.
+
+<Footnotes>
+  <FNItem n="1">**Yao, S., et al.** (2023). "ReAct: synergizing reasoning and acting in language models". *ICLR*. [arXiv:2210.03629](https://arxiv.org/abs/2210.03629). Interleaving reasoning traces with tool actions, the loop built here.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Agents as a model in a tool-calling loop with a step budget.</FNItem>
+</Footnotes>

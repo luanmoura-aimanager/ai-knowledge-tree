@@ -49,7 +49,7 @@ The same `SELECT` can be made physical in different ways, chosen per model by it
   partition logic of a pipeline, expressed declaratively.
 
 Choosing materializations is the main performance lever in a dbt project: views for cheap
-staging logic, tables for frequently-queried marts, incremental for the big event tables.
+staging logic, tables for frequently-queried marts, incremental for the big event tables<FN n="1" />.
 
 ```mermaid
 graph LR
@@ -72,6 +72,11 @@ browsable lineage graph showing exactly which sources feed which marts.
 
 Put together, `ref`-inferred DAG, per-model materializations, and built-in tests and docs,
 dbt makes warehouse transformations version-controlled, tested, and traceable, which is why
-it anchors the analytics-engineering workflow. Transformations assume the data already
+it anchors the analytics-engineering workflow<FN n="2" />. Transformations assume the data already
 arrived correctly; guaranteeing *that* at the boundary is the job of
 [data contracts](data-contracts).
+
+<Footnotes>
+  <FNItem n="1">**Armbrust, M., Ghodsi, A., Xin, R., & Zaharia, M.** (2021). "Lakehouse: a new generation of open platforms that unify data warehousing and advanced analytics". *CIDR*. Motivates the warehouse-as-tables substrate dbt models build on.</FNItem>
+  <FNItem n="2">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. The analytics-engineering workflow and the transformation layer in the data-engineering lifecycle.</FNItem>
+</Footnotes>

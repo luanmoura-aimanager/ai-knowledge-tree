@@ -16,7 +16,7 @@ billing tools; otherwise to support), they loop back (retrieve, check if the con
 is sufficient, retrieve again if not), and they sometimes pause to wait for a human to
 approve an action. Expressing that as a linear chain becomes a tangle of conditionals.
 **LangGraph** models the agent as an explicit **state machine** instead, which makes
-the control flow a first-class, inspectable object.
+the control flow a first-class, inspectable object<FN n="1" />.
 
 ## Nodes, edges, state, and routers
 
@@ -72,7 +72,7 @@ Three properties fall out of making the control flow explicit. **Cycles are
 first-class**: a loop is just an edge pointing back, so retrieve-check-retrieve needs
 no special casing. **The structure is inspectable**: because the graph is a data
 object, you can visualize it, test each node in isolation, and reason about every path
-the agent can take, instead of tracing nested `if`s. And **checkpointing is natural**:
+the agent can take, instead of tracing nested `if`s<FN n="2" />. And **checkpointing is natural**:
 since all the work lives in the shared state, the framework can snapshot that state
 between nodes, which is what lets a graph *pause* for human approval and *resume*
 later, or recover from a crash mid-run.
@@ -83,3 +83,8 @@ auditable, human-in-the-loop workflows stay manageable. With the agent-building 
 in hand (RAG, tools, the loop, frameworks, graphs), the next subsection steps up to
 *systems thinking*: how these agents talk to the outside world through a standard
 protocol, [MCP](J2/mcp-protocol).
+
+<Footnotes>
+  <FNItem n="1">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Branching, looping, and human-in-the-loop control flow in agent systems.</FNItem>
+  <FNItem n="2">**Yao, S., et al.** (2023). "ReAct: synergizing reasoning and acting in language models". *ICLR*. [arXiv:2210.03629](https://arxiv.org/abs/2210.03629). The reason-act loop that each graph node and router generalizes.</FNItem>
+</Footnotes>

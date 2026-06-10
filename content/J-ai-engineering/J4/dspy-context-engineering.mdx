@@ -23,7 +23,7 @@ The core idea is a change of what you specify by hand. In DSPy you declare the *
 of a step, its inputs and outputs (a **signature**, like `question -> answer`), and the
 *control flow* (retrieve, then reason, then answer). What you do **not** write is the
 exact prompt text, the phrasing, the instructions, the few-shot examples. Those are
-treated as **parameters** to be filled in by an optimizer.
+treated as **parameters** to be filled in by an optimizer<FN n="1" />.
 
 ```mermaid
 graph LR
@@ -35,7 +35,7 @@ graph LR
 
 An **optimizer** then "compiles" the program: given a handful of training examples and a
 [metric](J2/llm-as-judge) (could be exact match, or an LLM judge), it searches over prompt
-phrasings and, crucially, *selects which examples to include as few-shot demonstrations*,
+phrasings and, crucially, *selects which examples to include as few-shot demonstrations*<FN n="2" />,
 keeping the choices that score best on the metric. The output is a concrete, tuned prompt,
 but you arrived at it by measurement, not vibes.
 
@@ -60,3 +60,8 @@ The takeaway is not "use DSPy specifically" but the principle it embodies: the p
 the context are parameters of your system, and parameters should be optimized against a
 metric, not hand-set. The next lesson scales the *structure* the same way, coordinating
 several models with [multi-agent orchestration](multi-agent-orchestration).
+
+<Footnotes>
+  <FNItem n="1">**Khattab, O., et al.** (2024). "DSPy: compiling declarative language model calls into self-improving pipelines". *ICLR.* [arXiv:2310.03714](https://arxiv.org/abs/2310.03714)</FNItem>
+  <FNItem n="2">**Brown, T. B., et al.** (2020). "Language models are few-shot learners". *NeurIPS.* [arXiv:2005.14165](https://arxiv.org/abs/2005.14165). In-context demonstrations as the unit DSPy optimizes over.</FNItem>
+</Footnotes>

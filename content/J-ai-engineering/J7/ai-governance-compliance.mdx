@@ -14,7 +14,7 @@ An AI system that processes personal data is subject to data-protection law, GDP
 in Brazil, and similar regimes elsewhere, and these are engineering requirements, not just legal
 paperwork. They constrain what you may store, where, for how long, and what you must be able to do
 on request. An architect designs the controls in from the start, because retrofitting deletion or
-audit trails into a system that was not built for them is painful and often infeasible. Four
+audit trails into a system that was not built for them is painful and often infeasible<FN n="1" />. Four
 obligations have the most direct architectural impact.
 
 ## The obligations that shape the architecture
@@ -34,7 +34,7 @@ obligations have the most direct architectural impact.
   track *where every piece of personal data flows* so it can be found and removed, which is why
   data lineage is a compliance feature, not just an analytics nicety.
 - **Auditability of automated decisions.** When an AI system makes a decision that affects someone
-  (a loan, a hiring screen), regimes grant rights to an explanation and to human review. The system
+  (a loan, a hiring screen), regimes grant rights to an explanation and to human review<FN n="2" />. The system
   must therefore **log its decisions and their inputs** in an immutable [audit trail](J3/observability-tracing),
   so any decision can be reconstructed and justified after the fact.
 
@@ -56,3 +56,8 @@ may even carry. An architect who treats these as first-class requirements, along
 designs a system that can satisfy a regulator and a deletion request without a rebuild. Governance also
 covers *safety* obligations, the duty to test the system against misuse, which the next lesson scales up
 as [red teaming](red-teaming-at-scale).
+
+<Footnotes>
+  <FNItem n="1">**NIST.** (2023). *Artificial Intelligence Risk Management Framework (AI RMF 1.0).* NIST AI 100-1. [doi:10.6028/NIST.AI.100-1](https://doi.org/10.6028/NIST.AI.100-1). Govern/map/measure/manage functions that make compliance a design input.</FNItem>
+  <FNItem n="2">**European Parliament and Council.** (2024). "Regulation (EU) 2024/1689 (Artificial Intelligence Act)". *Official Journal of the European Union*. Risk tiers, transparency, and human-oversight duties for automated decisions.</FNItem>
+</Footnotes>

@@ -23,7 +23,7 @@ A cascade arranges models from cheap to expensive and tries them in order. Run t
 model first; if its answer is good enough, stop, otherwise **escalate** to the next model
 up. The decision uses a **confidence signal**: the cheap model's own probability, a judge
 score, or a difficulty estimate. When confidence clears a threshold, accept the cheap
-answer; when it does not, escalate.
+answer; when it does not, escalate<FN n="1" />.
 
 ```mermaid
 graph LR
@@ -50,7 +50,7 @@ caching** stores the response for a given prompt and returns it instantly on a r
 further: it embeds the query and returns a cached answer if a *semantically similar* prior
 query exists (cosine similarity above a threshold), catching paraphrases that exact match
 misses. Each cache hit is a model call avoided, latency and cost both going to near zero,
-at the risk of a stale or slightly-off answer if the similarity threshold is too loose.
+at the risk of a stale or slightly-off answer if the similarity threshold is too loose<FN n="2" />.
 
 ## Worked example
 
@@ -87,3 +87,8 @@ The cascade reaches $98\%$ of the strong model's accuracy at $55\%$ of its cost 
 the premium only on the $45\%$ of queries the router flags as hard. Routing and caching
 close the advanced-patterns subsection; the next subsection drops back down to the data
 platform that feeds all of this, starting with [dbt](J5/dbt-transformations).
+
+<Footnotes>
+  <FNItem n="1">**Chen, L., Zaharia, M., & Zou, J.** (2023). "FrugalGPT: how to use large language models while reducing cost and improving performance". [arXiv:2305.05176](https://arxiv.org/abs/2305.05176). The LLM cascade and cost-quality tradeoff.</FNItem>
+  <FNItem n="2">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Routing, caching, and inference cost optimization.</FNItem>
+</Footnotes>
