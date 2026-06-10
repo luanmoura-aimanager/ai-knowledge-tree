@@ -27,7 +27,13 @@ import type { ReactNode } from "react";
 /** Normalize the string/number props into a list of citation numbers. */
 function toList(n?: string | number, ns?: string | number[]): number[] {
   if (ns !== undefined) {
-    const arr = Array.isArray(ns) ? ns : String(ns).split(/[,\s]+/);
+    // filter(Boolean) drops empty tokens from leading/trailing/double separators
+    // BEFORE Number(), since Number("") is 0 (finite) and would leak a stray [0].
+    const arr = Array.isArray(ns)
+      ? ns
+      : String(ns)
+          .split(/[,\s]+/)
+          .filter(Boolean);
     return arr.map(Number).filter((k) => Number.isFinite(k));
   }
   if (n !== undefined && n !== "") {

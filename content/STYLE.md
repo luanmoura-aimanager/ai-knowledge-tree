@@ -347,7 +347,8 @@ Rules:
 - **Entry format:** `**Authors** (Year). "Paper title"` or `*Book title*`,
   optional `§`. `Venue.` then a link: `[arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX)`
   or `[doi:10.…](https://doi.org/10.…)`. A short trailing context note is
-  optional. Authors render bold, book/journal titles italic.
+  optional; separate it with a period, **never the banned `—`** (§2.1).
+  Authors render bold, book/journal titles italic.
 - **2–5 references per lesson** is the norm: a canonical textbook plus the
   seminal paper(s) for the concept. `codeExempt`/infra lessons may cite
   standards, official docs, or books.
