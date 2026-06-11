@@ -203,11 +203,29 @@ than re-teaching it.
    ("Step 1 — …", "Step 2 — …"). The goal is that the reader can follow each move
    without filling a gap themselves. State what each step uses (which axiom, which
    prior result).
-4. **Worked code at the end.** Close with a runnable `python` (numpy-first) block
+4. **Ground it in concrete examples.** A definition plus its derivation is not
+   yet intuition. After introducing a quantity, show it on instances the reader
+   already has a feel for, with the numbers computed. Three patterns earn their
+   space (the canonical reference is `A-foundations/A2/entropy.mdx`):
+   - **A magnitude scale**: several familiar events spanning the quantity's range
+     (sunrise ≈ 0 bits of surprise, fair coin = 1, lottery win ≈ 28), so the
+     reader calibrates what small and large mean.
+   - **A contrasting pair**: two cases identical except for the property being
+     taught (a desert city at 0.08 bits of entropy vs a coin-flip city at 1 bit),
+     so the property, not the setting, explains the difference.
+   - **A named confusion**: when two nearby quantities are routinely conflated
+     (surprise of one outcome vs entropy of the distribution), state the
+     confusion explicitly and pick the example where they point in opposite
+     directions.
+   Every number quoted in an example must be correct; tie it to the closing code
+   block where one exists so the reader can reproduce it. Format example sets as
+   bullet lists, not pipe tables: the MDX pipeline has no `remark-gfm`, so tables
+   render as raw text.
+5. **Worked code at the end.** Close with a runnable `python` (numpy-first) block
    that *checks* the lesson's claims on real arrays, plus one sentence tying the
    output back to the math. Math is primary; code confirms it. Conceptual lessons
    with no code surface set `codeExempt: true` and skip this.
-5. **Hand off.** End with one sentence pointing to what the next lesson builds.
+6. **Hand off.** End with one sentence pointing to what the next lesson builds.
 
 ### 6.3 Rigor without dryness
 
