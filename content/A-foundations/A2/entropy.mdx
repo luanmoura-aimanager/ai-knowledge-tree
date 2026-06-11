@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: entropy
 order: 14
-estimatedMinutes: 20
+estimatedMinutes: 24
 goal: "Define entropy as expected surprise and derive its basic properties."
 prerequisites: ["common-distributions"]
 ---
@@ -30,6 +30,25 @@ you by $I(p_1) + I(p_2)$. Since the joint probability is $p_1 p_2$, the function
 satisfy $I(p_1 p_2) = I(p_1) + I(p_2)$, and the logarithm is the function that turns
 products into sums. With $\log_2$, surprise is in **bits**.
 
+A good mental hook: surprise measures **newsworthiness**, how much you learn when
+one specific outcome actually happens. Some real-world magnitudes:
+
+- **The sun rose this morning.** $p \approx 1$, so $I \approx 0$ bits. You learned
+  nothing; nobody reports it.
+- **A fair coin landed heads.** $p = 1/2$, so $I = 1$ bit, the unit itself.
+- **Two dice came up snake eyes.** $p = 1/36$, so $I = \log_2 36 \approx 5.2$ bits.
+  Noteworthy at the table, not in the paper.
+- **You won a national lottery.** $p \approx 3 \times 10^{-9}$ (about one in 300
+  million), so $I \approx 28$ bits. Front-page news, precisely because it was so
+  improbable.
+
+The additivity requirement is easy to sanity-check on the coin: two heads in a row
+has probability $\tfrac12 \cdot \tfrac12 = \tfrac14$, and your surprise is
+$1 + 1 = 2$ bits; indeed $-\log_2 \tfrac14 = 2$. And a "bit" itself has an
+operational reading: an event of probability $1/8$ carries $\log_2 8 = 3$ bits
+because learning it happened is like learning which of $8$ equally likely doors
+opened, which takes exactly three yes/no questions.
+
 ## Entropy
 
 The **entropy** of a discrete distribution $p$ is the expected surprise<FN n="3" />:
@@ -40,7 +59,30 @@ $$
 
 with the convention $0 \log 0 = 0$ (vanishingly rare outcomes contribute nothing).
 With $\log_2$ it is in bits; with natural log, in nats. Entropy is a property of the
-distribution, not of any particular outcome.
+distribution, not of any particular outcome: it asks not "how surprised am I by
+*this* event?" but "how surprised am I *on average*, draw after draw?"
+
+Compare the weather in two cities. In a **desert city**, $P(\text{sun}) = 0.99$ and
+$P(\text{rain}) = 0.01$. Almost every morning you look outside and learn essentially
+nothing ($I \approx 0.014$ bits); once in a hundred days you are quite surprised
+($I = \log_2 100 \approx 6.6$ bits), but that almost never happens. The average is
+
+$$
+H \approx 0.99 \times 0.014 + 0.01 \times 6.6 \approx 0.08 \text{ bits}.
+$$
+
+The weather there is *boring*: low entropy. In a **coin-flip city** with
+$P(\text{sun}) = P(\text{rain}) = 0.5$, every single morning is a genuine coin toss
+worth one full bit: $H = 1$ bit, the most unpredictable a two-outcome source can be.
+
+This averaging resolves a confusion worth naming explicitly: **a rare event has huge
+surprise but contributes almost nothing to entropy**, because entropy weights each
+surprise by how often it occurs, and $p \log\frac{1}{p} \to 0$ as $p \to 0$ (that is
+exactly the $0 \log 0 = 0$ convention at work). The lottery is the extreme case:
+winning is a 28-bit shock, yet the lottery as a distribution has nearly zero entropy
+(about $10^{-7}$ bits), because the outcome is almost always the utterly
+unsurprising "you lost." High surprise describes one outcome; high entropy describes
+an unpredictable source. They can point in opposite directions.
 
 ## The binary entropy function
 
@@ -92,7 +134,7 @@ def H_bits(p):
     nz = p[p > 0]                       # skip zero-probability outcomes
     return -np.sum(nz * np.log2(nz))
 
-for q in [0.0, 0.1, 0.5, 0.9, 1.0]:
+for q in [0.0, 0.1, 0.5, 0.9, 0.99, 1.0]:    # 0.99 = the desert city
     dist = np.array([q, 1 - q])
     print(f"H(Bernoulli({q})) = {H_bits(dist):.4f} bits")
 
