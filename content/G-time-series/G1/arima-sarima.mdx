@@ -74,6 +74,17 @@ likelihood and penalize parameters; BIC penalizes harder for large $n$, so it
 favours sparser models. Automatic order selection (the auto-ARIMA procedure)
 searches over $(p, d, q)(P, D, Q)$ and returns the minimizer<FN n="2" />.
 
+The split between the two criteria is concrete once the per-parameter penalty is
+written out. Each extra parameter costs $2$ under AIC, but $\ln n$ under BIC, so the
+two agree only at $n = e^2 \approx 7.4$ and diverge from there. With $n = 100$ daily
+points, adding one AR lag must raise $-2\ln\hat L$ by more than $2$ to be worth it
+under AIC, but by more than $\ln 100 \approx 4.6$ under BIC: more than twice the
+evidence. At $n = 1000$ the BIC bar is $\ln 1000 \approx 6.9$ against AIC's flat $2$.
+So on a long series the criteria routinely disagree: a fifth seasonal term that AIC
+keeps (likelihood gain of $3$ clears its threshold of $2$) is dropped by BIC (the
+same gain of $3$ misses BIC's $6.9$), which is the precise sense in which BIC runs
+leaner.
+
 ![ARIMA differences a series to stationarity, fits its AR/MA structure, then integrates back; the forecast continues the trend with an interval that widens as the horizon grows.](/figures/G1/arima-sarima.svg)
 
 ## Forecasting

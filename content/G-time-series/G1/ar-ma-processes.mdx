@@ -80,6 +80,26 @@ $\gamma(0)$ gives the ACF recursion. For AR(1) this yields $\rho(h) = \phi^h$, t
 geometric decay seen in the first lesson: the ACF tails off rather than cutting
 off, which is the AR signature.
 
+## Reading the two signatures off the numbers
+
+The contrast that identifies a model is cleanest when the two ACFs sit side by side
+on the same lags. The MA cut-off and the AR tail-off are routinely conflated until
+you compute them:
+
+- **MA(1), $\theta = 0.8$.** Only lag 1 survives: $\rho(1) = 0.8 / (1 + 0.8^2) = 0.488$,
+  and $\rho(2) = \rho(3) = \rho(4) = 0$. The correlation is nonzero at lag 1 and then
+  drops to exactly zero, a hard edge.
+- **AR(1), $\phi = 0.6$.** Every lag is nonzero, shrinking geometrically as $\phi^h$:
+  $\rho(1) = 0.6$, $\rho(2) = 0.36$, $\rho(3) = 0.216$, $\rho(4) = 0.130$. No lag is
+  ever exactly zero; the tail just fades.
+
+The diverging case to watch is lag 2. The MA(1) has already cut off ($\rho(2) = 0$)
+while the AR(1) still carries $\rho(2) = 0.36$, a third of its lag-1 value. A single
+strong lag with nothing after it reads MA; a smooth decay that never quite reaches
+zero reads AR. Stronger persistence stretches the AR tail further: an AR(1) with
+$\phi = 0.9$ keeps $\rho(4) = 0.656$, so it is still strongly correlated four steps
+out where the MA(1) has long since vanished.
+
 ## Stationarity and invertibility through the characteristic roots
 
 Write the AR(p) with the lag operator $L$, defined by $L X_t = X_{t-1}$:

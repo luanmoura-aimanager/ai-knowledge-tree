@@ -36,6 +36,20 @@ geometrically. The weights sum to one (a geometric series with ratio $1-\alpha$)
 so the forecast is a proper weighted average. A large $\alpha$ tracks recent
 changes fast; a small $\alpha$ smooths heavily.
 
+Two settings make "fast" and "heavy" concrete. The weights on the three most
+recent observations (lags $k = 0, 1, 2$) and the **half-life** (the lag at which
+the cumulative weight first reaches $\tfrac12$) are:
+
+- **$\alpha = 0.4$ (responsive):** weights $0.400,\ 0.240,\ 0.144$, so the last
+  three points already carry $0.784$ of the total weight, and the half-life is
+  $1$ lag. The forecast is essentially the last point or two.
+- **$\alpha = 0.1$ (smooth):** weights $0.100,\ 0.090,\ 0.081$, so the last three
+  points carry only $0.271$, and the half-life stretches to $6$ lags. The forecast
+  averages over a much longer window and barely reacts to a single new value.
+
+Same recursion, same geometric decay; the one parameter $\alpha$ moves the
+effective memory from one step to six.
+
 ## Holt's method: adding a trend
 
 A level alone produces a flat forecast. Holt's linear method adds a second

@@ -70,6 +70,18 @@ target minus the slack $k$: while the process is on target the increment is
 negative and the chart stays near zero; once the mean shifts past $k$ the increments
 turn positive and the chart ramps to the threshold $h$.
 
+This is where a sequential detector pulls away from any point test, and it is worth
+making the gap concrete. Take a one-sigma shift, $\mu_0 = 0 \to 1$ with
+$\sigma = 1$. A single-point $3\sigma$ rule fires on a post-shift point only when
+$x_t > 3$, i.e. $P(\mathcal{N}(1,1) > 3) \approx 0.023$: about 1 shifted point in 44,
+barely above the $0.0027$ in-control rate, so on its own it stays silent through
+almost the entire shifted stretch. CUSUM instead banks the shift every step. With
+$k = 0.5$, the expected post-shift increment is $\delta - k = 0.5$ per step, so the
+statistic climbs at half a unit per observation and reaches $h = 8$ in roughly
+$16$ steps regardless of whether any individual point ever looks extreme. The point
+test asks "is *this* value far?"; CUSUM asks "has the running total drifted?", and
+for a sub-threshold shift those questions diverge.
+
 ![CUSUM accumulates how far each point sits above the expected mean; it hovers near zero while in control, then drifts steadily after a mean shift until it crosses a threshold, flagging the change.](/figures/G4/cusum-changepoint.svg)
 
 ## Tuning the trade-off
