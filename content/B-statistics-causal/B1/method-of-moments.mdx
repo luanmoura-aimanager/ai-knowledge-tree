@@ -57,7 +57,13 @@ $$
 \hat\alpha = \frac{\hat\mu_1^2}{\hat\sigma^2}, \qquad \hat\beta = \frac{\hat\mu_1}{\hat\sigma^2}.
 $$
 
-These are explicit formulas: no iteration needed.
+These are explicit formulas: no iteration needed. Putting numbers through them
+makes the mechanic concrete. Draw $n = 500$ samples from $\mathrm{Gamma}(\alpha=3,
+\beta=2)$, the setting in the code below. The sample mean is $\hat\mu_1 = 1.438$
+and the sample variance is $\hat\sigma^2 = 0.670$. The two formulas then read off
+the estimates directly: $\hat\alpha = 1.438^2 / 0.670 = 3.09$ and $\hat\beta =
+1.438 / 0.670 = 2.15$, against the true $(3, 2)$. No likelihood was written, no
+optimizer run; two sample summaries went in and two parameter estimates came out.
 
 **MLE for the Gamma** requires numerically solving $\log\hat\alpha - \psi(\hat\alpha)
 = \log\hat\mu_1 - \widehat{\log X}$, where $\psi$ is the digamma function. The MoM

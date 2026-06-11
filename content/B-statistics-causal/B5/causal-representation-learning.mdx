@@ -140,10 +140,24 @@ print(f"\nCausal feature coefficient: {model_X.coef_[0]:.4f}  (true: 2.0)")
 print(f"Spurious feature is stable: no, its correlation with Y changes across envs")
 ```
 
-The causal model (using $X$) has stable test error across environments; the
-spurious model (using $S$) has low training error but higher test error when the
-distribution shifts, demonstrating why causal features generalize and spurious
-correlates do not.
+Reading the four numbers this code prints makes the point and warns against a
+common confusion. Raw accuracy on a single environment does not certify a feature
+as causal: the spurious feature $S$ posts a *lower* MSE than the causal $X$ in both
+environments ($0.35$ vs $1.11$ on env 1, $0.55$ vs $1.03$ on env 2), because $S$
+sits downstream of $Y$ and so tracks it tightly in-sample. What separates them is
+behaviour under the shift, not the level of the error:
+
+- **Causal feature $X$:** MSE $1.11 \to 1.03$ as $p(X)$ shifts, a change of $-7\%$.
+  Flat, because the recovered coefficient ($1.9995$) matches the true mechanism
+  $p(Y \mid X)$, which the shift left untouched.
+- **Spurious feature $S$:** MSE $0.35 \to 0.55$, a $+59\%$ jump, because the
+  $S$-to-$Y$ association is induced by $Y$'s distribution, and shifting $p(X)$
+  shifts $p(Y)$ with it.
+
+The lesson is that you cannot rank a causal and a spurious feature by their error on
+one environment; you rank them by how that error moves across environments. The
+causal feature's error is invariant, which is the property IRM and SMS are built to
+detect.
 
 This lesson closes pillar B. The causal inference thread connects forward to
 pillar F (probabilistic graphical models and VI/MCMC) and backward to pillar A

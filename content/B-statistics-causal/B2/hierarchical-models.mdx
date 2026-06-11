@@ -77,6 +77,22 @@ small ($n_j$ small) or the between-group variance $\tau^2$ is large relative to
 within-group variance<FN n="2" />. When $n_j \to \infty$, $\lambda_j \to 0$ and the estimate
 is the group mean.
 
+A contrasting pair pins down how much "small" matters. Fix the variances at the
+values used in the code below, $\sigma = 15$ (within group) and $\tau = 10$
+(between group), with population mean $\mu = 50$, and consider two schools that
+both posted the same raw average $\bar Y_j = 65$, fifteen points above the
+population mean. The only difference is sample size.
+
+- **Small school, $n_j = 5$:** $\lambda_j = \frac{225/5}{225/5 + 100} = \frac{45}{145} = 0.31$.
+  Its estimate is $0.69 \times 65 + 0.31 \times 50 = 60.3$, pulled a third of the
+  way back toward the population mean.
+- **Large school, $n_j = 40$:** $\lambda_j = \frac{225/40}{225/40 + 100} = \frac{5.625}{105.6} = 0.053$.
+  Its estimate is $0.947 \times 65 + 0.053 \times 50 = 64.2$, barely moved.
+
+Same observed average, same model; the small school's 65 is treated as mostly noise
+and discounted, while the large school's 65 is trusted as signal. Shrinkage is the
+model distrusting an estimate in proportion to how little data backs it.
+
 ![Partial pooling shrinks each group's estimate toward the global mean by an amount set by its sample size: small groups borrow the most strength.](/figures/B2/hierarchical-models.svg)
 
 ## Implementation
