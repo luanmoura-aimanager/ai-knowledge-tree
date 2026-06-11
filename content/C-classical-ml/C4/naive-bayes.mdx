@@ -74,6 +74,18 @@ But the **argmax** is often correct: even badly calibrated probabilities can
 rank classes correctly. NB is therefore a strong classifier and a weak
 probability estimator<FN n="3" />.
 
+The split between these two is the confusion worth pinning down, because the
+posterior and the decision can diverge sharply. Take a spam filter where two
+features fire together, the words "free" and "gratis", which co-occur almost
+perfectly. With equal priors and each feature carrying a likelihood ratio
+$\Pr(x_j \mid \text{spam}) / \Pr(x_j \mid \text{ham}) = 4$, NB multiplies them
+as if independent, combined ratio $4 \times 4 = 16$, giving posterior
+$16 / 17 \approx 0.94$. The honest answer treats the duplicated word as one
+piece of evidence, ratio $4$, posterior $4 / 5 = 0.8$. The probability is
+inflated by double-counting, but **both clear $0.5$, so the argmax is spam
+either way**. The decision survives the modeling error the calibrated
+probability does not.
+
 When calibration matters (decisions weighted by probability), recalibrate
 with Platt scaling or isotonic regression (the calibration lesson in C10).
 

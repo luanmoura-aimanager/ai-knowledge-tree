@@ -77,6 +77,16 @@ would be more expressive but cannot precompute item embeddings<FN n="2" />: ever
 (user, item) pair needs a forward pass at serving time. For a catalog of
 millions of items per query, this is too slow.
 
+The cost gap is concrete. For a catalog of $M = 10^6$ items, the
+cross-feature model needs one forward pass per (user, item) pair, so
+$10^6$ network evaluations per query. The two-tower model runs the user
+tower once, then searches a precomputed index: an HNSW graph reaches the
+top matches in a few hundred distance comparisons, scaling like $\log M$
+rather than $M$ ($\log_2 10^6 \approx 20$). Even brute-force scoring against
+the precomputed item embeddings is $M$ cheap dot products, not $M$ full
+forward passes. The dot-product score is what makes the index possible, so
+it is non-negotiable.
+
 Two-tower is the design that gives you neural expressiveness in the towers
 *and* sub-linear retrieval via ANN at serving time. It is the dominant
 architecture for industrial-scale recommendation **retrieval** (the first

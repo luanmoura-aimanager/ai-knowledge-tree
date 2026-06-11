@@ -54,6 +54,20 @@ It is the MSE of probability predictions and decomposes into reliability
 + resolution + uncertainty. Lower is better. Brier penalizes both poor
 calibration and poor accuracy.
 
+## Calibration is not ranking
+
+The confusion worth naming: a model can rank perfectly and still be badly
+calibrated, because ranking only cares about the *order* of scores while
+calibration cares about their *level*. Take a calibrated model whose output
+is the true probability $p$, and a second model that reports
+$\sigma(3s)$ on the same logit $s$. The second is a monotone reshaping of
+the first, so it preserves order: both score the identical AUC of $0.858$
+on the synthetic data below. Yet on the items the second model rates near
+$0.91$, the actual positive rate is only $0.68$, and on the items it rates
+above $0.95$, the actual rate is $0.86$. Its Brier score is $0.176$ against
+the calibrated $0.152$. The ranking metric cannot see this gap; the
+reliability diagram and Brier score can.
+
 ## Why classifiers come out miscalibrated
 
 - **Random forests**: probabilities are averages of leaf frequencies,

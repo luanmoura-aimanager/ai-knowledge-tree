@@ -33,6 +33,24 @@ Three regimes:
 
 The total violation $\sum_i \xi_i$ should be small.
 
+The slack is the margin shortfall, so its size reads off directly from the
+signed margin $z_i = y_i(w^\top x_i + b)$, which is $\xi_i = \max(0, 1 - z_i)$.
+Several points spanning the range, to fix what a unit of slack means:
+
+- A confidently correct point at $z = 2.0$ sits well outside the margin:
+  $\xi = 0$. No penalty.
+- A point right on the margin, $z = 1.0$: $\xi = 0$. The constraint binds but
+  is not violated.
+- A point inside the margin band but still on the correct side, $z = 0.4$:
+  $\xi = 0.6$.
+- A point on the decision boundary, $z = 0$: $\xi = 1.0$. Slack of exactly one
+  marks the boundary between "inside the margin" and "misclassified".
+- A point misclassified with room, $z = -1.5$: $\xi = 2.5$. Slack grows without
+  bound as a point moves deeper onto the wrong side.
+
+The $C\sum_i \xi_i$ term sums these, so the objective pays $C$ per unit of this
+shortfall.
+
 ## The QP
 
 $$

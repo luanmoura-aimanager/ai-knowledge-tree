@@ -75,7 +75,20 @@ $$
 $$
 
 The $n - d$ correction accounts for the degrees of freedom lost to fitting $d$
-coefficients.
+coefficients. The two estimators differ by the factor $(n - d)/n$, which is the
+fraction by which the MLE underestimates on average, so the gap is a story about
+sample size. Fitting $d = 3$ coefficients:
+
+- $n = 10$: factor $7/10 = 0.7$, the MLE runs about $30\%$ low. With ten points
+  and three coefficients, three of the residuals are nearly forced to zero, and
+  dividing by $n$ ignores that.
+- $n = 50$: factor $47/50 = 0.94$, a $6\%$ underestimate.
+- $n = 500$ (the code block's size): factor $497/500 \approx 0.994$, under $1\%$.
+  The correction barely moves the answer here, which is why the two printed
+  variances come out close.
+
+The correction matters when $d$ is a real fraction of $n$ and is negligible when
+$n \gg d$.
 
 ## Why this matters
 

@@ -42,6 +42,19 @@ The objective is invariant under positive scaling of $(w, b)$, so fix the scale
 by requiring the closest point to satisfy $y_i(w^\top x_i + b) = 1$. Then
 $\gamma = 1/\lVert w\rVert$, and maximizing $\gamma$ is minimizing $\lVert w\rVert$.
 
+The scaling invariance is worth pinning down, because two "margins" are easy to
+conflate. The **functional margin** $y_i(w^\top x_i + b)$ is the raw score; the
+**geometric margin** divides it by $\lVert w\rVert$ and is the actual distance.
+Take the hyperplane $w = (1, 0)$, $b = 0$ and a point at $x = (2, 0)$: the
+functional margin is $2$ and the geometric margin is $2/\lVert w\rVert = 2$, a
+real distance of two units. Rescale to $w = (5, 0)$ (same hyperplane, the line
+$x_1 = 0$ is unchanged): the functional margin balloons to $10$, but the
+geometric margin is $10/5 = 2$, unchanged. Only the geometric margin means
+anything; the functional one can be inflated to any value by scaling $w$. Pinning
+the closest functional margin to $1$ removes that freedom, after which
+$\gamma = 1/\lVert w\rVert$ reads off the geometric margin directly: $\lVert w\rVert = 2$
+is a margin of $0.5$, $\lVert w\rVert = 0.5$ is a margin of $2$.
+
 ## The hard-margin SVM
 
 $$

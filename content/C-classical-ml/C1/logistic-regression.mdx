@@ -32,6 +32,18 @@ This is the **logit link**. From the exponential-family lesson, the Bernoulli's
 natural parameter *is* the log-odds: the logistic does not just look natural,
 it falls out of the Bernoulli's algebra<FN n="1" />.
 
+The link runs the whole real line into $[0, 1]$, and a few points fix the scale.
+A score of $0$ is the decision boundary, $\sigma(0) = 0.5$. A score of $\pm 2$
+is already fairly confident ($\sigma(2) \approx 0.88$, $\sigma(-2) \approx 0.12$),
+and $\pm 4$ is nearly committed ($\sigma(4) \approx 0.982$). The coefficients act
+on the **odds**, not the probability: with the code block's
+$\beta = (-0.5, 1.5, -1.0, 0.7)$, raising feature 1 by one unit adds $1.5$ to the
+score, which multiplies the odds by $e^{1.5} \approx 4.48$; raising feature 2 by
+one unit subtracts $1.0$, multiplying the odds by $e^{-1.0} \approx 0.37$. The
+same coefficient moves the probability by very different amounts depending on
+where the score starts: near the boundary the sigmoid is steep, out in the tails
+it is flat.
+
 ## The log-likelihood
 
 Treat each example as a Bernoulli trial with success probability

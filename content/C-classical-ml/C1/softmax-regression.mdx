@@ -44,6 +44,22 @@ $$
 The log-sum-exp form is exactly the **stable softmax** of the numerical-methods
 lesson; production code always shifts by the maximum before exponentiating.
 
+A few score vectors over three classes make the scale concrete (true class is
+class 0 throughout, so the per-example loss is $-\log p_0$):
+
+- **Confident and right.** Scores $(4, 1, 0)$ softmax to $(0.936, 0.047, 0.017)$.
+  The model puts $94\%$ on the true class, paying loss $-\log 0.936 = 0.066$ nats.
+- **Hesitant.** Scores $(1, 0.5, 0)$ give $(0.506, 0.307, 0.186)$: a bare majority
+  on the true class, loss $-\log 0.506 = 0.68$ nats, ten times the confident case.
+- **No opinion.** Scores $(0, 0, 0)$ give the uniform $(0.333, 0.333, 0.333)$,
+  loss $-\log \tfrac13 = 1.099$ nats, the most a three-class model can pay while
+  still ranking the truth first.
+
+The overparameterization from the model section shows up here as shift
+invariance: adding $10$ to every score, $(14, 11, 10)$, leaves the softmax at
+$(0.936, 0.047, 0.017)$ unchanged, since the shared constant cancels in the
+ratio. Only the **differences** between scores carry information.
+
 ## Gradient
 
 The gradient with respect to $\beta_k$ has a clean form:
