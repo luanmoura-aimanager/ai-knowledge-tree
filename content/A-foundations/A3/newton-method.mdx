@@ -60,6 +60,22 @@ roughly doubles per iteration. This **quadratic** rate is far faster than the li
 rate of gradient descent, but it is **local**: it holds only once the iterate is close
 enough that the quadratic model is trustworthy.
 
+To see "doubling digits" as real numbers, run the closing block's example
+($f(x) = \sum_i (x_i - \log x_i)$, minimized at the all-ones point). Once the iterate
+enters the basin, the error norm and its accurate-digit count ($-\log_{10}$ error)
+fall as:
+
+- step 4: error $\approx 2.8 \times 10^{-2}$, about $1.6$ digits.
+- step 5: error $\approx 7.9 \times 10^{-4}$, about $3.1$ digits.
+- step 6: error $\approx 6.3 \times 10^{-7}$, about $6.2$ digits.
+
+Each step nearly doubles the digit count ($1.6 \to 3.1 \to 6.2$), the signature of a
+quadratic rate. The contrast is sharp against gradient descent on the identical
+problem from the identical start: with $\eta = 0.4$ it decays linearly and still sits
+at error $\approx 1.2 \times 10^{-1}$ at step 6, where Newton has reached $10^{-7}$.
+Same function, same starting point; the curvature information is the whole
+difference.
+
 ![Near the optimum Newton's method converges quadratically: the error roughly squares each step, plunging far faster than gradient descent's linear rate.](/figures/A3/newton-method.svg)
 
 ## Practical cautions

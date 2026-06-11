@@ -72,6 +72,21 @@ mechanically: the prox step zeroes out small coordinates each iteration. Proxima
 gradient descent with this prox is **ISTA**, the iterative soft-thresholding algorithm
 for LASSO.
 
+Watching the operator act on a few coordinates makes the two behaviors concrete. With
+threshold $t = \eta\lambda = 0.5$:
+
+- A large coordinate $v = 2.0$ survives but is pulled in: $\operatorname{sign}(2.0)\max(2.0 - 0.5,\,0) = 1.5$.
+- A mid coordinate $v = 0.8$ takes the same fixed $0.5$ cut, dropping to $0.3$. The
+  shrinkage is the same absolute amount, so it bites hardest in relative terms here.
+- A small coordinate $v = 0.3$ falls below the threshold and is set to $0$.
+- The sign carries through unchanged: $v = -1.2$ maps to $-0.7$, and $v = -0.4$ maps
+  to $0$.
+
+Contrast this with the gradient step on a smooth L2 penalty, which would scale every
+coordinate by a factor like $0.9$: the small $0.3$ would become $0.27$, still nonzero.
+Soft-thresholding subtracts a constant instead of scaling, and that constant is what
+pushes small coordinates to exact zero rather than merely shrinking them.
+
 ![The proximal operator of the L1 norm is soft-thresholding: it shrinks each coordinate toward zero by λ and clamps small ones exactly to zero, creating sparsity.](/figures/A3/proximal-methods.svg)
 
 ## Check it on arrays

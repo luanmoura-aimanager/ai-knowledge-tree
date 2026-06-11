@@ -91,6 +91,16 @@ together; negative means opposite; and **independence implies zero covariance**
 covariance does not imply independence, because covariance only sees linear
 structure.
 
+That last point names a confusion worth pinning to a concrete case, since "zero
+covariance" and "independent" are routinely treated as the same thing. Take $X$
+uniform on $\{-1, 0, 1\}$ and set $Y = X^2$. Here $Y$ is a deterministic function
+of $X$ (the strongest possible dependence: observe $X$ and you know $Y$ exactly),
+yet $\mathbb{E}[X] = 0$, $\mathbb{E}[XY] = \mathbb{E}[X^3] = 0$, so
+$\operatorname{Cov}(X, Y) = 0 - 0 \cdot \tfrac{2}{3} = 0$. The covariance is blind
+to this dependence because the dependence is curved, not linear: $X$ and $-X$
+contribute opposite-signed cross terms that cancel. Zero covariance rules out
+linear co-movement, nothing more.
+
 The variance of a sum picks up a covariance term:
 
 $$
@@ -127,6 +137,11 @@ U = rng.normal(size=N)
 V = rng.normal(size=N)
 print("Cov(indep):", round(np.mean((U - U.mean()) * (V - V.mean())), 4))
 
+# Dependent yet zero-covariance: X uniform on {-1,0,1}, Y = X^2 (Y is a function of X)
+Xd = rng.integers(-1, 2, size=N)        # -1, 0, or 1
+Yd = Xd**2
+print("Cov(X, X^2):", round(np.mean((Xd - Xd.mean()) * (Yd - Yd.mean())), 4), " (~0, yet dependent)")
+
 # Marginal by summing a joint table (discrete)
 joint = np.array([[0.1, 0.2], [0.3, 0.4]])   # P(X=i, Y=j)
 print("P(X) marginal:", joint.sum(axis=1))   # sum over Y
@@ -134,8 +149,9 @@ print("P(Y|X=0):", joint[0] / joint[0].sum())
 ```
 
 The covariance is positive for the shared-component pair, the variance-of-sum
-decomposition holds, the independent pair has near-zero covariance, and summing a
-joint table recovers the marginal. The next lesson turns the conditioning formula
+decomposition holds, the independent pair has near-zero covariance, the
+function-dependent pair $(X, X^2)$ also has near-zero covariance despite being
+fully dependent, and summing a joint table recovers the marginal. The next lesson turns the conditioning formula
 around into Bayes' rule.
 
 <Footnotes>

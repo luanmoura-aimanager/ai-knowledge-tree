@@ -78,6 +78,20 @@ size $1/L$ is tiny relative to the gentle curvature $\mu$ along the flat directi
 For a quadratic, $\kappa$ is the ratio of largest to smallest Hessian eigenvalue, the
 same condition number from the SVD.
 
+To feel what $\kappa$ buys, count the steps to shrink the gap to $\varepsilon = 10^{-6}$,
+which is $\log\varepsilon / \log(1 - 1/\kappa)$ steps:
+
+- $\kappa = 2$ (nearly round bowl): factor $1 - 1/2 = 0.5$, about 20 steps. The gap
+  halves every iteration.
+- $\kappa = 10$: factor $0.9$, about 131 steps.
+- $\kappa = 100$: factor $0.99$, about 1375 steps.
+- $\kappa = 1000$ (a ravine 1000 times steeper across than along): factor $0.999$,
+  about 13800 steps.
+
+The cost grows roughly in proportion to $\kappa$: each tenfold worsening of the
+conditioning multiplies the step count by about ten. The three runs in the code
+below ($\kappa = 2, 10, 100$) trace the first three rows.
+
 ## Sublinear rate without strong convexity
 
 If $f$ is convex and $L$-smooth but not strongly convex ($\mu = 0$), the rate drops to

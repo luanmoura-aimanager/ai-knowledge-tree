@@ -59,6 +59,22 @@ All $\ell^p$ norms for $p \ge 1$ are genuine norms. The hard part is the triangl
 inequality (Minkowski's inequality); the proof uses Holder's inequality, which the
 inner-products lesson derives in the $p=2$ case.
 
+To see what each norm measures, compare two vectors with the **same Euclidean
+length but opposite shapes**. A spread-out $v = (1, 1, 1, 1)$ and a spiky
+$w = (2, 0, 0, 0)$ both have $\lVert \cdot \rVert_2 = 2$, so $\ell^2$ cannot tell
+them apart. The other two norms can:
+
+- **Spread** $(1, 1, 1, 1)$: $\lVert v\rVert_1 = 4$, $\lVert v\rVert_\infty = 1$.
+- **Spiky** $(2, 0, 0, 0)$: $\lVert w\rVert_1 = 2$, $\lVert w\rVert_\infty = 2$.
+
+The same $\ell^2 = 2$ splits into $\ell^1 = 4$ for the spread vector and $\ell^1 = 2$
+for the spiky one: $\ell^1$ charges every coordinate its full magnitude, so it
+penalizes mass-spreading and rewards concentrating it on fewer entries, which is why
+minimizing it drives coordinates to zero. The $\ell^\infty$ values invert the
+ranking ($1$ vs $2$): it sees only the largest entry, so the spiky vector, with one
+big coordinate, costs more. Three norms, one $\ell^2$, two different orderings of the
+same pair.
+
 ## Equivalence of norms
 
 On a finite-dimensional space all norms are **equivalent**: for any two norms
@@ -96,6 +112,14 @@ linf = np.linalg.norm(v, ord=np.inf)
 print(f"L1 = {l1:.4f}")     # 8.0
 print(f"L2 = {l2:.4f}")     # 5.0990...
 print(f"Linf = {linf:.4f}") # 4.0
+
+# Same L2, opposite shapes: L1 and Linf disagree on which is "bigger"
+spread = np.array([1.0, 1.0, 1.0, 1.0])
+spiky  = np.array([2.0, 0.0, 0.0, 0.0])
+for name, u in [("spread", spread), ("spiky", spiky)]:
+    print(f"{name}: L1={np.linalg.norm(u,1):.1f} "
+          f"L2={np.linalg.norm(u,2):.1f} Linf={np.linalg.norm(u,np.inf):.1f}")
+# spread: L1=4.0 L2=2.0 Linf=1.0 ; spiky: L1=2.0 L2=2.0 Linf=2.0
 
 # Verify the inequalities: linf <= l2 <= l1 <= sqrt(n)*l2
 n = len(v)

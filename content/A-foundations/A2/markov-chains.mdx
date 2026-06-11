@@ -75,6 +75,20 @@ distance to $\pi$ shrinks roughly like $|\lambda_2|^n$. The spectral gap $1 - |\
 is the mixing speed. This is the engine behind MCMC sampling and PageRank, both of
 which construct a chain whose stationary distribution is the target.
 
+The gap is what separates a chain that forgets its start quickly from one that
+clings to it. Take two chains on three states, both with stationary distribution
+near uniform, differing only in how readily they leave the current state:
+
+- **The weather chain** in the code below has $|\lambda_2| = 0.45$, so a gap of
+  $0.55$. Starting certain it is sunny, the total-variation-scale $L^1$ distance to
+  $\pi$ falls from $0.47$ at one step to $0.10$ at three steps, and it is within
+  $0.01$ of $\pi$ after **6 steps**. The start is forgotten in under a week.
+- **A sticky chain** that stays put with probability $0.98$ each step (off-diagonal
+  $0.01$) has $|\lambda_2| = 0.97$, a gap of only $0.03$. From the same sunny start
+  it needs **161 steps** to reach the same $L^1$ distance of $0.01$. Same stationary
+  distribution, same three states; a $0.55$-vs-$0.03$ gap is the whole difference
+  between mixing in 6 steps and mixing in 161.
+
 ![Starting certain it is sunny, the weather distribution relaxes to the stationary distribution (dotted) within a few steps; the rate is set by the second eigenvalue.](/figures/A2/markov-chains.svg)
 
 ## Check it on arrays

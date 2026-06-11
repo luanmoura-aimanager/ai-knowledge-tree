@@ -37,9 +37,20 @@ I(X; Y) \ge 0, \quad \text{with } I(X; Y) = 0 \iff p_{X,Y} = p_X\,p_Y.
 $$
 
 Zero mutual information is exactly independence. Unlike zero covariance, this detects
-every form of dependence, linear or not. A variable that determines another
-nonlinearly (say $Y = X^2$ with symmetric $X$) has zero covariance but positive
-mutual information.
+every form of dependence, linear or not.
+
+This is the confusion worth naming: **zero covariance is not independence**, and the
+two measures can disagree completely. Take $X$ uniform on $\{-1, 0, 1\}$ and
+$Y = X^2$, so $Y$ is fully determined by $X$. Covariance sees nothing, $\operatorname{Cov}(X, Y) = 0$,
+because the symmetric $\pm 1$ contributions cancel. Mutual information sees the whole
+dependence: $Y$ takes value $0$ with probability $1/3$ and $1$ with probability $2/3$,
+so $I(X; Y) = H(Y) = -\tfrac13\log_2\tfrac13 - \tfrac23\log_2\tfrac23 = 0.918$ bits.
+A linear summary reports independence; the information measure reports near-complete
+dependence. Where the dependence *is* linear the gap closes: for a bivariate Gaussian
+with correlation $\rho$, $I = -\tfrac12\log_2(1 - \rho^2)$, which is $0$ at $\rho = 0$,
+$0.21$ bits at $\rho = 0.5$, and $1.20$ bits at $\rho = 0.9$. Covariance and mutual
+information agree on independence only when the dependence has no nonlinear part to
+miss.
 
 ## The entropy decomposition
 

@@ -63,6 +63,27 @@ with $\Phi, \phi$ the standard normal CDF and PDF. EI is large where the mean is
 (promising) or the variance is high (uncertain), and it is zero where the model is
 confident the value is worse than $f^\star$. The next query is $\arg\max_x \text{EI}(x)$<FN n="2" />.
 
+The two terms encode exploitation and exploration, and a few computed values make
+their tug-of-war concrete. Take the current best $f^\star = 0$:
+
+- **Exploration, isolated.** A point predicted *above* the best, $\mu = 0.5$, looks
+  unpromising on its mean alone. With small uncertainty $s = 0.1$ its EI is $0$: the
+  model is sure it is worse, nothing to gain. Widen the uncertainty to $s = 1.0$ at
+  the same mean and EI rises to $\approx 0.198$, because now the upside tail might
+  beat $f^\star$. Same predicted mean, opposite verdicts; the variance term is the
+  whole difference.
+- **Exploitation, isolated.** A point predicted *below* the best, $\mu = -0.5$ with
+  $s = 0.1$, has EI $\approx 0.5$, essentially its mean improvement: the gain is
+  locked in, not speculative.
+- **Ruled out.** A point with $\mu = 2.0$ and tiny $s = 0.05$ has EI $\approx 0$
+  (under $10^{-5}$): far above the best and almost certain, so no query is worth
+  spending there.
+
+This is the named confusion behind "explore vs exploit": EI does not optimize the
+predicted mean, and it does not chase raw uncertainty either. It scores the *expected
+improvement over the current best*, which is why a high-variance point that looks
+mediocre on its mean can outrank a confident, slightly-better one.
+
 ## The loop
 
 1. Fit the GP to all evaluations so far.

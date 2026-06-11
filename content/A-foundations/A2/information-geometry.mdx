@@ -56,6 +56,17 @@ $\mathbb{E}[\nabla^2 \log p]$, and their sum is zero. Rearranging gives the two
 forms. High Fisher information means the log-likelihood is sharply peaked, so the
 parameter is easy to pin down.
 
+This is what makes the opening claim concrete. For a Gaussian with known variance
+$\sigma^2$ and unknown mean, a single observation carries Fisher information
+$\mathcal{I} = 1/\sigma^2$. Contrast two models identical except for spread: a sharp
+$\sigma = 0.2$ gives $\mathcal{I} = 1/0.2^2 = 25$, a broad $\sigma = 2.0$ gives
+$\mathcal{I} = 1/2.0^2 = 0.25$, a factor of $100$. The same $0.1$ nudge to the mean
+is $100$ times more distinguishable under the sharp model: the KL between
+$N(\theta, \sigma^2)$ and $N(\theta + 0.1, \sigma^2)$ is $0.5 \cdot 0.1^2/\sigma^2$,
+which is $0.125$ for the sharp model and $0.00125$ for the broad one. Sharper
+densities pack more information about their mean into each sample, so the parameter
+is pinned down faster.
+
 ## The Cramer-Rao bound
 
 Fisher information sets the best possible precision of any unbiased estimator
@@ -121,6 +132,13 @@ print("Fisher I = Var(score):", round(score.var(), 4), " exact 1.0")
 # Curvature form: -E[d^2/dtheta^2 log p] = -E[-1] = 1
 print("Fisher (curvature form): 1.0")
 
+# Contrasting pair: sharp vs broad Gaussian, I = 1/sigma^2 per observation
+for sigma in [0.2, 2.0]:
+    xs = rng.normal(theta_true, sigma, N)
+    sc = (xs - theta_true) / sigma**2          # score = (x - theta)/sigma^2
+    print(f"sigma={sigma}: Fisher I = Var(score) =", round(sc.var(), 3),
+          " exact", 1 / sigma**2)
+
 # Cramer-Rao: MLE (sample mean) variance vs 1/(N*I)
 trials = 4000
 mle = rng.normal(theta_true, 1.0, size=(trials, 50)).mean(axis=1)
@@ -132,7 +150,8 @@ kl_exact = d**2 / 2
 print("KL(N(0,1)||N(d,1)):", round(kl_exact, 6), " ~ 0.5 d I d:", round(0.5 * d * 1.0 * d, 6))
 ```
 
-The score averages to zero, its variance recovers the Fisher information of 1, the
+The score averages to zero, its variance recovers the Fisher information of 1 (and
+$1/\sigma^2$ for the sharp and broad models, a factor of 100 apart), the
 MLE variance sits at the Cramer-Rao bound, and the KL between nearby Gaussians equals
 the Fisher quadratic form. This closes the A2 probability and information-theory
 track; the optimization pillar (A3) builds on these gradients and curvatures to
