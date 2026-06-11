@@ -58,6 +58,20 @@ With DeepSeek-V2's choice $d_c$ around $4 d_h$, this is several times smaller th
 GQA cache, while staying closer to full multi-head quality because every head still gets
 its own reconstructed $k_t, v_t$ rather than a shared one.
 
+The magnitudes make the saving concrete. At the V2-scale config below ($d = 5120$,
+$n_h = 128$ heads, $d_h = 40$, GQA with 8 KV groups, $d_c = 512$, $d^R_h = 64$), the
+per-token-per-layer cache in raw numbers is:
+
+- **MHA** caches $2 n_h d_h = 2 \cdot 128 \cdot 40 = 10240$ numbers, the full keys and
+  values for all 128 heads.
+- **GQA** shares them down to 8 KV groups: $2 \cdot 8 \cdot 40 = 640$ numbers, a 16x cut.
+- **MLA** caches the latent plus the decoupled key: $d_c + d^R_h = 512 + 64 = 576$
+  numbers, 17.8x below MHA and a hair under GQA's 640.
+
+So MLA reaches GQA-level memory (576 vs 640) while every head still reconstructs its own
+distinct $k_t, v_t$, where GQA forces eight heads to share one. Same footprint, more
+expressive cache.
+
 ## 3. The decoupled RoPE key
 
 There is one obstruction. [Rotary position embeddings](positional-encodings) rotate keys

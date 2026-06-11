@@ -51,6 +51,21 @@ $$
 This is binary cross-entropy on the pairwise comparison: push $r(y_w) - r(y_l)$ to be
 large and positive for preferred responses.
 
+The reward gap $\Delta = r(x, y_w) - r(x, y_l)$ is the only thing the BT model sees; the
+absolute scores are arbitrary up to a shift. A scale for what a gap buys, since
+$\sigma(\Delta)$ is the predicted preference probability:
+
+- **$\Delta = 0$:** $\sigma(0) = 0.5$. The model is indifferent, a coin flip between the
+  two responses.
+- **$\Delta = 1$:** $\sigma(1) = 0.731$. A clear but not overwhelming preference, near the
+  60-80% annotator agreement the data itself carries.
+- **$\Delta = 3$:** $\sigma(3) = 0.953$. The winner is preferred about 19 times out of 20.
+- **$\Delta = 5$:** $\sigma(5) = 0.993$. Near-certainty; pushing the gap wider barely moves
+  the probability, which is why the loss flattens once a pair is confidently ordered.
+
+Because only the difference matters, two reward models that disagree on absolute scale but
+agree on every gap induce identical preferences.
+
 ## Reward model architecture
 
 The RM is initialized from the **SFT model** (same transformer backbone), with one

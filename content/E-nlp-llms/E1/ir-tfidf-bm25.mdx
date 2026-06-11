@@ -40,7 +40,20 @@ containing $t$. The $+1$ avoids division by zero for unseen terms.
 
 **Derivation from information theory.** A term that appears in fraction $p = \text{df}(t)/N$
 of documents has self-information $\log(1/p) = \log(N/\text{df}(t))$: rare terms carry more
-information per occurrence. IDF is exactly this self-information.
+information per occurrence. IDF is this self-information.
+
+A magnitude scale on a million-document corpus ($N = 10^6$) shows the weighting at work,
+using $\log(N/(1+\text{df}))$:
+
+- A term in **every** document ("the", $\text{df} = N$): $\log(N/N) \approx 0$. No
+  discriminative signal, so IDF zeroes it out.
+- A term in **half** the corpus ($\text{df} = 5 \times 10^5$): $\log 2 \approx 0.69$.
+- A term in **1%** ($\text{df} = 10^4$): $\log 100 \approx 4.6$.
+- A near-unique term ($\text{df} = 100$): $\log(10^4) \approx 9.2$.
+
+So the gap between a stopword and a rare technical term is a factor of roughly $9.2 / 0.69
+\approx 13$ in IDF weight, before TF even enters. The IDF spread is what makes a query's
+rare terms dominate its score.
 
 ## TF-IDF
 

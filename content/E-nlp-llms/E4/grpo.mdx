@@ -30,6 +30,24 @@ current policy -- a form of **self-normalized reward**.
 
 This is essentially REINFORCE with leave-one-out baseline, adapted to the LLM setting.
 
+**What "group-relative" buys you.** The same reward yields a different advantage
+depending on the company it keeps, because the baseline is the group mean. Take a
+verifiable reward $r \in \{0, 1\}$ and $G = 8$ responses, and look at a single
+*correct* response ($r_i = 1$):
+
+- **Easy prompt**, 7 of 8 responses correct. Group mean $= 0.875$, so the correct
+  response gets advantage $A_i = 1 - 0.875 = 0.125$. Getting it right was expected;
+  the gradient barely pushes.
+- **Hard prompt**, 1 of 8 responses correct. Group mean $= 0.125$, so the same
+  correct response gets $A_i = 1 - 0.125 = 0.875$. Solving what the policy usually
+  fails is the signal worth chasing, and the advantage is $7\times$ larger.
+
+So the curriculum is automatic: per-prompt, the baseline subtracts off whatever the
+policy can already do, leaving the gradient to concentrate on the prompts at the
+edge of its ability. The degenerate case makes the same point from the other side:
+if all 8 responses agree (all correct or all wrong), the mean equals every reward
+and every $A_i = 0$, so a group that gives no information gives no update.
+
 ## The GRPO objective
 
 For each group of $G$ responses, the objective mirrors PPO's clipped surrogate<FN n="2" />:

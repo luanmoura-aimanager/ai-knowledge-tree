@@ -63,6 +63,29 @@ DPO maximizes $[\text{implicit reward of } y_w] - [\text{implicit reward of } y_
 - It decreases the relative probability of dispreferred responses.
 - The $\beta$ controls the scale -- large $\beta$ keeps changes close to the reference.
 
+The loss is binary cross-entropy on the **margin** $\hat r_w - \hat r_l$, where
+$\hat r = \beta \log \frac{\pi_\theta}{\pi_{\text{ref}}}$. Watching that margin makes the
+scale concrete (with the per-pair loss $-\log\sigma(\text{margin})$):
+
+- **At initialization**, $\pi_\theta = \pi_{\text{ref}}$, so both log-ratios are $0$, the
+  margin is $0$, and the loss is $-\log\sigma(0) = -\log\tfrac12 \approx 0.693$ nats. Every
+  pair starts at the same value, the entropy of a coin flip.
+- **A modest correct nudge.** Suppose training raises $\log\pi_\theta(y_w)$ by $+3$ nats
+  over the reference and lowers $\log\pi_\theta(y_l)$ by $2$ nats. With $\beta = 0.1$ the
+  implicit rewards are $\hat r_w = 0.3$ and $\hat r_l = -0.2$, a margin of $0.5$, and the loss
+  drops to $-\log\sigma(0.5) \approx 0.474$. The same probability shifts at $\beta = 1$ would
+  give a margin of $5$ and loss $\approx 0.0067$: $\beta$ rescales how loudly a fixed change
+  in token probabilities registers.
+- **Saturation.** Once the margin reaches $\approx 4$, $\sigma(4) \approx 0.982$ and the loss
+  is $\approx 0.018$; pushing further yields almost no gradient. The objective stops driving a
+  pair apart once the preferred response is already clearly ahead, which is what keeps DPO from
+  collapsing the policy onto the chosen samples.
+
+The confusion to name: the implicit reward $\hat r$ is **not** a log-probability of $y$, but
+$\beta$ times a log-*ratio* against the frozen reference. A response can have low absolute
+likelihood and still earn a high implicit reward if the policy raised it far above where the
+SFT model put it.
+
 ## Implementation
 
 ```python-static
