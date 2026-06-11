@@ -42,6 +42,24 @@ $$
 = \frac{1}{2} \sum_j (\mu_j^2 + \sigma_j^2 - 1 - \log \sigma_j^2).
 $$
 
+The formula reads cleanly on a single latent dimension, where it measures how far
+the encoder has drifted from the unit Gaussian prior:
+
+- **On the prior** ($\mu = 0$, $\sigma = 1$): KL $= 0$. Every term cancels, so an
+  encoder that ignores $x$ and outputs the prior pays no penalty (this is the
+  posterior-collapse fixed point).
+- **Shifted off-center** ($\mu = 2$, $\sigma = 1$): KL $= \tfrac12(4) = 2$ nats. The
+  $\mu^2$ term is the cost of placing the code two standard deviations from the
+  origin.
+- **Over-confident** ($\mu = 0$, $\sigma = 0.1$): KL $\approx 1.81$ nats. A posterior
+  much narrower than the prior is penalized through the $-\log\sigma^2$ term, even
+  with the mean on target. This is what stops the encoder from shrinking each code to
+  a noiseless point and overfitting.
+
+The contrast between the second and third case is the lesson: the same KL budget
+buys either a displaced mean or a sharpened variance, and the regularizer charges
+for both, keeping the latent code both centered and appropriately fuzzy.
+
 ## The reparameterization trick
 
 The ELBO contains $\mathbb{E}_{q_\phi}[\cdot]$, which requires sampling from $q_\phi(z \mid x)$.

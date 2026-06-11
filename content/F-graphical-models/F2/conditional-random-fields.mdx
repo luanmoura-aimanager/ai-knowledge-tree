@@ -60,14 +60,17 @@ the MAP label sequence.
 
 ## CRF vs. HMM
 
-Both model sequences, but differently:
+Both model sequences, but differently across four axes:
 
-| Aspect | HMM | Linear-chain CRF |
-|---|---|---|
-| Factorization | $P(\mathbf{x},\mathbf{y})$ joint | $P(\mathbf{y} \mid \mathbf{x})$ conditional |
-| Features | Local emission $P(x_t \mid y_t)$ | Arbitrary $\mathbf{f}(y_{t-1}, y_t, \mathbf{x}, t)$ |
-| Modeling cost | Must model $P(\mathbf{x})$ | No model needed for $P(\mathbf{x})$ |
-| Label bias | None | Avoids via global normalization |
+- **Factorization.** The HMM models the joint $P(\mathbf{x}, \mathbf{y})$; the
+  linear-chain CRF models the conditional $P(\mathbf{y} \mid \mathbf{x})$ directly.
+- **Features.** The HMM is limited to local emissions $P(x_t \mid y_t)$; the CRF
+  admits arbitrary features $\mathbf{f}(y_{t-1}, y_t, \mathbf{x}, t)$ over the whole
+  input.
+- **Modeling cost.** The HMM must model $P(\mathbf{x})$; the CRF needs no model of the
+  input distribution at all.
+- **Label bias.** The HMM has none; the CRF avoids it through global normalization by
+  $Z(\mathbf{x})$ rather than per-step normalization.
 
 CRFs can use long-range features in $\mathbf{x}$ without worrying about modeling the
 full input distribution, which is the main practical advantage for NLP.

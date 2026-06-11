@@ -56,6 +56,25 @@ $$
 
 where $\lambda_{q+1}, \ldots, \lambda_D$ are the discarded eigenvalues.
 
+Putting numbers on the split makes both formulas concrete. Take $D = 6$, $q = 2$,
+with sample covariance eigenvalues $\lambda = (10,\, 4,\, 0.5,\, 0.5,\, 0.5,\, 0.5)$:
+the first two are signal directions, the last four are a flat noise floor.
+
+- **Noise variance.** $\sigma^2_\text{MLE}$ averages the four discarded eigenvalues:
+  $\frac{1}{6-2}(0.5+0.5+0.5+0.5) = 0.5$. PPCA reads the noise level straight off the
+  tail of the spectrum.
+- **Loading scale.** Each retained column of $W$ is scaled by
+  $\sqrt{\lambda - \sigma^2}$, not by $\sqrt{\lambda}$ as plain PCA would use. The
+  first axis carries $\sqrt{10 - 0.5} = 3.082$ against PCA's $\sqrt{10} = 3.162$; the
+  second carries $\sqrt{4 - 0.5} = 1.871$ against $\sqrt{4} = 2.0$. The probabilistic
+  model attributes part of every observed direction's spread to noise and shrinks the
+  loadings to match, more aggressively on the weaker axis (ratio $0.935$) than the
+  strong one ($0.975$).
+
+The shrinkage is the named distinction between PPCA and PCA: identical principal
+*directions* $U_q$, but loading *magnitudes* discounted by the noise floor. As
+$\sigma^2 \to 0$ the two coincide.
+
 ## EM algorithm for PPCA
 
 **E-step.** Compute posterior statistics:

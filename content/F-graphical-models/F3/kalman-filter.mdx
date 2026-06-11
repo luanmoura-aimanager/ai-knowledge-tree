@@ -87,6 +87,23 @@ and covariance $\hat{\Sigma}_t - \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top +
 
 Identifying the gain $K_t = \hat{\Sigma}_t H^\top (H\hat{\Sigma}_t H^\top + R)^{-1}$ recovers both formulas.
 
+The gain is the dial between trusting the prediction and trusting the measurement.
+A scalar tracker ($H = 1$) makes the magnitudes legible: $K = \hat{\Sigma} / (\hat{\Sigma} + R)$,
+so $K$ lives in $[0, 1)$ and the updated variance is $(1 - K)\hat{\Sigma}$.
+
+- **Confident prediction, noisy sensor.** $\hat{\Sigma} = 0.1$, $R = 10$: gain
+  $K = 0.0099$. The update barely moves; the measurement is almost ignored, and the
+  posterior variance stays at $0.099$.
+- **Balanced.** $\hat{\Sigma} = 1$, $R = 1$: gain $K = 0.5$. The estimate sits halfway
+  between prediction and measurement, posterior variance $0.5$.
+- **Vague prediction, precise sensor.** $\hat{\Sigma} = 10$, $R = 0.1$: gain
+  $K = 0.9901$. The filter snaps to the measurement, posterior variance $0.099$.
+
+The two extremes land on the same posterior variance ($0.099$) by opposite routes:
+a prediction that was already tight, or a measurement sharp enough to make it tight.
+The middle term, the prediction error $(x_t - H\hat{\mu}_t)$, is what the gain scales;
+$K$ alone decides how much of that error to believe.
+
 ![The Kalman filter fuses a motion model with noisy measurements by predicting then correcting, yielding an estimate smoother than the raw measurements with a calibrated ±2σ band.](/figures/F3/kalman-filter.svg)
 
 ## Implementation

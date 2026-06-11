@@ -71,6 +71,22 @@ $$
 $N_\text{eff} = N$ when all weights are equal; $N_\text{eff} \approx 1$ when one weight dominates.
 A rule of thumb: IS is informative when $N_\text{eff} \ge N/10$.
 
+The proposal alone decides where on this scale a sample lands. Estimating the mean of
+the two-Gaussian target in the code below with $N = 5000$ draws, changing nothing but
+the proposal width:
+
+- A **wide** proposal $\mathcal{N}(0, 4^2)$ covers both modes, so the weights stay
+  fairly even: $N_\text{eff} \approx 2266$, about $45\%$ of $N$. Comfortably above the
+  $N/10$ threshold.
+- A **narrow** proposal $\mathcal{N}(0, 0.5^2)$ samples almost nothing near the
+  right-hand mode at $x = 2$; the rare draws that land there get enormous weights and
+  swamp the rest: $N_\text{eff} \approx 15$, about $0.3\%$ of $N$. The estimate now
+  rests on a handful of particles.
+
+Same target, same $N$, same estimator: a 150-fold swing in effective samples, driven
+entirely by how well the proposal's tails cover the target's. That is the failure
+mode ESS is built to detect before the estimate's noise gives it away.
+
 ![Rejection sampling draws from a simple proposal scaled to envelope the target, then keeps each point with probability p(x)/(M·q(x)); accepted points (under the target curve) are exact target samples.](/figures/F6/rejection-importance-sampling.svg)
 
 ## Implementation

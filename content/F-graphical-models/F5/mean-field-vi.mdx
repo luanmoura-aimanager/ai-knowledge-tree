@@ -83,6 +83,26 @@ This is exactly the posterior (no approximation for conjugate Gaussian models).
 Mean-field becomes approximate only when latent variables are not independent
 under the true posterior, which is the case for most latent variable models.
 
+## How much variance mean-field loses
+
+The cost of the factorization is concrete and worth seeing in numbers. Take a true
+posterior that is a two-dimensional Gaussian with unit marginal variances and
+correlation $\rho$. Minimizing $\mathrm{KL}(q \| P)$ over factorized $q$ matches the
+diagonal of the *precision* matrix, so the optimal mean-field marginal variance is
+$1 - \rho^2$, never the true value of $1$.
+
+- **No correlation** ($\rho = 0$): mean-field variance $1.00$, matching the truth.
+  The factorization is exact, the same outcome the conjugate regression above showed.
+- **Moderate correlation** ($\rho = 0.5$): mean-field variance $0.75$, a $25\%$
+  underestimate.
+- **Strong correlation** ($\rho = 0.9$): mean-field variance $0.19$, marginal
+  standard deviation $0.436$ against the true $1.0$.
+
+The mean is centred correctly in every case; what collapses is the spread. This is the
+named failure of mean-field VI: it is *overconfident*, reporting credible intervals
+narrower than the true posterior, and the gap widens with $\rho^2$. The figure below
+shows the same collapse geometrically: the factorized contour pinches onto one axis.
+
 ![Mean-field VI approximates the posterior with a factorized (axis-aligned) distribution; it centres correctly but, ignoring correlations, collapses onto one axis and underestimates the variance.](/figures/F5/mean-field-vi.svg)
 
 ## Implementation

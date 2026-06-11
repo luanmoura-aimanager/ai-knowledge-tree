@@ -66,6 +66,29 @@ Both are standard distributions, so sampling is exact.
 
 ![Gibbs sampling updates one coordinate at a time from its exact conditional, moving in axis-aligned steps: the characteristic zigzag, which mixes slowly along a strong correlation.](/figures/F6/gibbs-sampling.svg)
 
+## What correlation costs
+
+Acceptance rate 1 sounds like a free lunch, but it hides the real cost: successive
+Gibbs samples are correlated, and the stronger the correlation between the variables,
+the more correlated the chain. For the bivariate Gaussian above, the lag-1
+autocorrelation of a coordinate works out to $\rho^2$. Holding everything else fixed
+and varying only $\rho$:
+
+- **$\rho = 0.3$ (weak):** lag-1 autocorrelation $\approx 0.09$. Successive draws are
+  nearly independent; the integrated autocorrelation time is about $1.2$, so 15,000
+  draws are worth roughly that many independent samples.
+- **$\rho = 0.85$ (strong):** lag-1 autocorrelation $\approx 0.72$. The integrated
+  autocorrelation time climbs to about $6.4$; you need roughly 6 draws per effective
+  sample.
+- **$\rho = 0.99$ (near-degenerate):** lag-1 autocorrelation $\approx 0.98$. The
+  integrated autocorrelation time is about $100$, so 15,000 draws carry the
+  information of only about 150 independent ones.
+
+The setting is identical in all three cases (same sampler, same number of draws,
+exact conditionals, every proposal accepted); only $\rho$ changes, and it alone
+explains why the third chain wastes most of its samples. This is the cost
+axis-aligned updates pay along a tilted ridge.
+
 ## Implementation
 
 ```python

@@ -48,6 +48,26 @@ The set $N(i)$ is the **Markov blanket** of $X_i$.
 
 **Pairwise:** $X_i \perp X_j \mid \mathbf{X}_{\text{rest}}$ whenever $(i,j) \notin \mathcal{G}$.
 
+The local property is the one that pays off in practice, so it is worth seeing on
+numbers. Take the $3\times 3$ Ising grid from the code below ($J = 0.5$, $h = 0$). The
+center spin has four neighbors (up, down, left, right); the four corners are not
+adjacent to it. Conditioning shows the blanket at work:
+
+- **Marginal**, knowing nothing: $P(X_\text{center} = +1) = 0.5$. By symmetry of the
+  $h = 0$ field, up and down are equally likely.
+- **All four neighbors $= +1$**: $P(X_\text{center} = +1) = 0.982$. The neighbors
+  pull the center to agree with them.
+- **All four neighbors $= -1$**: $P(X_\text{center} = +1) = 0.018$. The same pull, the
+  other way.
+
+Now the point of the blanket: once the four neighbors are fixed at $+1$, also telling
+you a far corner is $+1$ or $-1$ leaves $P(X_\text{center} = +1) = 0.982$ either way.
+The corner carries zero extra information about the center given its neighbors, exactly
+the local Markov property. This is the routine confusion to name: in a directed model
+"who influences the center" would include indirect ancestors, but in an MRF the
+**Markov blanket is just the immediate neighbors**, and conditioning on it screens off
+the entire rest of the grid.
+
 ## Hammersley-Clifford theorem
 
 The Hammersley-Clifford theorem establishes the equivalence<FN n="3" />:

@@ -52,6 +52,25 @@ $$
 The normalizing constant of $\pi$ cancels in the acceptance ratio, so the algorithm
 only needs the unnormalized target $\tilde{\pi}(x) \propto \pi(x)$.
 
+To see what the ratio does, take a standard normal target $\pi(x) \propto e^{-x^2/2}$
+with a symmetric random-walk proposal, so the $q$ factors cancel and
+$\alpha = \min(1, e^{-(x'^2 - x^2)/2})$:
+
+- **Uphill, toward the mode** (from $x = 1$ to $x' = 0$): the proposal lands at higher
+  density, the ratio exceeds 1, and $\alpha = 1$. Moves that improve the target are
+  taken with certainty.
+- **A modest step downhill** (from $x = 0$ to $x' = 1$): $\alpha = e^{-1/2} \approx
+  0.61$. Roughly three in five such proposals are accepted, so the chain wanders into
+  the tail often enough to sample it.
+- **A long step downhill** (from $x = 0$ to $x' = 3$): $\alpha = e^{-9/2} \approx
+  0.011$. About one in ninety is accepted; the chain rarely jumps far into a
+  low-probability region, which is what makes the time spent in each region track its
+  probability.
+
+The asymmetry is the whole mechanism: never refusing an uphill move and accepting
+downhill moves in proportion to the density drop is what makes the stationary
+distribution $\pi$ rather than something flatter.
+
 ## Proposal choice and mixing
 
 The proposal $q(x' \mid x)$ controls the chain's mixing speed:
