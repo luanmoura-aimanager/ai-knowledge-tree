@@ -61,7 +61,15 @@ into the saturated regime where one entry dominates and gradients
 vanish. Dividing by $\sqrt{d_k}$ keeps the variance constant in $d_k$,
 preserving useful attention distributions.
 
-Without this scaling, training stalls for any reasonable head size.
+Concretely, take $d_k = 64$ (a standard head size) and one query against
+$10$ keys, all unit-variance Gaussian. The raw scores then have standard
+deviation $\sqrt{64} = 8$, so the largest is typically several units above
+the rest, and the softmax collapses onto it: averaged over random draws,
+the top weight sits at about $0.86$ of the total mass, nearly a hard
+argmax over $10$ positions. Divide by $\sqrt{d_k} = 8$ and the scores have
+unit spread; the top weight drops to about $0.32$, a distribution that
+still spreads attention and still has gradient. The scaling is the
+difference between a soft lookup and a saturated one-hot.
 
 ## Why it works
 

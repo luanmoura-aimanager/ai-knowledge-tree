@@ -57,6 +57,17 @@ If $f_t$ is close to 1 (the forget gate is "open"), the gradient flows
 through the multiplicative chain $\prod_k f_{k+1}$ which can stay near
 1 over many timesteps. The vanishing gradient is no longer geometric.
 
+Put numbers on the contrast over a 100-step dependency. A vanilla RNN
+whose recurrence Jacobian has spectral norm $0.9$ shrinks the gradient
+by $0.9^{100} \approx 2.7 \times 10^{-5}$: the signal from step 100 back
+to step 0 is gone. The LSTM's gradient down the cell path instead scales
+by $\prod_t f_t$, the product of forget gates. If the cell learns to hold
+a memory and keeps $f_t \approx 0.99$, that product is
+$0.99^{100} \approx 0.37$, still order one after 100 steps. The whole
+trick is that the forget gate is a learned per-unit number near 1, not a
+fixed decay below 1: where the RNN multiplies by a contraction it cannot
+control, the LSTM multiplies by a gate it can drive open.
+
 ## What each gate does
 
 - **Forget gate** $f_t$: decides what fraction of the previous cell

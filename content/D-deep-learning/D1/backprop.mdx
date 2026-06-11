@@ -102,6 +102,18 @@ For scalar-output networks, reverse mode is the right choice. For
 networks with many outputs and few inputs (rare in deep learning),
 forward mode wins.
 
+The magnitude of what reverse mode buys is the whole reason deep learning
+is tractable. The tiny MLP in the code below has $P = 26$ parameters, so a
+naive finite-difference gradient costs about $2 \times 26 = 52$ extra
+forward passes (two per parameter for a central difference). Backprop gets
+the same gradient in one backward pass. The gap is linear in $P$, so it
+explodes with scale: a $1$-million-parameter network would need on the
+order of $10^6$ forward passes per gradient by finite differences against
+the single backward pass of backprop, and GPT-3, at $1.75 \times 10^{11}$
+parameters, would need on the order of $10^{11}$. That factor of $P$ is the
+difference between "train in a backward pass" and "never finish one
+gradient step."
+
 ```mermaid
 graph LR
   X["input"] --> H1["layer 1"]

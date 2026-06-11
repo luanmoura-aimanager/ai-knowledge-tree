@@ -99,6 +99,29 @@ concatenate (or average) their outputs, exactly as in Transformers.
 GAT's advantages: it can downweight noisy or irrelevant neighbors and
 upweight informative ones, all while keeping permutation invariance.
 
+## GCN weights vs GAT weights on one node
+
+Both GCN and GAT collapse to "weighted average of neighbors", so it is worth
+seeing the weights they actually assign diverge. Take node 2 in the toy graph
+of the code block: after adding self-loops it has degree 4, with neighbors 0
+and 1 (each degree 3), neighbor 3 (degree 4), and itself (degree 4). The GCN
+weight node 2 pays neighbor $j$ is $1/\sqrt{\tilde d_2\, \tilde d_j}$, fixed
+entirely by degrees:
+
+- to neighbors 0 and 1: $1/\sqrt{4 \cdot 3} \approx 0.289$ each.
+- to neighbor 3 and to itself: $1/\sqrt{4 \cdot 4} = 0.25$ each.
+
+Swap any two neighbors' feature vectors and these weights do not move: GCN is
+blind to what a neighbor *says*, it only sees how connected the neighbor is.
+GAT's $\alpha_{2j}$ over the same four neighbors is a softmax of learned
+similarity scores, so it can put $0.7$ of node 2's attention on the one
+neighbor whose features match its task and $0.1$ on each of the rest, the
+opposite ordering from GCN if the high-degree neighbor happens to be the
+uninformative one. The named confusion to avoid: both produce a convex
+combination summing to 1 over the same neighborhood, but GCN's coefficients are
+a fixed property of the graph topology while GAT's are a learned function of the
+features, recomputed per layer.
+
 ## Heterogeneous graphs
 
 Many real graphs have **multiple node and edge types**: in a knowledge

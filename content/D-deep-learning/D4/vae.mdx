@@ -71,6 +71,27 @@ $$
 
 No Monte Carlo estimation needed for the KL.
 
+To calibrate what this penalty costs, read it one latent dimension at a
+time, $\tfrac12(\mu^2 + \sigma^2 - 1 - \log\sigma^2)$:
+
+- $\mu = 0,\ \sigma = 1$: the code already matches the prior, KL $= 0$. No
+  penalty.
+- $\mu = 1,\ \sigma = 1$: shifted one standard deviation off-center, KL $= 0.5$
+  nat. A modest pull back toward the origin.
+- $\mu = 2,\ \sigma = 1$: two off-center, KL $= 2$ nats. The cost grows
+  quadratically in the mean.
+- $\mu = 0,\ \sigma = 0.1$: centered but the posterior has collapsed to a near
+  delta, KL $\approx 1.81$ nats. The same $\sigma = 0.1$ at $\mu = 3$ costs
+  $\approx 6.31$ nats.
+
+Two ways to drift carry different prices, which is the distinction the loss
+enforces. A confident-but-centered code ($\mu = 0,\ \sigma = 0.1$) and an
+uncertain-but-displaced code ($\mu = 1,\ \sigma = 1$) are both off the prior, but
+the over-confident one costs $1.81$ nats against $0.5$: the KL punishes a
+posterior that pins $z$ down (small $\sigma$) harder than one that merely
+sits a step away, which is what keeps the latent space smooth enough to
+interpolate through.
+
 ## The reparameterization trick
 
 The reconstruction term requires sampling $z \sim q_\phi(z \mid x)$,

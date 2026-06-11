@@ -69,6 +69,23 @@ The Jacobian is triangular, so its determinant is the product of
 the diagonal entries: $\det = \prod_i \exp(s(x_a)_i)$. The log
 determinant is just $\sum s_i$, computed in $O(d)$.
 
+That single number $\log|\det J| = \sum_i s_i$ is the local volume change the
+layer applies, and reading it on a scale makes the change-of-variables
+bookkeeping concrete:
+
+- $\sum s_i = 0$: the layer is locally volume-preserving, factor $e^0 = 1$. A
+  unit cube of latent space maps to a unit cube of data space, density unchanged.
+- $\sum s_i = +2$: the map stretches volume by $e^2 \approx 7.4\times$. Density
+  spreads over $7.4$ times the volume, so $p_X$ drops by that factor where the
+  flow expands.
+- $\sum s_i = -2$: the map compresses volume to $e^{-2} \approx 0.135\times$.
+  Probability piles up, density rises about $7.4$-fold.
+
+A flow builds a sharp data distribution out of a smooth Gaussian by
+accumulating these per-layer volume changes; the closing code's stacked layers
+report log-dets in the range $[-0.28,\ 0.34]$ for this small affine example,
+each a near-unit volume tweak that compounds across the stack.
+
 Stack many coupling layers, alternating which half is "active", and you
 get an expressive flow. RealNVP was the first practical normalizing-flow
 generative model.
