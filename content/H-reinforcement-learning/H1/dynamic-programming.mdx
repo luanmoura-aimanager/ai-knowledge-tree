@@ -80,6 +80,17 @@ so the error shrinks by a factor $\gamma$ each sweep. Stop when the change
 $\lVert V_{k+1} - V_k\rVert_\infty$ falls below a tolerance, then read off the
 greedy policy $\pi(s) = \arg\max_a [R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V_k(s')]$.
 
+That geometric rate sets how many sweeps a target accuracy costs, and it depends
+sharply on $\gamma$. To cut the initial error by $10^{-3}$:
+
+- At $\gamma = 0.9$, each sweep multiplies the error by $0.9$, and $0.9^{66}
+  \approx 10^{-3}$, so about $66$ sweeps suffice.
+- At $\gamma = 0.99$, each sweep multiplies by $0.99$, and reaching $10^{-3}$ takes
+  about $688$ sweeps, roughly ten times as many.
+
+The same decimal place that buys a tenfold-deeper horizon (from the MDP lesson)
+costs a tenfold-longer convergence, the practical tax of planning far ahead.
+
 ## Policy iteration
 
 **Policy iteration** alternates two steps until the policy stops changing:
