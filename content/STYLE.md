@@ -225,9 +225,8 @@ than re-teaching it.
    that *checks* the lesson's claims on real arrays, plus one sentence tying the
    output back to the math. Math is primary; code confirms it. Conceptual lessons
    with no code surface set `codeExempt: true` and skip this.
-6. **Exercises.** After the code block and its tie-back sentence, an
-   `## Exercises` section with at least three exercises and hidden solutions,
-   per §6.7.
+6. **Exercises.** An `## Exercises` section with hidden solutions; rules and
+   placement in §6.7.
 7. **Hand off.** End with one sentence pointing to what the next lesson builds.
 
 ### 6.3 Rigor without dryness
@@ -278,10 +277,12 @@ the right fit).
 
 ### 6.7 Exercises with hidden solutions
 
-`Rule:` every lesson ends with an `## Exercises` section containing **at least
+`Rule:` every lesson carries an `## Exercises` section containing **at least
 three exercises**, each with a hidden solution the reader reveals after trying.
 This is binding. Placement: after the worked code block and its tie-back
 sentence, before the one-sentence handoff; `<Footnotes>` stays last (§9).
+Account for the exercises in `estimatedMinutes` (attempting three typically
+adds about 10 minutes).
 
 **Mix.** At least one theoretical exercise (derive, prove, or compute by hand).
 Lessons with a code surface include at least one code exercise solvable in the
@@ -315,7 +316,7 @@ $$
 
 </details>
 
-**Exercise 2 (code).** Verify the result numerically.
+**Exercise 3 (code).** Verify the result numerically.
 
 <details>
 <summary>Solution</summary>
@@ -330,6 +331,9 @@ print(H)
 
 </details>
 ````
+
+(Exercise 2 elided above; a real lesson always has at least three. The full
+worked reference is `content/A-foundations/A2/entropy.mdx`.)
 
 **MDX pitfalls inside `<details>`.** A blank line after `</summary>` and before
 `</details>` is mandatory; without it the inner markdown (math, fenced code,
