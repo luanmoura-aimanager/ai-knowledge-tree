@@ -4,11 +4,19 @@ Canonical backlog of upcoming work for `ai-knowledge-tree`. When asked "what are
 the next steps?", read this file. As items ship, check them off or remove them so
 the list never claims work that's already done.
 
-Last reviewed: 2026-06-11 (intuition-examples campaign + remark-gfm both shipped).
+Last reviewed: 2026-06-11 (exercises campaign started; intuition-examples
+campaign + remark-gfm both shipped).
 
 ## Backlog
 
-_Empty._ Two efforts shipped on 2026-06-11:
+- **Exercises campaign** (in progress, started 2026-06-11). Every lesson gets an
+  `## Exercises` section: at least 3 exercises (theory and code) with hidden
+  `<details>` solutions, per the new STYLE.md §6.7. Infrastructure (STYLE §6.7,
+  `.mdx-body details` CSS, `render-check.mjs --exercises` gate, exemplar
+  `A2/entropy.mdx`) shipped first; then one PR per pillar retrofits all 458
+  lessons. Pillar status: A ☐ B ☐ C ☐ D ☐ E ☐ F ☐ G ☐ H ☐ I ☐ J ☐ K ☐.
+
+Two efforts shipped on 2026-06-11:
 
 - **Intuition-examples campaign** (PRs #73–82, merged). The scan flagged 145
   lessons; 84 gained verified concrete examples (magnitude scale / contrasting
