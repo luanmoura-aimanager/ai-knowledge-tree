@@ -4,7 +4,7 @@ pillar: I
 subId: I4
 lessonId: cost-monitoring
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Build a per-request cost model for an LLM service from token counts and hardware utilization, and see how batching and caching change the unit economics."
 prerequisites: ["I3/llm-serving", "slos-and-error-budgets"]
 ---
@@ -102,6 +102,93 @@ print(f"with prompt caching:                  ${cached_cost:.6f}  "
       f"({1 - cached_cost / req_cost:.0%} cheaper)")
 assert big < small and cached_cost < req_cost
 ```
+
+## Exercises
+
+**Exercise 1.** A GPU costs $4 per hour and sustains $2000$ tokens per second.
+Compute the cost per token and the cost per $1$ million tokens by hand. Then a
+request reads $1500$ input tokens and writes $500$ output tokens; give its cost
+under the first-order single-rate model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Convert the hourly rate to a per-second rate: $C_{\text{hr}}/3600 =
+4/3600 \approx 0.001111$ dollars per GPU-second.
+
+**Step 2.** Divide by throughput to get cost per token:
+
+$$
+\text{cost per token} = \frac{0.001111}{2000} \approx 5.56 \times 10^{-7}
+\text{ dollars}.
+$$
+
+Per $1$ million tokens that is $5.56 \times 10^{-7} \times 10^6 \approx 0.556$
+dollars.
+
+**Step 3.** The request uses $n_{\text{in}} + n_{\text{out}} = 1500 + 500 = 2000$
+tokens, so its cost is $2000 \times 5.56 \times 10^{-7} \approx 1.11 \times
+10^{-3}$ dollars, about one tenth of a cent.
+
+</details>
+
+**Exercise 2.** Cost per token is $C_{\text{hr}}/(3600\,r)$. A serving change
+raises throughput $r$ by $50\%$. By what fraction does the cost per token drop?
+Show that the percentage drop in cost is not equal to the percentage rise in
+throughput, and explain why.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Cost per token is inversely proportional to $r$. If $r \to 1.5\,r$,
+the new cost is $C_{\text{hr}}/(3600 \cdot 1.5\,r) = \frac{1}{1.5}$ of the old
+cost, so the new cost is $0.6\overline{6}$ of the old.
+
+**Step 2.** The drop is $1 - \frac{1}{1.5} = 1 - 0.6\overline{6} = 0.3\overline{3}$,
+about a $33.3\%$ reduction, not $50\%$.
+
+**Step 3.** Because cost scales as $1/r$, not $-r$, a relative rise of factor $g$
+in throughput gives a relative cost of $1/g$. The cost reduction $1 - 1/g$ is
+always smaller than the throughput gain $g - 1$ for $g > 1$ (here $0.333 < 0.5$).
+The reciprocal compresses large multiplicative gains: each additional unit of
+throughput buys a smaller and smaller absolute cost saving.
+
+</details>
+
+**Exercise 3 (code).** A prompt has $4000$ input tokens, of which $3600$ are a
+cached prefix billed at $\rho = 0.1$ of a fresh token, plus $400$ output tokens.
+At a flat rate of $6 \times 10^{-7}$ dollars per token, compute the per-request
+cost with and without prompt caching, and confirm caching cuts the cost by more
+than $60\%$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+cost_per_tok = 6e-7
+n_in, n_out = 4000, 400
+n_cached, rho = 3600, 0.1
+
+uncached_cost = (n_in + n_out) * cost_per_tok
+
+eff_in = (n_in - n_cached) + rho * n_cached    # cached prefix billed at 10%
+cached_cost = (eff_in + n_out) * cost_per_tok
+
+saving = 1 - cached_cost / uncached_cost
+print(f"uncached: ${uncached_cost:.6f}")
+print(f"cached:   ${cached_cost:.6f}  ({saving:.0%} cheaper)")
+
+assert cached_cost < uncached_cost and saving > 0.60
+```
+
+The effective input count drops from $4000$ to $(4000 - 3600) + 0.1 \cdot 3600 =
+400 + 360 = 760$ tokens, so with the $400$ output tokens the priced total falls
+from $4400$ to $1160$ tokens. That is a saving of about $74\%$, comfortably past
+the $60\%$ bar, with no change to the generated output.
+
+</details>
 
 Raising throughput from $800$ to $3000$ tokens per second cuts the cost per token
 almost fourfold, and caching a mostly-static prompt roughly halves the per-request

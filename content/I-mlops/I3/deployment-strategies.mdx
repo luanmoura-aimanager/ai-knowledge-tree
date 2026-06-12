@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 lessonId: deployment-strategies
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Release a new model behind shadow, canary, and blue-green patterns, and size a canary as a two-proportion test so you ship on evidence and roll back on a metric, not a hunch."
 prerequisites: ["latency-throughput", "B4/ab-testing"]
 ---
@@ -97,7 +97,98 @@ assert not ship           # a true 2-point regression is correctly caught
 
 The pipeline ships on a measured comparison and rolls back on a metric crossing a
 threshold, never on a hunch, and the sample-size formula tells you in advance how
-much traffic that decision needs. A model that survives the canary and ramps to
+much traffic that decision needs.
+
+## Exercises
+
+**Exercise 1.** Match each release pattern to the question it answers and name its
+one defining limitation: shadow, canary, blue-green.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Shadow answers "what are the new model's *predictions* and *latency*
+under real load?" by mirroring live traffic to it. Its limitation: the user never
+sees the output, so it cannot measure any downstream outcome (clicks, conversions).
+
+**Step 2.** Canary answers "*should* we switch?" by routing a small live fraction
+to the new model and reading real outcome metrics on that slice. Its limitation: it
+takes time and traffic to gather a trustworthy sample before the verdict is reliable.
+
+**Step 3.** Blue-green answers "*can* we switch atomically?" by keeping two full
+environments and flipping all traffic in one step (instant rollback). Its
+limitation: it runs two full production environments at once, doubling that cost.
+
+</details>
+
+**Exercise 2.** The canary sample size scales as $n \propto 1/\delta^2$, where
+$\delta$ is the regression you want to detect. A team sizes a canary to catch a
+$\delta = 4\%$ drop. They now want to catch a $\delta = 1\%$ drop instead. By what
+factor does the required per-arm traffic grow, and why is that the costly part?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $n \propto 1/\delta^2$, the ratio of sample sizes is
+
+$$
+\frac{n_{\text{new}}}{n_{\text{old}}} = \frac{1/\delta_{\text{new}}^2}{1/\delta_{\text{old}}^2}
+= \left(\frac{\delta_{\text{old}}}{\delta_{\text{new}}}\right)^2 = \left(\frac{0.04}{0.01}\right)^2 = 4^2 = 16.
+$$
+
+**Step 2.** The traffic per arm must grow $16\times$. The $\delta^2$ in the
+denominator means resolution is expensive: each halving of the detectable
+regression quadruples the traffic, so chasing a $4\times$ finer effect costs
+$16\times$ the requests, which (divided by the request rate) is $16\times$ the bake
+time before the canary can decide.
+
+</details>
+
+**Exercise 3 (code).** Size a canary to detect a $\delta = 0.03$ drop from a
+baseline success rate $p_0 = 0.85$ at $\alpha = 0.05$ (two-sided, $z = 1.96$) and
+power $0.80$ ($z = 0.84$). Simulate a *healthy* canary (no regression, true rate
+$p_0$) and apply a one-sided z-test gate. Assert the healthy canary is not rolled
+back.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from math import sqrt
+rng = np.random.default_rng(1)
+
+p0, delta = 0.85, 0.03
+p1 = p0 - delta
+z_a, z_b = 1.96, 0.84                     # alpha = 0.05 two-sided, power = 0.80
+
+n = (z_a + z_b) ** 2 * (p0 * (1 - p0) + p1 * (1 - p1)) / delta ** 2
+n = int(np.ceil(n))
+print(f"requests per arm to detect a {delta:.0%} drop = {n}")
+
+# Healthy canary: both arms truly at p0 (no regression).
+control = rng.random(n) < p0
+canary  = rng.random(n) < p0
+pc, pk = control.mean(), canary.mean()
+
+pooled = (control.sum() + canary.sum()) / (2 * n)
+se = sqrt(pooled * (1 - pooled) * 2 / n)
+z = (pc - pk) / se                        # positive z means canary looks worse
+print(f"control = {pc:.3f}, canary = {pk:.3f}, z = {z:.2f}")
+
+ship = z < z_a                            # not significantly worse -> ramp
+print("decision:", "ramp up" if ship else "ROLL BACK")
+assert ship                              # a genuinely healthy canary is not rolled back
+```
+
+The sizing formula asks for roughly $2400$ requests per arm; a canary that is
+actually healthy produces a small $z$ inside the gate, so it correctly ramps rather
+than rolling back, the complement of the regression caught in the lesson's worked
+example.
+
+</details>
+
+A model that survives the canary and ramps to
 100% is now the thing the [monitoring and retraining](I4/production-drift) lessons
 watch over its production lifetime.
 

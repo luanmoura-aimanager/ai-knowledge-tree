@@ -4,7 +4,7 @@ pillar: I
 subId: I2
 lessonId: hyperparameter-search
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Frame hyperparameter tuning as black-box optimization over a search space, and see why random search dominates grid search when only a few dimensions actually matter."
 prerequisites: ["A3/bayesian-optimization"]
 ---
@@ -90,9 +90,108 @@ print("random search beats grid on the same budget:", True)
 
 With nine runs the grid pins the important hyperparameter to three coarse values
 and never gets close to the peak at $0.3$, while random search, sampling nine
-distinct values of it, lands nearer on average. The next lesson stops paying for
-*full* runs at all: [multi-fidelity HPO](multi-fidelity-hpo) kills bad
-configurations early and reallocates their budget to the survivors.
+distinct values of it, lands nearer on average.
+
+## Exercises
+
+**Exercise 1.** You have a budget of $N = 64$ runs over $d$ hyperparameters using
+a balanced grid (the same number $k$ of values per axis, so $N = k^d$). Compute
+the per-axis resolution $k$ for $d = 1, 2, 3, 6$. Contrast each with the per-axis
+resolution random search achieves on the same budget, and state in one sentence
+what the table says about where grid search fails.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A balanced grid spends $N = k^d$, so $k = N^{1/d}$. With $N = 64$:
+
+- $d = 1$: $k = 64^{1} = 64$.
+- $d = 2$: $k = 64^{1/2} = 8$.
+- $d = 3$: $k = 64^{1/3} = 4$.
+- $d = 6$: $k = 64^{1/6} = 2$.
+
+**Step 2.** Random search draws each of the $64$ configurations independently, so
+projecting onto any single axis gives $64$ distinct values of that hyperparameter
+regardless of $d$.
+
+**Step 3.** Grid resolution per axis collapses as $N^{1/d}$ while random search
+holds at $N$. As the number of knobs grows, the grid checks each important
+hyperparameter at fewer and fewer settings ($2$ values at $d = 6$), which is
+exactly where it fails: with several knobs, the grid cannot resolve the few that
+matter.
+
+</details>
+
+**Exercise 2.** Suppose only one of $d$ hyperparameters affects the score, and a
+configuration counts as a "hit" if its value of that one knob lands in the best
+fraction $f$ of its range. For random search, the probability that **none** of
+$N$ independent draws is a hit is $(1 - f)^N$. Find the smallest $N$ that drives
+the miss probability below $0.05$ for $f = 0.05$, and explain why this bound does
+not depend on $d$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Require $(1 - f)^N \le 0.05$ with $f = 0.05$, i.e.
+$0.95^N \le 0.05$.
+
+**Step 2.** Take logs: $N \ln 0.95 \le \ln 0.05$. Both logs are negative, so
+dividing flips the inequality:
+
+$$
+N \ge \frac{\ln 0.05}{\ln 0.95} = \frac{-2.996}{-0.0513} \approx 58.4,
+$$
+
+so $N = 59$ runs.
+
+**Step 3.** Each draw is uniform over the whole space, so its projection onto the
+one relevant axis is uniform on that axis whatever the other $d - 1$ knobs do.
+The hit probability $f$ per draw, and therefore the miss bound $(1-f)^N$, is set
+entirely by the relevant axis; the irrelevant dimensions never enter. Random
+search is insensitive to how many useless knobs are bolted on.
+
+</details>
+
+**Exercise 3 (code).** Confirm the projection fact and the coverage gap directly.
+For a $d$-dimensional balanced grid and random search on the same budget $N$,
+count the distinct values each method produces along a single axis, and check
+that the random count matches $N$ while the grid count matches $N^{1/d}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+def grid_distinct_per_axis(N, d):
+    k = round(N ** (1 / d))                 # values per axis on a balanced grid
+    axis = np.linspace(0, 1, k)
+    pts = np.array(np.meshgrid(*([axis] * d))).reshape(d, -1).T
+    return len(np.unique(np.round(pts[:, 0], 9))), k
+
+def random_distinct_per_axis(N, d):
+    pts = rng.uniform(0, 1, size=(N, d))
+    return len(np.unique(np.round(pts[:, 0], 9)))
+
+N = 64
+for d in [2, 3, 6]:
+    g, k = grid_distinct_per_axis(N, d)
+    r = random_distinct_per_axis(N, d)
+    assert g == k == round(N ** (1 / d))    # grid: N^(1/d) distinct per axis
+    assert r == N                            # random: N distinct per axis
+    print(f"d={d}: grid {g} distinct/axis, random {r} distinct/axis")
+```
+
+The grid resolves each axis at only $N^{1/d}$ values, which shrinks fast as $d$
+grows, while random search resolves it at the full $N$ on every axis, which is the
+coverage advantage the lesson's argument rests on.
+
+</details>
+
+The next lesson stops paying for *full* runs at all:
+[multi-fidelity HPO](multi-fidelity-hpo) kills bad configurations early and
+reallocates their budget to the survivors.
 
 <Footnotes>
   <FNItem n="1">**Bergstra, J., & Bengio, Y.** (2012). "Random search for hyper-parameter optimization". *JMLR*, 13, 281-305.</FNItem>

@@ -4,7 +4,7 @@ pillar: I
 subId: I4
 lessonId: production-drift
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Separate a shift in the inputs P(x) from a shift in the labelling rule P(y|x), and monitor each in production when ground-truth labels arrive late or never."
 prerequisites: ["I1/drift-detection"]
 ---
@@ -100,9 +100,98 @@ print("data drift is seen without labels; concept drift hides until labels arriv
 
 Data drift lights up the input PSI while accuracy holds, so input monitoring flags
 it the moment it starts; concept drift leaves the input PSI at zero while accuracy
-falls to $0.80$, so nothing short of labels reveals it. Monitoring a model's
-*predictions* is one thing; judging the *quality* of a generative model's outputs is
-another, which the next lesson takes up as [LLM evaluation](llm-evaluation).
+falls to $0.80$, so nothing short of labels reveals it.
+
+## Exercises
+
+**Exercise 1.** A monitored input feature is binned into three buckets. Its
+training reference proportions are $p = (0.5, 0.3, 0.2)$ and the live proportions
+are $q = (0.3, 0.4, 0.3)$. Compute the population stability index
+$\text{PSI} = \sum_i (q_i - p_i)\ln(q_i/p_i)$ by hand, and say whether it crosses
+the common $0.25$ "significant drift" threshold.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute each bucket's contribution $(q_i - p_i)\ln(q_i/p_i)$.
+
+Bucket 1: $(0.3 - 0.5)\ln(0.3/0.5) = (-0.2)\ln(0.6) = (-0.2)(-0.5108) = 0.1022$.
+
+Bucket 2: $(0.4 - 0.3)\ln(0.4/0.3) = (0.1)\ln(1.3333) = (0.1)(0.2877) = 0.0288$.
+
+Bucket 3: $(0.3 - 0.2)\ln(0.3/0.2) = (0.1)\ln(1.5) = (0.1)(0.4055) = 0.0405$.
+
+**Step 2.** Sum: $\text{PSI} = 0.1022 + 0.0288 + 0.0405 \approx 0.1715$.
+
+**Step 3.** $0.17$ sits below the $0.25$ threshold, so this counts as moderate but
+not yet "significant" drift by the usual convention (under $0.1$ is negligible,
+$0.1$ to $0.25$ is moderate, above $0.25$ warrants action).
+
+</details>
+
+**Exercise 2.** Explain why data drift can be detected before any label arrives,
+while concept drift in general cannot. Refer to the factorization
+$P(x, y) = P(x)\,P(y \mid x)$ and to which factor each drift type touches.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Data drift is a change in $P(x)$ with $P(y \mid x)$ fixed. The factor
+$P(x)$ depends only on inputs, which arrive immediately in production, so comparing
+the live input histogram to the training reference (via KS or PSI) detects it with
+no labels at all. It is a leading indicator.
+
+**Step 2.** Concept drift is a change in $P(y \mid x)$, which involves the label
+$y$. If $P(x)$ is unchanged, every input-only statistic compares an unchanged $P(x)$
+to itself and sees nothing, yet the conditional rule has moved and accuracy decays.
+Confirming the change requires measuring accuracy or loss on freshly labelled data,
+so it is blind until labels return. That asymmetry is why concept drift is the
+dangerous case: it hides from the cheap, label-free monitor.
+
+</details>
+
+**Exercise 3 (code).** Implement PSI from scratch and verify it on a clean shift:
+a reference feature drawn uniformly on $[0, 1]$ versus a live feature shifted to
+$[0.4, 1.4]$ should give a PSI above $0.25$, while comparing the reference to a
+fresh draw from the same $[0, 1]$ should give a PSI below $0.1$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+N = 50_000
+
+def psi(ref, new, edges, eps=1e-6):
+    p = np.histogram(ref, edges)[0] / ref.size
+    q = np.histogram(new, edges)[0] / new.size
+    p, q = np.maximum(p, eps), np.maximum(q, eps)
+    return float(np.sum((q - p) * np.log(q / p)))
+
+ref = rng.uniform(0, 1, N)
+edges = np.quantile(ref, np.linspace(0, 1, 11))
+edges[0], edges[-1] = -np.inf, np.inf
+
+shifted = rng.uniform(0.4, 1.4, N)          # genuine covariate shift
+same = rng.uniform(0, 1, N)                 # no drift, just sampling noise
+
+psi_shift, psi_same = psi(ref, shifted, edges), psi(ref, same, edges)
+print(f"shifted PSI = {psi_shift:.3f}")
+print(f"same    PSI = {psi_same:.3f}")
+
+assert psi_shift > 0.25 and psi_same < 0.1
+```
+
+The shifted feature lands well above $0.25$ (the input distribution genuinely
+moved), while two draws from the same distribution give a PSI near zero, dominated
+by binning noise. PSI separates real covariate shift from sampling jitter.
+
+</details>
+
+Monitoring a model's *predictions* is one thing; judging the *quality* of a
+generative model's outputs is another, which the next lesson takes up as
+[LLM evaluation](llm-evaluation).
 
 <Footnotes>
   <FNItem n="1">**Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M., & Bouchachia, A.** (2014). "A survey on concept drift adaptation". *ACM Computing Surveys*, 46(4), 1-37. [doi:10.1145/2523813](https://doi.org/10.1145/2523813) Formalizes the P(x) vs P(y|x) drift decomposition.</FNItem>

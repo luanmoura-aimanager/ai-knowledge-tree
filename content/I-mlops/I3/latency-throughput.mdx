@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 lessonId: latency-throughput
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Summarize a latency distribution with percentiles, relate concurrency, throughput, and latency through Little's law, and see why batching raises throughput at the cost of tail latency."
 prerequisites: ["A2/expectation"]
 ---
@@ -111,9 +111,102 @@ print("\nbatching trades latency for throughput:", True)
 The $p99$ latency sits far above the mean (the reason targets are written against
 it), Little's law converts a throughput-and-latency target into a concurrency
 requirement, and the batch sweep shows throughput climbing toward $1/c_1$ while
-per-request latency climbs with it. Autoregressive models complicate this picture,
-because each request is not one forward pass but a *loop* of them, which the next
-lesson on [LLM serving](llm-serving) takes on.
+per-request latency climbs with it.
+
+## Exercises
+
+**Exercise 1.** A service measures a mean latency of $W = 40$ ms and must sustain a
+throughput of $\lambda = 500$ requests per second. Using Little's law, find the
+average concurrency $L$ the system must hold. Then, if a single replica can hold at
+most $L = 8$ requests in flight, how many replicas are needed?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Convert latency to seconds: $W = 40 \text{ ms} = 0.040$ s.
+
+**Step 2.** Apply Little's law $L = \lambda W$:
+
+$$
+L = 500 \cdot 0.040 = 20 \text{ concurrent requests}.
+$$
+
+**Step 3.** Divide by the per-replica capacity and round up: $\lceil 20 / 8 \rceil = \lceil 2.5 \rceil = 3$ replicas.
+
+So the service must carry $20$ requests in flight on average, which takes $3$
+replicas at $8$ slots each ($24$ slots of headroom for the $20$ needed).
+
+</details>
+
+**Exercise 2.** With the batch cost model $T(b) = c_0 + c_1 b$, throughput is
+$b / (c_0 + c_1 b)$. Show that throughput is strictly increasing in $b$ and
+approaches the ceiling $1/c_1$ as $b \to \infty$. Then, for $c_0 = 5$ ms and
+$c_1 = 1$ ms, find the smallest integer batch whose per-request latency $T(b)$
+exceeds a $p99$ budget of $50$ ms.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write throughput as $g(b) = b / (c_0 + c_1 b)$ and differentiate with
+the quotient rule:
+
+$$
+g'(b) = \frac{(c_0 + c_1 b) - b \cdot c_1}{(c_0 + c_1 b)^2} = \frac{c_0}{(c_0 + c_1 b)^2}.
+$$
+
+Since $c_0 > 0$, $g'(b) > 0$ for all $b$, so throughput strictly increases.
+
+**Step 2.** Take the limit by dividing numerator and denominator by $b$:
+
+$$
+\lim_{b \to \infty} \frac{b}{c_0 + c_1 b} = \lim_{b \to \infty} \frac{1}{c_0/b + c_1} = \frac{1}{c_1}.
+$$
+
+The ceiling is $1/c_1$, reached as the fixed cost $c_0$ is amortized away.
+
+**Step 3.** Solve $T(b) = 5 + b > 50$, giving $b > 45$. The smallest integer batch
+that breaks the budget is $b = 46$, with $T(46) = 51$ ms.
+
+</details>
+
+**Exercise 3 (code).** A serving system has fixed batch overhead $c_0 = 4$ ms and
+per-request cost $c_1 = 0.8$ ms. Sweep batch sizes and find the largest batch whose
+per-request latency $T(b)$ stays at or below a $p99$ budget of $30$ ms, then report
+the throughput it achieves. Verify with an assert that the chosen batch meets the
+budget and the next batch up would break it.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+c0, c1 = 4.0, 0.8          # ms fixed overhead, ms per request
+budget = 30.0              # p99 latency budget in ms
+
+batches = np.arange(1, 200)
+T = c0 + c1 * batches               # ms to process a batch of each size
+ok = T <= budget                    # batches that fit the budget
+best = batches[ok].max()            # largest batch that meets the budget
+
+T_best = c0 + c1 * best
+thru = best / T_best * 1000         # requests per second
+print(f"largest batch within {budget:.0f} ms = {best}, "
+      f"T = {T_best:.1f} ms, throughput = {thru:.0f} req/s")
+
+assert c0 + c1 * best <= budget                 # chosen batch meets the budget
+assert c0 + c1 * (best + 1) > budget            # one larger would break it
+```
+
+The largest batch is $32$ ($T = 4 + 0.8 \cdot 32 = 29.6$ ms, within budget), and
+$33$ would push $T$ to $30.4$ ms, over the line. That batch delivers about $1081$
+requests per second, climbing toward the ceiling $1/c_1 = 1250$ req/s.
+
+</details>
+
+Autoregressive models complicate this picture, because each request is not one
+forward pass but a *loop* of them, which the next lesson on
+[LLM serving](llm-serving) takes on.
 
 <Footnotes>
   <FNItem n="1">**Little, J. D. C.** (1961). "A proof for the queuing formula: L = λW". *Operations Research*, 9(3), 383-387. [doi:10.1287/opre.9.3.383](https://doi.org/10.1287/opre.9.3.383)</FNItem>

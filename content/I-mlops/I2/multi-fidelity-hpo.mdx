@@ -4,7 +4,7 @@ pillar: I
 subId: I2
 lessonId: multi-fidelity-hpo
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Spend a fixed compute budget efficiently by training many configurations briefly, then promoting only the survivors, the successive-halving rule behind Hyperband and ASHA."
 prerequisites: ["hyperparameter-search"]
 ---
@@ -104,9 +104,116 @@ print(f"speedup over training all to convergence: {full_cost / total:.2f}x")
 Each rung costs the same $27$ units of budget, the survivor lands among the very
 best configurations (here, the top-ranked one, though that is not guaranteed, which
 is exactly why several survivors are promoted per rung), and the sweep spends a
-small fraction of what training all $27$ configurations to convergence would. With a
-strong configuration chosen, the remaining infrastructure question is how to train
-*that* model when it is too big for one machine, which is
+small fraction of what training all $27$ configurations to convergence would.
+
+## Exercises
+
+**Exercise 1.** Run successive halving by hand with $n = 81$ configurations,
+reduction factor $\eta = 3$, and starting budget $b = 1$. List the
+(count, per-config budget) pair at each rung, confirm that the per-rung work is
+constant, and compute the total budget. Then compute the budget that training all
+$81$ configurations to the full budget $b_{\max}$ would cost, and give the
+speedup.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Counts shrink by $\eta = 3$ and budgets grow by $\eta$ each rung,
+starting from $(81, 1)$ until one survivor remains:
+
+- Rung 0: $(81, 1)$, work $81 \cdot 1 = 81$.
+- Rung 1: $(27, 3)$, work $27 \cdot 3 = 81$.
+- Rung 2: $(9, 9)$, work $9 \cdot 9 = 81$.
+- Rung 3: $(3, 27)$, work $3 \cdot 27 = 81$.
+- Rung 4: $(1, 81)$, work $1 \cdot 81 = 81$.
+
+**Step 2.** Every rung does $n_r b_r = (n/\eta^r)(b\eta^r) = nb = 81$ units, the
+promised constant. There are $R + 1 = 5$ rungs (since
+$R = \log_3 81 = 4$), so the total is $81 \cdot 5 = 405$ units.
+
+**Step 3.** Training all $81$ to the full budget $b_{\max} = b\,\eta^R = 81$ costs
+$81 \cdot 81 = 6561$ units. The speedup is $6561 / 405 = 16.2\times$.
+
+</details>
+
+**Exercise 2.** The whole scheme rests on relative ranking being roughly preserved
+across fidelities. Suppose at the first rung a configuration's low-budget score is
+its true quality plus zero-mean noise of standard deviation $\sigma_b$, and noise
+shrinks as $\sigma_b = c/\sqrt{b}$. Argue qualitatively why raising the starting
+budget $b$ lowers the chance of cutting a truly good configuration, and why that
+gain trades against the number of configurations you can afford to start.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A good configuration is wrongly cut when noise pushes its observed
+score below the survival cutoff. Larger noise $\sigma_b$ widens the spread of
+observed scores around the true ordering, so more good configurations land below
+the cutoff by chance.
+
+**Step 2.** Since $\sigma_b = c/\sqrt{b}$, raising the starting budget $b$ shrinks
+$\sigma_b$, tightening observed scores around true quality and making the
+top-$1/\eta$ cut at rung 0 closer to a true-quality cut. The mis-cut probability
+falls.
+
+**Step 3.** Total budget is finite. For fixed total $\approx n b (R+1)$, raising
+$b$ forces $n$ down, so fewer configurations are explored at the start. Cleaner
+early ranking is bought with a narrower search. Hyperband resolves the dilemma by
+running several brackets at different $(n, b)$ trade-offs rather than committing to
+one.
+
+</details>
+
+**Exercise 3 (code).** Implement successive halving for general $(n, \eta, b)$
+with $n$ a power of $\eta$. Assert that the per-rung work is exactly $nb$ at every
+rung, that the number of rungs is $\log_\eta n + 1$, and that the total budget
+matches $nb(R+1)$. Run it for $(n, \eta) = (81, 3)$ and report the speedup over
+full training.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def sha_budget(n, eta, b=1):
+    R = round(np.log(n) / np.log(eta))      # number of cuts
+    rung_work, counts = [], []
+    count, budget = n, b
+    for r in range(R + 1):
+        rung_work.append(count * budget)
+        counts.append((count, budget))
+        count //= eta
+        budget *= eta
+    return R, rung_work, counts
+
+n, eta, b = 81, 3, 1
+R, rung_work, counts = sha_budget(n, eta, b)
+
+# Every rung does exactly n*b units of work.
+assert all(w == n * b for w in rung_work)
+# Number of rungs is log_eta(n) + 1.
+assert R + 1 == round(np.log(n) / np.log(eta)) + 1 == 5
+# Total budget equals n*b*(R+1).
+total = sum(rung_work)
+assert total == n * b * (R + 1) == 405
+
+b_max = b * eta ** R                         # full budget = 81
+full_cost = n * b_max                        # train all n to full budget
+speedup = full_cost / total
+assert np.isclose(speedup, 6561 / 405)
+print("counts/budgets per rung:", counts)
+print(f"SHA total {total} vs full {full_cost}, speedup {speedup:.2f}x")
+```
+
+The per-rung work is a flat $81$ units, the five rungs total $405$, and the sweep
+runs $16.2\times$ cheaper than training all $81$ configurations to convergence,
+matching the hand computation.
+
+</details>
+
+With a strong configuration chosen, the remaining infrastructure question is how
+to train *that* model when it is too big for one machine, which is
 [data-parallel training](data-parallel-training).
 
 <Footnotes>

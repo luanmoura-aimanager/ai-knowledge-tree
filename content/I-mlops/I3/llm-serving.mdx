@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 lessonId: llm-serving
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Size the KV-cache memory that bounds autoregressive serving and explain why continuous batching keeps the GPU saturated when requests finish at different lengths."
 prerequisites: ["latency-throughput", "E5/kv-cache", "E5/paged-attention"]
 ---
@@ -111,9 +111,108 @@ assert cont_util > static_util
 The KV cache costs half a megabyte per token here, so a couple of thousand tokens
 already consume a gigabyte per request and memory caps the batch at a few dozen
 sequences; and because requests finish at different lengths, static batching wastes
-roughly half the device while continuous batching keeps it full. When even the
-cached, full-precision model is too big or too slow for the budget, the next lever
-is to shrink the numbers themselves with [quantization](quantization).
+roughly half the device while continuous batching keeps it full.
+
+## Exercises
+
+**Exercise 1.** A transformer has $L = 40$ layers and model dimension $d = 5120$,
+served in fp16 ($s = 2$ bytes per number). Compute the KV-cache bytes per token,
+then the KV memory a single request of $n = 4096$ tokens consumes. If $32$ GB of
+GPU memory is free for the cache, how many such full-length sequences fit at once?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** KV bytes per token is $2 L d s$ (the factor $2$ for keys and values):
+
+$$
+2 \cdot 40 \cdot 5120 \cdot 2 = 819\,200 \text{ bytes} = 0.8 \text{ MB per token}.
+$$
+
+**Step 2.** A request of $n = 4096$ tokens costs $4096$ times that:
+
+$$
+819\,200 \cdot 4096 \approx 3.36 \times 10^9 \text{ bytes} \approx 3.36 \text{ GB}.
+$$
+
+**Step 3.** Divide the free memory by the per-sequence cost and floor:
+
+$$
+\left\lfloor \frac{32 \times 10^9}{3.36 \times 10^9} \right\rfloor = \lfloor 9.53 \rfloor = 9 \text{ sequences}.
+$$
+
+Memory, not compute, caps this model at $9$ concurrent full-length requests.
+
+</details>
+
+**Exercise 2.** Under static batching, utilization is
+$\left(\sum_k n_k\right) / \left(B \cdot \max_k n_k\right)$. Show that when all $B$
+output lengths are equal, utilization is exactly $1$, and that it falls toward $0$
+as one sequence grows much longer than the rest. Give the utilization for a batch
+with lengths $(10, 10, 10, 970)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** If every $n_k = c$, then $\sum_k n_k = Bc$ and $\max_k n_k = c$, so
+
+$$
+\frac{Bc}{B \cdot c} = 1.
+$$
+
+Equal lengths leave no idle slots, so the device is fully used.
+
+**Step 2.** Fix $B$ and the small lengths, and let one length $n_1 \to \infty$. The
+numerator grows like $n_1$ and the denominator like $B \cdot n_1$, so utilization
+tends to $1/B$; with the other lengths fixed and finite it is dragged below that.
+A single straggler starves the batch.
+
+**Step 3.** For $(10, 10, 10, 970)$: $\sum n_k = 1000$, $B = 4$, $\max n_k = 970$:
+
+$$
+\frac{1000}{4 \cdot 970} = \frac{1000}{3880} \approx 0.258.
+$$
+
+The batch runs at about $26\%$ utilization; three slots sit idle for most of the run.
+
+</details>
+
+**Exercise 3 (code).** Draw a batch of $B = 24$ requests with output lengths
+uniform in $[20, 600)$ (seed $0$). Compute static-batching utilization, then the
+continuous-batching throughput gain over static (continuous utilization is $1$).
+Assert the gain equals $1 / \text{static utilization}$ and exceeds $1$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+B = 24
+lengths = rng.integers(20, 600, size=B)        # output length per request
+
+static_util = lengths.sum() / (B * lengths.max())   # idle slots after early finishers
+cont_util = 1.0                                     # refilled every step
+gain = cont_util / static_util
+
+print(f"static utilization     = {static_util:.3f}")
+print(f"continuous utilization = {cont_util:.3f}")
+print(f"throughput gain        = {gain:.2f}x")
+
+assert np.isclose(gain, 1.0 / static_util)     # gain is the inverse of static util
+assert gain > 1.0                              # continuous batching wins whenever lengths vary
+```
+
+Static utilization comes out near $0.56$, so continuous batching delivers about a
+$1.8\times$ throughput gain by refilling freed slots every step instead of waiting
+for the longest sequence.
+
+</details>
+
+When even the cached, full-precision model is too big or too slow for the budget,
+the next lever is to shrink the numbers themselves with
+[quantization](quantization).
 
 <Footnotes>
   <FNItem n="1">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention". *SOSP*. [arXiv:2309.06180](https://arxiv.org/abs/2309.06180) Introduces vLLM and quantifies KV-cache memory as the binding serving constraint.</FNItem>

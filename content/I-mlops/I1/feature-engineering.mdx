@@ -4,7 +4,7 @@ pillar: I
 subId: I1
 lessonId: feature-engineering
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Turn raw columns into model-ready features by encoding categoricals and standardizing numerics, fit every transform on the training split only, and see how a leaked statistic silently inflates offline accuracy."
 prerequisites: ["feature-stores", "A2/expectation"]
 ---
@@ -111,9 +111,121 @@ target and temporal leaks distort the offline *score* far more, but all share th
 one cause. The train-only fit refuses to peek, so the shift shows up as a standard
 deviation well above one, which is information your
 [drift detector](I1/drift-detection) and [production monitor](I4/production-drift)
-need to see. With clean features defined, the next subsection moves from the data
-layer to the [infrastructure that trains](I2/experiment-tracking) the models that
-consume them.
+need to see.
+
+## Exercises
+
+**Exercise 1.** A categorical column "device" has the three levels phone, tablet,
+and desktop, and a column "country" has $180$ distinct levels. One-hot encode both. How many
+columns does the encoded feature vector have, and what does the desktop row look
+like in the device block?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** One-hot encoding maps a column with $k$ levels to $k$ indicator
+columns. Device has $k = 3$ levels, so it becomes $3$ columns; country has $k =
+180$ levels, so it becomes $180$ columns.
+
+**Step 2.** Total width is the sum across encoded columns:
+
+$$
+3 + 180 = 183 \text{ columns}.
+$$
+
+**Step 3.** A desktop row, with the device columns ordered (phone, tablet,
+desktop), is $(0, 0, 1)$ in the device block: a single $1$ in the desktop column,
+$0$ in the others. The high-cardinality country column is what drives the width,
+which is the cost one-hot pays for assuming no order between levels.
+
+</details>
+
+**Exercise 2.** Standardization is fitted on the training split: $\mu, \sigma$ are
+estimated there and frozen. Suppose the training feature has $\mu = 50$, $\sigma =
+10$. A production row arrives with $x = 80$. Compute its standardized value, then
+explain why re-estimating $\sigma$ on a pooled train-plus-production sample would
+constitute leakage even though it might look like a more accurate scale.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the frozen transform $z = (x - \mu)/\sigma$ with the train-fit
+parameters:
+
+$$
+z = \frac{80 - 50}{10} = \frac{30}{10} = 3.0.
+$$
+
+The production row sits three training-standard-deviations above the training mean.
+
+**Step 2.** Re-estimating $\sigma$ on pooled train-plus-production data makes the
+scale of every training row depend on production rows that arrive after it. At
+training and evaluation time those rows are by construction unavailable, so a model
+whose offline features used them is reading information it cannot have at serving
+time.
+
+**Step 3.** The honest pipeline freezes $\mu, \sigma$ at $50, 10$ and applies them
+unchanged forever. The point of the transform is not to track the live scale; it
+is to map every future row onto the *same* coordinate system the model learned, so
+$x = 80$ must read as $z = 3.0$ regardless of what the production batch looks like.
+
+</details>
+
+**Exercise 3 (code).** Quantify how target leakage inflates an offline score, a
+sharper version of the lesson's scaler leak. Build a binary target and a categorical
+feature with one rare level. Target-encode the feature two ways: leaked (encode
+using the whole dataset's per-level target mean, including the row being encoded)
+and honest (leave-one-out, excluding the row's own label). Show the leaked encoding
+correlates more strongly with the target than the honest one, which is the spurious
+lift that vanishes in production.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n = 2000
+# Categorical feature with 50 levels; the target is mostly noise w.r.t. the level.
+levels = rng.integers(0, 50, size=n)
+y = rng.integers(0, 2, size=n).astype(float)   # target independent of the level
+
+# Per-level sums and counts (used by both encodings).
+level_sum = np.zeros(50)
+level_cnt = np.zeros(50)
+np.add.at(level_sum, levels, y)
+np.add.at(level_cnt, levels, 1.0)
+
+# LEAKED: encode each row with its level's full mean (includes the row's own y).
+enc_leaked = level_sum[levels] / level_cnt[levels]
+
+# HONEST: leave-one-out mean (subtract the row's own label and count).
+loo_sum = level_sum[levels] - y
+loo_cnt = level_cnt[levels] - 1.0
+global_mean = y.mean()
+enc_honest = np.where(loo_cnt > 0, loo_sum / np.maximum(loo_cnt, 1.0), global_mean)
+
+corr_leaked = np.corrcoef(enc_leaked, y)[0, 1]
+corr_honest = np.corrcoef(enc_honest, y)[0, 1]
+print(f"leaked encoding corr with target = {corr_leaked:.3f}")
+print(f"honest encoding corr with target = {corr_honest:.3f}")
+
+# The leaked encoding manufactures correlation with a target it is independent of.
+assert corr_leaked > corr_honest
+assert abs(corr_honest) < 0.1   # honest encoding sees the true near-zero signal
+```
+
+Because each leaked encoding includes the row's own label, the feature partly
+echoes the target it is meant to predict, producing correlation where the true
+signal is near zero. The leave-one-out fit refuses that peek and exposes the
+feature as uninformative, which is the accuracy the model will actually reach on
+unseen rows.
+
+</details>
+
+With clean features defined, the next subsection moves from the data layer to the
+[infrastructure that trains](I2/experiment-tracking) the models that consume them.
 
 <Footnotes>
   <FNItem n="1">**Zheng, A., & Casari, A.** (2018). *Feature Engineering for Machine Learning.* O'Reilly. Categorical encoding and numeric scaling for tabular features.</FNItem>

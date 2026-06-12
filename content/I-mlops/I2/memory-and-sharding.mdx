@@ -4,7 +4,7 @@ pillar: I
 subId: I2
 lessonId: memory-and-sharding
 order: 5
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Account for the optimizer-state, gradient, and parameter memory that dominates large-model training, and compute how ZeRO's three sharding stages divide it across workers."
 prerequisites: ["data-parallel-training", "D7/model-parallel"]
 ---
@@ -99,9 +99,108 @@ print("baseline needs", per_worker_bytes(0) / GB, "GB; ZeRO-3 fits in",
 The baseline asks $120$ GB on every worker, which does not fit an $80$ GB GPU,
 while ZeRO-3 spreads the same total across the eight workers to $15$ GB each, which
 does. Sharding is what makes training a model larger than one device possible at
-all. That closes the training-infrastructure subsection; the next subsection turns
-from training the model to [serving](I3/latency-throughput) it under a latency
-budget.
+all.
+
+## Exercises
+
+**Exercise 1.** A $13$-billion-parameter model is trained with mixed-precision
+Adam on $K = 16$ workers. Using the $16P$-byte rule, compute the per-worker bytes
+for the baseline and for each ZeRO stage, and state which stages still keep a full
+parameter copy on every worker.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Per parameter the resident state is $2$ bytes fp16 params,
+$2$ bytes fp16 gradients, $12$ bytes fp32 optimizer state, totaling $16$. With
+$P = 13 \times 10^9$, the full state is $16P = 208$ GB.
+
+**Step 2.** Apply the per-worker formulas with $K = 16$
+($2P = 26$ GB, $12P = 156$ GB):
+
+- **Baseline:** $16P = 208$ GB.
+- **ZeRO-1** (shard optimizer): $2P + 2P + 12P/K = 26 + 26 + 156/16 = 61.75$ GB.
+- **ZeRO-2** (shard optimizer + gradients): $2P + (2P + 12P)/K = 26 + 182/16 = 37.375$ GB.
+- **ZeRO-3** (shard everything): $16P/K = 208/16 = 13$ GB.
+
+**Step 3.** ZeRO-1 and ZeRO-2 leave the $2P$ fp16 parameter term unsharded, so
+each worker still holds a full parameter copy. Only ZeRO-3 shards the parameters,
+which is why it alone removes the standalone $2P$ term.
+
+</details>
+
+**Exercise 2.** Show that all three ZeRO stages store the same *total* bytes
+across the cluster as the baseline, $16P$, even though per-worker memory falls. Then
+explain why ZeRO-3, despite the identical total, is the only stage that adds
+communication beyond the data-parallel gradient all-reduce.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sharded state divides one component into $K$ disjoint slices of
+$1/K$ each; summing the slices back over the $K$ workers restores the whole
+component. For ZeRO-3, per-worker is $16P/K$, so the cluster total is
+$K \cdot 16P/K = 16P$. ZeRO-1 and ZeRO-2 leave some components replicated and
+shard the rest, but each sharded component still sums to its full size, so the
+total is again $16P$. Sharding redistributes the same bytes; it does not delete
+any.
+
+**Step 2.** ZeRO-1 and ZeRO-2 keep the full fp16 parameters resident on every
+worker, so the forward and backward passes read parameters locally and need no
+extra transfers beyond the gradient all-reduce already present.
+
+**Step 3.** ZeRO-3 shards the parameters, so a worker owns only $1/K$ of them. To
+run a layer it must gather the parameter slices it does not own from peers, then
+release them after use. That extra gather (and release) is communication the
+other stages avoid, the price ZeRO-3 pays to drive per-worker memory down to
+$16P/K$.
+
+</details>
+
+**Exercise 3 (code).** Generalize the worked example to a function of $(P, K)$
+and verify three invariants across the stages: per-worker memory is
+non-increasing from baseline through ZeRO-3, ZeRO-3 holds exactly $16P/K$ per
+worker so its distinct state summed across the cluster is $16P$, and the
+fully-replicated baseline holds that same $16P$ of distinct state.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def per_worker_bytes(P, K, stage):
+    param_b, grad_b, opt_b = 2 * P, 2 * P, 12 * P
+    if stage == 0: return param_b + grad_b + opt_b
+    if stage == 1: return param_b + grad_b + opt_b / K
+    if stage == 2: return param_b + (grad_b + opt_b) / K
+    if stage == 3: return (param_b + grad_b + opt_b) / K
+
+P, K = 13e9, 16
+mems = [per_worker_bytes(P, K, s) for s in range(4)]
+
+# Per-worker memory is non-increasing baseline -> ZeRO-3.
+assert all(mems[i] >= mems[i + 1] for i in range(3))
+
+# The sharded distinct state summed across workers is 16P at every stage.
+# ZeRO-3 shards all three components, so its per-worker total times K is 16P.
+assert np.isclose(per_worker_bytes(P, K, 3) * K, 16 * P)
+assert np.isclose(per_worker_bytes(P, K, 3), 16 * P / K)
+# Baseline replicates everything, so its distinct state is also 16P.
+assert np.isclose(per_worker_bytes(P, K, 0), 16 * P)
+
+GB = 1e9
+print([round(m / GB, 2) for m in mems], "GB/worker, baseline -> ZeRO-3")
+```
+
+Per-worker memory falls monotonically from $208$ GB to $13$ GB across the stages,
+and ZeRO-3 lands at exactly $16P/K$ per worker, confirming the accounting scales
+to any $(P, K)$.
+
+</details>
+
+That closes the training-infrastructure subsection; the next subsection turns from
+training the model to [serving](I3/latency-throughput) it under a latency budget.
 
 <Footnotes>
   <FNItem n="1">**Rajbhandari, S., Rasley, J., Ruwase, O., & He, Y.** (2020). "ZeRO: memory optimizations toward training trillion parameter models". *SC*. [arXiv:1910.02054](https://arxiv.org/abs/1910.02054) The $16P$ mixed-precision memory accounting and the three sharding stages.</FNItem>

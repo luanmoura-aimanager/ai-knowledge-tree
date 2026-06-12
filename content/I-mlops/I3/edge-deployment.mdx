@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 lessonId: edge-deployment
 order: 5
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Reason about deploying to phones and embedded targets, where the binding constraints are memory, power, and offline operation rather than peak throughput, via exchange formats and graph optimization."
 prerequisites: ["quantization"]
 codeExempt: true
@@ -84,7 +84,85 @@ without changing what it computes:
 
 Together, quantization to shrink the weights, an exchange format to reach the
 hardware, and graph optimization to use it well are what turn a data-center model
-into one that runs in a few hundred milliseconds on a phone. That closes the
+into one that runs in a few hundred milliseconds on a phone.
+
+## Exercises
+
+**Exercise 1.** A speech model could run either as a cloud endpoint or on-device.
+For each of the three edge pressures in the lesson (latency/connectivity, privacy,
+cost), give a concrete deployment scenario where that pressure alone forces the
+model onto the device, even if the cloud model were more accurate.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (latency/connectivity).** A car's voice command system or an offline
+dictation feature on a plane must respond with no network. A round trip adds latency
+and fails entirely when offline, so the model must be on-device regardless of cloud
+accuracy.
+
+**Step 2 (privacy).** A medical transcription app handling patient audio may be
+legally required to keep data on the device. If the audio cannot leave the device,
+the model cannot live in the cloud, accuracy notwithstanding.
+
+**Step 3 (cost).** A keyboard's always-on dictation runs millions of times per user
+per day. On-device inference runs on hardware the user already paid for, so its
+marginal server cost is zero; at that scale a more accurate cloud model could be
+economically impossible to serve.
+
+</details>
+
+**Exercise 2.** Graph optimization rewrites a model "without changing what it
+computes." Explain why operator fusion (merging a convolution, bias add, and ReLU
+into one kernel) speeds up inference even though it performs the same arithmetic,
+and connect this to the memory-bound argument from the quantization lesson.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Run separately, each operation reads its input from memory and writes
+its output back: the convolution writes a tensor, the bias add reads and rewrites
+it, the ReLU reads and rewrites it again. The arithmetic is cheap; the repeated
+memory round-trips are not.
+
+**Step 2.** Fusion keeps the intermediate values in fast registers or on-chip cache
+and applies all three operations in one pass, so the tensor is read once and written
+once. The same floating-point operations happen, but the memory traffic collapses.
+
+**Step 3.** This is the memory-bound regime: throughput is limited by moving data,
+not by the compute units. Quantization attacks the same bottleneck from the other
+side, shrinking the *bytes per weight* moved; fusion shrinks the *number of trips*.
+Both win by reducing memory traffic, not arithmetic.
+
+</details>
+
+**Exercise 3.** An exchange format like ONNX sits between the training framework and
+the serving runtime. Describe the coupling a team would suffer without it (training
+in PyTorch, deploying to three platforms: iOS, Android, and a browser), and how the
+format removes that coupling. Identify the one thing the format alone does not give
+you that still requires per-platform work.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (the coupling).** Without an exchange format, the model's served form is
+tied to its training framework. Reaching iOS, Android, and a browser would mean
+maintaining three separate hand-ported reimplementations of the model, each kept in
+sync with the PyTorch original as it changes: a combinatorial maintenance burden.
+
+**Step 2 (what the format removes).** Exporting once to a standard serialization of
+the computation graph (ONNX) decouples "trained in" from "served by." Any runtime
+that reads the format can load the one exported graph, so the team maintains a
+single artifact instead of three ports.
+
+**Step 3 (what remains).** The format standardizes the graph, not its execution on
+each chip. Compiling the graph to a platform's accelerators (CoreML for Apple,
+TFLite for Android, a browser runtime) and the per-target graph optimization and
+kernel selection are still platform-specific work the format does not do for you.
+
+</details>
+
+That closes the
 deployment subsection. The model is now trained, served, and shipped; the final
 subsection asks how to know it is still *working* once real traffic hits it, which
 is [monitoring](I4/slos-and-error-budgets).
