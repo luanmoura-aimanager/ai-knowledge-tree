@@ -1,0 +1,277 @@
+---
+title: "Double and triple integrals"
+pillar: L
+subId: L5
+lessonId: multiple-integrals
+order: 1
+estimatedMinutes: 32
+goal: "Integrate over regions of the plane and space with iterated integrals, justify swapping order with Fubini's theorem, and compute volumes and averages."
+prerequisites: ["L3/fundamental-theorem", "L4/multivariable-functions"]
+---
+
+A joint probability density assigns mass over a *plane*, not a line, and
+total mass means integrating over a two-dimensional region. The Riemann
+recipe survives the dimension jump unchanged, chop, sample, sum, refine,
+but a new practical question appears: how to actually *compute* such an
+integral. The answer, slice it into one-dimensional integrals and use the
+FTC twice, is the **iterated integral**, and the license to slice in
+whichever order is convenient is **Fubini's theorem**.
+
+## The double integral
+
+For $f(x, y)$ on a region $R$ in the plane, partition $R$ into small cells
+of area $\Delta A$, sample, and sum:
+
+$$
+\iint_R f(x, y)\, dA
+= \lim_{\Delta A \to 0} \sum_k f(x_k^*, y_k^*) \, \Delta A_k .
+$$
+
+For $f \ge 0$ this is the **volume** under the surface $z = f(x,y)$ over
+$R$; for $f = 1$ it is the **area** of $R$ itself; for a density it is the
+mass (or probability) sitting on $R$. Continuous integrands on decent
+regions are integrable, by the same trapping argument as in L3.
+
+## Iterated integrals and Fubini
+
+Compute by slicing. Over the rectangle
+$R = [a, b] \times [c, d]$:
+
+$$
+\iint_R f \, dA
+= \int_a^b \left( \int_c^d f(x, y) \, dy \right) dx
+= \int_c^d \left( \int_a^b f(x, y) \, dx \right) dy .
+$$
+
+The inner integral freezes one variable (the partial-derivative move, in
+reverse) and computes the area of one cross-sectional slice; the outer
+integral stacks the slices. **Fubini's theorem** is the middle equality:
+for continuous $f$ (more generally, whenever
+$\iint \lvert f \rvert$ is finite), the two slicing orders agree<FN n="1" />.
+
+**Worked example 1.** $\iint_R x y^2 \, dA$ on
+$R = [0, 2] \times [0, 1]$:
+
+$$
+\int_0^2 \left( \int_0^1 x y^2 \, dy \right) dx
+= \int_0^2 x \left[ \frac{y^3}{3} \right]_0^1 dx
+= \int_0^2 \frac{x}{3}\, dx = \frac{1}{3} \cdot \frac{4}{2} = \frac{2}{3} .
+$$
+
+(The integrand factors as $x \cdot y^2$, so the double integral factors
+into $\int_0^2 x\,dx \cdot \int_0^1 y^2\,dy = 2 \cdot \tfrac13$: products
+of single-variable functions integrate as products, the continuous
+version of independent random variables factorizing.)
+
+**Worked example 2 (non-rectangular region).** The triangle $T$ with
+vertices $(0,0)$, $(1, 0)$, $(1, 1)$ is described by
+$0 \le x \le 1$, $0 \le y \le x$: the inner limits *depend on the outer
+variable*. Then
+
+$$
+\iint_T e^{x^2}\, dA = \int_0^1 \int_0^x e^{x^2}\, dy\, dx
+= \int_0^1 x e^{x^2} dx = \frac{e - 1}{2},
+$$
+
+by the substitution from L3. Try the other order and the inner integral
+is $\int_y^1 e^{x^2} dx$: no elementary antiderivative, dead end. **Order
+of integration is a real decision on non-rectangular regions**, and
+re-describing the region to swap the order (here: $y \le x \le 1$,
+$0 \le y \le 1$) is the standard rescue when one order stalls.
+
+![The region under a parabola sliced both ways: vertical strips integrate dy first, horizontal strips integrate dx first. Fubini's theorem says the two stacks total the same volume.](/figures/L5/multiple-integrals.svg)
+
+The caution attached to Fubini: the theorem has hypotheses. When
+$\iint \lvert f \rvert = \infty$, the two orders can disagree outright (the
+classic $\frac{x^2 - y^2}{(x^2+y^2)^2}$ on the unit square gives
+$\pi/4$ one way and $-\pi/4$ the other). For the everyday continuous,
+bounded integrands of this pillar the license is unconditional, but
+"swap whenever" is a theorem's conclusion, not a reflex.
+
+## Triple integrals, volume, and averages
+
+One more dimension changes nothing structural:
+
+$$
+\iiint_W f \, dV = \int\!\!\int\!\!\int f(x,y,z)\; dz\, dy\, dx
+$$
+
+over a solid $W$, computed by three nested slices with any workable
+ordering of the six possible. With $f = 1$ it measures volume; with $f$ a
+density it measures mass.
+
+The **average value** generalizes verbatim from L3:
+
+$$
+\bar{f} = \frac{1}{\operatorname{area}(R)} \iint_R f \, dA ,
+$$
+
+and likewise with volume in 3D. This is the definition behind every
+"expected value of a joint distribution" in A2: an expectation is an
+average against a density,
+$\mathbb{E}[g(X, Y)] = \iint g(x,y)\, p(x,y)\, dA$, a double integral
+with a probability weight.
+
+**Worked example 3.** Average of $f(x,y) = x^2 + y^2$ over the unit
+square $[0,1]^2$:
+
+$$
+\iint f\, dA = \int_0^1\!\!\int_0^1 (x^2 + y^2)\, dy\, dx
+= \int_0^1 \left( x^2 + \tfrac13 \right) dx = \tfrac13 + \tfrac13 = \tfrac23 ,
+$$
+
+and the square has area $1$, so $\bar f = \tfrac23$: the mean squared
+distance from the origin of a uniformly random point in the unit square.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Worked example 1 on a grid: midpoint rule in 2D
+n = 2000
+x = (np.arange(n) + 0.5) * (2.0 / n)            # midpoints on [0, 2]
+y = (np.arange(n) + 0.5) * (1.0 / n)            # midpoints on [0, 1]
+X, Y = np.meshgrid(x, y, indexing="ij")
+cell = (2.0 / n) * (1.0 / n)
+I = np.sum(X * Y**2) * cell
+assert abs(I - 2 / 3) < 1e-6
+
+# Fubini on the grid: row-sums-then-columns == columns-then-rows
+F = X * Y**2 * cell
+assert np.isclose(F.sum(axis=0).sum(), F.sum(axis=1).sum())
+
+# Worked example 2: the triangle, by masking
+m = 3000
+u = (np.arange(m) + 0.5) / m
+U, V = np.meshgrid(u, u, indexing="ij")          # unit square midpoints
+mask = V <= U                                     # the triangle y <= x
+I_tri = np.sum(np.exp(U**2) * mask) / m**2
+assert abs(I_tri - (np.e - 1) / 2) < 1e-3
+
+# Average of x^2 + y^2 over the unit square: 2/3, cross-checked by Monte Carlo
+rng = np.random.default_rng(0)
+pts = rng.random((2_000_000, 2))
+mc = np.mean(pts[:, 0] ** 2 + pts[:, 1] ** 2)
+print("grid 2/3 =", 2 / 3, " monte carlo:", round(mc, 5))
+assert abs(mc - 2 / 3) < 1e-3
+```
+
+The grid sum hits $2/3$ to six decimals, summing rows-then-columns equals
+columns-then-rows to machine precision (Fubini on a finite grid is just
+reordering a finite sum, which is the theorem's heart), the masked
+triangle reproduces $(e-1)/2$, and two million random points agree with
+the average.
+
+## Exercises
+
+**Exercise 1.** Compute
+$\displaystyle \iint_R (2x + 3y^2)\, dA$ over $R = [0,1] \times [1, 2]$,
+both orders, confirming they agree.
+
+<details>
+<summary>Solution</summary>
+
+**Order 1 ($y$ inner).**
+
+$$
+\int_0^1 \int_1^2 (2x + 3y^2)\, dy\, dx
+= \int_0^1 \left[ 2xy + y^3 \right]_{y=1}^{2} dx
+= \int_0^1 (2x + 7)\, dx = 1 + 7 = 8 .
+$$
+
+**Order 2 ($x$ inner).**
+
+$$
+\int_1^2 \int_0^1 (2x + 3y^2)\, dx\, dy
+= \int_1^2 \left[ x^2 + 3y^2 x \right]_{x=0}^{1} dy
+= \int_1^2 (1 + 3y^2)\, dy = 1 + (8 - 1) = 8 .
+$$
+
+Both stacks of slices total $8$, as Fubini guarantees for a polynomial on
+a rectangle.
+
+</details>
+
+**Exercise 2.** Evaluate
+$\displaystyle \int_0^1 \int_y^1 \sin(x^2)\, dx \, dy$ by swapping the
+order of integration. (As written, the inner integral has no elementary
+antiderivative.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read off the region: $y \le x \le 1$ with $0 \le y \le 1$ is
+the triangle below the diagonal, the same $T$ as the worked example.
+Re-describe it with $x$ outer: $0 \le x \le 1$, $0 \le y \le x$.
+
+**Step 2.** Swap:
+
+$$
+\int_0^1 \int_0^x \sin(x^2)\, dy\, dx
+= \int_0^1 x \sin(x^2)\, dx .
+$$
+
+**Step 3.** Substitute $u = x^2$, $du = 2x\,dx$ (L3):
+
+$$
+\frac{1}{2} \int_0^1 \sin u \, du = \frac{1 - \cos 1}{2} \approx 0.22985 .
+$$
+
+The unintegrable order and the easy order describe the same solid; the
+swap is what made the FTC applicable.
+
+</details>
+
+**Exercise 3 (code).** A joint density on the unit square:
+$p(x, y) = x + y$ (check it integrates to 1). Compute, by 2D midpoint
+grid, the expectation $\mathbb{E}[XY] = \iint xy\, p \, dA$ and the
+marginal density value $p_X(0.5) = \int_0^1 p(0.5, y)\, dy$, comparing
+both against the closed forms $1/3$ and $1$.
+
+<details>
+<summary>Solution</summary>
+
+**Closed forms.** Total mass:
+$\iint (x+y) dA = \tfrac12 + \tfrac12 = 1$, a valid density.
+$\mathbb{E}[XY] = \int_0^1\!\int_0^1 xy(x+y)\,dy\,dx
+= \int_0^1 \left( \tfrac{x^2}{2} + \tfrac{x}{3} \right) dx
+= \tfrac16 + \tfrac16 = \tfrac13$.
+Marginal: $p_X(0.5) = \int_0^1 (0.5 + y)\, dy = 0.5 + 0.5 = 1$.
+
+```python
+import numpy as np
+
+n = 4000
+u = (np.arange(n) + 0.5) / n
+X, Y = np.meshgrid(u, u, indexing="ij")
+cell = 1.0 / n**2
+p = X + Y
+
+assert abs(np.sum(p) * cell - 1.0) < 1e-9          # a true density
+
+E_xy = np.sum(X * Y * p) * cell
+print("E[XY] =", round(E_xy, 8), " (closed form 1/3)")
+assert abs(E_xy - 1 / 3) < 1e-6
+
+pX_half = np.sum((0.5 + u)) / n                     # 1D midpoint in y
+print("p_X(0.5) =", round(pX_half, 8))
+assert abs(pX_half - 1.0) < 1e-9
+```
+
+The density integrates to one, the expectation comes out at $1/3$, and
+integrating out $y$ at $x = 0.5$ gives the marginal value $1$: the joint-
+distribution machinery of A2 is double integration with probability
+weights, no more.
+
+</details>
+
+Rectangles and triangles slice cleanly along the axes; circles do not, and
+the natural fix, integrating in polar coordinates, costs a stretching
+factor. The next lesson computes that factor with the Jacobian determinant
+and uses it to finally crack the Gaussian integral.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 5, double and triple integrals and Fubini's theorem.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 15.1-15.3 and 15.6, iterated integrals over general regions.</FNItem>
+</Footnotes>

@@ -1,0 +1,289 @@
+---
+title: "Divergence and curl"
+pillar: L
+subId: L5
+lessonId: divergence-curl
+order: 4
+estimatedMinutes: 31
+goal: "Define divergence as local flux density and curl as local circulation density, compute both, and identify irrotational and incompressible fields."
+prerequisites: ["line-integrals"]
+---
+
+Last lesson measured a field's behavior along whole curves. The two
+differential operators of this lesson shrink those measurements to a
+point: **divergence** asks "how much does the field pour out of an
+infinitesimal box here?", and **curl** asks "how hard does it spin an
+infinitesimal paddle wheel here?". They are the local face of flux and
+circulation, and the integral theorems next lesson will say so exactly.
+
+## Divergence
+
+For $\mathbf{F} = (P, Q, R)$ on $\mathbb{R}^3$ (drop $R$ and $z$ for the
+plane),
+
+$$
+\operatorname{div} \mathbf{F} = \nabla \cdot \mathbf{F}
+= \frac{\partial P}{\partial x} + \frac{\partial Q}{\partial y} + \frac{\partial R}{\partial z} :
+$$
+
+a **scalar** field, the trace of the Jacobian of $\mathbf{F}$. The
+notation $\nabla \cdot$ reads the symbol
+$\nabla = (\partial_x, \partial_y, \partial_z)$ as a vector of operators
+dotted into $\mathbf{F}$.
+
+Why "outflow density": consider a small box at a point, side lengths
+$\Delta x, \Delta y, \Delta z$. The net flow out through the two
+$x$-faces is (flow out right) minus (flow in left)
+$\approx \left[ P(x + \Delta x) - P(x) \right] \Delta y \, \Delta z
+\approx \frac{\partial P}{\partial x} \Delta V$, and likewise per axis.
+Summing: net outflow $\approx (\operatorname{div} \mathbf{F}) \, \Delta V$. Positive
+divergence: a source (more leaves than enters); negative: a sink;
+**zero everywhere: incompressible**, what flows in flows out, the
+defining property of an idealized fluid and of any flow that preserves
+volume.
+
+**Worked examples.** The radial field $\mathbf{F} = (x, y)$:
+$\operatorname{div} = 1 + 1 = 2$ everywhere, a uniform source (the figure's left
+panel, arrows fleeing every point). The rotation field
+$(-y, x)$: $\operatorname{div} = 0 + 0 = 0$, pure stirring, no net outflow, matching
+its closed circular streamlines. The shear field $(y, 0)$:
+$\operatorname{div} = 0$ as well; incompressibility allows plenty of motion, just no
+compression.
+
+## Curl
+
+In three dimensions,
+
+$$
+\operatorname{curl} \mathbf{F} = \nabla \times \mathbf{F}
+= \left(
+\frac{\partial R}{\partial y} - \frac{\partial Q}{\partial z}, \;\;
+\frac{\partial P}{\partial z} - \frac{\partial R}{\partial x}, \;\;
+\frac{\partial Q}{\partial x} - \frac{\partial P}{\partial y}
+\right) ,
+$$
+
+a **vector** field: its direction is the axis the paddle wheel spins
+about (right-hand rule), its magnitude twice the angular velocity. For
+planar fields $(P(x,y), Q(x,y), 0)$ only the third component survives,
+and it earns a name of its own, the **scalar curl**
+
+$$
+\operatorname{curl}_z \mathbf{F} = \frac{\partial Q}{\partial x} - \frac{\partial P}{\partial y} .
+$$
+
+This expression has appeared twice already in this pillar wearing
+disguises: it is the quantity whose vanishing was the conservative-field
+test ($P_y = Q_x$), and the antisymmetric part of the Jacobian. The
+symmetric part of $J_{\mathbf{F}}$ stretches, the trace expands, the
+antisymmetric part rotates: divergence and curl are the trace and the
+antisymmetric part of the same matrix, read separately.
+
+**Worked examples.** Rotation $(-y, x)$:
+$\operatorname{curl}_z = 1 - (-1) = 2$, a uniform spin (every paddle wheel turns at
+the same rate, even far from the center, because the field's shear is
+the same everywhere). Radial $(x, y)$:
+$\operatorname{curl}_z = 0 - 0 = 0$: **irrotational**. Shear $(y, 0)$:
+$\operatorname{curl}_z = 0 - 1 = -1$: no closed streamlines anywhere, yet a paddle
+wheel spins clockwise, because the flow pushes its top harder than its
+bottom. That is the named confusion: **curl measures local shear-spin,
+not whether the streamlines loop.** A field can swirl globally with zero
+curl (the punctured-plane vortex of last lesson's exercise: curl zero
+away from the origin, all circulation concentrated at the puncture) and
+flow straight with nonzero curl (the shear).
+
+![Side by side: the radial source field, all outflow and no rotation, and the rotation field, all rotation and no outflow. Divergence picks out the first behavior, curl the second, and a general field mixes both.](/figures/L5/divergence-curl.svg)
+
+Gradient fields are automatically irrotational:
+$\operatorname{curl}(\nabla f) = \mathbf{0}$, because each component is a difference of
+mixed partials that Clairaut (L4) makes equal, e.g. the $z$-component is
+$f_{yx} - f_{xy} = 0$. The companion identity
+$\operatorname{div}(\operatorname{curl} \mathbf{F}) = 0$ holds by the same cancellation. These two
+"derivative of a derivative is zero" facts organize the whole subject
+(they are the reason potentials and vector potentials exist), and the
+exercise below proves the first one cleanly<FN n="1" />.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+h = 1e-5
+
+def div_num(F, p):
+    out = 0.0
+    for i in range(len(p)):
+        e = np.zeros_like(p); e[i] = h
+        out += (F(p + e)[i] - F(p - e)[i]) / (2 * h)
+    return out
+
+def curlz_num(F, p):
+    ex, ey = np.array([h, 0.0]), np.array([0.0, h])
+    dQdx = (F(p + ex)[1] - F(p - ex)[1]) / (2 * h)
+    dPdy = (F(p + ey)[0] - F(p - ey)[0]) / (2 * h)
+    return dQdx - dPdy
+
+radial = lambda p: np.array([p[0], p[1]])
+rot = lambda p: np.array([-p[1], p[0]])
+shear = lambda p: np.array([p[1], 0.0])
+
+rng = np.random.default_rng(0)
+for _ in range(50):
+    p = rng.uniform(-2, 2, 2)
+    assert np.isclose(div_num(radial, p), 2.0, atol=1e-6)
+    assert np.isclose(curlz_num(radial, p), 0.0, atol=1e-6)
+    assert np.isclose(div_num(rot, p), 0.0, atol=1e-6)
+    assert np.isclose(curlz_num(rot, p), 2.0, atol=1e-6)
+    assert np.isclose(div_num(shear, p), 0.0, atol=1e-6)
+    assert np.isclose(curlz_num(shear, p), -1.0, atol=1e-6)
+
+# curl of a gradient vanishes: try f = x^2 y + sin(x y)
+f = lambda p: p[0] ** 2 * p[1] + np.sin(p[0] * p[1])
+gradf = lambda p: np.array([2 * p[0] * p[1] + p[1] * np.cos(p[0] * p[1]),
+                            p[0] ** 2 + p[0] * np.cos(p[0] * p[1])])
+for _ in range(50):
+    p = rng.uniform(-1.5, 1.5, 2)
+    assert abs(curlz_num(gradf, p)) < 1e-5
+
+# Divergence as box outflow: flux of F = (x^2, y^2)-style nonlinear field
+# (here F = (x^2, x*y)) through a tiny square boundary, by midpoint sums
+G = lambda x, y: (x**2 + 0 * y, x * y)             # div G = 2x + x = 3x
+p0, s = np.array([0.7, -0.4]), 1e-3
+n = 20000
+t = -s / 2 + (np.arange(n) + 0.5) * (s / n)        # midpoints along each side
+dt = s / n
+flux = (np.sum(G(p0[0] + s / 2, p0[1] + t)[0]) * dt    # right: +P
+        - np.sum(G(p0[0] - s / 2, p0[1] + t)[0]) * dt  # left:  -P
+        + np.sum(G(p0[0] + t, p0[1] + s / 2)[1]) * dt  # top:   +Q
+        - np.sum(G(p0[0] + t, p0[1] - s / 2)[1]) * dt) # bottom: -Q
+print("flux / area:", flux / s**2, " div at p0:", 3 * p0[0])
+assert np.isclose(flux / s**2, 3 * p0[0], atol=1e-6)
+```
+
+Fifty random points confirm each field's signature (source: div 2, curl
+0; rotation: div 0, curl 2; shear: div 0, curl −1), the gradient field's
+curl vanishes everywhere sampled, and the outflow through a tiny box,
+divided by its area, lands on the divergence: the box argument, run
+numerically.
+
+## Exercises
+
+**Exercise 1.** For
+$\mathbf{F}(x, y, z) = (x^2 y, \; y z^2, \; x z)$, compute
+$\operatorname{div} \mathbf{F}$ and $\operatorname{curl} \mathbf{F}$, and evaluate both at
+$(1, 2, -1)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Divergence, term by diagonal term:
+
+$$
+\operatorname{div} \mathbf{F} = 2xy + z^2 + x ,
+$$
+
+which at $(1, 2, -1)$ is $4 + 1 + 1 = 6$: locally a source.
+
+**Step 2.** Curl, component by component from the formula:
+
+$$
+\operatorname{curl} \mathbf{F}
+= \left( \partial_y (xz) - \partial_z (yz^2), \;\;
+\partial_z (x^2 y) - \partial_x (xz), \;\;
+\partial_x (yz^2) - \partial_y (x^2 y) \right)
+= \left( -2yz, \; -z, \; -x^2 \right) .
+$$
+
+**Step 3.** At $(1, 2, -1)$:
+$\operatorname{curl} \mathbf{F} = (4, 1, -1)$: the local paddle-wheel axis points
+mostly along $+x$, with spin rate
+$\tfrac12 \lVert (4,1,-1) \rVert = \tfrac{\sqrt{18}}{2} \approx 2.12$.
+
+</details>
+
+**Exercise 2.** Prove the identity
+$\operatorname{curl}(\nabla f) = \mathbf{0}$ for any $f$ with continuous second
+partials, and state precisely where Clairaut's theorem is used.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $\nabla f = (f_x, f_y, f_z)$ and apply the curl
+formula with $P = f_x$, $Q = f_y$, $R = f_z$:
+
+$$
+\operatorname{curl}(\nabla f)
+= \left( \partial_y f_z - \partial_z f_y, \;\;
+\partial_z f_x - \partial_x f_z, \;\;
+\partial_x f_y - \partial_y f_x \right) .
+$$
+
+**Step 2.** Each component is a difference of mixed second partials in
+opposite orders: $f_{zy} - f_{yz}$, $f_{xz} - f_{zx}$,
+$f_{yx} - f_{xy}$.
+
+**Step 3.** Clairaut's theorem (continuous second partials) equates each
+pair, so every component is zero. The hypothesis is exactly what
+Clairaut needs; with discontinuous second partials the identity can
+fail. Conclusion: gradient fields are irrotational wherever they are
+twice continuously differentiable, which is the easy direction of the
+conservative-field characterization from last lesson.
+
+</details>
+
+**Exercise 3 (code).** The velocity field of a rigid body rotating at
+angular velocity $\boldsymbol{\omega} = (0, 0, \omega)$ is
+$\mathbf{v}(\mathbf{r}) = \boldsymbol{\omega} \times \mathbf{r} =
+(-\omega y, \, \omega x, \, 0)$. Verify numerically for
+$\omega = 3$: (a) $\operatorname{curl} \mathbf{v} = 2\boldsymbol{\omega}$ at random
+points (curl is twice the angular velocity); (b)
+$\operatorname{div} \mathbf{v} = 0$ (rigid rotation preserves volume).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+w = 3.0
+v = lambda p: np.array([-w * p[1], w * p[0], 0.0])
+h = 1e-5
+
+def partial(F, p, i, j):
+    e = np.zeros(3); e[j] = h
+    return (F(p + e)[i] - F(p - e)[i]) / (2 * h)
+
+def curl(F, p):
+    return np.array([partial(F, p, 2, 1) - partial(F, p, 1, 2),
+                     partial(F, p, 0, 2) - partial(F, p, 2, 0),
+                     partial(F, p, 1, 0) - partial(F, p, 0, 1)])
+
+def div(F, p):
+    return sum(partial(F, p, i, i) for i in range(3))
+
+rng = np.random.default_rng(0)
+for _ in range(100):
+    p = rng.uniform(-5, 5, 3)
+    assert np.allclose(curl(v, p), [0.0, 0.0, 2 * w], atol=1e-6)
+    assert abs(div(v, p)) < 1e-6
+print("curl = (0, 0, 2w) and div = 0 at 100 random points; w =", w)
+```
+
+At every sampled point the curl is $(0, 0, 6) = 2\boldsymbol{\omega}$ and
+the divergence vanishes: the paddle wheel in a rigidly rotating fluid
+spins at the body's own rate (hence the factor 2 normalization in the
+definition), and rigid motion compresses nothing. The factor-of-two and
+the zero are both worth carrying as calibration constants for reading
+real fields.
+
+</details>
+
+Divergence and curl are pointwise densities of outflow and circulation;
+the next lesson states the three theorems (Green, Stokes, divergence)
+that integrate them back up, each one an FTC in higher dimensions.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 4.4, divergence and curl, with the trace/antisymmetric-part reading of the Jacobian.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 16.5, curl and divergence and their physical interpretations.</FNItem>
+  <FNItem n="3">**Feynman, R. P., Leighton, R. B., & Sands, M.** (1964). *The Feynman Lectures on Physics, Vol. II.* Addison-Wesley. Ch. 2-3, the vector operators with the box and paddle-wheel pictures this lesson borrows. [https://www.feynmanlectures.caltech.edu/II_02.html](https://www.feynmanlectures.caltech.edu/II_02.html)</FNItem>
+</Footnotes>
