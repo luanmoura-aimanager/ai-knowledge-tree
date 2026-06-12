@@ -19,6 +19,20 @@ the original values exactly, and the engineering question is how to map floats t
 integers so the error stays small and controlled. The standard answer is **affine
 quantization**<FN n="1" />.
 
+To make the stakes concrete, weigh a 7-billion-parameter model. Each weight at
+fp32 is $4$ bytes, so the raw footprint is $7\times10^9 \times 4 = 28$ GB. The bits
+per weight set everything else in proportion:
+
+- **fp32** ($4$ B/weight): $28$ GB. Will not fit on a $24$ GB consumer GPU.
+- **fp16** ($2$ B/weight): $14$ GB. The usual serving default.
+- **int8** ($1$ B/weight): $7$ GB. Now it fits a single $24$ GB card with room for
+  activations.
+- **int4** ($\tfrac12$ B/weight): $3.5$ GB. Eight times smaller than fp32, small
+  enough for a laptop GPU, and where accuracy starts to need careful schemes.
+
+The footprint scales linearly with the bit budget, so the same map that saves
+bytes is the one that decides whether the model fits the hardware at all.
+
 ## The affine map
 
 Take a tensor of weights spanning the range $[\beta_{\min}, \beta_{\max}]$, and a
