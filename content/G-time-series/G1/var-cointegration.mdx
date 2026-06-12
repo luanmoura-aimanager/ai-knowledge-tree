@@ -4,7 +4,7 @@ pillar: G
 subId: G1
 lessonId: var-cointegration
 order: 7
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Extend AR to a vector autoregression, define cointegration between integrated series, and write the error-correction (VECM) representation."
 prerequisites: ["ar-ma-processes", "A1/eigenvalues"]
 ---
@@ -122,6 +122,128 @@ print(f"I(1) ensemble var at t={n//4}: {var_t[n//4]:.0f}   at t={n-1}: {var_t[-1
 The spread $y_2 - 2y_1$ has stable variance across the sample while each level
 series' variance grows, the empirical signature that two $I(1)$ series share one
 cointegrating vector.
+
+## Exercises
+
+**Exercise 1.** A bivariate VAR(1) has transition matrix
+
+$$
+A = \begin{pmatrix} 0.5 & 0.2 \\ 0.1 & 0.4 \end{pmatrix}.
+$$
+
+Compute its eigenvalues and decide whether the VAR is stationary. State the
+condition you are checking.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The stationarity condition is that every eigenvalue of $A$ has modulus
+below one. The eigenvalues solve $\det(A - \lambda I) = 0$.
+
+**Step 2.** The characteristic polynomial is
+
+$$
+(0.5 - \lambda)(0.4 - \lambda) - (0.2)(0.1) = \lambda^2 - 0.9\lambda + 0.18,
+$$
+
+since $0.5\cdot 0.4 - 0.02 = 0.20 - 0.02 = 0.18$ and the trace is $0.9$.
+
+**Step 3.** Solve the quadratic:
+
+$$
+\lambda = \frac{0.9 \pm \sqrt{0.81 - 0.72}}{2} = \frac{0.9 \pm 0.3}{2} = \{0.6,\ 0.3\}.
+$$
+
+Both eigenvalues are real and below $1$ in modulus, so the VAR(1) is stationary.
+
+</details>
+
+**Exercise 2.** Take the VAR(1) $\mathbf{x}_t = A\mathbf{x}_{t-1} +
+\boldsymbol{\varepsilon}_t$ with
+
+$$
+A = \begin{pmatrix} 0.5 & 0.5 \\ 0.5 & 0.5 \end{pmatrix}.
+$$
+
+Form $\Pi = A - I$, find its rank, and read off the cointegrating vector and
+adjustment vector from the factorization $\Pi = \boldsymbol{\alpha}
+\boldsymbol{\beta}^\top$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Subtract the identity:
+
+$$
+\Pi = A - I = \begin{pmatrix} -0.5 & 0.5 \\ 0.5 & -0.5 \end{pmatrix}.
+$$
+
+**Step 2.** The two rows are scalar multiples (row 2 is $-1$ times row 1), so
+$\operatorname{rank}(\Pi) = 1$. With $k = 2$ and $r = 1$, the case $0 < r < k$ holds:
+one cointegrating relation.
+
+**Step 3.** Factor $\Pi = \boldsymbol{\alpha}\boldsymbol{\beta}^\top$ with each
+factor $2 \times 1$. Writing $\boldsymbol{\beta} = (1, -1)^\top$ gives the
+stationary combination $\boldsymbol{\beta}^\top \mathbf{x}_t = x_{1,t} - x_{2,t}$
+(the spread). Matching entries, $\boldsymbol{\alpha} = (-0.5, 0.5)^\top$, so
+
+$$
+\boldsymbol{\alpha}\boldsymbol{\beta}^\top = \begin{pmatrix} -0.5 \\ 0.5 \end{pmatrix}\begin{pmatrix} 1 & -1 \end{pmatrix} = \begin{pmatrix} -0.5 & 0.5 \\ 0.5 & -0.5 \end{pmatrix} = \Pi.
+$$
+
+The adjustment vector $\boldsymbol{\alpha}$ pulls each $\Delta x$ back in proportion
+to last period's equilibrium error $x_{1,t-1} - x_{2,t-1}$: series 1 falls when the
+spread is positive, series 2 rises, both restoring equilibrium.
+
+</details>
+
+**Exercise 3 (code).** Simulate two cointegrated series, build the $\Pi$ matrix from
+the OLS fit of $\Delta\mathbf{x}_t$ on $\mathbf{x}_{t-1}$, and confirm by its
+singular values that $\Pi$ has effective rank $1$ (one cointegrating relation), in
+contrast to two independent random walks whose fitted $\Pi$ has near-zero rank.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(8)
+n = 4000
+
+def fit_pi(X):
+    # OLS of dX_t on X_{t-1}: dX = X_{t-1} Pi^T + noise, solve for Pi (k x k)
+    dX = np.diff(X, axis=0)
+    Xlag = X[:-1]
+    B, *_ = np.linalg.lstsq(Xlag, dX, rcond=None)   # B = Pi^T, shape k x k
+    return B.T
+
+# Cointegrated pair: common trend w drives both; spread y2 - 2 y1 is stationary
+w = np.cumsum(rng.normal(0, 1, n))
+y1 = w + rng.normal(0, 0.5, n)
+y2 = 2*w + rng.normal(0, 0.5, n)
+X_coint = np.column_stack([y1, y2])
+
+# Two independent random walks: no cointegration
+X_indep = np.cumsum(rng.normal(0, 1, (n, 2)), axis=0)
+
+s_coint = np.linalg.svd(fit_pi(X_coint), compute_uv=False)
+s_indep = np.linalg.svd(fit_pi(X_indep), compute_uv=False)
+
+# Cointegrated Pi: one clearly nonzero singular value, one near zero -> rank 1
+assert s_coint[0] / s_coint[1] > 20
+# Independent walks: both singular values tiny vs the coint dominant one -> rank 0
+assert s_indep.max() < 0.05 * s_coint[0]
+print("coint singular values:", np.round(s_coint, 4))
+print("indep singular values:", np.round(s_indep, 4))
+```
+
+The fitted $\Pi$ for the cointegrated pair shows one dominant singular value and one
+near zero, the rank-$1$ signature of a single cointegrating vector, while the
+independent walks give a $\Pi$ with both singular values near zero, the rank-$0$ "no
+cointegration" case where a VAR in differences is the right model.
+
+</details>
 
 VAR and VECM model the conditional mean across series. The next lesson turns to the
 conditional *variance* of a single series with GARCH, where the volatility itself

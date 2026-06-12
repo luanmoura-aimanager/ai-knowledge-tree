@@ -4,7 +4,7 @@ pillar: G
 subId: G4
 lessonId: statistical-anomaly-detection
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Flag point anomalies with the IQR rule and the robust z-score, and apply the generalized ESD test for multiple outliers under normality."
 prerequisites: ["G1/stationarity-acf", "B1/hypothesis-testing"]
 ---
@@ -116,6 +116,98 @@ print("IQR-rule flags:    ", np.where((x < lo) | (x > hi))[0])
 The robust z-score and the IQR rule both flag the two injected indices 37 and 112
 cleanly, while the non-robust z-score is pulled toward them and detects less
 reliably, the masking effect that motivates robust statistics.
+
+## Exercises
+
+**Exercise 1.** For the data $x = (4, 5, 6, 7, 8, 100)$, compute the IQR fences and
+say which points the rule flags. Use linear interpolation for the quartiles, so
+$Q_1$ is the value at fractional rank $0.25(n-1)$ and $Q_3$ at $0.75(n-1)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sort: the data is already sorted, $n = 6$, fractional ranks run from $0$
+to $5$. $Q_1$ sits at rank $0.25 \cdot 5 = 1.25$, between $x_{(1)} = 5$ and
+$x_{(2)} = 6$: $Q_1 = 5 + 0.25(6 - 5) = 5.25$.
+
+**Step 2.** $Q_3$ sits at rank $0.75 \cdot 5 = 3.75$, between $x_{(3)} = 7$ and
+$x_{(4)} = 8$: $Q_3 = 7 + 0.75(8 - 7) = 7.75$. So
+$\text{IQR} = 7.75 - 5.25 = 2.5$.
+
+**Step 3.** The fences are
+$Q_1 - 1.5\,\text{IQR} = 5.25 - 3.75 = 1.5$ and
+$Q_3 + 1.5\,\text{IQR} = 7.75 + 3.75 = 11.5$.
+
+**Step 4.** Only $100 > 11.5$ falls outside, so the rule flags the single point
+$100$. The other five values lie inside $[1.5, 11.5]$. The quartiles ignored the
+extreme value, so it did not inflate the fences around itself.
+
+</details>
+
+**Exercise 2.** Derive the constant $1.4826$ in the robust z-score. For
+$X \sim \mathcal{N}(\mu, \sigma^2)$, the population MAD is the value $m$ with
+$P(|X - \mu| \le m) = 1/2$. Show $m = 0.6745\,\sigma$ and hence that
+$\sigma = \text{MAD} / 0.6745 = 1.4826 \cdot \text{MAD}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By symmetry of the normal about $\mu$, the median of $|X - \mu|$ is the
+half-width $m$ such that the central interval $[\mu - m, \mu + m]$ holds half the
+mass: $P(|X - \mu| \le m) = 1/2$.
+
+**Step 2.** Standardize with $Z = (X - \mu)/\sigma$, so $m = z_0 \sigma$ where
+$P(|Z| \le z_0) = 1/2$. That means $P(Z \le z_0) = 0.75$, so $z_0$ is the
+0.75-quantile of the standard normal, $z_0 = \Phi^{-1}(0.75) \approx 0.6745$.
+
+**Step 3.** Therefore $\text{MAD} = m = 0.6745\,\sigma$ for Gaussian data, and
+inverting gives $\sigma = \text{MAD}/0.6745 \approx 1.4826 \cdot \text{MAD}$. The
+constant simply converts the MAD scale back to a standard-deviation scale so the
+robust z-score is comparable to the classical one under normality.
+
+</details>
+
+**Exercise 3 (code).** Implement one round of the generalized ESD statistic: compute
+$R_1 = \max_j |x_j - \bar{x}| / s$ and remove the maximizing point, then recompute
+$R_2$ on the reduced data. Demonstrate on a sample with two injected outliers that
+removing the first outlier makes the second one's $R_2$ larger than its masked value
+in the full sample.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(0, 1, 100)
+x[10] = 9.0; x[20] = 7.0          # two large outliers
+
+def esd_R(data):
+    m, s = data.mean(), data.std(ddof=1)
+    dev = np.abs(data - m)
+    j = dev.argmax()
+    return dev[j] / s, j
+
+# Round 1 on the full data
+R1, j1 = esd_R(x)
+reduced = np.delete(x, j1)        # drop the most extreme point
+R2, j2 = esd_R(reduced)
+
+# The second outlier's R-value when measured WITHOUT first removing the largest one
+m0, s0 = x.mean(), x.std(ddof=1)
+R_masked = np.abs(x[20] - m0) / s0
+
+assert j1 == 10                   # round 1 catches the biggest outlier
+assert R2 > R_masked              # after removal, the 2nd outlier stands out more
+print(f"R1={R1:.2f} (removed idx {j1}); R2={R2:.2f} vs masked {R_masked:.2f}")
+```
+
+Removing the largest outlier shrinks the mean and standard deviation, so the second
+outlier's deviation is measured against a cleaner spread and its $R$ value climbs,
+which is exactly how ESD defeats masking by peeling the extremes off one at a time.
+
+</details>
 
 These tests flag individual points against a static notion of normal. The next
 lesson handles a different anomaly: a sustained *shift* in the series, detected

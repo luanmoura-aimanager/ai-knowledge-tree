@@ -4,7 +4,7 @@ pillar: G
 subId: G3
 lessonId: nbeats-nhits
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Build the doubly-residual block stack of N-BEATS, express trend and seasonality as basis projections, and explain the multi-rate pooling of N-HiTS."
 prerequisites: ["G1/spectral-analysis", "D1/mlp-forward"]
 ---
@@ -124,6 +124,89 @@ print(f"trend+seasonality basis RMSE vs clean signal: {rmse:.3f}  (noise std 0.1
 The trend block absorbs the polynomial part, passes its residual to the
 seasonality block, and the summed forecast reconstructs the clean signal to the
 noise floor, the doubly-residual basis mechanism in miniature.
+
+## Exercises
+
+**Exercise 1.** An interpretable N-BEATS stack forecasts a horizon of $H = 24$
+steps. The trend block uses a polynomial basis up to degree $P = 3$, and the
+seasonality block uses a Fourier basis with the first $K = 4$ harmonics (cosine
+and sine each). How many expansion coefficients does each block's MLP output, and
+how many forecast values does each $V^f$ column span?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The trend basis has one column per polynomial degree $0,1,\dots,P$,
+so $P + 1 = 4$ columns. The MLP therefore outputs $4$ trend coefficients
+$\boldsymbol{\theta}^f$.
+
+**Step 2.** The seasonality basis has a cosine and a sine column per harmonic
+$k = 1,\dots,K$, so $2K = 8$ columns, and the MLP outputs $8$ seasonal
+coefficients.
+
+**Step 3.** Each $V^f$ is shaped $H \times (\text{columns})$: every column is a
+length-$H = 24$ vector over the horizon grid $t = 0,\dots,23$. The forecast
+$\hat{\mathbf{y}} = V^f \boldsymbol{\theta}^f$ is the length-24 weighted sum of
+those columns, so each column spans all $24$ forecast values.
+
+</details>
+
+**Exercise 2.** N-HiTS gives a block a pooling rate $r$: it average-pools the
+input by $r$ before the MLP and predicts at a reduced horizon resolution, then
+interpolates back to the full horizon $H$. For $H = 168$ and a block with pooling
+rate $r = 24$, how many control points does the block predict, and state in one
+sentence why this is efficient for the low-frequency component.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Predicting at resolution reduced by $r$ means the block emits
+$\lceil H / r \rceil = \lceil 168 / 24 \rceil = 7$ control points, which
+hierarchical interpolation then upsamples to the full $168$-step horizon.
+
+**Step 2.** A slow, low-frequency component is nearly determined by a handful of
+control points, so emitting $7$ values instead of $168$ cuts the block's output
+dimension (and parameters) by a factor of $24$ while losing nothing the smooth
+component carries.
+
+</details>
+
+**Exercise 3 (code).** Construct a signal that lies exactly in the span of a
+combined trend-plus-seasonality basis, then verify a least-squares projection onto
+that basis reconstructs it to machine precision, the property that lets N-BEATS
+blocks represent trend and seasonal components exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+H = 48
+t = np.arange(H)
+
+# Trend basis (polynomials up to degree 2) and seasonality basis (2 harmonics)
+Vt = np.stack([(t/H)**p for p in range(3)], axis=1)
+Vs = np.concatenate([np.stack([np.cos(2*np.pi*k*t/H) for k in (1, 2)], 1),
+                     np.stack([np.sin(2*np.pi*k*t/H) for k in (1, 2)], 1)], axis=1)
+V = np.concatenate([Vt, Vs], axis=1)
+
+# A signal built inside the joint span: projection must recover it exactly
+coef = rng.normal(size=V.shape[1])
+y = V @ coef
+theta, *_ = np.linalg.lstsq(V, y, rcond=None)
+recon = V @ theta
+
+print("max reconstruction error:", np.abs(recon - y).max())
+assert np.allclose(recon, y, atol=1e-8)
+```
+
+A signal in the joint span is reconstructed to machine precision, the exact-fit
+property a basis-expansion block relies on; only the part outside the span (noise
+or unmodeled frequencies) survives as residual to pass down the stack.
+
+</details>
 
 N-BEATS and N-HiTS are basis-projection models. The next lesson brings attention
 into forecasting with the Temporal Fusion Transformer, which mixes static

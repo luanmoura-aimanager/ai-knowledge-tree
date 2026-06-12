@@ -4,7 +4,7 @@ pillar: G
 subId: G5
 lessonId: granger-causality
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Define Granger causality as predictive improvement, test it with a restricted-versus-full VAR F-test, and state what it does and does not claim."
 prerequisites: ["G1/var-cointegration", "B5/potential-outcomes"]
 ---
@@ -120,6 +120,106 @@ print("5% F critical value (df1=2, large df2) ~ 3.0")
 The F-statistic is large in the $X \to Y$ direction and near the critical value in
 the reverse, recovering the asymmetric dependence built into the data, exactly the
 directional predictability Granger causality measures.
+
+## Exercises
+
+**Exercise 1.** A restricted model fit on $n = 103$ usable rows with lag $p = 2$ has
+$\text{RSS}_{\text{restricted}} = 120$; adding $X$'s two lags gives the full model
+$\text{RSS}_{\text{full}} = 90$. Compute the Granger F-statistic, and state the
+$F$-distribution degrees of freedom it should be compared against.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The numerator degrees of freedom is the number of restrictions,
+$p = 2$. The denominator degrees of freedom is $n - 2p - 1 = 103 - 4 - 1 = 98$ (the
+full model has $2p + 1 = 5$ parameters: intercept, $p$ own-lags, $p$ cross-lags).
+
+**Step 2.** Plug into the F formula:
+
+$$
+F = \frac{(\text{RSS}_{\text{restricted}} - \text{RSS}_{\text{full}})/p}{\text{RSS}_{\text{full}}/(n - 2p - 1)} = \frac{(120 - 90)/2}{90/98} = \frac{15}{0.9184} \approx 16.3.
+$$
+
+**Step 3.** Compare $F \approx 16.3$ against the $F_{2,\,98}$ distribution. The 5%
+critical value there is near $3.09$, so this $F$ is far in the tail: reject $H_0$ and
+conclude $X$ Granger-causes $Y$. The big RSS drop from adding $X$'s lags is the
+predictive improvement Granger causality measures.
+
+</details>
+
+**Exercise 2.** Construct a concrete case where $X$ Granger-causes $Y$ yet there is
+no causal influence of $X$ on $Y$. Specify the data-generating process and explain
+which Granger assumption it violates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let a hidden common cause $Z_t$ follow $Z_t = 0.5 Z_{t-1} + \nu_t$. Make
+$X$ a fast echo of $Z$ and $Y$ a slow echo:
+$X_t = Z_{t-1} + \epsilon_t$ and $Y_t = Z_{t-2} + \omega_t$, with $\epsilon, \omega,
+\nu$ independent noise. There is no arrow from $X$ to $Y$; both are driven only by
+$Z$.
+
+**Step 2.** Since $X_t = Z_{t-1} + \epsilon_t$, the past value $X_{t-1}$ carries
+information about $Z_{t-2}$, which is the signal inside $Y_t$. So regressing $Y_t$ on
+its own past plus $X_{t-1}$ lowers the residual variance: $X$ Granger-causes $Y$.
+
+**Step 3.** No intervention on $X$ (forcing $X_t$ to a chosen value while leaving
+$Z$ alone) would change $Y$, because $Y$ depends on $Z$, not on $X$. The violated
+premise is the absence of unobserved common causes: Granger causality measures
+predictive information, and a confounder supplies that information without any
+mechanism linking $X$ to $Y$.
+
+</details>
+
+**Exercise 3 (code).** Confounding by a common cause. Generate $Z$ as an AR(1)
+process, set $X_t = Z_{t-1} + \text{noise}$ and $Y_t = Z_{t-2} + \text{noise}$ with
+no direct $X \to Y$ link, and show the Granger F-statistic for $X \to Y$ is large
+anyway. Reuse the `granger_F` routine from the lesson.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, p = 4000, 2
+
+# Hidden common cause Z; X echoes Z at lag 1, Y echoes Z at lag 2. No X -> Y link.
+z = np.zeros(n)
+for t in range(1, n):
+    z[t] = 0.5*z[t-1] + rng.normal()
+x = np.concatenate([[0], z[:-1]]) + rng.normal(0, 0.3, n)   # X_t = Z_{t-1} + noise
+y = np.concatenate([[0, 0], z[:-2]]) + rng.normal(0, 0.3, n) # Y_t = Z_{t-2} + noise
+
+def granger_F(y, x, p):
+    rows_r, rows_f, target = [], [], []
+    for t in range(p, len(y)):
+        ylags = [y[t-i] for i in range(1, p+1)]
+        xlags = [x[t-i] for i in range(1, p+1)]
+        rows_r.append([1.0] + ylags)
+        rows_f.append([1.0] + ylags + xlags)
+        target.append(y[t])
+    Xr, Xf, yv = map(np.array, (rows_r, rows_f, target))
+    def rss(X):
+        b, *_ = np.linalg.lstsq(X, yv, rcond=None)
+        r = yv - X @ b; return r @ r
+    rss_r, rss_f = rss(Xr), rss(Xf)
+    df2 = len(yv) - Xf.shape[1]
+    return ((rss_r - rss_f)/p) / (rss_f/df2)
+
+F = granger_F(y, x, p)
+assert F > 3.0          # well past the 5% critical value, yet there is no X -> Y link
+print(f"F(X -> Y) under pure confounding: {F:.1f}  (5% crit ~ 3.0)")
+```
+
+$X$ Granger-causes $Y$ with a large $F$ even though no arrow runs from $X$ to $Y$:
+the shared driver $Z$ leaks predictive information through $X$'s lag, which is the
+confounding failure the lesson warns about.
+
+</details>
 
 Granger causality detects predictive direction but cannot quantify the effect of a
 specific intervention. The next lesson does: CausalImpact estimates what would have
