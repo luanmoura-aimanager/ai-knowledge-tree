@@ -47,6 +47,21 @@ largest score. This pushes the attention into a nearly-argmax regime where gradi
 tiny (the softmax is saturated). Dividing by $\sqrt{d_k}$ keeps the inputs to softmax
 at unit variance, maintaining informative gradients.
 
+Put numbers on it at $d_k = 64$, a typical head dimension, where the score standard
+deviation is $\sqrt{64} = 8$. Take two keys whose raw scores differ by one standard
+deviation, a gap of $8$, with everything else held fixed so only the scaling changes:
+
+- **Unscaled.** $\text{softmax}(8, 0)$ puts weight $0.9997$ on the larger key. The
+  distribution is one-hot in all but name; the second key gets $0.0003$ and its gradient
+  is starved.
+- **Scaled by $1/\sqrt{d_k} = 1/8$.** The same gap becomes $1$, and $\text{softmax}(1, 0)$
+  puts weight $0.731$ on the larger key. The attention stays soft and both keys carry
+  gradient.
+
+A wider gap of two standard deviations ($16$ raw, $2$ after scaling) saturates even harder
+unscaled ($\approx 1.0000$) but stays soft once scaled ($0.881$). The scaling does not
+change which key wins; it changes whether the loser is heard at all.
+
 ![Scaled dot-product attention: the token-by-token weight matrix softmax(QKᵀ/√dₖ) (left), and why scaling matters: with large dₖ the unscaled scores saturate the softmax onto a single key, while the 1/√dₖ factor keeps the distribution soft (right).](/figures/E3/self-attention.svg)
 
 ## Self-attention

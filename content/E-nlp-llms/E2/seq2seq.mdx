@@ -79,6 +79,22 @@ The $S \times T$ matrix $\alpha_{tj}$ is the **attention matrix**: it shows whic
 positions the decoder focuses on when generating each target token. For translation, this
 matrix is nearly diagonal for similar-word-order languages and shows the alignment.
 
+A contrasting pair makes the role of the weights concrete. Take three encoder states
+$h_1 = (1,0)$, $h_2 = (0,1)$, $h_3 = (1,1)$ and two alignment-score vectors over them.
+The softmax converts each into a weight row, and the context is its weighted sum:
+
+- **Peaked alignment** $e = (0.2, 3.0, 0.1)$ softmaxes to $\alpha \approx (0.054, 0.896,
+  0.049)$, almost all mass on position 2, so $c \approx 0.896\,h_2 \approx (0.10, 0.95)$.
+  The decoder reads source position 2 and largely ignores the rest.
+- **Flat alignment** $e = (0.2, 0.3, 0.1)$ softmaxes to $\alpha \approx (0.332, 0.367,
+  0.301)$, near the uniform $1/3$, so $c \approx (0.63, 0.67)$, a blur of all three states.
+
+Same encoder states, same softmax; only the score *spread* differs, and it decides whether
+the context is one sharply selected source vector or an averaged smear. A trained model
+learns to produce peaked rows that align target words to their source counterparts; with
+the random untrained states in the block below, the rows come out near-uniform (every
+weight close to $1/5 = 0.2$), which is the flat case before any alignment has been learned.
+
 ## Implementation
 
 ```python

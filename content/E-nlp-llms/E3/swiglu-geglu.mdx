@@ -66,6 +66,20 @@ $$
 \qquad W_1, W_3 \in \mathbb{R}^{d_{ff}\times d},\; W_2 \in \mathbb{R}^{d\times d_{ff}}.
 $$
 
+What the gate buys is per-coordinate control that a plain ReLU MLP cannot express.
+Take one hidden coordinate with value branch $W_1 x = 2.0$ and watch the SwiGLU
+output as the gate pre-activation $W_3 x$ swings sign:
+
+- **Gate open.** $W_3 x = +3$ gives $\text{Swish}(3) = 3\,\sigma(3) \approx 2.858$,
+  so the coordinate passes through amplified: $2.0 \times 2.858 \approx 5.72$.
+- **Gate shut.** $W_3 x = -3$ gives $\text{Swish}(-3) \approx -0.142$, so the same
+  value branch is squeezed to $2.0 \times (-0.142) \approx -0.285$, near zero.
+
+The value $W_1 x = 2.0$ is identical in both rows; only the gate input differs, and
+it moves the output across a factor of twenty. A ReLU MLP would key the gate to the
+same coordinate's own sign; the GLU lets a *separate* projection $W_3$ decide, per
+coordinate, how much of the value to let through.
+
 ## 3. The 2/3 width rule
 
 The gated FFN uses three weight matrices instead of two, so a naive swap at $d_{ff}=4d$

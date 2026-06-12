@@ -95,8 +95,25 @@ The spectral radius of $W_h^\top$ and the saturating $\tanh$ derivative interact
 - If $\rho(W_h) > 1$: the product $\to \infty$ exponentially. **Gradients explode**. Fixed
   with gradient clipping: $\nabla \leftarrow \nabla \cdot \min(1, \tau / \|\nabla\|)$.
 
-The vanishing case is the harder structural problem: clipping does not help a gradient of
-zero. LSTM and GRU (next lesson) solve this with gated, additive updates<FN n="2" />.
+Put numbers on it. The $\tanh$ derivative $1 - h_k^2$ is at most $1$, so the gradient norm
+is bounded by $\rho^{\,T-t}$, and the spectral radius alone sets the rate. Span a 50-step
+dependency ($t=1$, $T=51$) and watch where the factor lands:
+
+- $\rho = 1.1$ (slightly expansive): $1.1^{50} \approx 117$. Gradients **explode** by two
+  orders of magnitude; clipping is needed to keep training stable.
+- $\rho = 1.0$ (the boundary): $1.0^{50} = 1$. The gradient is preserved, the only setting
+  that carries signal cleanly across 50 steps, and it is measure-zero in practice.
+- $\rho = 0.99$ (barely contractive): $0.99^{50} \approx 0.60$. Survivable: the early token
+  still feels about $60\%$ of the gradient.
+- $\rho = 0.9$: $0.9^{50} \approx 0.0052$. The early token receives half a percent of the
+  signal; a 0.1-sized weight update at step 51 reaches step 1 as a $5 \times 10^{-4}$ nudge.
+
+The asymmetry is the point. Exploding gradients are a nuisance with a one-line fix
+(clipping), but a vanishing gradient of $0.0052$ is not "explode and rescale": there is
+almost no signal left to rescale, and the $\tanh$ saturation only makes it smaller, since
+$1 - h_k^2 < 1$ pushes the realistic factor well below $\rho^{\,T-t}$. The vanishing case
+is the harder structural problem: clipping does not help a gradient of zero. LSTM and GRU
+(next lesson) solve this with gated, additive updates<FN n="2" />.
 
 ## Implementation
 

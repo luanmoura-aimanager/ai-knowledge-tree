@@ -60,6 +60,20 @@ split equally between doubling $N$ and doubling $D$.
 **The Chinchilla rule of thumb:** for a compute-optimal run, train on approximately
 $D \approx 20 \cdot N$ tokens. For a 70B parameter model: $20 \times 70\text{B} = 1.4\text{T}$ tokens.
 
+Run the $C \approx 6ND$ FLOP count on real models to calibrate what these budgets cost:
+
+- **GPT-3** ($N = 175\text{B}$, $D = 300\text{B}$): $C = 6 \times 175\text{B} \times 300\text{B}
+  \approx 3.1 \times 10^{23}$ FLOPs.
+- **Chinchilla** ($N = 70\text{B}$, $D = 1.4\text{T}$): $C \approx 5.9 \times 10^{23}$ FLOPs.
+  Fewer parameters than GPT-3, more compute, and a lower final loss, the result that
+  overturned the Kaplan allocation.
+- **LLaMA-3 70B** ($N = 70\text{B}$, $D = 15\text{T}$): $C \approx 6.3 \times 10^{24}$ FLOPs,
+  about $11\times$ the compute of the Chinchilla-optimal 70B run that reaches a similar loss.
+
+The GPT-3 vs Chinchilla pair is the lesson in one comparison: at roughly the same compute
+budget, moving parameters into tokens ($175\text{B}/300\text{B}$ to $70\text{B}/1.4\text{T}$)
+lowered the loss. The LLaMA-3 figure is the deliberate overshoot below.
+
 ## Chinchilla-optimal models
 
 | Model | $N$ | $D$ (tokens) | $D/N$ |

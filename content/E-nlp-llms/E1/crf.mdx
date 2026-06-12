@@ -49,6 +49,19 @@ A CRF can use any feature. Common ones for POS/NER:
 These features all condition on $\mathbf{x}$, which is why a CRF can extract information
 the generative HMM cannot.
 
+To see one feature change a decision, take the token "Apple" with two candidate tags, $O$
+and $B$-ORG, whose other scores happen to tie. With no informative feature both tags score
+$0$, so $p(B\text{-ORG}) = e^0 / (e^0 + e^0) = 0.5$: a coin flip. Now add the single feature
+"current word is capitalized," firing only for $B$-ORG with learned weight $\lambda = 1.5$.
+The score of $B$-ORG rises to $1.5$ while $O$ stays at $0$, so
+
+$$
+p(B\text{-ORG}) = \frac{e^{1.5}}{e^{1.5} + e^{0}} \approx 0.82,
+$$
+
+and $p(O) \approx 0.18$. One feature of $\mathbf{x}$ moved the call from 50/50 to better than
+4-to-1, which is precisely the lever the HMM does not have.
+
 ## Computing $Z(\mathbf{x})$: the forward algorithm
 
 Direct summation over $K^T$ sequences is exponential. The chain factorization makes
@@ -157,13 +170,11 @@ graph LR
 
 ## CRF vs HMM: the key difference
 
-| Property | HMM | Linear-chain CRF |
-|----------|-----|-----------------|
-| Model type | Generative | Discriminative |
-| Conditions on | Current word only | Full sentence |
-| Features | Fixed (emission/transition) | Arbitrary |
-| Training | MLE counting | CML (gradient) |
-| Decoding | Viterbi | Viterbi (same) |
+- **Model type:** HMM is generative; CRF is discriminative.
+- **Conditions on:** HMM sees the current word only; CRF sees the full sentence.
+- **Features:** HMM is fixed (emission/transition); CRF allows arbitrary feature functions.
+- **Training:** HMM uses MLE counting; CRF uses conditional maximum likelihood (gradient).
+- **Decoding:** both use Viterbi (the CRF swaps in feature-weighted potentials).
 
 Modern NER systems stack a CRF on top of a pre-trained transformer encoder (BERT+CRF):
 the encoder produces contextual embeddings for each token, and the CRF layer enforces
