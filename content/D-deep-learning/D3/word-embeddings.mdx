@@ -92,6 +92,22 @@ A few invariants that emerged from word2vec / GloVe:
 - **Polysemy is averaged**: "bank" gets one embedding regardless of
   meaning.
 
+These are not qualitative claims; cosine similarity puts a number on the
+geometry. The closing code trains skip-gram on a toy corpus and reads off
+the cosines, which separate cleanly by co-occurrence:
+
+- **Two words that share contexts** (words 1 and 2 both appear in the
+  sentences `[0,1,2,3]` and `[1,2,7,8]`): $\cos = 0.66$. The predictive
+  objective pulled their vectors into near-alignment.
+- **Two words that never co-occur** (words 1 and 9, in disjoint
+  sentences): $\cos = 0.37$. No training signal ever tied them, so they
+  drift toward the random baseline.
+
+That gap, $0.66$ against $0.37$ on the same trained model with the same
+random initialization, is the whole mechanism in one contrast: the only
+thing separating the two pairs is whether the words occurred together, and
+that is what the geometry recovers.
+
 The polysemy limitation is what motivated contextual embeddings (ELMo,
 BERT): instead of one vector per word, produce a vector per word *in
 context*. The next lessons cover the architectures that produce them.

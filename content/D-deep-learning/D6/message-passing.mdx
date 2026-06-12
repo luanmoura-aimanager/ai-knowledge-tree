@@ -74,6 +74,22 @@ But empirically, deep GNNs (10+ layers) **over-smooth**: every node's
 representation converges to the same vector (the global average over
 the graph). Discriminative information is lost.
 
+The closing code makes the collapse concrete on a 6-node graph (two
+triangles joined by one bridge edge). Take nodes 0 and 5, sitting in
+opposite triangles:
+
+- **At layer 0**, their feature vectors are far apart: Euclidean
+  distance $\approx 2.02$. They are distinct nodes with distinct
+  features.
+- **After 50 mean-aggregate passes**, the same two nodes sit at distance
+  $\approx 0.0008$, three orders of magnitude smaller. Both have
+  drifted to the connected component's average vector.
+
+This is the receptive-field promise turned against itself: one or two
+hops mixes in useful neighborhood context, but iterating the same
+contractive averaging washes out the per-node signal that made the nodes
+separable in the first place.
+
 Causes:
 
 - The aggregation is contractive (especially mean and sum-with-

@@ -49,8 +49,21 @@ $$
 \theta_{t+1} = \theta_t - \eta\!\left(\frac{\hat m_t}{\sqrt{\hat v_t} + \varepsilon} + \lambda \theta_t\right).
 $$
 
-The fix matters: AdamW consistently outperforms Adam with the same
-weight-decay value, and it is the default for Transformer training.
+A concrete contrast makes the coupling visible. Take two coordinates at
+$\theta = 1$ with weight decay $\lambda = 0.1$, one in a flat direction
+(curvature 1, so gradient $g \approx 1$) and one in a steep direction
+(curvature 100, so $g \approx 100$). Adam divides the decay term by
+$\sqrt{\hat v} \approx |g|$:
+
+- **Flat direction**: effective decay $\lambda / |g| = 0.1 / 1 = 0.1$.
+- **Steep direction**: effective decay $0.1 / 100 = 0.001$.
+
+The flat coordinate gets decayed $100\times$ harder than the steep one,
+the ratio of their curvatures, even though both were assigned the same
+$\lambda$. AdamW removes the division: the decay is $\lambda\theta = 0.1$
+in both directions, identical regardless of curvature. That is the entire
+fix, and it is why AdamW consistently outperforms Adam at the same
+weight-decay value and is the default for Transformer training.
 
 ## Learning-rate schedules
 

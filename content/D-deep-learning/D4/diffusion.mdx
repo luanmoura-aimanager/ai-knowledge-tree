@@ -37,6 +37,18 @@ where $\alpha_t = 1 - \beta_t$ and $\bar\alpha_t = \prod_{s=1}^t \alpha_s$.
 By $T \approx 1000$ steps with a reasonable schedule, $\bar\alpha_T \approx 0$,
 and $x_T$ is nearly pure noise.
 
+The single number $\bar\alpha_t$ controls the signal-to-noise mix at step
+$t$: the clean sample enters with weight $\sqrt{\bar\alpha_t}$ and the noise
+with weight $\sqrt{1 - \bar\alpha_t}$. On the standard linear schedule
+($T = 1000$, $\beta_t$ from $10^{-4}$ to $0.02$) those weights trace the
+whole range. At $t = 1$, $\bar\alpha_t \approx 0.9999$: signal weight
+$\approx 1.000$, noise weight $\approx 0.010$, the image barely perturbed.
+At $t = 500$, $\bar\alpha_t \approx 0.079$: signal $\approx 0.28$, noise
+$\approx 0.96$, half-melted. At $t = 1000$, $\bar\alpha_t \approx 4 \times
+10^{-5}$: signal $\approx 0.006$, noise $\approx 1.000$, indistinguishable
+from a draw of $\mathcal{N}(0, I)$. The schedule is just this monotone slide
+from all-signal to all-noise.
+
 A key reparameterization:
 
 $$
