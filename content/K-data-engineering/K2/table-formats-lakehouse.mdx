@@ -4,7 +4,7 @@ pillar: K
 subId: K2
 lessonId: table-formats-lakehouse
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Turn a pile of Parquet files into a transactional table with a metadata layer (Iceberg, Delta, Hudi): atomic snapshots, schema evolution, and time travel over object storage."
 prerequisites: ["partitioning-pruning"]
 codeExempt: true
@@ -94,6 +94,89 @@ its file set. This is what makes a query reproducible (rerun against the exact
 snapshot a model trained on, the [data-versioning](I1/data-versioning) guarantee
 at table scale) and what makes a bad write recoverable: roll back by repointing
 the table at the previous good snapshot, the same atomic swap in reverse.
+
+## Exercises
+
+**Exercise 1.** A reader resolves the table pointer to snapshot v2 and begins
+reading its manifests. While it reads, a writer commits v3, which deletes one of
+v2's data files and adds two new ones. Explain why the in-progress reader still
+sees a consistent v2 and does not error on the deleted file.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Data files are immutable and a commit never edits or deletes bytes in
+place; it publishes a new snapshot whose manifests reference a different file set.
+Committing v3 writes new Parquet files and new manifests and swaps the table
+pointer, but it does not physically remove v2's files at commit time.
+
+**Step 2.** The reader captured the snapshot v2 pointer at the start and reads the
+file set v2's manifests name. Those files all still exist on object storage, so
+every read resolves. The v3 commit changed only which snapshot the *table pointer*
+names, not the files v2 points at.
+
+**Step 3.** The reader therefore sees the entire v2 snapshot, a complete consistent
+version, with no half-applied mix and no missing file. The dropped file is removed
+only later by a separate garbage-collection step that retains files reachable from
+any retained snapshot, so an in-flight reader is never cut off. This is snapshot
+isolation built from immutability plus an atomic pointer swap.
+
+</details>
+
+**Exercise 2.** Two jobs commit concurrently under optimistic concurrency. Job A
+appends 100 rows; job B appends 50 different rows. Both read current snapshot v5,
+prepare their files, and race to swap the pointer. Walk through what happens, and
+contrast it with a case where both jobs instead try to *overwrite the same
+partition*.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Both read v5 and write their new data files and manifests. Each attempts
+a compare-and-set: "swap the pointer to my new snapshot only if it is still v5."
+
+**Step 2.** Append case. Say job A's CAS wins; the pointer becomes v6. Job B's CAS
+fails because the pointer is no longer v5. Job B re-reads the now-current v6,
+re-validates: two appends of disjoint new rows do not conflict, so B's files are
+still valid on top of v6. B rebuilds its snapshot as v7 referencing v6's files plus
+its own, and retries the CAS, which now succeeds. Both appends land.
+
+**Step 3.** Overwrite case. If both jobs rewrite the *same* partition, B's
+re-validation against v6 detects that A already replaced the files B assumed. B's
+change now conflicts: applying it would silently drop A's overwrite. B must abort or
+recompute against the new data rather than blindly retry. Optimistic concurrency
+lets non-conflicting commits both succeed while forcing genuine write-write
+conflicts to be resolved, all without holding a lock.
+
+</details>
+
+**Exercise 3.** A team adds a column `discount` to a lakehouse table holding ten
+years of Parquet files, then asks to query the table *as of* a snapshot from before
+the column existed. Explain, using schema evolution and time travel, why neither
+operation rewrites old data files, and what a query against each schema version
+sees for `discount`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Adding `discount` is a metadata change. The schema, column names, types,
+and stable column ids, lives in the metadata layer, not in the file paths or file
+bytes. The add defines a new schema version that includes a new column id for
+`discount`; the ten years of Parquet files are untouched.
+
+**Step 2.** A query against the *current* schema reads old files by column id. Old
+files have no chunk for the `discount` id, so the engine serves that column as null
+for their rows. New files written after the change carry real `discount` values. No
+backfill rewrite is needed to introduce the column.
+
+**Step 3.** Time travel to a pre-change snapshot resolves the table pointer to that
+older snapshot and reads its file set against the schema in force then, which has no
+`discount` column at all, so the column is simply absent from the result. Both
+operations are pure metadata: immutable data files plus a versioned schema and
+versioned snapshots give column addition and historical queries for free, with no
+data movement.
+
+</details>
 
 Atomic snapshots, optimistic concurrency, schema evolution, and time travel are
 the warehouse semantics, delivered on top of cheap object storage and open Parquet

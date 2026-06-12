@@ -4,7 +4,7 @@ pillar: K
 subId: K6
 lessonId: schema-evolution-contracts
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Classify a schema change as backward-, forward-, or full-compatible, and enforce a data contract so a producer's breaking change fails fast at the boundary instead of corrupting consumers."
 prerequisites: ["data-quality-dimensions"]
 ---
@@ -144,7 +144,114 @@ The classifier labels the optional add `full`, the required-field drop `backward
 (a reader on the new schema is fine, but any old consumer that still requires
 `amount` is not, which is why the drop is unsafe to ship to them), and the retype
 `breaking`; the contract then rejects the payload that omits `amount` before it
-can reach a consumer. Knowing a change *is* breaking is half the problem; the next
+can reach a consumer.
+
+## Exercises
+
+**Exercise 1.** The base schema has required fields `{id: int, email: str}`. A
+producer proposes adding a *required* field `phone: str` (no default). Classify
+this change as backward-, forward-, full-, or breaking, working from the two
+direction rules, and contrast it with adding an *optional* `phone`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Backward asks: can the new schema read old data? The new schema
+requires `phone`, but old data (written under the base schema) has no `phone`
+field. A required field with no default cannot be filled, so the new reader fails
+on old records. Backward *fails*.
+
+**Step 2.** Forward asks: can the old schema read new data? The old schema requires
+`id` and `email`, both present in new data with matching types, and it ignores the
+unknown `phone`. So forward *holds*.
+
+**Step 3.** Backward fails and forward holds, so the change is **forward
+compatible** (not full). Contrast: an *optional* `phone` (with a default) is not in
+the required set, so the new reader can fill the default on old records, making
+backward hold too. That is why an optional add is full-compatible while a required
+add is only forward-compatible.
+
+</details>
+
+**Exercise 2.** Prove that retyping a required field (changing its type while
+keeping the name) is breaking in both directions, using the matching-type clause of
+the two rules.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let field $f$ have type $t_{\text{old}}$ in the old schema and
+$t_{\text{new}} \ne t_{\text{old}}$ in the new schema; $f$ is required in both.
+
+**Step 2.** Backward requires every required field of the *new* schema to be
+present in old data *with a matching type*. Field $f$ is present in old data but
+with type $t_{\text{old}} \ne t_{\text{new}}$, so the type does not match and
+backward fails.
+
+**Step 3.** Forward requires every required field of the *old* schema to be present
+in new data with a matching type. Field $f$ is present in new data but with type
+$t_{\text{new}} \ne t_{\text{old}}$, so the type does not match and forward fails.
+
+Both directions fail, so a retype is breaking. The decoded bytes no longer match
+the type either reader expects, which is the concrete reason it corrupts both.
+
+</details>
+
+**Exercise 3 (code).** Represent a schema as a `{field: type}` dict of required
+fields. Implement `backward_ok`, `forward_ok`, and `classify`, then verify on a
+base schema that adding an optional field is `full`, dropping a required field is
+`backward`, and renaming a required field is `breaking`.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np  # required by the runner; the schema logic is pure-python
+
+base = {"id": "int", "email": "str", "amount": "float"}
+
+def backward_ok(old, new):
+    # new schema reads old data: every required field of `new` present in `old`
+    return all(f in old and old[f] == t for f, t in new.items())
+
+def forward_ok(old, new):
+    # old schema reads new data: every required field of `old` survives in `new`
+    return all(f in new and new[f] == t for f, t in old.items())
+
+def classify(old, new):
+    b, f = backward_ok(old, new), forward_ok(old, new)
+    if b and f:
+        return "full"
+    if b:
+        return "backward"
+    if f:
+        return "forward"
+    return "breaking"
+
+# optional add: required set is unchanged
+add_optional = dict(base)
+# drop a required field
+drop_required = {"id": "int", "email": "str"}            # `amount` removed
+# rename a required field: old name gone, new name appears
+rename_required = {"id": "int", "email": "str", "total": "float"}  # amount -> total
+
+print("add optional ->", classify(base, add_optional))
+print("drop required ->", classify(base, drop_required))
+print("rename       ->", classify(base, rename_required))
+
+assert classify(base, add_optional) == "full"
+assert classify(base, drop_required) == "backward"
+assert classify(base, rename_required) == "breaking"
+```
+
+A rename is breaking because it is a simultaneous drop of the old name (forward
+fails: old readers requiring `amount` find it gone) and add of a required new name
+(backward fails: new readers require `total`, absent from old data), so neither
+direction survives.
+
+</details>
+
+Knowing a change *is* breaking is half the problem; the next
 lesson tracks *who would be hit* by tracing a column through the pipeline as
 [data lineage](K6/data-lineage).
 

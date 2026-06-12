@@ -4,7 +4,7 @@ pillar: K
 subId: K2
 lessonId: row-vs-columnar
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Lay the same table out by row or by column and compute the bytes an analytical query must scan in each, the I/O argument that makes columnar the default for analytics."
 prerequisites: ["K1/oltp-vs-olap"]
 ---
@@ -123,7 +123,137 @@ print("columnar scans far fewer bytes for a narrow projection:", bytes_col < byt
 ```
 
 The column store scans only the two requested columns while the row store scans
-all eight, a ratio fixed by the row width over the projected width. Storing one
+all eight, a ratio fixed by the row width over the projected width.
+
+## Exercises
+
+**Exercise 1.** A table has six columns of byte widths
+$(8, 8, 4, 4, 2, 1)$ and $R = 2{,}000{,}000$ rows. A query projects the two 4-byte
+columns. Compute the bytes scanned under row-major and column-major layout, and the
+columnar advantage ratio.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Row width is $W = 8+8+4+4+2+1 = 27$ bytes. A row store has no
+contiguous all-unwanted run, so it scans the whole table:
+
+$$
+B_{\text{row}} = R \cdot W = 2{,}000{,}000 \cdot 27 = 54{,}000{,}000 \text{ bytes}.
+$$
+
+**Step 2.** A column store reads only the two projected blocks, total width
+$4 + 4 = 8$ bytes per row:
+
+$$
+B_{\text{col}} = R \sum_{j \in S} w_j = 2{,}000{,}000 \cdot 8 = 16{,}000{,}000
+\text{ bytes}.
+$$
+
+**Step 3.** The advantage is
+
+$$
+\frac{B_{\text{row}}}{B_{\text{col}}} = \frac{27}{8} \approx 3.4\times .
+$$
+
+The row store moves about 3.4 times the data to answer the same projection.
+
+</details>
+
+**Exercise 2.** Show that the columnar advantage $B_{\text{row}}/B_{\text{col}}$
+equals the number of columns $C$ exactly when all columns have equal width and the
+query projects a single column. Then state how the advantage changes as the
+projection widens to $k$ of $C$ equal-width columns.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With equal width $w_j = w$ for all $j$, the row store scans
+$B_{\text{row}} = R \cdot C w$. Projecting a single column scans
+$B_{\text{col}} = R \cdot w$.
+
+**Step 2.** The ratio is
+
+$$
+\frac{B_{\text{row}}}{B_{\text{col}}} = \frac{R C w}{R w} = C ,
+$$
+
+the column count, independent of $R$ and $w$.
+
+**Step 3.** Projecting $k$ of $C$ equal-width columns scans $B_{\text{col}} = R k w$,
+so the advantage becomes $C/k$. It is largest ($C$) for a single-column projection
+and falls toward 1 as $k \to C$: when a query reads every column, columnar layout
+moves the same bytes as row layout. The columnar I/O win is exactly the
+narrow-projection-of-a-wide-table shape.
+
+</details>
+
+**Exercise 3.** An OLTP workload fetches whole single rows by primary key
+(`SELECT * WHERE id = ?`), one row at a time, thousands of times a second. Argue
+from the byte-scan model why row-major storage suits this workload better than
+columnar, the reverse of the analytical case.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The query projects *all* $C$ columns of *one* row. In row-major layout
+that row is a single contiguous block of $W$ bytes, fetched in one seek and one
+read of $W$ bytes.
+
+**Step 2.** In column-major layout the same row's $C$ fields are scattered across
+$C$ separate column blocks, far apart on disk. Assembling one row requires $C$
+seeks, one into each column block, to gather $C$ small fragments totalling $W$
+bytes. The bytes are similar but the access pattern is $C$ random seeks instead of
+one.
+
+**Step 3.** Seeks, not bytes, dominate a point lookup. Row-major answers it with a
+single contiguous read; columnar pays $C$ scattered seeks per row, multiplied by
+thousands of lookups per second. Row layout wins for OLTP point access for the same
+contiguity reason columnar wins for wide-table analytical scans: each layout keeps
+contiguous exactly what its workload reads together.
+
+</details>
+
+**Exercise 4 (code).** For an 8-column table of widths
+$(8, 8, 4, 4, 2, 1, 16, 8)$ and $R = 500{,}000$ rows, compute the bytes scanned for
+a projection of columns $\{2, 7\}$ under each layout and the advantage ratio. Then
+show that narrowing the projection to the single 1-byte column (index 5) strictly
+increases the advantage.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+widths = np.array([8, 8, 4, 4, 2, 1, 16, 8])
+R = 500_000
+W = widths.sum()                       # 51 bytes per row
+
+S = np.array([2, 7])                    # project a 4-byte and an 8-byte column
+bytes_row = R * W
+bytes_col = R * widths[S].sum()
+adv = bytes_row / bytes_col
+
+assert bytes_col == R * (4 + 8)
+assert np.isclose(adv, W / widths[S].sum())
+
+# Narrower projection: just the 1-byte column -> larger advantage.
+adv_narrow = (R * W) / (R * widths[5])
+assert adv_narrow > adv
+
+print(f"row width = {W} bytes")
+print(f"row scanned = {bytes_row/1e6:.1f} MB, col scanned = {bytes_col/1e6:.1f} MB")
+print(f"advantage(2 cols) = {adv:.2f}x, advantage(1-byte col) = {adv_narrow:.1f}x")
+```
+
+The two-column projection gives advantage $51/12 \approx 4.25\times$; projecting
+only the 1-byte column raises it to $51/1 = 51\times$, confirming the advantage
+$C$-over-projection-width grows as the projection narrows.
+
+</details>
+
+Storing one
 column contiguously also makes its values uniform and predictable, which is what
 lets the lightweight encodings of the [next lesson](compression-encoding) shrink
 it so aggressively.

@@ -4,7 +4,7 @@ pillar: K
 subId: K2
 lessonId: compression-encoding
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Shrink a column with dictionary, run-length, and delta encoding, compute the compression ratio each gives on real data, and see why columnar layout makes these encodings so effective."
 prerequisites: ["row-vs-columnar"]
 ---
@@ -143,8 +143,138 @@ print("each encoding compresses the column it was built for:", True)
 ```
 
 Each encoder beats the raw column on the shape it targets, with ratios that the
-formulas above predict from cardinality, run length, and delta width. A real
-columnar file (Parquet) stacks these encodings inside every column chunk and
+formulas above predict from cardinality, run length, and delta width.
+
+## Exercises
+
+**Exercise 1.** A status column has $R = 100{,}000$ rows holding $d = 4$ distinct
+values, each a 1-byte category code already. You apply dictionary encoding with
+1-byte codes. Compute $\rho_{\text{dict}}$ and explain why dictionary encoding is
+the wrong tool here.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The raw column is $R \cdot w = 100{,}000 \cdot 1 = 100{,}000$ bytes,
+since each value is already $w = 1$ byte.
+
+**Step 2.** Dictionary encoding stores a 1-byte code per row plus the dictionary,
+$S_{\text{dict}} = R \cdot b + d \cdot w = 100{,}000 \cdot 1 + 4 \cdot 1 =
+100{,}004$ bytes.
+
+**Step 3.** The ratio is
+
+$$
+\rho_{\text{dict}} = \frac{100{,}000}{100{,}004} \approx 0.99996 < 1 .
+$$
+
+The encoding is slightly *larger* than the raw column. Dictionary encoding wins
+only when the raw values are wide ($w > b$); when the values are already as narrow
+as the codes, replacing them by codes of the same width adds the dictionary for no
+gain. The shape to exploit here is the repetition (run-length), not the
+cardinality.
+
+</details>
+
+**Exercise 2.** A run-length encoded column has $r$ runs over $R$ rows, value
+width $w$, count width $c$. Derive the break-even average run length $R/r$ at which
+$\rho_{\text{rle}} = 1$, and evaluate it for $w = c = 4$ bytes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set the ratio to one:
+
+$$
+\rho_{\text{rle}} = \frac{R \cdot w}{r\,(w + c)} = 1
+\quad\Longrightarrow\quad R \cdot w = r\,(w + c) .
+$$
+
+**Step 2.** Solve for the average run length $\bar{L} = R/r$:
+
+$$
+\frac{R}{r} = \frac{w + c}{w} = 1 + \frac{c}{w} .
+$$
+
+**Step 3.** For $w = c = 4$, the break-even is $\bar{L} = 1 + 4/4 = 2$. Runs of
+average length below 2 (a near-random column) make RLE expand the data; runs
+longer than 2 on average shrink it. This is why an engine sorts a column to
+lengthen its runs before applying RLE.
+
+</details>
+
+**Exercise 3.** A column draws each value independently from $d$ symbols with
+probabilities $p_1, \dots, p_d$. Information theory says the smallest expected
+code length per value is the entropy $H = -\sum_i p_i \log_2 p_i$ bits. For a
+uniform alphabet of $d = 256$ symbols, compute $H$ and the best achievable
+compression ratio against a fixed 1-byte-per-value layout, and explain what this
+says about compressing high-entropy data.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Uniform over $d = 256$ symbols gives $p_i = 1/256$, so
+
+$$
+H = -\sum_{i=1}^{256} \tfrac{1}{256} \log_2 \tfrac{1}{256} = \log_2 256 = 8
+\text{ bits}.
+$$
+
+**Step 2.** A fixed layout already spends 8 bits (1 byte) per value, so the best
+ratio is
+
+$$
+\rho \le \frac{8 \text{ bits}}{H} = \frac{8}{8} = 1 .
+$$
+
+**Step 3.** No encoding can shrink a uniform 256-symbol column below its raw size:
+its entropy already equals the byte budget. Lightweight encodings beat the raw
+size only by exploiting structure the entropy bound assumes away, low cardinality
+($d$ small lowers $H$), runs, or monotonicity. On genuinely high-entropy data they
+cannot help, which is why a column store skips encoding such columns rather than
+paying the decode cost for nothing.
+
+</details>
+
+**Exercise 4 (code).** Build a run-heavy `int32` column of $R = 60{,}000$ rows as
+$200$ equal-length runs, implement a run-length encoder in numpy, and verify the
+measured compression ratio matches the formula $\rho_{\text{rle}} = R w / (r(w+c))$
+with $w = c = 4$ bytes. Confirm the decoder round-trips exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+R, run_len = 60_000, 300
+col = np.repeat(np.arange(R // run_len), run_len)   # 200 equal runs
+
+def rle_encode(a):
+    starts = np.r_[0, 1 + np.flatnonzero(np.diff(a))]
+    counts = np.diff(np.r_[starts, a.size])
+    return a[starts], counts
+
+vals, counts = rle_encode(col)
+r = vals.size                                       # number of runs
+w = c = 4                                            # int32 value, int32 count
+raw = col.size * w
+enc = r * (w + c)
+rho = raw / enc
+rho_formula = (R * w) / (r * (w + c))
+
+decoded = np.repeat(vals, counts)                    # decode
+assert np.array_equal(decoded, col)                  # exact round-trip
+assert np.isclose(rho, rho_formula)
+print(f"runs = {r}, ratio = {rho:.1f}x (formula {rho_formula:.1f}x)")
+```
+
+The column has $r = 200$ runs, so $\rho = (60{,}000 \cdot 4)/(200 \cdot 8) = 150$,
+matching the formula exactly, and the decoder reconstructs the original column.
+
+</details>
+
+A real columnar file (Parquet) stacks these encodings inside every column chunk and
 records per-chunk statistics on top; the [next lesson](parquet-internals) opens
 that file format up.
 

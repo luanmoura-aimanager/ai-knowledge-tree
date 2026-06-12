@@ -4,7 +4,7 @@ pillar: K
 subId: K5
 lessonId: etl-vs-elt
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Contrast transform-before-load with load-then-transform, and see why cheap cloud storage and scalable warehouses made ELT (pushing transformation into the warehouse) the modern default."
 prerequisites: ["K1/dimensional-modeling"]
 codeExempt: true
@@ -99,7 +99,89 @@ graph TB
 
 The diagram makes the structural difference concrete: ETL's transform sits outside
 the warehouse and throws raw away; ELT's transform is a chain of in-warehouse steps
-over a retained raw layer. Once transformation lives inside the warehouse as SQL, the
+over a retained raw layer.
+
+## Exercises
+
+**Exercise 1.** A team using ETL discovers that last quarter's "active customer"
+rule was wrong and wants to recompute the corrected figures. Walk through why the
+fix is expensive in their architecture, and name the single property of ELT that
+would have made the same fix cheap.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In ETL the transform engine sits between source and warehouse, and only
+its finished output is written. The raw input passes through and is discarded, so the
+warehouse never held the raw rows the "active customer" rule consumed.
+
+**Step 2.** To recompute, the corrected rows must come from raw input that no longer
+exists in the warehouse. The team must re-extract from the source (and only if the
+source still holds that quarter's history) and rerun the external engine. If the
+source has aged the data out, the history is unrecoverable.
+
+**Step 3.** The property ELT adds is a **retained raw layer**: the untransformed
+records are loaded and kept in the warehouse. A rule change becomes a pure
+recomputation, rerun the transformation SQL over raw, with no dependence on whether
+the source still holds history.
+
+</details>
+
+**Exercise 2.** ETL was the sensible default for years, then the default flipped to
+ELT. State the two cloud-infrastructure changes that drove the flip, and for each
+explain which specific ETL-era constraint it dissolved.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** ETL's two constraints were both about scarcity. Warehouse storage was
+expensive and fixed, so you did not want to pay to store raw data you would
+immediately rewrite. Warehouse compute was expensive and fixed, so you did not want
+transformation queries starving the warehouse's scarce CPU.
+
+**Step 2.** Storage got cheap. Object and columnar warehouse storage fell to a small
+fraction of the earlier cost, so keeping the raw layer stopped being a meaningful line
+item. This dissolves the "do not store raw" constraint: raw data you keep is raw data
+you can reprocess.
+
+**Step 3.** Warehouse compute got elastic. Separating storage from compute lets you
+scale compute on demand, spinning it up for a heavy transform and down afterward, so
+the transform no longer starves the rest of the warehouse. This dissolves the
+"transforms compete for scarce CPU" constraint and removes the reason to buy a
+separate transform box.
+
+**Step 4.** With both constraints gone, **pushdown** (running the transform inside the
+warehouse that already holds the data) wins, because moving compute to the data is
+cheaper than moving data to a separate engine.
+
+</details>
+
+**Exercise 3.** A new ELT project will hold orders, customers, and a daily revenue
+summary. Assign each of these tables to the raw, staging, or mart layer, justify the
+placement, and explain why a fix to the revenue logic never needs to re-extract from
+the source.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Raw layer: the orders and customers source records loaded untouched and
+append-only. This is the faithful copy that can always be reprocessed.
+
+**Step 2.** Staging layer: one lightly cleaned table per source table, `stg_orders`
+and `stg_customers`, fixing types, renaming columns, and standardizing nulls, with no
+business logic yet.
+
+**Step 3.** Mart layer: the daily revenue summary, a business-facing modeled table
+(a fact built from the staging tables) that analysts and dashboards query.
+
+**Step 4.** A fix to revenue logic edits only staging or mart SQL. Because the raw
+layer is retained and never moves, rerunning the transformation recomputes the
+corrected mart tables straight from raw. The source is touched only to load new raw
+rows, never to recover history a transform already consumed.
+
+</details>
+
+Once transformation lives inside the warehouse as SQL, the
 next question is how to manage that SQL so it stays trustworthy, which the
 [next lesson](K5/transformation-as-code) answers by treating transformations as
 tested, version-controlled code.

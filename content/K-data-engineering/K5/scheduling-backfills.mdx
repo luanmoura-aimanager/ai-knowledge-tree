@@ -4,7 +4,7 @@ pillar: K
 subId: K5
 lessonId: scheduling-backfills
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Schedule a pipeline as dependency-driven runs partitioned by time, and design each task to be idempotent so a backfill or retry recomputes a partition cleanly without double-counting."
 prerequisites: ["incremental-processing", "A5/graph-traversal"]
 ---
@@ -121,7 +121,132 @@ print("idempotent overwrite survives the re-run; append double-counts:", True)
 
 After the double backfill the overwrite table holds the correct 3, 2, 4 rows per day
 (9 total) while the append table holds a doubled 6, 4, 8 (18 total). Idempotent
-partition overwrite is the rule every well-built task follows. The
+partition overwrite is the rule every well-built task follows.
+
+## Exercises
+
+**Exercise 1.** A daily pipeline must be backfilled from `2026-01-01` through
+`2026-03-31` inclusive. Compute the number of partitions (and therefore $W_d$
+invocations) the backfill runs. Then explain why running the entire backfill a second
+time is harmless, citing the partition-write property.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Daily partitioning means one partition per calendar day, and the run for a
+date is responsible for exactly that date's partition. The backfill range is every day
+from `2026-01-01` to `2026-03-31` inclusive.
+
+**Step 2.** Count the days. January has 31, February 2026 has 28 (2026 is not a leap
+year, since 2026 is not divisible by 4), March has 31. The total is
+
+$$
+31 + 28 + 31 = 90 \text{ partitions},
+$$
+
+so the backfill invokes $W_d$ for 90 distinct dates.
+
+**Step 3.** Each $W_d$ deletes its target partition and writes it fresh, so
+$W_d \circ W_d = W_d$ (idempotent). Running the full backfill again reapplies each of
+the 90 $W_d$ a second time, and each leaves its partition with exactly the rows one
+clean run produces. The repeat is harmless.
+
+</details>
+
+**Exercise 2.** Show that an **append** write is not idempotent while a
+partition-**overwrite** write is, using the row count of a single partition $d$ with a
+true content of $r_d$ rows. Express the count after the task has run $k$ times under
+each strategy.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $W_d$ write partition $d$ whose one clean run yields $r_d$ rows. Start
+from an empty partition and apply $W_d$ a total of $k$ times.
+
+**Step 2.** Append adds the run's $r_d$ rows on top of whatever the partition holds.
+After $k$ applications the count is
+
+$$
+k \cdot r_d,
+$$
+
+which grows without bound in $k$. So $W_d \circ W_d \ne W_d$: append is not idempotent,
+and any retry or re-touched backfill date double-counts.
+
+**Step 3.** Overwrite replaces the whole partition with this run's rows. After $k$
+applications the count is
+
+$$
+r_d \quad \text{for every } k \ge 1,
+$$
+
+independent of $k$. So $W_d \circ W_d = W_d$: overwrite is idempotent, and reruns are
+safe.
+
+</details>
+
+**Exercise 3 (code).** Model a scheduler with catchup. A daily DAG has a start date and
+has not run since; the scheduler must enumerate every missing daily partition up to a
+current date, then build them in dependency order. Implement (a) the catchup window as
+a count of daily partitions between two dates, and (b) a topological sort of a small
+task DAG via Kahn's algorithm. Assert the partition count and a valid topological order.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from datetime import date, timedelta
+
+# (a) Catchup: enumerate daily partitions in [start, current] inclusive.
+def daily_partitions(start, current):
+    n = (current - start).days + 1
+    return [start + timedelta(days=i) for i in range(n)]
+
+start, current = date(2026, 1, 1), date(2026, 1, 10)
+parts = daily_partitions(start, current)
+assert len(parts) == 10              # 1st through 10th inclusive
+assert parts[0] == start and parts[-1] == current
+
+# (b) Within a run, order tasks by dependency via Kahn topological sort.
+# Edge u -> v means v reads what u produces, so u runs first.
+tasks = ["extract", "transform", "join", "load"]
+edges = [("extract", "transform"), ("extract", "join"),
+         ("transform", "join"), ("join", "load")]
+
+indeg = {t: 0 for t in tasks}
+adj = {t: [] for t in tasks}
+for u, v in edges:
+    adj[u].append(v)
+    indeg[v] += 1
+
+# Repeatedly emit a task whose dependencies are all complete (indeg 0).
+ready = sorted([t for t in tasks if indeg[t] == 0])
+order = []
+while ready:
+    u = ready.pop(0)
+    order.append(u)
+    for v in adj[u]:
+        indeg[v] -= 1
+        if indeg[v] == 0:
+            ready.append(v)
+    ready.sort()
+
+pos = {t: i for i, t in enumerate(order)}
+# Every edge points forward in the emitted order: a valid topological sort.
+assert all(pos[u] < pos[v] for u, v in edges)
+assert len(order) == len(tasks)
+print("catchup partitions:", len(parts), "| build order:", order)
+```
+
+The catchup window enumerates exactly the 10 missing daily partitions, and Kahn's
+algorithm derives the build order from the declared dependencies, the same
+"run any task whose dependencies are complete" rule the scheduler applies each run.
+
+</details>
+
+The
 [next lesson](K5/orchestrators-compared) steps up to the systems that run these
 schedules, contrasting orchestrators that think in tasks with those that think in the
 data assets the tasks produce.

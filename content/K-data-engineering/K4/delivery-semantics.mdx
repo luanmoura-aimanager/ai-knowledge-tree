@@ -4,7 +4,7 @@ pillar: K
 subId: K4
 lessonId: delivery-semantics
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Distinguish at-most-once, at-least-once, and exactly-once delivery, and see why an idempotent consumer turns cheap at-least-once delivery into effectively-once processing."
 prerequisites: ["watermarks-late-data"]
 ---
@@ -120,7 +120,119 @@ print("over-count =", naive_count - true_n, "duplicates absorbed by dedup")
 
 The naive counter reports 1160 against a true 1000, while the idempotent consumer
 reports exactly 1000: the duplicates from cheap at-least-once delivery are absorbed
-by the dedup set. So far the source of events has been an application publishing to
+by the dedup set.
+
+## Exercises
+
+**Exercise 1.** A consumer reads each event, processes it, then commits its offset.
+For each of the two orderings below, classify the delivery semantics and say
+whether a crash at the worst moment loses or duplicates an event: (a)
+process-then-commit; (b) commit-then-process. Then explain why no ordering of just
+these two steps can give exactly-once.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Process-then-commit. The work happens, then the offset advances. A
+crash after processing but before the commit leaves the offset pointing *before* the
+event, so on restart the event is re-read and processed again. Nothing is skipped.
+This is **at-least-once**: events may be duplicated, never lost.
+
+**Step 2.** Commit-then-process. The offset advances first, then the work happens. A
+crash after the commit but before processing leaves the offset *past* an event whose
+work never ran, so on restart it is skipped. This is **at-most-once**: events may be
+lost, never duplicated.
+
+**Step 3.** Why neither gives exactly-once. The processing side effect and the
+offset commit are two writes to two different systems (the sink and the offset
+store) with no shared transaction. Whichever you do first, a crash in the gap
+between them exposes the other as not-yet-done, producing either a duplicate or a
+loss. Closing the gap requires making the two atomic across machines (a distributed
+transaction), which is precisely the expensive coordination exactly-once needs and
+that mere ordering cannot supply.
+
+</details>
+
+**Exercise 2.** Classify each operation as idempotent or not, using the definition
+$f(f(x)) = f(x)$, and justify: (a) `SET balance = 100`; (b) `balance += 100`; (c)
+`INSERT ... ON CONFLICT (id) DO NOTHING`; (d) `counter = counter + 1`. For the
+non-idempotent ones, state the dedup mechanism that makes redelivery safe.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) `SET balance = 100` is idempotent. Applying it once sets 100;
+applying it again sets 100. $f(f(x)) = f(100) = 100 = f(x)$. A redelivery is a
+no-op by construction.
+
+**Step 2.** (b) `balance += 100` is not idempotent. Once gives $x + 100$; twice
+gives $x + 200 \ne x + 100$. (d) `counter = counter + 1` is the same shape: each
+delivery over-counts, which is the canonical at-least-once failure.
+
+**Step 3.** (c) `INSERT ... ON CONFLICT (id) DO NOTHING` is idempotent on the row
+keyed by `id`. The first insert lands; a second insert with the same `id` conflicts
+and is dropped, leaving the table unchanged. $f(f(x)) = f(x)$.
+
+**Step 4.** Making the non-idempotent operations safe. Wrap them in a dedup on a
+stable, source-assigned event id: keep a `seen` set (or a unique key in the sink),
+and apply the increment only when the id is not already present. The first sighting
+runs `+= 100` or `+= 1`; every redelivery finds the id in `seen` and skips, turning
+at-least-once delivery into effectively-once processing.
+
+</details>
+
+**Exercise 3 (code).** Simulate at-least-once delivery where each event can be
+redelivered *more than once* (not just once). Generate 2000 distinct events; give
+each a random number of extra deliveries drawn so the duplicate rate is heavy.
+Count three ways: the true distinct count, a naive per-delivery counter, and an
+idempotent consumer that dedups on the event id. Assert the naive counter strictly
+overshoots and the idempotent counter recovers the truth exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+true_n = 2000
+ids = np.arange(true_n)                          # the distinct event ids
+
+# At-least-once with heavy redelivery: each event delivered 1 + k times,
+# k ~ Poisson, so many events arrive several times over.
+extra = rng.poisson(0.7, true_n)                 # extra deliveries per event
+stream = np.repeat(ids, 1 + extra)               # originals plus their duplicates
+rng.shuffle(stream)                              # duplicates interleave with originals
+
+# Naive consumer: count += 1 per delivery (non-idempotent).
+naive_count = stream.size
+
+# Idempotent consumer: dedup on the event id; only the first sighting counts.
+seen = set()
+idempotent_count = 0
+for eid in stream:
+    if eid not in seen:                          # f(f(x)) == f(x): redelivery is a no-op
+        seen.add(int(eid))
+        idempotent_count += 1
+
+print("true       :", true_n)
+print("naive      :", naive_count)
+print("idempotent :", idempotent_count)
+print("over-count :", naive_count - true_n)
+
+# Heavy redelivery makes the naive count strictly overshoot the truth.
+assert naive_count > true_n
+# Dedup on a stable id recovers the true distinct count exactly: effectively-once.
+assert idempotent_count == true_n
+```
+
+The naive counter inflates with every redelivery, while the idempotent consumer
+keyed on the event id absorbs all of them and lands exactly on 2000, the same result
+exactly-once delivery would give, without any distributed transaction.
+
+</details>
+
+So far the source of events has been an application publishing to
 the log. The [next lesson](K4/change-data-capture) asks where a *database's* changes
 enter the stream, and how to publish them without the dual-write inconsistency that
 duplicates and losses come from in the first place.

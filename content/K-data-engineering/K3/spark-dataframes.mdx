@@ -4,7 +4,7 @@ pillar: K
 subId: K3
 lessonId: spark-dataframes
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Build a transformation as a lazy DataFrame lineage that Spark compiles into a DAG of stages, and distinguish the narrow transformations that pipeline from the wide ones that force a shuffle."
 prerequisites: ["mapreduce"]
 codeExempt: true
@@ -74,6 +74,80 @@ graph LR
     AG["aggregate"] --> WR["write"]
   end
 ```
+
+## Exercises
+
+**Exercise 1.** Classify each transformation in this pipeline as narrow or wide, then count
+how many stages Spark compiles it into: `scan`, `filter`, `select`, `groupBy`, `count`,
+`write`. State where each stage boundary falls.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Classify each operation. `scan`, `filter`, and `select` are narrow: each output
+row depends only on a single input row, so no data crosses the network. `groupBy` is wide:
+it must bring rows with the same group key together from across partitions, forcing a
+shuffle. `count` here is the aggregate that completes the group-by, and `write` is the
+action that emits the result; both run after the shuffle.
+
+**Step 2.** A stage is a maximal run of narrow operations with no data movement, so a stage
+boundary falls exactly at the shuffle the `groupBy` introduces. Stage 1 fuses
+`scan → filter → select` into one pipelined pass. The shuffle ends stage 1. Stage 2 runs the
+post-shuffle `groupBy`/`count` aggregate and `write`.
+
+**Step 3.** The pipeline compiles into $2$ stages, with the single boundary at the
+`groupBy` shuffle.
+
+</details>
+
+**Exercise 2.** Spark holds the entire lineage before executing because transformations are
+lazy. Explain concretely how this enables predicate pushdown, and why an eager system that
+runs each call immediately cannot perform the same optimization.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under lazy evaluation, calling `filter` and `select` only appends nodes to the
+lineage; nothing runs until an action like `write` fires. At that point Spark sees the whole
+plan at once: the source scan, the filter predicate, and which columns survive downstream.
+
+**Step 2.** With the full plan in hand, the optimizer can rewrite it before any I/O: it moves
+the filter down to the scan so storage returns fewer rows, and drops columns no later step
+references. The scan reads strictly less data than the literal top-down plan would.
+
+**Step 3.** An eager system executes each call the moment it is written, so when `filter` is
+called the upstream scan has already read and materialized the full table. The filter then
+runs on data already in memory, and there is no remaining opportunity to push it into the
+scan; the optimization requires knowing the filter exists before the scan runs, which only
+deferred execution provides.
+
+</details>
+
+**Exercise 3.** A job reads a large table, then performs `join → groupBy → join`, with each
+of the three wide operations forcing a shuffle. A colleague proposes caching the result
+after the first join. Reason about how many stage boundaries the job has, and discuss the
+trade-off of materializing an intermediate result between stages.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each wide transformation ends a stage and begins the next. With three wide
+operations (`join`, `groupBy`, `join`) there are three shuffle boundaries. Counting the
+initial scan-and-narrow work as the first stage, the job spans four stages: the pre-first-join
+stage, then one stage after each of the three shuffles.
+
+**Step 2.** Caching after the first join materializes that intermediate DataFrame in memory
+or on disk. The benefit is reuse: if the cached result feeds more than one downstream branch,
+or the job is retried after a failure, Spark replays from the cache instead of recomputing the
+scan and first shuffle from the source lineage.
+
+**Step 3.** The cost is the materialization itself: writing the intermediate consumes memory
+or disk and adds a write pass that a purely pipelined plan would skip. If the intermediate is
+consumed exactly once and no failure occurs, caching is pure overhead, since lineage-based
+recomputation would never be triggered. Caching pays off when the intermediate is reused or
+when recomputation across many stages is expensive enough to justify storing it.
+
+</details>
 
 Reading a Spark plan is therefore mostly counting shuffle boundaries: each one is a stage
 break and the expensive part of the job. The two transformations that most often force a

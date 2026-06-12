@@ -4,7 +4,7 @@ pillar: K
 subId: K6
 lessonId: data-lineage
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Trace a column end to end as a dependency graph from source to dashboard, and use lineage to scope the blast radius of a change and to debug where a bad value entered."
 prerequisites: ["schema-evolution-contracts", "A5/graph-traversal"]
 codeExempt: true
@@ -82,6 +82,87 @@ record of exactly which inputs, transform version, and run produced it, the same
 back-pointer a [model registry](I2/model-registry) keeps for a trained artifact<FN n="2" />.
 Lineage tells you the shape of the dependency graph; provenance pins a specific
 value to the specific run that made it.
+
+## Exercises
+
+**Exercise 1.** Consider the lineage DAG drawn above: `orders_raw` and
+`customers_raw` are sources; `orders` and `customers` are staging tables derived
+from them; `revenue_by_customer` is a mart joining `orders` and `customers`;
+`orders_daily` is a mart derived from `orders`; `revenue` and `ops` are dashboards
+reading `revenue_by_customer` and `orders_daily` respectively. List the blast
+radius of a change to `customers_raw`, that is, every node a change to it can
+affect.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Blast radius is the set of nodes reachable by following edges
+*forward* from the start node. Start at `customers_raw` and take its only outgoing
+edge to `customers`.
+
+**Step 2.** From `customers`, follow the edge into `revenue_by_customer` (the join
+that reads `customers`).
+
+**Step 3.** From `revenue_by_customer`, follow the edge into the `revenue`
+dashboard. No further forward edges remain.
+
+The reachable set, excluding the start node, is
+`{customers, revenue_by_customer, revenue}`. Note `orders_daily` and `ops` are
+*not* reachable: nothing derived from `customers_raw` feeds them, so they are
+outside the blast radius and need not be reviewed.
+
+</details>
+
+**Exercise 2.** A number on the `revenue` dashboard is wrong. Describe the
+upstream traversal that localizes the defect, and explain why walking from the
+dashboard toward the sources (rather than the reverse) is the order that pins down
+the *first* place the value went bad.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Upstream traversal follows edges *backward* from the symptom,
+collecting every node the wrong value was derived from. From `revenue` the suspect
+set is `{revenue_by_customer, orders, customers, orders_raw, customers_raw}`: the
+mart, its two staging inputs, and their two sources.
+
+**Step 2.** Each suspect is checked against its quality dimensions (is it complete,
+valid, consistent). The defect is the *first upstream node that is already wrong*:
+every node downstream of it is wrong only because it inherited the bad value.
+
+**Step 3.** Walking from the dashboard toward the sources means checking the most
+derived nodes first. The moment a node is found correct, everything upstream of it
+on that path is exonerated, so the search narrows toward the boundary between a
+correct upstream node and the first incorrect one. That boundary is exactly where
+the value entered, which is what localizing the root cause means.
+
+</details>
+
+**Exercise 3.** A producer wants to retype `customers_raw.region` from a free-text
+string to an enumerated code. Under table-level lineage, ten downstream tables
+touch `customers_raw` and all ten teams are notified. Explain how column-level
+lineage shrinks this notification set, and state the precise condition under which
+a downstream table can be safely excluded.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Table-level lineage records one node per dataset, so any change to
+`customers_raw` marks *every* table derived from `customers_raw` as potentially
+affected. It cannot distinguish a change to `region` from a change to any other
+column, so all ten consuming tables are in scope.
+
+**Step 2.** Column-level lineage records which *input columns* feed each *output
+column*. A retype of `customers_raw.region` propagates only along edges that
+actually carry `region`. A downstream table is affected only if at least one of
+its columns is derived (directly or transitively) from `customers_raw.region`.
+
+**Step 3.** A downstream table can be safely excluded precisely when *none* of its
+columns trace back to `customers_raw.region`, even if it reads other columns of
+`customers_raw`. This is the difference between notifying all ten teams and
+notifying only the subset whose output columns depend on the retyped field.
+
+</details>
 
 The next lesson watches these datasets *operationally*, freshness, volume, and
 null rates over time, so a feed that breaks upstream is flagged before its bad

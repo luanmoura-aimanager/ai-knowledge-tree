@@ -4,7 +4,7 @@ pillar: K
 subId: K5
 lessonId: incremental-processing
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Process only new or changed rows instead of rebuilding a table, and use a merge/upsert keyed on a stable id so a reprocessed batch updates rather than duplicates."
 prerequisites: ["transformation-as-code"]
 ---
@@ -124,7 +124,122 @@ print("incremental, idempotent, cheaper:", True)
 ```
 
 The merge keeps one row per id with the latest value, reprocessing the last batch is a
-no-op, and incremental touched 7 rows where full-rebuild touched 15. Idempotency here
+no-op, and incremental touched 7 rows where full-rebuild touched 15.
+
+## Exercises
+
+**Exercise 1.** A `fct_orders` table holds $N = 730{,}000$ rows of accumulated
+history. Each daily run adds $\Delta = 1{,}000$ new or changed rows. Compute the rows
+processed by a full-refresh run and by an incremental run, and the saving ratio. Then
+state in words how each cost scales as the table keeps growing.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A full-refresh model recreates the output from the entire source, so its
+cost is proportional to the accumulated size: it processes all $N = 730{,}000$ rows.
+
+**Step 2.** An incremental model reads, transforms, and writes only the new or changed
+rows: it processes $\Delta = 1{,}000$ rows.
+
+**Step 3.** The saving is the ratio
+
+$$
+\frac{N}{\Delta} = \frac{730{,}000}{1{,}000} = 730,
+$$
+
+so the incremental run does $1/730$ of the work.
+
+**Step 4.** Full-refresh cost grows with $N$: as history accumulates, each run gets
+strictly more expensive even though the daily $\Delta$ is unchanged. Incremental cost
+stays proportional to $\Delta$, so it is flat as long as the daily change volume is
+flat, independent of how large the history grows.
+
+</details>
+
+**Exercise 2.** A merge keyed on a stable id is **idempotent**: reapplying an
+already-merged batch changes nothing. Prove this from the merge rule (absent key
+inserts, present key updates), and explain why this is exactly the property a retry or
+backfill needs.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take a batch $B$ already merged into target $T$, giving $T' = \text{merge}(T, B)$.
+Every key $k$ in $B$ is present in $T'$ with $T'$'s value equal to $B$'s value, because
+the first merge either inserted $k$ from $B$ or updated $k$ to $B$'s value.
+
+**Step 2.** Apply $B$ again to $T'$. For each key $k$ in $B$: $k$ is present in $T'$, so
+the rule updates $k$'s columns to $B$'s values. But $T'$ already holds exactly $B$'s
+values for those columns, so the update overwrites each value with the identical value.
+No key is inserted (all are present) and no value changes.
+
+**Step 3.** Therefore $\text{merge}(T', B) = T'$: the second application is a no-op, the
+definition of idempotence.
+
+**Step 4.** A retry reruns the same batch after a failure, and a backfill may re-touch a
+batch already processed. Idempotence guarantees each such rerun lands the table in the
+same state as a single clean run, so reruns cannot duplicate rows or double-count. This
+is the standard defense against the duplicate delivery batch and stream systems cannot
+fully rule out.
+
+</details>
+
+**Exercise 3 (code).** Implement high-watermark selection over a stream of source rows
+stamped with an `updated_at` integer. Starting from watermark $w = 0$, process rows
+with `updated_at > w` in two runs, advancing $w$ to the new maximum each time. Assert
+that each row is processed exactly once across the two runs and that the final
+watermark equals the global maximum.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+# Source rows: (id, updated_at). updated_at is a monotone version stamp.
+n = 12
+ids = np.arange(n)
+updated_at = np.sort(rng.integers(1, 100, size=n))   # ascending stamps
+source = np.rec.fromarrays([ids, updated_at], names=["id", "updated_at"])
+
+def run(source, w):
+    # Select only rows strictly above the high-water mark.
+    mask = source["updated_at"] > w
+    selected = source[mask]
+    new_w = int(selected["updated_at"].max()) if selected.size else w
+    return selected, new_w
+
+# Split the stamp range so run 1 sees an early slice, run 2 sees the rest.
+mid = int(np.median(source["updated_at"]))
+
+# Run 1: watermark starts at 0, but cap the visible source at `mid` to model
+# rows that have not yet arrived.
+w = 0
+arrived_1 = source[source["updated_at"] <= mid]
+sel_1, w = run(arrived_1, w)
+
+# Run 2: now all rows have arrived; select only those above the advanced watermark.
+sel_2, w = run(source, w)
+
+processed_ids = np.concatenate([sel_1["id"], sel_2["id"]])
+
+# Every source row processed exactly once (no row skipped, none reprocessed).
+assert np.array_equal(np.sort(processed_ids), ids)
+assert len(processed_ids) == n
+# Final watermark is the global maximum stamp.
+assert w == int(source["updated_at"].max())
+print("processed:", len(processed_ids), "rows once; final watermark:", w)
+```
+
+The high-water mark turns "which rows are new" into the single comparison
+`updated_at > w`; across the two runs every row is selected once and the watermark
+climbs to the global maximum.
+
+</details>
+
+Idempotency here
 was a property of one table's merge; the [next lesson](K5/scheduling-backfills) lifts
 it to the schedule, where time-partitioned runs and backfills demand that *every* task
 be safe to rerun.
