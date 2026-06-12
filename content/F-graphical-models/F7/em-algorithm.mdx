@@ -62,6 +62,24 @@ $$
 r_{nk} = P(Z_n = k \mid x_n, \theta) = \frac{\pi_k \mathcal{N}(x_n; \mu_k, \Sigma_k)}{\sum_j \pi_j \mathcal{N}(x_n; \mu_j, \Sigma_j)}.
 $$
 
+The word "soft" earns its place only when the responsibilities are between $0$ and $1$,
+which depends on where the point sits. Take the three components used in the code below
+($\pi = (0.3, 0.5, 0.2)$, means $-2, 1, 4$, standard deviations $0.7, 0.9, 0.5$) and read
+off $r_n$ for a few positions:
+
+- **On a center**, $x = -2$: $r = (0.995,\, 0.005,\, 0)$. The point is claimed almost
+  entirely by component 1; the assignment is effectively hard.
+- **On another center**, $x = 1$: $r = (0,\, 1.0,\, 0)$, hard again.
+- **Between two centers**, $x = -0.5$: $r = (0.237,\, 0.763,\, 0)$. Now the assignment
+  is genuinely soft, split between the two flanking components in proportion to how well
+  each explains the point.
+- **Between the far pair**, $x = 2.5$: $r = (0,\, 0.969,\, 0.031)$, mostly component 2
+  with a sliver of component 3.
+
+This is the contrast hard $k$-means cannot make: a point near a mode is assigned with
+near-certainty, but a point in the overlap region contributes fractionally to several
+components, and those fractions are what weight the M-step averages below.
+
 **M-step.** Compute effective counts $N_k = \sum_n r_{nk}$ and update:
 
 $$

@@ -51,6 +51,22 @@ $$
 quantifies this: $N_\text{eff} = N$ when all weights are equal; $N_\text{eff} = 1$
 when one particle has all the weight.
 
+To calibrate the scale, take $N = 500$ particles and read off where a weight profile
+lands:
+
+- **Equal weights** ($w^{(i)} = 1/500$): $N_\text{eff} = 500$. Every particle pulls
+  its full share; the cloud is healthy.
+- **Ten particles share the weight equally, the rest near zero**:
+  $N_\text{eff} = 10$. Out of 500 stored samples, the estimate is effectively built
+  from ten. The other 490 cost memory and compute for nothing.
+- **One particle holds 90%, the remaining 499 split the last 10%**:
+  $N_\text{eff} \approx 1.2$. The filter has collapsed to a single sample masquerading
+  as a cloud of 500.
+
+The drop is steep: long before a single particle dominates, $N_\text{eff}$ has already
+fallen far below $N$. That is why the trigger is set at $N/2$ rather than waiting for
+near-total collapse.
+
 **Resampling** draws $N$ new particles with replacement from the current weighted set,
 restoring equal weights. It should trigger when $N_\text{eff}$ drops below $N/2$.
 

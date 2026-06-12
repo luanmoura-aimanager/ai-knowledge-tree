@@ -69,8 +69,18 @@ $$
 $$
 
 This holds for any $q_\phi$ (no reparameterizability required), but the variance is
-typically orders of magnitude higher than the reparameterization trick.
+typically much higher than the reparameterization trick.
 Control variates (baselines) reduce variance at the cost of additional code complexity.
+
+The gap is concrete. Take $q_\phi = \mathcal{N}(\mu, 1)$ at $\mu = 1$ and the simple
+integrand $f(z) = z^2$, and estimate $\nabla_\mu \mathbb{E}_q[z^2]$ (whose true value
+is $2\mu = 2$). The pathwise estimate is $2z$ with $z = \mu + \epsilon$, so its
+per-sample variance is $\mathrm{Var}(2z) = 4$. The score-function estimate is
+$z^2\,(z-\mu)$, whose per-sample variance is $30$: a $7.5\times$ heavier single-sample
+estimate, both unbiased and both centered on $2$. The ratio is modest here only
+because $f$ and $\mu$ are small; it grows quickly as the integrand takes larger
+values or the proposal tightens, which is why reparameterization is the default
+whenever $q_\phi$ admits it.
 
 ![Stochastic VI optimizes the ELBO with noisy mini-batch gradients: it climbs toward the optimum quickly but rattles around it, unlike the smooth full-batch ascent.](/figures/F5/stochastic-vi.svg)
 

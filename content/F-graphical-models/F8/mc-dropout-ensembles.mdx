@@ -51,6 +51,21 @@ a flexible output distribution rather than a point estimate.
 Decomposition: total uncertainty = epistemic + aleatoric. A model that only reports
 a single prediction mixes both.
 
+The distinction is easy to state and easy to conflate, so the closing $\sin(x)$ fit
+makes it concrete. Training data covers $|x| < 3$; the MC-dropout spread is the
+epistemic part:
+
+- **Inside the data**, $|x| < 3$: mean dropout std $\approx 1.25$. The function is
+  pinned down by samples, so the random masks barely move the prediction.
+- **Outside the data**, $|x| > 3$: mean dropout std $\approx 6.4$, five times larger.
+  No data constrains the high-degree polynomial there, so different masks extrapolate
+  to wildly different curves.
+
+That fanning-out is epistemic: it shrinks as you add data in the gap. It is the
+opposite of aleatoric noise, which is the $0.2$ observation noise baked into every
+training label and would not shrink no matter how many points you collect. A model
+that emits one number reports their sum and cannot tell you which dominates.
+
 ## Deep ensembles
 
 Train $M$ independent networks with different random seeds (different weight initializations
@@ -66,11 +81,12 @@ trajectories, not from explicit Bayesian inference.
 
 **Practical comparison:**
 
-| Method | Calibration | Compute at test | OOD detection |
-|---|---|---|---|
-| MC dropout | Moderate | $T \times$ single forward | Moderate |
-| Deep ensembles | Strong | $M \times$ single forward | Strong |
-| Single network | Poor | $1 \times$ | Poor |
+- **MC dropout**: moderate calibration, $T \times$ a single forward pass at test time,
+  moderate OOD detection.
+- **Deep ensembles**: strong calibration, $M \times$ a single forward pass at test
+  time, strong OOD detection.
+- **Single network**: poor calibration, $1 \times$ a single forward pass, poor OOD
+  detection.
 
 Deep ensembles consistently outperform MC dropout on calibration and OOD benchmarks
 but require training $M$ models instead of one.
