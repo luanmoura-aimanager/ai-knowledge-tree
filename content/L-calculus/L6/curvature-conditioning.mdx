@@ -1,0 +1,324 @@
+---
+title: "Curvature, conditioning, and why optimizers zigzag"
+pillar: L
+subId: L6
+lessonId: curvature-conditioning
+order: 5
+estimatedMinutes: 33
+goal: "Connect the Hessian's eigenvalue spread to the condition number, show why gradient descent zigzags across ill-conditioned ravines, and preview the momentum and second-order fixes."
+prerequisites: ["steepest-descent"]
+---
+
+Last lesson's guarantee promised descent, and kept the promise even on
+a canyon like Rosenbrock's. What it never promised was speed, and on
+canyons there is none: the iterates ricochet between the walls while
+inching along the floor. This lesson quantifies the pathology. One
+number, the ratio of the Hessian's extreme eigenvalues, prices exactly
+how slow steepest descent must be, and identifies what momentum,
+Newton's method, and Adam are each engineered to fix<FN n="1" />.
+
+## The model problem
+
+Strip the issue to its skeleton: a quadratic bowl with axis-aligned
+curvatures,
+
+$$
+f(x, y) = \frac{1}{2} \left( \mu x^2 + L y^2 \right),
+\qquad 0 \lt \mu \le L ,
+$$
+
+Hessian $\operatorname{diag}(\mu, L)$: gentle curvature $\mu$ along $x$, steep
+curvature $L$ along $y$. Gradient descent decouples by coordinate:
+
+$$
+x_{k+1} = (1 - \eta\mu)\, x_k,
+\qquad
+y_{k+1} = (1 - \eta L)\, y_k ,
+$$
+
+two geometric sequences (L1) with different ratios, and the conflict is
+already visible. Stability demands $\eta \lt 2/L$ (the steep direction
+sets the speed limit), but progress along the gentle direction shrinks
+the error by only $1 - \eta\mu \approx 1 - 2\mu/L$ per step. One
+direction is over-served, the other starved, by the *same* $\eta$.
+
+## The condition number prices the delay
+
+Define the **condition number** of the Hessian,
+
+$$
+\kappa = \frac{L}{\mu} = \frac{\lambda_{\max}}{\lambda_{\min}} ,
+$$
+
+the eigenvalue spread A1 met for matrices, now wearing its optimization
+meaning. The best constant step balances the two ratios
+($1 - \eta\mu = -(1 - \eta L)$, giving $\eta^* = 2/(L + \mu)$), and the
+resulting per-step error contraction is
+
+$$
+\rho = \frac{\kappa - 1}{\kappa + 1} .
+$$
+
+**Step 1 (read the formula).** $\kappa = 1$: $\rho = 0$, one step
+solves it (round bowl, the gradient points at the center).
+$\kappa = 100$: $\rho = 0.980$. $\kappa = 10^4$: $\rho = 0.9998$.
+
+**Step 2 (convert to iteration counts).** Reaching accuracy
+$\epsilon$ needs about $\log(1/\epsilon) / \log(1/\rho)
+\approx \frac{\kappa}{2} \log(1/\epsilon)$ steps: **iterations scale
+linearly with $\kappa$.** Six digits of accuracy on a
+$\kappa = 100$ bowl: roughly $700$ steps; on $\kappa = 10^4$, roughly
+$70{,}000$.
+
+**Step 3 (see the path).** Off the axes the two geometric decays
+interleave: the steep coordinate overshoots and flips sign each step
+(its ratio is negative at $\eta^*$) while the gentle coordinate creeps,
+and the trajectory is the textbook **zigzag**: long valley, short
+hops, each hop perpendicular to the local contour but nearly
+perpendicular to where the minimum actually lies.
+
+![A round bowl and a kappa-equals-50 valley, same algorithm: on the left the path runs straight to the center in a few steps; on the right it ricochets between the walls dozens of times while drifting along the floor.](/figures/L6/curvature-conditioning.svg)
+
+The geometric reading of the disease: the negative gradient is
+perpendicular to the *contour*, and on an elongated ellipse the
+perpendicular to the contour points almost at the nearest wall, not at
+the center. Steepest descent is only as good as "steepest" is aligned
+with "toward the minimum", and $\kappa$ measures exactly that
+misalignment's worst case. This is the L4 Rosenbrock observation
+($\kappa \approx 2508$ at its minimum) explaining the 100,000-step
+crawl observed last lesson.
+
+## The three escapes
+
+Each classical fix attacks a different term of the analysis; A3 builds
+all three properly, so here is just the mechanism of each.
+
+**Momentum** adds memory:
+$\mathbf{v}_{k+1} = \beta \mathbf{v}_k - \eta \nabla f$,
+$\mathbf{x}_{k+1} = \mathbf{x}_k + \mathbf{v}_{k+1}$. Zigzag
+components alternate sign and cancel in the running average, while
+valley-floor components accumulate; the contraction improves from
+$\frac{\kappa - 1}{\kappa + 1}$ to
+$\frac{\sqrt{\kappa} - 1}{\sqrt{\kappa} + 1}$, replacing $\kappa$ by
+$\sqrt{\kappa}$ in the iteration count, $100\times$ fewer steps at
+$\kappa = 10^4$<FN n="2" />.
+
+**Newton's method** changes the geometry: step
+$-H^{-1} \nabla f$ instead of $-\nabla f$. In the Hessian's own
+coordinates this rescales every curvature to $1$, so the model problem
+becomes a round bowl ($\kappa_{\text{effective}} = 1$) and converges in
+one step; on non-quadratics it inherits L2's Newton-iteration
+digit-doubling near the minimum. The price is computing and inverting
+$H$, hopeless at $n = 10^9$, which is why deep learning approximates
+it.
+
+**Per-coordinate rescaling** (AdaGrad/RMSProp/Adam) is the budget
+Newton: divide each gradient coordinate by a running estimate of its
+own scale, equalizing the *axis-aligned* curvatures, the diagonal of
+the idea. It fixes the model problem exactly (the model problem *is*
+axis-aligned) and helps real losses to the degree their curvature
+respects the coordinates.
+
+The named confusion: **ill-conditioning is not nonconvexity.** The
+$\kappa = 10^4$ bowl is strictly convex with one global minimum and
+still nearly stalls steepest descent; conversely a nonconvex surface
+can be locally round and easy. Conditioning is about eigenvalue
+*spread*, convexity about eigenvalue *signs*, and the two failure
+modes need different medicine.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+mu, L = 1.0, 50.0                              # kappa = 50
+grad = lambda p: np.array([mu * p[0], L * p[1]])
+f = lambda p: 0.5 * (mu * p[0] ** 2 + L * p[1] ** 2)
+
+# Optimal constant step and its predicted contraction rho
+eta = 2 / (L + mu)
+rho = (L / mu - 1) / (L / mu + 1)
+
+p = np.array([1.0, 1.0])
+errs = [np.linalg.norm(p)]
+flips = 0
+for k in range(400):
+    p_new = p - eta * grad(p)
+    flips += int(np.sign(p_new[1]) != np.sign(p[1]) and p_new[1] != 0)
+    p = p_new
+    errs.append(np.linalg.norm(p))
+errs = np.array(errs)
+
+# The steep coordinate flips sign nearly every step: the zigzag
+print("sign flips of y in 400 steps:", flips)
+assert flips > 380
+
+# Worst-coordinate contraction matches rho (x dominates eventually)
+tail = errs[200:300]
+rate = (tail[-1] / tail[0]) ** (1 / (len(tail) - 1))
+print("measured rate:", round(rate, 6), " predicted rho:", round(rho, 6))
+assert abs(rate - rho) < 1e-3
+
+# Iteration count scales with kappa: steps to reach 1e-6, three kappas
+for kap in [10.0, 100.0, 1000.0]:
+    Lk = kap
+    ek = 2 / (Lk + 1)
+    q = np.array([1.0, 1.0])
+    n = 0
+    while np.linalg.norm(q) > 1e-6 and n < 200_000:
+        q = q - ek * np.array([q[0], Lk * q[1]])
+        n += 1
+    print(f"kappa={kap:>6}: {n} steps")
+    assert n > 2 * kap                          # at least ~kappa-scaled
+
+# Momentum on kappa = 100: beats plain GD by a wide margin
+Lk, kap = 100.0, 100.0
+gradk = lambda p: np.array([p[0], Lk * p[1]])
+beta = ((np.sqrt(kap) - 1) / (np.sqrt(kap) + 1)) ** 2
+etam = 4 / (np.sqrt(Lk) + 1) ** 2
+q, v = np.array([1.0, 1.0]), np.zeros(2)
+nm = 0
+while np.linalg.norm(q) > 1e-6 and nm < 200_000:
+    v = beta * v - etam * gradk(q)
+    q = q + v
+    nm += 1
+print("momentum steps at kappa=100:", nm)
+assert nm < 500                                 # ~sqrt(kappa) regime
+```
+
+The steep coordinate flips sign on 396 of 400 steps (the zigzag,
+counted), the measured contraction matches
+$(\kappa-1)/(\kappa+1)$ to three decimals, the steps-to-tolerance grow
+in lockstep with $\kappa$ across two orders of magnitude, and momentum
+at $\kappa = 100$ finishes in a few hundred steps where plain descent
+needs thousands: every claim of the analysis, run live.
+
+## Exercises
+
+**Exercise 1.** For the quadratic
+$f(x,y) = \tfrac12 (4x^2 + 400 y^2)$: compute $\kappa$, the optimal
+constant step $\eta^*$, the contraction factor $\rho$, and estimate the
+number of iterations to shrink the error by $10^6$. Then state what
+momentum's $\sqrt{\kappa}$ scaling would give instead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Eigenvalues $\mu = 4$, $L = 400$:
+$\kappa = 100$.
+
+**Step 2.** $\eta^* = \dfrac{2}{L + \mu} = \dfrac{2}{404} \approx
+0.00495$.
+
+**Step 3.** $\rho = \dfrac{\kappa - 1}{\kappa + 1} = \dfrac{99}{101}
+\approx 0.9802$.
+
+**Step 4.** Iterations: $\dfrac{\ln 10^6}{\ln(1/\rho)} =
+\dfrac{13.8}{0.0200} \approx 690$ steps.
+
+**Step 5.** Momentum contracts at
+$\frac{\sqrt{100}-1}{\sqrt{100}+1} = \frac{9}{11} \approx 0.818$, so
+$\frac{13.8}{0.201} \approx 69$ steps: the promised $\sqrt{\kappa}$
+speedup, a clean factor of ten here.
+
+</details>
+
+**Exercise 2.** Show that for the quadratic
+$f(\mathbf{x}) = \tfrac12 \mathbf{x}^\top H \mathbf{x}$ with symmetric
+positive-definite $H$, Newton's step from any point
+$\mathbf{x}_0$ lands exactly at the minimum in one iteration.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Gradient: $\nabla f(\mathbf{x}) = H \mathbf{x}$ (the
+quadratic-gradient identity from the L4 Hessian exercise, with
+$\mathbf{b} = \mathbf{0}$). The minimum is at
+$\nabla f = \mathbf{0}$, i.e. $\mathbf{x}^* = \mathbf{0}$ (unique,
+since $H$ is invertible and the function strictly convex).
+
+**Step 2.** Newton's update:
+
+$$
+\mathbf{x}_1 = \mathbf{x}_0 - H^{-1} \nabla f(\mathbf{x}_0)
+= \mathbf{x}_0 - H^{-1} H \mathbf{x}_0 = \mathbf{0} = \mathbf{x}^* .
+$$
+
+**Step 3.** The condition number never appeared: multiplying by
+$H^{-1}$ rescales every eigen-direction by its own inverse curvature,
+which is exactly the per-direction step each coordinate wanted.
+Ill-conditioning is a disease of using *one* step size for *all*
+directions; Newton's method abolishes the "one".
+
+</details>
+
+**Exercise 3 (code).** Whitening the inputs conditions the loss: for
+linear least squares $\ell(\mathbf{w}) = \tfrac{1}{2m} \lVert X
+\mathbf{w} - \mathbf{y} \rVert^2$, the Hessian is $X^\top X / m$.
+Generate correlated 2D inputs, compute $\kappa$ before and after
+standardizing-and-decorrelating the columns of $X$, and verify descent
+converges in far fewer iterations on the whitened problem.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+m = 2000
+z = rng.normal(size=(m, 2))
+X = z @ np.array([[3.0, 0.0], [2.8, 0.3]])     # correlated, badly scaled
+w_true = np.array([1.0, -2.0])
+y = X @ w_true + 0.01 * rng.normal(size=m)
+
+def kappa_of(X):
+    lam = np.linalg.eigvalsh(X.T @ X / len(X))
+    return lam.max() / lam.min()
+
+def steps_to_converge(X, y, tol=1e-8):
+    H = X.T @ X / len(X)
+    L = np.linalg.eigvalsh(H).max()
+    w = np.zeros(2)
+    for n in range(1, 500_001):
+        g = X.T @ (X @ w - y) / len(X)
+        w = w - (1 / L) * g
+        if np.linalg.norm(g) < tol:
+            return n
+    return n
+
+k_raw = kappa_of(X)
+
+# Whiten: center, then rotate-and-scale by the covariance's inverse sqrt
+Xc = X - X.mean(axis=0)
+lam, Q = np.linalg.eigh(Xc.T @ Xc / m)
+Xw = Xc @ Q / np.sqrt(lam)
+k_white = kappa_of(Xw)
+
+n_raw = steps_to_converge(Xc, y - y.mean())
+n_white = steps_to_converge(Xw, y - y.mean())
+print(f"kappa raw: {k_raw:.1f} -> whitened: {k_white:.3f}")
+print(f"steps raw: {n_raw} -> whitened: {n_white}")
+assert k_raw > 100 and abs(k_white - 1.0) < 1e-6
+assert n_white < n_raw / 10
+```
+
+The correlated design matrix carries $\kappa$ in the hundreds and costs
+thousands of iterations; after whitening, $\kappa = 1$ to six decimals
+and descent converges in a handful. Data preprocessing *is*
+preconditioning: batch normalization, feature standardization, and
+Adam's rescaling are all attempts to buy this plot's right panel
+without computing an eigendecomposition.
+
+</details>
+
+One lesson remains, the pillar's destination: the multivariable chain
+rule, executed backward through a network's layers, computing every
+parameter's gradient at once. Backpropagation, derived rather than
+described.
+
+<Footnotes>
+  <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.). Springer. Ch. 3.3, the steepest-descent rate (kappa-1)/(kappa+1) on quadratics. [doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)</FNItem>
+  <FNItem n="2">**Polyak, B. T.** (1964). "Some methods of speeding up the convergence of iteration methods". *USSR Computational Mathematics and Mathematical Physics*, 4(5), 1-17. Heavy-ball momentum and the sqrt-kappa rate. [doi:10.1016/0041-5553(64)90137-5](https://doi.org/10.1016/0041-5553(64)90137-5)</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 8.2.3, ill-conditioning as a primary obstacle in neural network training. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+</Footnotes>

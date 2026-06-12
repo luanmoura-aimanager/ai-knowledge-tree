@@ -1,0 +1,313 @@
+---
+title: "Convexity through the Hessian"
+pillar: L
+subId: L6
+lessonId: convexity
+order: 2
+estimatedMinutes: 32
+goal: "Define convex functions, test convexity by positive semidefiniteness of the Hessian, and see why convexity turns local minima into global ones."
+prerequisites: ["critical-points"]
+---
+
+Last lesson's audit certifies *local* minima, and the Himmelblau exercise
+showed how little that promises: four basins, and the start decides which
+one you get. **Convexity** is the property that abolishes the problem. On
+a convex function there is one basin, every local minimum is global, and
+gradient information is globally trustworthy. Knowing whether a problem
+is convex is the first question optimization theory asks (A3 is largely
+the study of what convexity buys); this lesson defines it and gives the
+Hessian test that checks it<FN n="1" />.
+
+## The chord definition
+
+A function $f$ on a convex domain is **convex** if for all points
+$\mathbf{x}, \mathbf{y}$ and all $t \in [0, 1]$,
+
+$$
+f\!\left( (1-t)\,\mathbf{x} + t\,\mathbf{y} \right)
+\;\le\; (1-t)\, f(\mathbf{x}) + t\, f(\mathbf{y}) :
+$$
+
+the graph lies on or below every chord. **Strictly convex** when the
+inequality is strict for $t \in (0,1)$ and $\mathbf{x} \ne \mathbf{y}$
+(no flat chords); **concave** when the inequality flips ($-f$ convex).
+
+The bowl $x^2$ is convex, as are $e^x$, $\lvert x \rvert$ (convexity does
+not need differentiability: the hinge loss and ReLU live here), every
+norm, and every affine function (chords lie *on* the graph: convex and
+concave at once, never strictly). The double well
+$\tfrac14 x^4 - x^2$ is not: the chord between its two basins dips below
+the central bump's graph... rather, the graph rises above that chord,
+and that chord violation is exactly where a second basin hides.
+
+![The chord test, passing and failing: on the convex curve the dashed chord clears the graph; on the double well the graph pokes above its chord, and a second local minimum exists precisely because of it.](/figures/L6/convexity.svg)
+
+## The differential characterizations
+
+For differentiable $f$, two equivalent restatements, each useful daily:
+
+**First order: tangents are global underestimates.**
+
+$$
+f(\mathbf{y}) \;\ge\; f(\mathbf{x}) + \nabla f(\mathbf{x})^{\top} (\mathbf{y} - \mathbf{x})
+\qquad \text{for all } \mathbf{x}, \mathbf{y} .
+$$
+
+The tangent plane, a *local* construction, sits below the graph
+*everywhere*. This is the inequality that makes convexity globally
+informative: every gradient evaluation yields a certificate about the
+entire function.
+
+**Second order: curvature is nonnegative everywhere.** For
+twice-differentiable $f$,
+
+$$
+f \text{ convex} \iff H_f(\mathbf{x}) \succeq 0 \;\; \text{for all } \mathbf{x},
+$$
+
+positive *semi*definite Hessians (all eigenvalues $\ge 0$) at every
+point; positive definite everywhere gives strict convexity. The proof
+direction worth internalizing: restrict to a segment,
+$\phi(t) = f(\mathbf{x} + t \mathbf{d})$, compute
+$\phi''(t) = \mathbf{d}^\top H \mathbf{d} \ge 0$ (L4), and a one-variable
+function with nonnegative second derivative is convex by the MVT. As
+always in this pillar, the $n$-dimensional fact is the 1D fact along
+every line.
+
+**Worked example 1.** $f(x, y) = x^2 + y^2 - xy$. The Hessian is
+constant:
+
+$$
+H = \begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix},
+$$
+
+with eigenvalues $2 \pm 1 = \lbrace 1, 3 \rbrace$, both positive: strictly
+convex everywhere, one global minimum (at the origin), end of story.
+
+**Worked example 2.** The least-squares loss
+$\ell(\mathbf{w}) = \tfrac12 \lVert X\mathbf{w} - \mathbf{y} \rVert^2$
+has $H = X^\top X$, which is positive semidefinite for *any* data matrix
+($\mathbf{d}^\top X^\top X \mathbf{d} = \lVert X \mathbf{d} \rVert^2 \ge
+0$): linear regression is always convex. Logistic regression's loss is
+convex too; a neural network's, composing through nonlinearities, is
+not, which is the single most consequential dividing line in machine
+learning practice.
+
+## Why convexity is the prize
+
+**Theorem.** For convex $f$, every local minimum is a global minimum;
+for differentiable convex $f$, $\nabla f(\mathbf{x}^*) = \mathbf{0}$
+*alone* implies $\mathbf{x}^*$ is a global minimizer.
+
+The second claim is the first-order characterization with
+$\nabla f(\mathbf{x}^*) = 0$ plugged in:
+$f(\mathbf{y}) \ge f(\mathbf{x}^*) + 0$ for every $\mathbf{y}$. Done.
+The first: if some far point $\mathbf{y}$ were strictly better than a
+local minimum $\mathbf{x}^*$, the chord from $\mathbf{x}^*$ to
+$\mathbf{y}$ would descend immediately (its values are
+$\le (1-t) f(\mathbf{x}^*) + t f(\mathbf{y}) \lt f(\mathbf{x}^*)$ for
+small $t$), contradicting local minimality.
+
+So on a convex problem, last lesson's two-stage audit collapses to stage
+one, with the Hessian's role shifted from classifying critical points to
+certifying the *whole function* once. The named confusion to retire:
+**"the Hessian is positive definite at my critical point" is a local
+statement; convexity demands it everywhere.** The Himmelblau function
+passes the local test at four different points, which is precisely how
+you know it is not convex: a convex function cannot have two distinct
+strict local minima.
+
+Two closure properties generate most convex losses in practice: sums of
+convex functions are convex (so empirical risk, a sum over data points,
+inherits convexity from its per-example loss), and compositions with
+affine maps preserve convexity ($f(X\mathbf{w} + \mathbf{b})$ convex in
+$\mathbf{w}$ whenever $f$ is convex), which is why "convex loss on a
+linear model" is the convex island of ML, and why stacking a second
+nonlinear layer leaves it.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Chord test, 100k random chords: passes for the bowl, fails for the well
+bowl = lambda x: x**2
+well = lambda x: 0.25 * x**4 - x**2
+x, y, t = rng.uniform(-2.5, 2.5, (3, 100_000))
+t = (t + 2.5) / 5.0                                   # into [0, 1]
+mid = (1 - t) * x + t * y
+assert np.all(bowl(mid) <= (1 - t) * bowl(x) + t * bowl(y) + 1e-12)
+viol = well(mid) > (1 - t) * well(x) + t * well(y) + 1e-12
+print("double-well chord violations:", viol.mean().round(3))
+assert viol.any()
+
+# First-order: tangents of a convex f underestimate globally
+f = lambda p: p[0] ** 2 + p[1] ** 2 - p[0] * p[1]
+grad = lambda p: np.array([2 * p[0] - p[1], 2 * p[1] - p[0]])
+for _ in range(2000):
+    a, b = rng.uniform(-3, 3, (2, 2))
+    assert f(b) >= f(a) + grad(a) @ (b - a) - 1e-10
+
+# Second-order: least-squares Hessian X^T X is PSD for random data
+X = rng.normal(size=(50, 8))
+lam = np.linalg.eigvalsh(X.T @ X)
+assert np.all(lam >= -1e-10)
+
+# Convexity's payoff: zero gradient at a point => that point beats ALL others
+star = np.array([0.0, 0.0])
+assert np.allclose(grad(star), 0.0)
+pts = rng.uniform(-10, 10, (100_000, 2))
+vals = pts[:, 0] ** 2 + pts[:, 1] ** 2 - pts[:, 0] * pts[:, 1]
+assert np.all(vals >= f(star))
+print("one vanishing gradient certified a global minimum over 100k samples")
+```
+
+A hundred thousand chords never get under the bowl while 14% of them
+catch the double well cheating, two thousand random tangent planes all
+underestimate the convex quadratic, the least-squares Hessian's spectrum
+is nonnegative, and a single zero-gradient check at the origin beats
+every one of 100,000 sampled points: the global guarantee, bought
+locally.
+
+## Exercises
+
+**Exercise 1.** Determine where
+$f(x, y) = x^4 + y^4 - 4xy$ is convex, by finding where its Hessian is
+positive semidefinite. Is the function convex on all of
+$\mathbb{R}^2$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Hessian:
+
+$$
+H = \begin{pmatrix} 12x^2 & -4 \\ -4 & 12y^2 \end{pmatrix} .
+$$
+
+**Step 2.** PSD for a $2\times2$ symmetric matrix: nonnegative diagonal
+(automatic here) and $\det H \ge 0$:
+
+$$
+\det H = 144 x^2 y^2 - 16 \ge 0
+\iff \lvert xy \rvert \ge \frac{1}{3} .
+$$
+
+**Step 3.** Convexity fails on the strip $\lvert xy \rvert \lt 1/3$
+(which includes the origin, where
+$H = \begin{pmatrix} 0 & -4 \\ -4 & 0 \end{pmatrix}$ has eigenvalues
+$\pm 4$). So $f$ is not convex on $\mathbb{R}^2$; it is convex on each
+region where $\lvert xy \rvert \ge 1/3$ holds throughout a convex set.
+Consistently, $f$ has two strict global minima at $\pm(1, 1)$ (value
+$-2$), something no convex function could have.
+
+</details>
+
+**Exercise 2.** Prove that
+$f(\mathbf{x}) = \max(\ell_1(\mathbf{x}), \ell_2(\mathbf{x}))$ is convex
+whenever $\ell_1, \ell_2$ are convex, directly from the chord
+definition. (This is how the hinge loss
+$\max(0, 1 - y\hat{y})$ earns its convexity.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Fix $\mathbf{x}, \mathbf{y}, t$ and write
+$\mathbf{z} = (1-t)\mathbf{x} + t\mathbf{y}$. For each $i \in \lbrace 1, 2
+\rbrace$, convexity of $\ell_i$ gives
+
+$$
+\ell_i(\mathbf{z}) \le (1-t)\, \ell_i(\mathbf{x}) + t\, \ell_i(\mathbf{y}) .
+$$
+
+**Step 2.** Bound each right-side term by the max:
+$\ell_i(\mathbf{x}) \le f(\mathbf{x})$ and
+$\ell_i(\mathbf{y}) \le f(\mathbf{y})$, so for both $i$,
+
+$$
+\ell_i(\mathbf{z}) \le (1-t) f(\mathbf{x}) + t f(\mathbf{y}) .
+$$
+
+**Step 3.** The bound holds for both branches, hence for their maximum:
+
+$$
+f(\mathbf{z}) = \max_i \ell_i(\mathbf{z}) \le (1-t) f(\mathbf{x}) + t f(\mathbf{y}) .
+$$
+
+The chord condition for $f$. The argument never used differentiability,
+and indeed the max of two smooth functions has corners; convex analysis
+runs on exactly such functions (hinge, ReLU-based losses, $\ell_1$
+penalties), with subgradients standing in for gradients in A3.
+
+</details>
+
+**Exercise 3 (code).** Convexity makes one gradient check global, and
+nonconvexity breaks it. Verify numerically: for the convex
+$f_1(x,y) = x^2 + y^2 - xy$ and the nonconvex Himmelblau function, run
+gradient descent from 200 random starts in $[-5,5]^2$ and count the
+distinct final values (rounded to 4 decimals). Assert $f_1$ always
+reaches the same value while Himmelblau reaches its four basins.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+g1 = lambda p: np.array([2 * p[0] - p[1], 2 * p[1] - p[0]])
+f1 = lambda p: p[0] ** 2 + p[1] ** 2 - p[0] * p[1]
+
+def gh(p):
+    a = p[0]**2 + p[1] - 11
+    b = p[0] + p[1]**2 - 7
+    return np.array([4*a*p[0] + 2*b, 2*a + 4*b*p[1]])
+fh = lambda p: (p[0]**2 + p[1] - 11)**2 + (p[0] + p[1]**2 - 7)**2
+
+rng = np.random.default_rng(0)
+starts = rng.uniform(-5, 5, (200, 2))
+
+def descend(f, g, p, eta, steps=4000):
+    for _ in range(steps):
+        p = p - eta * g(p)
+    return f(p)
+
+ends1 = {round(descend(f1, g1, s.copy(), 0.1), 4) for s in starts}
+endsh = {round(descend(fh, gh, s.copy(), 0.005), 4) for s in starts}
+print("distinct convex outcomes:", ends1)
+print("distinct Himmelblau outcomes:", endsh)
+assert ends1 == {0.0}
+assert len(endsh) == 1 and endsh == {0.0}
+
+# The VALUES coincide (all four basins have value 0), so distinguish by
+# location instead: count distinct endpoints
+pts = []
+for s in starts:
+    p = s.copy()
+    for _ in range(4000):
+        p = p - 0.005 * gh(p)
+    pts.append(np.round(p, 3))
+uniq = np.unique(np.array(pts), axis=0)
+print("distinct Himmelblau minimizers found:", len(uniq))
+assert len(uniq) == 4
+```
+
+The convex bowl funnels all 200 starts to the unique value $0$ at the
+unique point; Himmelblau also reports "value 0" from every start, but
+at **four different minimizers**, exposed only by comparing locations.
+Convexity is what guarantees value *and* minimizer agree globally;
+without it, equal losses can hide genuinely different models, which is
+why two equally-trained networks need not be the same network.
+
+</details>
+
+Convexity settles unconstrained problems; the next lesson adds equality
+constraints, where the right tool is a tangency condition between
+gradients, the Lagrange multiplier.
+
+<Footnotes>
+  <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization.* Cambridge University Press. Ch. 3, convex functions and their characterizations. [https://web.stanford.edu/~boyd/cvxbook/](https://web.stanford.edu/~boyd/cvxbook/)</FNItem>
+  <FNItem n="2">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.). Springer. Theorem 2.5, local-equals-global for convex objectives. [doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)</FNItem>
+  <FNItem n="3">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 8.2, the nonconvexity of neural network training. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+</Footnotes>
