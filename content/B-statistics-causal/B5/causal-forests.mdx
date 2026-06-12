@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: causal-forests
 order: 10
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Estimate conditional average treatment effects with the T-learner, S-learner, and X-learner, then understand how causal forests enforce honest splitting to avoid overfitting."
 prerequisites: ["double-ml"]
 ---
@@ -137,6 +137,115 @@ print(f"X-learner RMSE: {rmse(tau_X):.4f}")
 
 The X-learner typically outperforms T and S when groups are imbalanced; the S-learner
 often underestimates heterogeneity due to regularization.
+
+## Exercises
+
+**Exercise 1.** Write out the T-learner and S-learner CATE estimators for a linear
+outcome model. Suppose the true outcome is
+$Y = \beta_0 + \beta_1 x + (1 + 2x)\,W + \varepsilon$ so the true CATE is
+$\tau(x) = 1 + 2x$. With unrestricted linear regressions, what does each learner
+recover, and where could the S-learner's structural form lose the heterogeneity?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (T-learner).** Fit $\hat\mu_1(x) = a_1 + b_1 x$ on treated units and
+$\hat\mu_0(x) = a_0 + b_0 x$ on controls. In population, $\mu_1(x) = \beta_0 + 1 +
+(\beta_1 + 2)x$ and $\mu_0(x) = \beta_0 + \beta_1 x$, so
+$\hat\tau_T(x) = (a_1 - a_0) + (b_1 - b_0)x \to 1 + 2x$: the T-learner recovers the
+true CATE.
+
+**Step 2 (S-learner, with interaction).** Fit
+$\hat\mu(x, w) = \gamma_0 + \gamma_1 x + \gamma_2 w + \gamma_3 (xw)$. Then
+$\hat\tau_S(x) = \gamma_2 + \gamma_3 x \to 1 + 2x$, also correct, because the
+interaction term $xw$ is in the model.
+
+**Step 3 (where S-learner fails).** If the S-learner omits the $xw$ interaction and
+fits only $\gamma_0 + \gamma_1 x + \gamma_2 w$, the treatment effect collapses to
+the constant $\gamma_2$, the average of $1 + 2x$ over the covariate distribution.
+The $x$-dependence of the effect is absorbed into the main effect $\gamma_1 x$ or
+lost, so the S-learner reports a flat CATE. Regularization that shrinks $w$-related
+terms has the same effect even when the interaction is nominally present.
+
+</details>
+
+**Exercise 2.** Explain why honest splitting gives valid confidence intervals for
+CATE that ordinary (non-honest) trees do not. Identify the specific bias that
+reusing the same data for splitting and estimation introduces.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A non-honest tree chooses splits to maximize the apparent treatment-
+effect difference between child leaves, then estimates each leaf's effect on the
+same data. The split was selected because that data happened to show a large
+contrast, so the in-leaf estimate inherits the noise that drove the split.
+
+**Step 2.** This is an optimistic, selection-induced bias: the leaf effects are
+systematically more extreme than the truth, and their sampling distribution is not
+centered at the leaf's true effect. Confidence intervals built from such estimates
+undercover.
+
+**Step 3.** Honest splitting separates the two roles. The splitting sample decides
+the tree structure; the disjoint estimation sample, never consulted during
+splitting, computes the leaf effects. Conditional on the structure, the estimation
+sample is a fresh draw, so the leaf mean is unbiased for that leaf's effect and is
+asymptotically normal. That normality is what licenses valid confidence intervals.
+
+</details>
+
+**Exercise 3 (code).** Implement a T-learner with plain numpy least-squares on a
+linear-CATE SCM ($\tau(x) = 1 + 2x$), and an S-learner that omits the treatment
+interaction. Using a fixed seed and $n = 4000$, show the T-learner's CATE RMSE is
+small while the interaction-free S-learner returns a nearly flat CATE. Assert the
+T-learner beats the S-learner.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 4000
+
+x = rng.normal(0, 1, n)
+W = rng.integers(0, 2, n).astype(float)
+tau = 1 + 2 * x                                  # true CATE
+Y = 0.5 * x + tau * W + rng.normal(0, 0.5, n)
+
+def ols(A, b):
+    coef, *_ = np.linalg.lstsq(A, b, rcond=None)
+    return coef
+
+# T-learner: separate linear fits on treated and control
+def design(xx):
+    return np.column_stack([np.ones_like(xx), xx])
+c1 = ols(design(x[W == 1]), Y[W == 1])
+c0 = ols(design(x[W == 0]), Y[W == 0])
+tau_T = (design(x) @ c1) - (design(x) @ c0)
+
+# S-learner WITHOUT interaction: features [1, x, W]
+Xs = np.column_stack([np.ones(n), x, W])
+cs = ols(Xs, Y)
+tau_S = np.full(n, cs[2])                         # effect = constant coeff on W
+
+def rmse(est):
+    return np.sqrt(np.mean((est - tau) ** 2))
+
+rmse_T, rmse_S = rmse(tau_T), rmse(tau_S)
+assert rmse_T < 0.1                               # T-learner tracks 1 + 2x
+assert rmse_S > 1.0                               # flat S-learner misses the slope
+assert rmse_T < rmse_S
+print(round(rmse_T, 4), round(rmse_S, 4))
+```
+
+The interaction-free S-learner can only fit one number for the treatment effect,
+so its CATE is flat and its RMSE is dominated by the missing $2x$ slope. The
+T-learner, fitting treated and control separately, lets the effect vary with $x$
+and recovers $1 + 2x$ up to estimation noise.
+
+</details>
 
 The next lesson connects causal reasoning to representation learning: when can
 observational data identify causal structure in the latent representations of

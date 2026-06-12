@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: diff-in-diff
 order: 8
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Apply the parallel-trends assumption to estimate ATT from panel data via DiD, then relax it with a synthetic control built as a convex combination of donor units."
 prerequisites: ["iv-estimation"]
 ---
@@ -155,6 +155,106 @@ print(f"Optimal donor weights: {w_opt.round(3)}")
 
 The synthetic control recovers the treatment effect of 2.0 by matching the pre-period
 trajectory of the treated unit.
+
+## Exercises
+
+**Exercise 1.** A state raises a tax. Mean tax revenue per capita, in the treated
+state and a control state, before and after:
+
+| Group | Pre | Post |
+| --- | --- | --- |
+| Treated | 30 | 38 |
+| Control | 28 | 30 |
+
+Compute the naive before-after change for the treated state and the DiD estimate
+of the treatment effect. State which common shock the DiD removes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Naive before-after for the treated state:
+$\bar Y_{1,1} - \bar Y_{1,0} = 38 - 30 = 8$.
+
+**Step 2.** Control change: $\bar Y_{0,1} - \bar Y_{0,0} = 30 - 28 = 2$. This is the
+common shock (a region-wide trend, here a $+2$ drift in revenue) that would have
+lifted the treated state too.
+
+**Step 3.** DiD nets out the shock:
+
+$$
+\hat\tau_{\mathrm{DiD}} = (38 - 30) - (30 - 28) = 8 - 2 = 6.
+$$
+
+The treatment added $6$ per capita relative to the shared trend; the naive $8$
+overstated it by charging the $+2$ common drift to the policy.
+
+</details>
+
+**Exercise 2.** Parallel trends can fail. Suppose the treated group was already
+growing faster than the control before treatment: in two pre-periods the treated
+outcome rises by $3$ while the control rises by $1$ each period. If that divergent
+pre-trend continues unchanged after treatment, what does DiD report when the true
+treatment effect is $0$? Explain the bias.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Parallel trends requires the treated and control changes to be equal
+absent treatment. Here they differ by $3 - 1 = 2$ per period before treatment, so
+the assumption is violated.
+
+**Step 2.** With a true effect of $0$, the post-period treated change is just the
+continued trend, $+3$, and the control change is $+1$.
+
+**Step 3.** DiD computes $(+3) - (+1) = +2$, reporting a spurious effect of $2$
+when the truth is $0$. The estimator attributes the pre-existing trend gap to the
+treatment. A pre-trends test, comparing the two pre-period slopes, would have
+flagged the $+2$ divergence and warned against the design.
+
+</details>
+
+**Exercise 3 (code).** Simulate a 2-group, 2-period DiD panel with a known effect
+and a common time shock, using a fixed seed. Compute the DiD estimator from group
+means, then fit the OLS interaction model
+$Y = \alpha + \beta W + \gamma t + \delta (W \cdot t)$ by normal equations
+(numpy only). Assert the interaction coefficient $\delta$ equals the DiD estimate.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 400                       # units per group
+true_effect, common = 2.0, 1.0
+
+pre_treat  = 5.0 + rng.normal(0, 1, n)
+pre_ctrl   = 5.0 + rng.normal(0, 1, n)
+post_treat = pre_treat + common + true_effect + rng.normal(0, 1, n)
+post_ctrl  = pre_ctrl  + common + rng.normal(0, 1, n)
+
+did = (post_treat.mean() - pre_treat.mean()) - (post_ctrl.mean() - pre_ctrl.mean())
+
+# Stack into a long panel: rows = (W, t) cells
+Y = np.concatenate([pre_treat, post_treat, pre_ctrl, post_ctrl])
+W = np.concatenate([np.ones(2 * n), np.zeros(2 * n)])
+t = np.concatenate([np.zeros(n), np.ones(n), np.zeros(n), np.ones(n)])
+Xd = np.column_stack([np.ones_like(Y), W, t, W * t])
+
+beta, *_ = np.linalg.lstsq(Xd, Y, rcond=None)
+delta = beta[3]               # interaction = DiD coefficient
+
+assert np.isclose(delta, did, atol=1e-9)
+print(round(did, 4), round(delta, 4))
+```
+
+The interaction coefficient $\delta$ in the saturated OLS model reproduces the
+mean-of-differences DiD exactly: with one binary regressor per dimension and their
+product, OLS fits the four cell means, and $\delta$ is precisely the
+difference-in-differences of those means.
+
+</details>
 
 The next lesson introduces double/debiased ML, which uses the Frisch-Waugh-Lovell
 theorem to handle high-dimensional confounders with flexible ML estimators.

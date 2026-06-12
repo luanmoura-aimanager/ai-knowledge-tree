@@ -4,7 +4,7 @@ pillar: B
 subId: B1
 lessonId: anova
 order: 6
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Partition total sum of squares into between-group and within-group components, derive the F-statistic, and connect ANOVA to the simultaneous comparison of group means."
 prerequisites: ["hypothesis-testing"]
 ---
@@ -127,6 +127,98 @@ print(f"scipy F={F_sp:.4f}, p={p_sp:.4f}")
 
 The F-statistic and p-value from manual computation and `scipy.stats.f_oneway`
 agree to floating-point precision.
+
+## Exercises
+
+**Exercise 1.** Three groups of $n = 5$ each have means
+$\bar X_1 = 10, \bar X_2 = 12, \bar X_3 = 14$ and a grand mean $\bar X = 12$.
+Compute SSB and its degrees of freedom $\mathrm{df}_B$, then the mean square
+MSB.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply $\mathrm{SSB} = \sum_j n_j(\bar X_j - \bar X)^2$ with $n_j = 5$:
+
+$$
+\mathrm{SSB} = 5(10-12)^2 + 5(12-12)^2 + 5(14-12)^2 = 5\cdot4 + 0 + 5\cdot4 = 40.
+$$
+
+**Step 2.** With $k = 3$ groups, $\mathrm{df}_B = k - 1 = 2$, so
+
+$$
+\mathrm{MSB} = \frac{\mathrm{SSB}}{k-1} = \frac{40}{2} = 20.
+$$
+
+</details>
+
+**Exercise 2.** Prove the variance partition $\mathrm{SST} = \mathrm{SSB} + \mathrm{SSW}$
+by expanding $(X_{ij} - \bar X) = (X_{ij} - \bar X_j) + (\bar X_j - \bar X)$ and
+showing the cross-term vanishes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the total deviation as a sum of a within-group and a
+between-group piece, then square:
+
+$$
+(X_{ij} - \bar X)^2 = (X_{ij} - \bar X_j)^2 + 2(X_{ij} - \bar X_j)(\bar X_j - \bar X) + (\bar X_j - \bar X)^2.
+$$
+
+**Step 2.** Sum over $i$ within group $j$. The cross-term factors because
+$(\bar X_j - \bar X)$ is constant in $i$:
+
+$$
+2(\bar X_j - \bar X)\sum_{i=1}^{n_j}(X_{ij} - \bar X_j) = 2(\bar X_j - \bar X)\cdot 0 = 0,
+$$
+
+since $\sum_i (X_{ij} - \bar X_j) = 0$ by definition of the group mean.
+
+**Step 3.** What remains after summing over both $i$ and $j$ is
+
+$$
+\sum_{j,i}(X_{ij} - \bar X)^2 = \underbrace{\sum_{j,i}(X_{ij} - \bar X_j)^2}_{\mathrm{SSW}} + \underbrace{\sum_j n_j(\bar X_j - \bar X)^2}_{\mathrm{SSB}},
+$$
+
+where the last sum collapsed $\sum_i$ of a constant to a factor $n_j$. This is the
+partition.
+
+</details>
+
+**Exercise 3 (code).** Implement the ANOVA sums of squares in numpy (no scipy)
+and confirm the identity $\mathrm{SST} = \mathrm{SSB} + \mathrm{SSW}$ holds on
+random data, then report the F-statistic.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+groups = [rng.normal(5.0, 1.5, 30),
+          rng.normal(6.2, 1.5, 30),
+          rng.normal(5.5, 1.5, 30)]
+
+allx = np.concatenate(groups)
+N, k = allx.size, len(groups)
+grand = allx.mean()
+
+sst = ((allx - grand) ** 2).sum()
+ssb = sum(g.size * (g.mean() - grand) ** 2 for g in groups)
+ssw = sum(((g - g.mean()) ** 2).sum() for g in groups)
+
+F = (ssb / (k - 1)) / (ssw / (N - k))
+print("SST:", round(sst, 4), " SSB+SSW:", round(ssb + ssw, 4))
+print("F:", round(F, 4))
+assert np.isclose(sst, ssb + ssw)
+```
+
+The total sum of squares equals the between-group plus within-group sums to
+floating-point precision, the identity proved in Exercise 2.
+
+</details>
 
 Running many ANOVA tests or following up with many pairwise comparisons reintroduces
 the problem that ANOVA was designed to avoid; the next lesson addresses that with

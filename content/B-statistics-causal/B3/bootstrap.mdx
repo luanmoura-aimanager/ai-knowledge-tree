@@ -4,7 +4,7 @@ pillar: B
 subId: B3
 lessonId: bootstrap
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Estimate the sampling distribution of any statistic by resampling with replacement; construct percentile and BCa confidence intervals."
 prerequisites: ["B1/sampling-distributions", "B1/estimator-properties"]
 ---
@@ -112,6 +112,103 @@ print(f"Pivotal coverage:    {covers_piv/1000:.3f}  (closer to 0.95)")
 
 The pivotal interval has coverage closer to 0.95 than the percentile interval for
 this skewed distribution.
+
+## Exercises
+
+**Exercise 1.** A bootstrap sample is drawn by sampling $n$ observations with
+replacement from a dataset of size $n$. Compute, by hand, the probability that a
+fixed observation $X_1$ is left out of a single bootstrap sample, and evaluate its
+limit as $n \to \infty$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each of the $n$ draws picks $X_1$ with probability $1/n$, so it misses
+$X_1$ with probability $1 - 1/n$. The draws are independent (sampling with
+replacement), so the probability $X_1$ is missed on all $n$ draws is
+
+$$
+\left(1 - \frac{1}{n}\right)^n.
+$$
+
+**Step 2.** Take the limit using $\left(1 - \tfrac{1}{n}\right)^n \to e^{-1}$:
+
+$$
+\lim_{n \to \infty} \left(1 - \frac{1}{n}\right)^n = e^{-1} \approx 0.368.
+$$
+
+About $36.8\%$ of observations are absent from any given bootstrap sample, which is
+the $0.368$ weight in the $.632$ estimator and the reason a bootstrap sample
+contains roughly $63.2\%$ distinct observations.
+
+</details>
+
+**Exercise 2.** The percentile interval reports
+$[Q_{\alpha/2}(\hat\theta^*), Q_{1-\alpha/2}(\hat\theta^*)]$ and the pivotal interval
+reports $[2\hat\theta - Q_{1-\alpha/2}(\hat\theta^*), 2\hat\theta - Q_{\alpha/2}(\hat\theta^*)]$.
+Show that the two intervals have the same width, and explain when they coincide.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the lower quantile as $L = Q_{\alpha/2}(\hat\theta^*)$ and the upper
+as $U = Q_{1-\alpha/2}(\hat\theta^*)$. The percentile width is $U - L$.
+
+**Step 2.** The pivotal endpoints are $2\hat\theta - U$ (lower) and $2\hat\theta - L$
+(upper). Its width is
+
+$$
+(2\hat\theta - L) - (2\hat\theta - U) = U - L,
+$$
+
+identical to the percentile width.
+
+**Step 3.** The pivotal interval is the percentile interval reflected about
+$\hat\theta$: its center is $2\hat\theta - \tfrac{L+U}{2}$ versus the percentile
+center $\tfrac{L+U}{2}$. The two coincide when the bootstrap distribution is
+symmetric about $\hat\theta$, that is $\tfrac{L+U}{2} = \hat\theta$. When the
+bootstrap distribution is skewed the intervals shift in opposite directions, which
+is why the pivotal interval corrects coverage for the skewed median above.
+
+</details>
+
+**Exercise 3 (code).** With `np.random.default_rng(0)`, draw $n = 200$ points from a
+standard normal and bootstrap the sample mean with $B = 4000$ resamples. Verify that
+the bootstrap standard error is close to the analytic $\sigma/\sqrt{n} = 1/\sqrt{200}$,
+and that the percentile and pivotal $95\%$ intervals have equal width.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200
+data = rng.standard_normal(n)
+B = 4000
+
+theta_hat = data.mean()
+boot_means = np.array([rng.choice(data, n, replace=True).mean() for _ in range(B)])
+
+se_boot = boot_means.std()
+se_analytic = 1 / np.sqrt(n)          # sigma = 1 for standard normal
+
+lo, hi = np.percentile(boot_means, [2.5, 97.5])
+width_pct = hi - lo
+width_piv = (2*theta_hat - lo) - (2*theta_hat - hi)
+
+# Bootstrap SE tracks the analytic SE within ~10%
+assert abs(se_boot - se_analytic) < 0.1 * se_analytic
+# Percentile and pivotal intervals share a width (Exercise 2)
+assert np.isclose(width_pct, width_piv)
+print(round(se_boot, 4), round(se_analytic, 4), round(width_pct, 4))
+```
+
+The bootstrap SE reproduces $1/\sqrt{200} \approx 0.0707$ without ever using the
+formula, and the two interval widths match exactly because each is $U - L$.
+
+</details>
 
 The next lesson introduces the jackknife, which provides bias and variance estimates
 via leave-one-out resampling.

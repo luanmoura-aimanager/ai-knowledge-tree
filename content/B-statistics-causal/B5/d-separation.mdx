@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: d-separation
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Apply d-separation through chains, forks, and colliders to read all conditional independencies from a DAG without algebra."
 prerequisites: ["scm-dags"]
 ---
@@ -131,6 +131,98 @@ print(f"  PartialCorr(A,B|K) = {partial_corr(A, B, K.reshape(-1,1)):.3f}  (opene
 
 The collider result shows: $A$ and $B$ are nearly uncorrelated marginally but become
 correlated after conditioning on the collider $K$.
+
+## Exercises
+
+**Exercise 1.** In the DAG $A \to B \leftarrow C \to D$ from the lesson, decide
+whether $A$ and $C$ are d-separated by the empty set, and whether they are
+d-separated given $B$. Justify each answer by listing every path and its blocking
+status.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Enumerate the paths between $A$ and $C$. There is one:
+$A \to B \leftarrow C$. On it, $B$ is a collider (both arrows point in).
+
+**Step 2 (empty conditioning set).** A collider with neither itself nor a
+descendant in $Z = \varnothing$ blocks the path. So the only path is blocked and
+$A \perp C$ marginally: they are d-separated by the empty set.
+
+**Step 3 (conditioning on $B$).** Now $B \in Z$. The collider rule says a collider
+in $Z$ opens the path. The path $A \to B \leftarrow C$ has no non-collider node
+besides $B$, so nothing re-blocks it. The path is open, hence
+$A \not\perp C \mid B$: conditioning on the collider induces dependence between
+two marginally independent variables.
+
+</details>
+
+**Exercise 2.** Consider the chain-with-confounder DAG
+$Z \to X \to Y$ together with $Z \to Y$. You want the causal effect of $X$ on $Y$.
+List the backdoor paths from $X$ to $Y$, and find a set satisfying the backdoor
+criterion.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A backdoor path leaves $X$ through an incoming arrow ($\leftarrow X$).
+From $X$ the incoming arrow is $Z \to X$, so the backdoor path is
+$X \leftarrow Z \to Y$. The direct edge $X \to Y$ leaves through an outgoing arrow,
+so it is a causal (front-door) path, not a backdoor path.
+
+**Step 2.** On the backdoor path $X \leftarrow Z \to Y$, the node $Z$ is a fork
+(common cause). Conditioning on a fork node blocks the path.
+
+**Step 3.** Check the criterion's second clause: $Z$ must contain no descendant of
+$X$. $Z$ is an ancestor of $X$, not a descendant, so it qualifies. Therefore
+$Z = \{Z\}$ blocks all backdoor paths and contains no descendant of $X$: it
+satisfies the backdoor criterion, and adjusting for $Z$ identifies the effect of
+$X$ on $Y$.
+
+</details>
+
+**Exercise 3 (code).** Build the collider DAG $A \to K \leftarrow B$ with $A$ and
+$B$ independent standard normals and $K = A + B + \varepsilon$. Using $n = 20000$
+samples and a fixed seed, show the marginal correlation of $A$ and $B$ is near
+zero while the partial correlation given $K$ is strongly negative. Assert both
+structural properties.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 20000
+
+A = rng.normal(0, 1, n)
+B = rng.normal(0, 1, n)
+K = A + B + rng.normal(0, 0.1, n)        # collider
+
+def corr(a, b):
+    return np.corrcoef(a, b)[0, 1]
+
+def partial_corr(a, b, z):
+    Z = np.column_stack([np.ones(len(z)), z])
+    def resid(x):
+        coef, *_ = np.linalg.lstsq(Z, x, rcond=None)
+        return x - Z @ coef
+    return corr(resid(a), resid(b))
+
+marg = corr(A, B)
+part = partial_corr(A, B, K.reshape(-1, 1))
+
+assert abs(marg) < 0.05            # marginally independent (path blocked)
+assert part < -0.5                 # conditioning on collider opens the path
+print(round(marg, 4), round(part, 4))
+```
+
+Conditioning on $K = A + B + \varepsilon$ ties $A$ and $B$ together: once their
+sum is fixed, a larger $A$ forces a smaller $B$, so the partial correlation turns
+strongly negative even though the two are independent at the source.
+
+</details>
 
 The next lesson introduces the do-operator and do-calculus, which use d-separation
 to derive when and how causal effects can be identified from observational data.

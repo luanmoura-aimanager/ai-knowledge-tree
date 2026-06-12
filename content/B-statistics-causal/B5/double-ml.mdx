@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: double-ml
 order: 9
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Apply the Frisch-Waugh-Lovell theorem with arbitrary ML nuisance estimators and cross-fitting to debias the treatment effect estimate and achieve semiparametric efficiency."
 prerequisites: ["diff-in-diff"]
 ---
@@ -130,6 +130,121 @@ print(f"DML theta:  {theta_dml:.4f}  (debiased)")
 
 DML recovers the true $\theta = 2.0$ even though the nuisance function $g$ is
 nonlinear and estimated with a gradient-boosted model.
+
+## Exercises
+
+**Exercise 1.** In the partially linear model $Y = \theta W + g(X) + \varepsilon$
+with $\theta = 2$, suppose the residualized covariances come out to
+$\frac{1}{n}\sum_i \tilde W_i \tilde Y_i = 1.8$ and
+$\frac{1}{n}\sum_i \tilde W_i^2 = 0.9$. Compute the DML estimate of $\theta$ by
+hand, and explain why it uses residualized quantities rather than raw $W$ and $Y$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The DML estimator is the ratio of the residual covariance to the
+residual variance:
+
+$$
+\hat\theta_{\mathrm{DML}} = \frac{\frac{1}{n}\sum_i \tilde W_i \tilde Y_i}{\frac{1}{n}\sum_i \tilde W_i^2} = \frac{1.8}{0.9} = 2.
+$$
+
+**Step 2.** Residualizing $Y$ and $W$ against $X$ (subtracting $\hat\ell(X)$ and
+$\hat m(X)$) strips out the part of each that the confounders $X$ explain. What
+remains in $\tilde W$ is variation in treatment not driven by $X$, so regressing
+$\tilde Y$ on $\tilde W$ isolates the treatment channel. Using raw $W$ and $Y$
+would let the nuisance $g(X)$ leak into the coefficient.
+
+</details>
+
+**Exercise 2.** Prove the Frisch-Waugh-Lovell identity for linear regression: in
+$Y = \theta W + X\beta + \varepsilon$, the OLS coefficient on $W$ equals
+$\mathrm{Cov}(\tilde Y, \tilde W) / \mathrm{Var}(\tilde W)$, where $\tilde Y$ and
+$\tilde W$ are the residuals of $Y$ and $W$ after projecting onto $X$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $P = X(X^\top X)^{-1}X^\top$ be the projection onto the column
+space of $X$ and $M = I - P$ the residual-maker, so $\tilde Y = MY$ and
+$\tilde W = MW$. $M$ is symmetric and idempotent ($M = M^\top$, $M^2 = M$) and
+annihilates $X$, meaning $MX = 0$.
+
+**Step 2.** Left-multiply the regression equation by $M$:
+
+$$
+MY = \theta\, MW + MX\beta + M\varepsilon = \theta\, MW + M\varepsilon,
+$$
+
+since $MX = 0$. This is a simple regression of $\tilde Y$ on $\tilde W$ with the
+same slope $\theta$.
+
+**Step 3.** The OLS slope of that simple regression is
+
+$$
+\hat\theta = \frac{\tilde W^\top \tilde Y}{\tilde W^\top \tilde W} = \frac{(MW)^\top (MY)}{(MW)^\top (MW)} = \frac{\mathrm{Cov}(\tilde Y, \tilde W)}{\mathrm{Var}(\tilde W)},
+$$
+
+using $M^\top M = M$ to fold the two projections into one. This is the FWL
+identity, the linear special case of the DML moment.
+
+</details>
+
+**Exercise 3 (code).** Implement DML with linear nuisances and 2-fold
+cross-fitting in numpy only (OLS via `np.linalg.lstsq`). On a partially linear
+model with true $\theta = 2.0$ and a nonlinear $g(X)$, verify with a fixed seed
+that naive OLS that ignores the nuisance (regressing $Y$ on $[1, W]$ alone) is
+biased and that cross-fit DML lands within tolerance of $2.0$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 4000, 5
+theta = 2.0
+
+X = rng.normal(0, 1, (n, d))
+g = np.sin(X[:, 0]) + 0.5 * X[:, 1]**2          # nonlinear nuisance
+m = 0.5 * X[:, 0] + 0.3 * X[:, 1]               # propensity mean
+W = m + rng.normal(0, 0.5, n)
+Y = theta * W + g + rng.normal(0, 0.5, n)
+
+# rich linear basis so a linear fit can approximate the nonlinear nuisance
+B = np.column_stack([np.ones(n), X, X**2, np.sin(X[:, :1])])
+
+def ols_predict(Btr, ytr, Bte):
+    coef = np.linalg.lstsq(Btr, ytr, rcond=None)[0]
+    return Bte @ coef
+
+# naive OLS that ignores the nuisance: Y on [1, W] alone
+naive = np.linalg.lstsq(np.column_stack([np.ones(n), W]), Y, rcond=None)[0][1]
+
+# 2-fold cross-fitting
+idx = rng.permutation(n)
+folds = [idx[:n // 2], idx[n // 2:]]
+Yt = np.zeros(n)
+Wt = np.zeros(n)
+for k in range(2):
+    val = folds[k]
+    tr = folds[1 - k]
+    Yt[val] = Y[val] - ols_predict(B[tr], Y[tr], B[val])     # outcome residual
+    Wt[val] = W[val] - ols_predict(B[tr], W[tr], B[val])     # treatment residual
+
+theta_dml = (Wt * Yt).mean() / (Wt**2).mean()
+
+assert abs(naive - theta) > 0.1        # ignoring the nuisance biases naive OLS
+assert abs(theta_dml - theta) < 0.1    # cross-fit DML recovers the truth
+print(f"naive {naive:.3f}, DML {theta_dml:.3f}")
+```
+
+The naive coefficient is pulled off $2.0$ because $W$ and the omitted $g(X)$ share
+the covariates $X$, while residualizing both $Y$ and $W$ on the richer basis and
+cross-fitting recovers $\theta$ within tolerance.
+
+</details>
 
 The next lesson uses similar ideas to estimate **heterogeneous** treatment effects:
 the treatment effect as a function of unit characteristics.

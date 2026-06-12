@@ -4,7 +4,7 @@ pillar: B
 subId: B4
 lessonId: power-analysis
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define statistical power as 1-β, derive the required sample size for a two-sample z-test, and plot power as a function of n, δ, and α."
 prerequisites: ["ab-testing"]
 ---
@@ -128,6 +128,101 @@ print(f"  Required n (theory): {required_n(delta, sigma)}")
 ```
 
 The empirical power at the theoretically required $n=64$ is close to the target 0.80.
+
+## Exercises
+
+**Exercise 1.** A two-sample z-test targets a standardized effect $d = \delta/\sigma = 0.5$
+at $\alpha = 0.05$ (two-sided) and power $0.80$. Compute the required $n$ per group
+by hand using the rounded critical values, and explain the small gap to the table
+value of $64$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $z_{\alpha/2} = 1.96$ and $z_\beta = 0.84$, the squared sum is
+$(1.96 + 0.84)^2 = 2.80^2 = 7.84$.
+
+**Step 2.** Apply $n = 2(z_{\alpha/2} + z_\beta)^2 / d^2$ with $d = 0.5$:
+
+$$
+n = \frac{2 \cdot 7.84}{0.25} = \frac{15.68}{0.25} = 62.72 \implies n = 63.
+$$
+
+**Step 3.** Using the unrounded quantiles $z_{0.025} = 1.95996$ and
+$z_{0.20} = 0.84162$ gives $(1.95996 + 0.84162)^2 = 7.849$ and
+$n = 2 \cdot 7.849 / 0.25 = 62.79$, which still rounds up to $63$. The table's
+$64$ does not come from the normal approximation at all: it reflects Cohen's
+exact power calculation based on the noncentral $t$ distribution, which is
+slightly more conservative than the closed-form normal formula used here. The
+one-unit gap is the approximation error of the normal-based $n$, not a rounding
+artifact.
+
+</details>
+
+**Exercise 2.** Power depends on $n$, $\delta$, and $\sigma$ only through the
+noncentrality $\lambda = \delta/(\sigma\sqrt{2/n})$. Show that to keep power fixed
+while halving the detectable effect $\delta$, the sample size $n$ must quadruple.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Fixed power means a fixed required $\lambda$, since power
+$\approx \Phi(\lambda - z_{\alpha/2})$ is monotone in $\lambda$. Set
+$\lambda = z_{\alpha/2} + z_\beta$, a constant.
+
+**Step 2.** Hold $\lambda$ and $\sigma$ fixed and solve for $n$:
+
+$$
+\lambda = \frac{\delta}{\sigma}\sqrt{\frac{n}{2}} \implies n = \frac{2\lambda^2 \sigma^2}{\delta^2}.
+$$
+
+**Step 3.** So $n \propto 1/\delta^2$. Replacing $\delta$ by $\delta/2$ multiplies
+$n$ by $(1/(1/2))^2 = 4$. Detecting effects half as large is four times as
+expensive, the central cost curve of experiment design.
+
+</details>
+
+**Exercise 3 (code).** With no `scipy`, build a numpy normal CDF, use it to compute
+the theoretical power of a two-sample z-test at $d = 0.5$, $n = 64$, then simulate
+$20{,}000$ experiments and confirm the empirical power matches the theory and the
+$0.80$ target.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def norm_cdf(x):
+    x = np.asarray(x, float)
+    t = 1.0 / (1.0 + 0.2316419 * np.abs(x))
+    d = 0.3989422804014327 * np.exp(-x * x / 2.0)
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937
+              + t * (-1.821255978 + t * 1.330274429))))
+    cdf = 1.0 - d * poly
+    return np.where(x >= 0, cdf, 1.0 - cdf)
+
+def theory_power(delta, sigma, n, z_crit=1.96):
+    lam = delta / (sigma * np.sqrt(2 / n))
+    return norm_cdf(lam - z_crit) + norm_cdf(-lam - z_crit)
+
+rng = np.random.default_rng(0)
+delta, sigma, n, n_sim = 0.5, 1.0, 64, 20_000
+x = rng.normal(0.0,   sigma, (n_sim, n))
+y = rng.normal(delta, sigma, (n_sim, n))
+z = (y.mean(1) - x.mean(1)) / (sigma * np.sqrt(2 / n))
+emp = np.mean(np.abs(z) > 1.96)
+th = float(theory_power(delta, sigma, n))
+
+assert abs(emp - th) < 0.02           # simulation matches the formula
+assert abs(emp - 0.80) < 0.03         # design hits its target
+print("theory:", round(th, 3), "empirical:", round(emp, 3))
+```
+
+Both land near $0.81$, slightly above the nominal $0.80$ because $n = 64$ rounds up
+from the exact requirement.
+
+</details>
 
 The next lesson shows how CUPED reduces the effective variance of the outcome,
 which lowers the required sample size without collecting more data.
