@@ -1,0 +1,259 @@
+---
+title: "Limits at infinity and growth rates"
+pillar: L
+subId: L1
+lessonId: growth-rates
+order: 6
+estimatedMinutes: 30
+goal: "Compare polynomial, exponential, and logarithmic growth with limits at infinity, and read little-o and big-O as statements about limits of ratios."
+prerequisites: ["sequences"]
+---
+
+Whether an algorithm is usable at scale, whether a series converges, whether a
+tail probability is negligible: all three questions reduce to comparing how
+fast two functions grow. This lesson runs limits out to infinity, establishes
+the growth hierarchy (logarithms, then polynomials, then exponentials), and
+shows that big-O notation, the lingua franca of algorithm analysis in A5, is
+limit language in compact form.
+
+## Limits at infinity
+
+$\lim_{x \to \infty} f(x) = L$ means: for every $\varepsilon \gt 0$ there is a
+threshold $M$ such that $x \gt M$ implies $\lvert f(x) - L \rvert \lt
+\varepsilon$. It is the sequence definition with the integer index replaced by
+a real one. Horizontal asymptotes are limits at infinity: $1/x \to 0$,
+$e^{-x} \to 0$, and
+
+$$
+\lim_{x \to \infty} \frac{3x^2 + 5x}{2x^2 - 7}
+= \lim_{x \to \infty} \frac{3 + 5/x}{2 - 7/x^2}
+= \frac{3}{2},
+$$
+
+by the divide-by-the-fastest-term maneuver: for rational functions, only the
+leading terms survive at infinity.
+
+## The growth hierarchy
+
+The central facts, stated as limits of ratios<FN n="1" />:
+
+$$
+\lim_{x \to \infty} \frac{\ln x}{x^p} = 0
+\quad \text{and} \quad
+\lim_{x \to \infty} \frac{x^p}{e^{x}} = 0
+\qquad \text{for every power } p \gt 0 .
+$$
+
+In words: **any positive power beats any logarithm, and any exponential beats
+any power.** Within a family, higher degree wins: $x^3/x^2 = x \to \infty$.
+
+A sandwich argument proves the first fact without derivatives. For $t \ge 1$,
+$\ln$ grows slower than square roots eventually, since
+
+$$
+\ln x = \int_1^x \frac{dt}{t} \le \int_1^x \frac{dt}{\sqrt{t}} = 2\sqrt{x} - 2 \lt 2 \sqrt{x}
+$$
+
+(read the integral as "area under $1/t$", made rigorous in L3; each integrand
+comparison is pointwise). Then for any $p \gt 0$, substituting $x^{p}$ and
+rescaling gives $\ln x \le \tfrac{2}{p} x^{p/2}$ eventually, so
+
+$$
+0 \le \frac{\ln x}{x^p} \le \frac{2}{p} \cdot \frac{x^{p/2}}{x^p} = \frac{2}{p} \, x^{-p/2} \longrightarrow 0,
+$$
+
+and the squeeze theorem finishes it. The exponential fact follows from the
+series bound $e^x \ge x^{n+1}/(n+1)!$ for $x \gt 0$ (every Taylor term of
+$e^x$ is positive, L3), which makes $x^n / e^x \le (n+1)!/x \to 0$.
+
+The hierarchy is not subtle at real scales. At $x = 100$:
+
+| function | value at $x = 100$ |
+|---|---|
+| $\ln x$ | $4.6$ |
+| $x$ | $100$ |
+| $x^2$ | $10^4$ |
+| $x^{10}$ | $10^{20}$ |
+| $2^x$ | $1.3 \times 10^{30}$ |
+| $e^x$ | $2.7 \times 10^{43}$ |
+
+Thirteen orders of magnitude separate $x^{10}$ from $e^x$ at an input of just
+one hundred, and the gap only widens. "Exponential" is not a synonym for
+"fast"; it is a different regime.
+
+![The race on a log-scaled axis: the exponential is the only straight line, polynomials are concave curves below it, and the logarithm crawls along the bottom. Every curve eventually falls behind the one above it in the hierarchy.](/figures/L1/growth-rates.svg)
+
+## Little-o and big-O are limit statements
+
+Asymptotic notation compresses these ratio limits into symbols.
+
+**Little-o.** $f(x) = o(g(x))$ as $x \to \infty$ means
+
+$$
+\lim_{x \to \infty} \frac{f(x)}{g(x)} = 0 :
+$$
+
+$f$ is *negligible* next to $g$. The hierarchy reads:
+$\ln x = o(x^p)$ and $x^p = o(e^x)$ for every $p \gt 0$.
+
+**Big-O.** $f(x) = O(g(x))$ means the ratio stays *bounded*: there are
+constants $C$ and $M$ with $\lvert f(x) \rvert \le C \, g(x)$ for all
+$x \gt M$. When the ratio happens to converge to a finite value, that limit
+provides the bound, so a finite ratio limit implies big-O. Bounded-both-ways
+(also $g = O(f)$) is written $f = \Theta(g)$: same growth rate up to
+constants<FN n="2" />.
+
+The confusion worth naming: **big-O is an upper bound, not an exact rate.**
+The statement $3n^2 + 7n = O(n^2)$ is true, and so is
+$3n^2 + 7n = O(n^{50})$; both ratios stay bounded. Only $\Theta$ pins the
+rate down. Sorting in $O(n \log n)$ promises "no worse than"; the matching
+lower bound is a separate theorem. A5 builds its complexity analysis on
+exactly this grammar, so the limits here are the semantics behind every
+$O(n \log n)$ uttered there.
+
+A worked classification. Where does $f(n) = n \ln n$ sit relative to $n$ and
+$n^{1.1}$?
+
+**Step 1.** Against $n$: the ratio is $f(n)/n = \ln n \to \infty$, so
+$n \ln n$ grows strictly faster than $n$ (it is *not* $O(n)$).
+
+**Step 2.** Against $n^{1.1}$: the ratio is
+$n \ln n / n^{1.1} = \ln n / n^{0.1} \to 0$ by the hierarchy (log loses to any
+positive power), so $n \ln n = o(n^{1.1})$.
+
+So $n \ln n$ sits strictly between $n$ and every polynomial $n^{1+\epsilon}$:
+faster than linear, slower than any super-linear power. That is why
+$O(n \log n)$ sorting is "almost linear" in practice.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+x = np.array([1e2, 1e4, 1e6, 1e8])
+
+# The hierarchy as ratio limits: each ratio should head to 0
+r_log_poly = np.log(x) / x**0.5          # ln x / x^0.5 -> 0
+xs = np.array([100.0, 600.0])            # e^x overflows past ~709, so stop at 600
+r_poly_exp = xs**10 / np.exp(xs)         # x^10 / e^x   -> 0
+print("ln x / sqrt(x):", r_log_poly)
+print("x^10 / e^x   :", r_poly_exp)
+assert np.all(np.diff(r_log_poly) < 0) and r_log_poly[-1] < 1e-2
+assert r_poly_exp[1] < 1e-22
+
+# n log n sits between n and n^1.1 (ln n / n^0.1 peaks near e^10 ~ 22000,
+# so sample past the peak to see the decay)
+n = np.array([1e6, 1e9, 1e12])
+print("n log n / n     :", np.log(n))                 # grows: not O(n)
+print("n log n / n^1.1 :", np.log(n) / n**0.1)        # shrinks: o(n^1.1)
+assert np.all(np.diff(np.log(n)) > 0)
+assert np.all(np.diff(np.log(n) / n**0.1) < 0)
+
+# Big-O bound for 3n^2 + 7n = O(n^2): ratio settles near 3, never above 10
+ratio = (3 * n**2 + 7 * n) / n**2
+assert np.all(ratio <= 10) and abs(ratio[-1] - 3) < 1e-8
+print("(3n^2+7n)/n^2 ->", ratio)
+```
+
+Every hierarchy ratio is shrinking toward zero, $n \ln n$ provably sits in its
+slot between the two polynomials, and the big-O ratio stabilizes at the
+leading coefficient $3$, well under the bound.
+
+## Exercises
+
+**Exercise 1.** Compute
+$\displaystyle \lim_{x \to \infty} \frac{5x^3 - 2x + 1}{7x^3 + 4x^2}$ and
+$\displaystyle \lim_{x \to \infty} \frac{2^x}{3^x}$, citing the principle used
+for each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For the rational function, divide numerator and denominator by the
+fastest term $x^3$:
+
+$$
+\frac{5 - 2/x^2 + 1/x^3}{7 + 4/x} \longrightarrow \frac{5 - 0 + 0}{7 + 0} = \frac{5}{7}.
+$$
+
+Only leading terms survive at infinity.
+
+**Step 2.** For the exponentials, combine into one base:
+
+$$
+\frac{2^x}{3^x} = \left(\frac{2}{3}\right)^{\! x} \longrightarrow 0,
+$$
+
+a geometric sequence with ratio $2/3 \lt 1$ (previous lesson). Two
+exponentials are not "the same speed": the larger base wins by an exponential
+factor.
+
+</details>
+
+**Exercise 2.** Order these five functions by growth rate as
+$n \to \infty$, justifying each adjacent comparison with a ratio limit:
+$\;n^2$, $\;2^n$, $\;n \ln n$, $\;(\ln n)^3$, $\;n^{1.5}$.
+
+<details>
+<summary>Solution</summary>
+
+**Claim:** $(\ln n)^3 \;\prec\; n \ln n \;\prec\; n^{1.5} \;\prec\; n^2 \;\prec\; 2^n$
+(each $\prec$ meaning little-o of the next).
+
+**Step 1.** $(\ln n)^3 / (n \ln n) = (\ln n)^2 / n \to 0$: a power of a log
+against the power $n^1$; substituting $m = \ln n$ makes it $m^2 / e^m \to 0$,
+the power-versus-exponential fact.
+
+**Step 2.** $(n \ln n)/n^{1.5} = \ln n / n^{0.5} \to 0$: log loses to the
+positive power $n^{0.5}$.
+
+**Step 3.** $n^{1.5}/n^2 = n^{-0.5} \to 0$: within polynomials, higher degree
+wins.
+
+**Step 4.** $n^2 / 2^n \to 0$: any polynomial loses to any exponential (base
+$\gt 1$).
+
+</details>
+
+**Exercise 3 (code).** Find numerically the crossover point where $1.01^n$
+overtakes $n^{100}$... is far beyond floating point. Instead compare
+*logarithms*: solve for the $n$ where $n \ln 1.01 = 100 \ln n$ by bisection,
+and verify the exponential is behind at $n/2$ and ahead at $2n$ (in log
+space).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# g(n) = log(1.01^n) - log(n^100) = n*ln(1.01) - 100*ln(n); root = crossover
+g = lambda n: n * np.log(1.01) - 100 * np.log(n)
+
+lo, hi = 1e5, 1e6                  # g(1e5) < 0 (poly ahead), g(1e6) > 0 (exp ahead)
+assert g(lo) < 0 < g(hi)
+for _ in range(80):
+    mid = 0.5 * (lo + hi)
+    lo, hi = (mid, hi) if g(mid) < 0 else (lo, mid)
+n_star = 0.5 * (lo + hi)
+print(f"crossover at n ~ {n_star:,.0f}")
+
+assert g(n_star / 2) < 0 < g(n_star * 2)   # behind before, ahead after
+```
+
+The crossover sits near $n \approx 117{,}000$: even a meager 1% exponential
+eventually buries $n^{100}$, but "eventually" can be far out. Asymptotic
+dominance says nothing about small inputs, which is why constant factors still
+matter in practice.
+
+</details>
+
+This closes the limits toolkit. The next discipline aims it at a single
+target: the slope of a curve at a point, where the derivative is born as a
+limit of difference quotients.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 2.6 and 4.4, limits at infinity and relative growth rates.</FNItem>
+  <FNItem n="2">**Knuth, D. E.** (1976). "Big omicron and big omega and big theta". *ACM SIGACT News*, 8(2), 18-24. The note that standardized O, Omega, and Theta in algorithm analysis. [doi:10.1145/1008328.1008329](https://doi.org/10.1145/1008328.1008329)</FNItem>
+  <FNItem n="3">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Ch. 3, asymptotic notation as used throughout computer science.</FNItem>
+</Footnotes>

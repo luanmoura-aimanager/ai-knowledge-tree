@@ -1,0 +1,238 @@
+---
+title: "Functions, graphs, and the elementary functions"
+pillar: L
+subId: L1
+lessonId: functions-and-graphs
+order: 1
+estimatedMinutes: 28
+goal: "Work fluently with functions, composition, and inverses, and know the graphs and qualitative behavior of polynomials, exponentials, logarithms, and the trig functions."
+prerequisites: []
+---
+
+Calculus studies how functions change, so before any limit or derivative there
+has to be fluency with the objects themselves: what a function is, how functions
+combine, and how the handful of elementary functions behave. Everything later in
+this pillar (and most of machine learning) is built by composing pieces from this
+small toolbox, which is why a neural network's forward pass is one long
+composition of functions<FN n="1" />.
+
+## What a function is
+
+A **function** $f : A \to B$ assigns to every input $x$ in the **domain** $A$
+one output $f(x)$ in the **codomain** $B$. The set of outputs that actually
+occur, $\lbrace f(x) : x \in A \rbrace$, is the **image**. In this pillar the
+domain and codomain are sets of real numbers, and the **graph** of $f$ is the
+set of points $(x, f(x))$ drawn in the plane.
+
+Two functions combine by **composition**: $(g \circ f)(x) = g(f(x))$, read
+"first apply $f$, then $g$". Order matters. With $f(x) = x + 1$ and
+$g(x) = x^2$:
+
+$$
+(g \circ f)(x) = (x+1)^2, \qquad (f \circ g)(x) = x^2 + 1,
+$$
+
+and these differ at almost every $x$ (at $x = 1$: $4$ versus $2$).
+
+A function is **injective** (one-to-one) if distinct inputs give distinct
+outputs. An injective $f$ has an **inverse** $f^{-1}$, defined by the property
+
+$$
+f^{-1}(f(x)) = x \quad \text{and} \quad f(f^{-1}(y)) = y .
+$$
+
+The graph of $f^{-1}$ is the graph of $f$ mirrored across the diagonal line
+$y = x$, because inverting swaps the roles of input and output.
+
+One confusion is worth naming before it bites: **$f^{-1}$ is not $1/f$**. The
+notation collides with powers, but $\sin^{-1}(x)$ (the inverse, also written
+$\arcsin x$) and $(\sin x)^{-1} = 1/\sin x$ are different functions. At
+$x = 1/2$: $\arcsin(1/2) = \pi/6 \approx 0.524$, while $1/\sin(1/2) \approx
+2.086$. The closing code block checks this on arrays.
+
+## The elementary functions
+
+Four families cover nearly everything this pillar needs.
+
+**Polynomials** $p(x) = a_n x^n + \dots + a_1 x + a_0$ are sums of powers. The
+leading term dominates for large $\lvert x \rvert$: even-degree leading terms
+send both tails up (or both down), odd-degree terms send them in opposite
+directions. Ratios of polynomials are **rational functions**, defined wherever
+the denominator is nonzero.
+
+**The exponential** $e^x$ (where $e \approx 2.71828$, defined properly in the
+sequences lesson) turns sums into products:
+
+$$
+e^{a+b} = e^a \, e^b .
+$$
+
+It is positive everywhere, increasing everywhere, and its growth is
+self-similar: increasing $x$ by $1$ multiplies the value by $e$, regardless of
+where you start. That fixed-ratio property is what "exponential growth" means.
+
+**The logarithm** $\ln x$ is the inverse of $e^x$, so it is defined only for
+$x \gt 0$ and turns products into sums:
+
+$$
+\ln(ab) = \ln a + \ln b, \qquad \ln(a^c) = c \ln a .
+$$
+
+The general-base versions convert through natural log:
+$\log_b x = \ln x / \ln b$. Logarithms grow, but glacially; that contrast is
+made quantitative in the growth-rates lesson.
+
+**The trig functions** $\sin x$ and $\cos x$ are the coordinates of a point
+moving around the unit circle: at angle $x$ (in radians), the point is
+$(\cos x, \sin x)$. Both repeat with period $2\pi$ and stay inside
+$[-1, 1]$, and the Pythagorean theorem on the unit circle gives the identity
+used constantly later:
+
+$$
+\sin^2 x + \cos^2 x = 1 .
+$$
+
+![The four elementary families: powers with their even/odd tails, exponentials with fixed-ratio growth and decay, the logarithm with its domain edge at zero, and the periodic sine and cosine.](/figures/L1/functions-and-graphs.svg)
+
+## Reading a graph for behavior
+
+A graph compresses qualitative facts a formula hides. The habits that pay off
+later:
+
+- **Where is it defined?** $\ln x$ stops at $x = 0$; $1/(x-3)$ has no value at
+  $x = 3$. Domain edges are exactly where limits get interesting.
+- **Where is it increasing or decreasing?** $e^x$ increases everywhere;
+  $x^2$ decreases then increases, with the turn at $x = 0$. The derivative will
+  make this precise.
+- **How fast do the tails move?** At $x = 10$, $x^2 = 100$ while
+  $2^x = 1024$; at $x = 60$, $x^2 = 3600$ while $2^x \approx 1.15 \times
+  10^{18}$, about a quintillion. Polynomial and exponential growth are not in
+  the same league, and the gap widens without bound.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+x = np.linspace(0.1, 5.0, 50)
+
+# Composition order matters: g(f(x)) != f(g(x)) in general
+f = lambda t: t + 1.0
+g = lambda t: t**2
+assert not np.allclose(g(f(x)), f(g(x)))
+
+# exp and log are inverses on the right domains
+assert np.allclose(np.log(np.exp(x)), x)
+assert np.allclose(np.exp(np.log(x)), x)
+
+# log turns products into sums
+a, b = 3.7, 12.4
+assert np.isclose(np.log(a * b), np.log(a) + np.log(b))
+
+# The unit-circle identity holds at every angle
+theta = np.linspace(-10, 10, 1000)
+assert np.allclose(np.sin(theta)**2 + np.cos(theta)**2, 1.0)
+
+# Inverse function vs reciprocal: not the same thing
+print("arcsin(0.5) =", np.arcsin(0.5))        # ~0.5236 (= pi/6)
+print("1/sin(0.5)  =", 1 / np.sin(0.5))       # ~2.0858
+assert not np.isclose(np.arcsin(0.5), 1 / np.sin(0.5))
+```
+
+Every identity above holds to floating-point precision, and the last two prints
+show the inverse-versus-reciprocal gap is not subtle: the two values differ by a
+factor of four.
+
+## Exercises
+
+**Exercise 1.** Let $f(x) = 2x + 3$. Find $f^{-1}$ explicitly, and verify both
+directions: $f^{-1}(f(x)) = x$ and $f(f^{-1}(y)) = y$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set $y = 2x + 3$ and solve for $x$: subtract 3 and divide by 2,
+giving $x = (y - 3)/2$. So
+
+$$
+f^{-1}(y) = \frac{y - 3}{2}.
+$$
+
+**Step 2.** Check the first direction by substituting $f(x)$ into $f^{-1}$:
+
+$$
+f^{-1}(f(x)) = \frac{(2x + 3) - 3}{2} = \frac{2x}{2} = x .
+$$
+
+**Step 3.** Check the second direction by substituting $f^{-1}(y)$ into $f$:
+
+$$
+f(f^{-1}(y)) = 2 \cdot \frac{y-3}{2} + 3 = (y - 3) + 3 = y .
+$$
+
+Both compositions collapse to the identity, which is the defining property of
+an inverse.
+
+</details>
+
+**Exercise 2.** Find the domain of $h(x) = \sqrt{1 - x^2} + \ln x$, and explain
+which constraint comes from which piece.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The square root needs a nonnegative argument: $1 - x^2 \ge 0$, so
+$x^2 \le 1$, which means $-1 \le x \le 1$.
+
+**Step 2.** The logarithm needs a positive argument: $x \gt 0$.
+
+**Step 3.** Both constraints must hold at once, so intersect them:
+
+$$
+\text{domain}(h) = (0, 1] .
+$$
+
+The left edge is open because $\ln 0$ is undefined; the right edge is closed
+because $\sqrt{1 - 1} = 0$ and $\ln 1 = 0$ are both fine.
+
+</details>
+
+**Exercise 3 (code).** Using the change-of-base identity
+$\log_2 x = \ln x / \ln 2$, compute $\log_2$ of the powers
+$x = 1, 2, 4, 8, \dots, 1024$ and verify the results are the integers
+$0, 1, \dots, 10$. Then verify numerically that $\log_2(a b) = \log_2 a +
+\log_2 b$ for 1000 random positive pairs.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+x = 2.0 ** np.arange(11)            # 1, 2, 4, ..., 1024
+log2x = np.log(x) / np.log(2.0)     # change of base through ln
+assert np.allclose(log2x, np.arange(11))
+
+rng = np.random.default_rng(0)
+a = rng.uniform(0.1, 100.0, 1000)
+b = rng.uniform(0.1, 100.0, 1000)
+lhs = np.log(a * b) / np.log(2.0)
+rhs = np.log(a) / np.log(2.0) + np.log(b) / np.log(2.0)
+assert np.allclose(lhs, rhs)
+print("change of base and product rule verified on", len(a), "pairs")
+```
+
+The powers of two land on the integers because $\log_2$ inverts $2^x$, and the
+product rule holds because it is the $\ln$ product rule divided through by the
+constant $\ln 2$.
+
+</details>
+
+The next lesson takes the first genuinely new step: what it means for $f(x)$ to
+approach a value as $x$ approaches a point, even when $f$ is not defined there.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 6 presents a feedforward network as a composition of simple functions. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 1, functions and models.</FNItem>
+  <FNItem n="3">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 1-4 build functions and graphs with full rigor.</FNItem>
+</Footnotes>
