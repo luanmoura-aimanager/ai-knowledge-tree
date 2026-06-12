@@ -225,7 +225,9 @@ than re-teaching it.
    that *checks* the lesson's claims on real arrays, plus one sentence tying the
    output back to the math. Math is primary; code confirms it. Conceptual lessons
    with no code surface set `codeExempt: true` and skip this.
-6. **Hand off.** End with one sentence pointing to what the next lesson builds.
+6. **Exercises.** An `## Exercises` section with hidden solutions; rules and
+   placement in §6.7.
+7. **Hand off.** End with one sentence pointing to what the next lesson builds.
 
 ### 6.3 Rigor without dryness
 
@@ -272,6 +274,73 @@ they do not count as the image.
 This applies even to `codeExempt: true` lessons. A conceptual lesson with no code
 surface still needs a diagram (a Mermaid flow or relationship map is almost always
 the right fit).
+
+### 6.7 Exercises with hidden solutions
+
+`Rule:` every lesson carries an `## Exercises` section containing **at least
+three exercises**, each with a hidden solution the reader reveals after trying.
+This is binding. Placement: after the worked code block and its tie-back
+sentence, before the one-sentence handoff; `<Footnotes>` stays last (§9).
+Account for the exercises in `estimatedMinutes` (attempting three typically
+adds about 10 minutes).
+
+**Mix.** At least one theoretical exercise (derive, prove, or compute by hand).
+Lessons with a code surface include at least one code exercise solvable in the
+runnable numpy environment. `codeExempt` lessons use three theoretical or
+conceptual exercises (hand computations, design questions, trade-off analyses).
+Order by difficulty: direct application of the lesson, then a variation, then a
+transfer to a new setting.
+
+**Quality bar.** Each exercise is solvable from this lesson plus its stated
+prerequisites, nothing else. Solutions are worked step-by-step, never bare
+answers; every number in a solution is correct and reproducible. Code solutions
+are runnable ```python blocks (numpy only) ending in a true `assert` where one
+is natural; solutions needing torch or a GPU use ```python-static.
+
+**Canonical skeleton.** Prompts are bold-numbered paragraphs; solutions hide in
+native `<details>` elements:
+
+````markdown
+## Exercises
+
+**Exercise 1.** Compute the entropy of $p = (0.5, 0.25, 0.25)$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expand the definition: $H(p) = -\sum_i p_i \log_2 p_i$.
+
+$$
+H = 0.5 \cdot 1 + 0.25 \cdot 2 + 0.25 \cdot 2 = 1.5 \text{ bits}
+$$
+
+</details>
+
+**Exercise 3 (code).** Verify the result numerically.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+p = np.array([0.5, 0.25, 0.25])
+H = -(p * np.log2(p)).sum()
+assert np.isclose(H, 1.5)
+print(H)
+```
+
+</details>
+````
+
+(Exercise 2 elided above; a real lesson always has at least three. The full
+worked reference is `content/A-foundations/A2/entropy.mdx`.)
+
+**MDX pitfalls inside `<details>`.** A blank line after `</summary>` and before
+`</details>` is mandatory; without it the inner markdown (math, fenced code,
+lists) is not parsed and the solution renders as raw text. Summary text is the
+plain word `Solution`. The global pitfalls still apply inside: no `$$` block
+adjacent to a JSX tag without a blank line, no raw `{}` braces in prose, no
+bare `<` followed by a letter or digit. Never nest `<details>`.
 
 ## 7. Suggested paths (app data, not content)
 
