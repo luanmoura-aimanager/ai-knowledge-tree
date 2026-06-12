@@ -251,8 +251,13 @@ rand_distinct_x0 = len(set(np.round(rand[:, 0], 6)))
 print(f"grid:   best={grid_best:.4f}, distinct x0 tried={grid_distinct_x0}")
 print(f"random: best={rand_best:.4f}, distinct x0 tried={rand_distinct_x0}")
 
-assert rand_distinct_x0 > grid_distinct_x0   # random covers the important axis better
-assert rand_best > grid_best                 # and gets closer to the optimum
+# Random always covers the important axis more densely (16 distinct vs 2).
+assert rand_distinct_x0 > grid_distinct_x0
+# Beating grid on a single run is seed-dependent, but the win holds on average:
+# over many restarts the typical random run lands closer to the optimum.
+wins = [max(objective(r) for r in np.random.default_rng(s).random((budget, D)))
+        > grid_best for s in range(200)]
+assert np.mean(wins) > 0.7                    # random beats grid in most runs
 ```
 
 Grid search wastes its $16$ evaluations testing only $2$ values of the coordinate
