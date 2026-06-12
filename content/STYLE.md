@@ -218,9 +218,9 @@ than re-teaching it.
      confusion explicitly and pick the example where they point in opposite
      directions.
    Every number quoted in an example must be correct; tie it to the closing code
-   block where one exists so the reader can reproduce it. Format example sets as
-   bullet lists, not pipe tables: the MDX pipeline has no `remark-gfm`, so tables
-   render as raw text.
+   block where one exists so the reader can reproduce it. Bullet lists usually
+   read best for an example set; GFM pipe tables also render (the pipeline runs
+   `remark-gfm`), so use a table when the data is genuinely tabular.
 5. **Worked code at the end.** Close with a runnable `python` (numpy-first) block
    that *checks* the lesson's claims on real arrays, plus one sentence tying the
    output back to the math. Math is primary; code confirms it. Conceptual lessons
