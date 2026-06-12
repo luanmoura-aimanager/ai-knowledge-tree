@@ -184,16 +184,22 @@ theta_true = np.array([1.0, -0.5])
 def softmax(u): e = np.exp(u - u.max()); return e / e.sum()
 
 pi_e = softmax(F @ theta_true)              # soft-optimal expert
-f_e = pi_e @ F                              # expert feature expectation
 
-# Fact 1: the feature-matching gradient is zero at the true theta.
-grad = f_e - softmax(F @ theta_true) @ F
-assert np.linalg.norm(grad) < 1e-9
+# Estimate the expert feature expectation from sampled demonstrations, so the
+# check below is empirical, not an algebraic identity.
+actions = rng.choice(K, size=200_000, p=pi_e)
+f_expert = F[actions].mean(axis=0)          # sampled expert feature mean
+
+# Fact 1: the feature-matching gradient vanishes at the true theta, i.e. the
+# model expectation E_pi[phi] under theta_true matches the demonstrated features.
+model_feat = softmax(F @ theta_true) @ F
+grad = f_expert - model_feat
+assert np.linalg.norm(grad) < 1e-2          # zero up to Monte Carlo error
 
 # Fact 2: shifting every action's reward by a constant leaves the policy unchanged.
 pi_shift = softmax(F @ theta_true + 3.7)
 assert np.allclose(pi_shift, pi_e)
-print("grad norm:", round(float(np.linalg.norm(grad)), 8),
+print("grad norm:", round(float(np.linalg.norm(grad)), 5),
       " policy invariant under shift:", np.allclose(pi_shift, pi_e))
 ```
 
