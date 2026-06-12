@@ -53,6 +53,17 @@ $$
 V^\pi(s) = \sum_a \pi(a \mid s)\left[ R(s,a) + \gamma \sum_{s'} P(s' \mid s,a)\, V^\pi(s') \right].
 $$
 
+A two-state cycle makes the equation concrete. Under a fixed policy with
+$\gamma = 0.9$, state $A$ pays reward $1$ and always moves to $B$; state $B$ pays
+$0$ and always moves back to $A$. The expectation equation collapses to two coupled
+lines, $V_A = 1 + 0.9\,V_B$ and $V_B = 0 + 0.9\,V_A$. Substituting the second into
+the first gives $V_A = 1 + 0.81\,V_A$, so $V_A = 1/(1-0.81) \approx 5.26$ and
+$V_B = 0.9\,V_A \approx 4.74$. The two values differ by the reward $A$ collects one
+step sooner: both states ride the same alternating reward cycle, but $A$ collects a
+$1$ on the very next step while $B$ has to wait one step for its first $1$, and the
+discounting makes that earlier payout worth more.
+The equation has turned an infinite discounted sum into a $2 \times 2$ solve.
+
 The same derivation applied to the action-value function, where the first action
 $a$ is fixed rather than sampled, gives
 

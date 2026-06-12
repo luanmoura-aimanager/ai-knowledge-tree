@@ -58,6 +58,25 @@ finite even over an infinite horizon whenever $\gamma < 1$. Behaviorally, $\gamm
 sets how far the agent looks ahead: $\gamma$ near $0$ is myopic, $\gamma$ near $1$
 is far-sighted.
 
+The quantity that makes "how far ahead" concrete is the **effective horizon**
+$1/(1-\gamma)$, the number of steps over which discounted rewards still carry real
+weight (the geometric series $\sum_k \gamma^k$ sums to exactly this). It scales
+sharply with $\gamma$:
+
+- $\gamma = 0.5$ gives horizon $2$: a reward two steps out is already discounted
+  to $\gamma^2 = 0.25$ of its face value. The agent is near-sighted.
+- $\gamma = 0.9$ gives horizon $10$. A reward $10$ steps out keeps weight
+  $\gamma^{10} \approx 0.35$; one $50$ steps out is down to $0.0052$, so anything
+  past a few dozen steps is invisible.
+- $\gamma = 0.99$ gives horizon $100$. Now a reward $50$ steps out still keeps
+  weight $\gamma^{50} \approx 0.61$, and the discount does not drop below $1\%$
+  until about step $458$. The agent plans hundreds of steps deep.
+
+The jump from $\gamma = 0.9$ to $\gamma = 0.99$ is one decimal place but a tenfold
+increase in horizon, which is why far-sighted tasks (a board game won only at the
+end) need $\gamma$ pressed close to $1$ while reactive control can use a smaller
+value.
+
 The single most useful fact about the return is that it unrolls one step at a
 time. Splitting off the first term,
 
