@@ -4,7 +4,7 @@ pillar: G
 subId: G4
 lessonId: cusum-changepoint
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the CUSUM statistic as a sequential likelihood-ratio accumulator and use it to detect a shift in mean online."
 prerequisites: ["statistical-anomaly-detection"]
 ---
@@ -128,6 +128,105 @@ print(f"max CUSUM before change: {S[:tau].max():.2f}  (stayed below h={h})")
 The CUSUM statistic hovers near zero while the process is on target, then ramps
 past the threshold a few steps after the true change-point, detecting a one-sigma
 shift that no single-point test would catch.
+
+## Exercises
+
+**Exercise 1.** A Gaussian series has known mean $\mu_0 = 10$, variance
+$\sigma^2 = 1$, and you want to detect a shift of $\delta = 2$, so $k = 1$. Starting
+from $S_0 = 0$, run the upper tabular CUSUM
+$S_t^{+} = \max(0, S_{t-1}^{+} + (x_t - \mu_0) - k)$ by hand over the five
+observations $x = (10.5, 9.0, 12.0, 13.0, 12.5)$. At which step does it first cross
+the threshold $h = 4$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each increment is $(x_t - \mu_0) - k = (x_t - 10) - 1 = x_t - 11$.
+
+**Step 2.** Apply the recursion, flooring at zero each step.
+
+$$
+\begin{aligned}
+S_1 &= \max(0,\; 0 + 10.5 - 11) = \max(0, -0.5) = 0 \\
+S_2 &= \max(0,\; 0 + 9.0 - 11) = \max(0, -2.0) = 0 \\
+S_3 &= \max(0,\; 0 + 12.0 - 11) = \max(0, 1.0) = 1.0 \\
+S_4 &= \max(0,\; 1.0 + 13.0 - 11) = \max(0, 3.0) = 3.0 \\
+S_5 &= \max(0,\; 3.0 + 12.5 - 11) = \max(0, 4.5) = 4.5
+\end{aligned}
+$$
+
+**Step 3.** The statistic first exceeds $h = 4$ at $t = 5$, where $S_5 = 4.5 > 4$.
+The two early below-target points reset the chart to zero, then the sustained shift
+accumulates quickly once the mean climbs past the reference value.
+
+</details>
+
+**Exercise 2.** Show that under the pre-change Gaussian model with mean $\mu_0$, the
+per-step CUSUM increment $(x_t - \mu_0) - k$ has expected value $-k$, while under a
+shift to $\mu_0 + \delta$ it has expected value $\delta - k$. Conclude why
+$k = \delta/2$ centers the design on the shift you most care about.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The increment is the random variable $g_t = (x_t - \mu_0) - k$.
+Expectation is linear, and $k$ is a constant, so
+$\mathbb{E}[g_t] = \mathbb{E}[x_t] - \mu_0 - k$.
+
+**Step 2.** Pre-change, $\mathbb{E}[x_t] = \mu_0$, so
+$\mathbb{E}[g_t] = \mu_0 - \mu_0 - k = -k < 0$. The chart drifts down and gets
+floored at zero, staying quiet.
+
+**Step 3.** Post-change, $\mathbb{E}[x_t] = \mu_0 + \delta$, so
+$\mathbb{E}[g_t] = \delta - k$. For detection the drift must be positive, which
+needs $k < \delta$.
+
+**Step 4.** Setting $k = \delta/2$ makes the post-shift drift $\delta - k = \delta/2$
+equal in magnitude to the pre-shift drift $-k = -\delta/2$. The design is balanced
+at the target shift $\delta$: smaller shifts drift too weakly to trigger fast,
+larger ones trigger even faster, so $k = \delta/2$ is the break-even tuning for the
+shift you most want to catch.
+
+</details>
+
+**Exercise 3 (code).** Implement the two-sided tabular CUSUM with both an upper
+chart $S_t^{+}$ (for positive shifts) and a lower chart $S_t^{-}$ (for negative
+shifts). On a series with $\mu_0 = 0$, $\sigma = 1$ that shifts to $-1$ at $t = 200$,
+verify the lower chart raises the alarm while the upper chart never does.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n, tau, delta = 400, 200, 1.0
+x = rng.normal(0.0, 1.0, n)
+x[tau:] -= delta                          # downward shift of one std
+
+k, h = delta / 2, 8.0
+Sp = np.zeros(n)                          # upper chart (positive shifts)
+Sn = np.zeros(n)                          # lower chart (negative shifts)
+alarm_up = alarm_dn = None
+for t in range(1, n):
+    Sp[t] = max(0.0, Sp[t-1] + (x[t] - 0.0) - k)
+    Sn[t] = max(0.0, Sn[t-1] - (x[t] - 0.0) - k)   # mirror: accumulate -x
+    if alarm_up is None and Sp[t] > h:
+        alarm_up = t
+    if alarm_dn is None and Sn[t] > h:
+        alarm_dn = t
+
+assert alarm_dn is not None and alarm_dn > tau    # lower chart catches the drop
+assert alarm_up is None                            # upper chart stays silent
+print(f"lower-chart alarm at {alarm_dn} (delay {alarm_dn - tau}); upper: {alarm_up}")
+```
+
+The lower chart accumulates $-(x_t - \mu_0) - k$, so a downward shift makes its
+increment positive and it ramps to the threshold, while the upper chart sees only
+negative increments and never leaves zero.
+
+</details>
 
 Statistical detectors assume a simple parametric notion of normal. The next lesson
 learns "normal" from data with a sequence autoencoder and scores anomalies by

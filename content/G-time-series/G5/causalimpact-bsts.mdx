@@ -4,7 +4,7 @@ pillar: G
 subId: G5
 lessonId: causalimpact-bsts
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Estimate an intervention effect by forecasting the counterfactual with a Bayesian structural time-series model fit on a control series."
 prerequisites: ["granger-causality", "G1/state-space-kalman", "B5/diff-in-diff"]
 ---
@@ -111,6 +111,99 @@ The model learns the response-to-control relationship on the pre-period, forecas
 a counterfactual that hugs the actual series before the intervention (near-zero
 residual), and then exposes the injected post-period lift of 5, the core
 CausalImpact estimate.
+
+## Exercises
+
+**Exercise 1.** A pre-period fit gives the counterfactual model
+$\hat{Y}_t = 2 + 1.5 X_t$. Over a four-step post-period the controls are
+$X = (10, 12, 11, 13)$ and the observed response is $Y = (22, 26, 24, 28)$. Compute
+the pointwise effects $\hat{\phi}_t$ and the cumulative effect.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Forecast the counterfactual at each step,
+$\hat{Y}_t = 2 + 1.5 X_t$:
+
+$$
+\hat{Y} = (2 + 15,\; 2 + 18,\; 2 + 16.5,\; 2 + 19.5) = (17,\; 20,\; 18.5,\; 21.5).
+$$
+
+**Step 2.** Pointwise effect is $\hat{\phi}_t = Y_t - \hat{Y}_t$:
+
+$$
+\hat{\phi} = (22 - 17,\; 26 - 20,\; 24 - 18.5,\; 28 - 21.5) = (5,\; 6,\; 5.5,\; 6.5).
+$$
+
+**Step 3.** The cumulative effect is the running sum, ending at
+$5 + 6 + 5.5 + 6.5 = 23$. The response sits consistently above what the control
+predicts, so the intervention added roughly $5.75$ per step and $23$ in total over
+the post-period.
+
+</details>
+
+**Exercise 2.** State the two identifying assumptions CausalImpact needs, and give a
+concrete scenario that violates each. Explain how a violation biases the estimated
+effect.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Assumption one: the controls are not themselves affected by the
+intervention. Violation: an ad campaign for product A also lifts a "control" product
+B sold by the same brand. Then $X_t$ rises with the treatment, so the counterfactual
+$\hat{Y}_t = \boldsymbol{\beta}^\top X_t$ is pulled up too, and the estimated effect
+$Y_t - \hat{Y}_t$ is biased toward zero: the leakage hides part of the true lift.
+
+**Step 2.** Assumption two: the pre-period relationship between $Y$ and the controls
+continues into the post-period absent the intervention. Violation: a market-wide
+trend break (a new competitor enters) changes the $Y$-from-$X$ mapping right at the
+intervention date. The pre-period coefficients no longer predict the
+no-intervention counterfactual, so the gap conflates the broken relationship with
+the true effect, biasing it in whichever direction the structural change runs.
+
+**Step 3.** Both failures break the claim that $\hat{Y}_t$ estimates the untreated
+potential outcome, so the contrast $Y_t - \hat{Y}_t$ no longer isolates the
+intervention. The credible interval is then centered on the wrong value, however
+tight it looks.
+
+</details>
+
+**Exercise 3 (code).** Confirm the pre-period residual is mean-zero by construction
+when the counterfactual is an ordinary least-squares fit on the pre-period. Generate
+a control and response, fit $Y$ on the control over the pre-period, and assert the
+average pre-period pointwise effect is within numerical tolerance of zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+n, t0 = 160, 120
+t = np.arange(n)
+control = 8 + 4*np.sin(2*np.pi*t/24) + np.cumsum(rng.normal(0, 0.15, n))
+y = 1.0 + 1.2*control + np.where(t >= t0, 3.0, 0.0) + rng.normal(0, 0.8, n)
+
+# Fit counterfactual on the PRE-period only.
+X = np.column_stack([np.ones(t0), control[:t0]])
+beta, *_ = np.linalg.lstsq(X, y[:t0], rcond=None)
+y_cf = np.column_stack([np.ones(n), control]) @ beta
+pointwise = y - y_cf
+
+# OLS with an intercept forces the in-sample residual mean to exactly zero.
+assert np.isclose(pointwise[:t0].mean(), 0.0, atol=1e-9)
+print(f"avg pre residual: {pointwise[:t0].mean():.2e}; "
+      f"avg post effect: {pointwise[t0:].mean():.2f} (true 3.0)")
+```
+
+The intercept column makes the least-squares normal equations force the pre-period
+residuals to sum to zero, so the counterfactual hugs the actual series before the
+intervention, which is the credential that lets the post-period gap be read as the
+effect.
+
+</details>
 
 CausalImpact relies on a regression of one response on its controls. The next
 lesson constructs the control itself: synthetic control builds a weighted

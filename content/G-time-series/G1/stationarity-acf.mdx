@@ -4,7 +4,7 @@ pillar: G
 subId: G1
 lessonId: stationarity-acf
 order: 1
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Define weak stationarity, derive the autocovariance and autocorrelation functions, and read AR/MA order off the ACF and partial ACF."
 prerequisites: ["A2/expectation", "A2/variance-moments"]
 ---
@@ -128,6 +128,102 @@ print("theory phi^h:", np.round(phi ** np.arange(6), 3))
 
 The sample ACF tracks $\phi^h$, the geometric decay an AR(1) predicts, confirming
 both the stationarity of $\phi=0.7$ and the gradual ACF that flags an AR process.
+
+## Exercises
+
+**Exercise 1.** Decide whether the random walk $X_t = X_{t-1} + \varepsilon_t$ with
+$X_0 = 0$ and white noise $\varepsilon_t$ of variance $\sigma^2$ is weakly
+stationary. Check each of the three conditions, computing $\operatorname{Var}(X_t)$
+and $\operatorname{Cov}(X_t, X_{t+h})$ explicitly.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Unroll the recursion: $X_t = \sum_{s=1}^{t} \varepsilon_s$. The mean is
+$\mathbb{E}[X_t] = 0$, constant, so condition 1 holds.
+
+**Step 2.** The variance is $\operatorname{Var}(X_t) = \sum_{s=1}^{t}
+\operatorname{Var}(\varepsilon_s) = t\sigma^2$ because the $\varepsilon_s$ are
+uncorrelated. This grows without bound in $t$, so condition 2 (finite, constant
+variance) fails.
+
+**Step 3.** For $h \ge 0$, $X_{t+h} = X_t + \sum_{s=t+1}^{t+h}\varepsilon_s$, and the
+added terms are independent of $X_t$, so
+
+$$
+\operatorname{Cov}(X_t, X_{t+h}) = \operatorname{Var}(X_t) = t\sigma^2.
+$$
+
+This depends on $t$, not on $h$ alone, so condition 3 fails too. The random walk is
+not weakly stationary: it is the canonical nonstationary series, and differencing it
+once gives the white noise $\Delta X_t = \varepsilon_t$.
+
+</details>
+
+**Exercise 2.** For the AR(1) process $X_t = \phi X_{t-1} + \varepsilon_t$ with
+$|\phi| < 1$ and white noise of variance $\sigma^2$, derive the stationary variance
+$\gamma(0)$ and show that $\rho(h) = \phi^{|h|}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Assume stationarity and take the variance of both sides. Since
+$X_{t-1}$ and $\varepsilon_t$ are uncorrelated,
+
+$$
+\gamma(0) = \phi^2 \gamma(0) + \sigma^2 \implies \gamma(0) = \frac{\sigma^2}{1 - \phi^2}.
+$$
+
+The condition $|\phi| < 1$ is what makes the denominator positive and the variance
+finite, the same condition that made the geometric series of shocks converge.
+
+**Step 2.** Multiply the recursion by $X_{t-h}$ (for $h \ge 1$) and take
+expectations. Because $\varepsilon_t$ is independent of the past $X_{t-h}$,
+
+$$
+\gamma(h) = \phi\,\gamma(h-1).
+$$
+
+**Step 3.** Iterating from $\gamma(0)$ gives $\gamma(h) = \phi^h \gamma(0)$, so
+$\rho(h) = \gamma(h)/\gamma(0) = \phi^h$ for $h \ge 0$. By evenness of the ACF,
+$\rho(h) = \phi^{|h|}$ for all integer $h$. The ACF decays geometrically and never
+hits exactly zero, the gradual-decay signature of an AR process.
+
+</details>
+
+**Exercise 3 (code).** Simulate an MA(1) process $X_t = \varepsilon_t + \theta
+\varepsilon_{t-1}$ with $\theta = 0.6$ and confirm the theoretical ACF: $\rho(1) =
+\theta/(1+\theta^2)$ and $\rho(h) = 0$ for $h \ge 2$. The sharp cutoff at lag 1 is
+the diagnostic that distinguishes MA from AR.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n, theta = 200_000, 0.6
+e = rng.normal(0, 1, n + 1)
+x = e[1:] + theta * e[:-1]               # X_t = e_t + theta e_{t-1}
+
+def acf(x, max_lag):
+    x = x - x.mean()
+    g0 = (x * x).mean()
+    return np.array([(x[:len(x)-h] * x[h:]).mean() / g0 for h in range(max_lag + 1)])
+
+r = acf(x, 4)
+rho1_theory = theta / (1 + theta**2)
+assert np.isclose(r[1], rho1_theory, atol=0.01)   # rho(1) matches
+assert np.all(np.abs(r[2:]) < 0.01)               # rho(h>=2) ~ 0: MA(1) cutoff
+print("rho(1) sample:", round(r[1], 3), " theory:", round(rho1_theory, 3))
+```
+
+The lag-1 autocorrelation matches $\theta/(1+\theta^2) = 0.6/1.36 \approx 0.441$
+and every higher lag is near zero, the abrupt ACF cutoff at lag $q = 1$ that marks
+an MA(1) and contrasts with the AR(1)'s gradual geometric decay.
+
+</details>
 
 The next lesson asks the prior question: how do you test whether a series is
 stationary at all, when the prime suspect is a unit root that the ACF decay alone

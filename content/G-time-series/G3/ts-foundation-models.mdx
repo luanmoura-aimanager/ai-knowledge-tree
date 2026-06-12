@@ -4,7 +4,7 @@ pillar: G
 subId: G3
 lessonId: ts-foundation-models
 order: 6
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Explain zero-shot forecasting with pretrained models: Chronos value tokenization, TimeGPT, and Lag-Llama, and the scaling that makes them transfer."
 prerequisites: ["patchtst-itransformer", "E3/decoder-only"]
 ---
@@ -106,6 +106,85 @@ print(f"round-trip RMSE from tokenization: {rmse:.3f}  (set by bin width)")
 Mean-scaling followed by quantization turns the real-valued series into a sequence
 of integer tokens with only quantization-level reconstruction error, which is the
 representation that lets a plain language-model architecture forecast time series.
+
+## Exercises
+
+**Exercise 1.** Chronos mean-scales a series, then quantizes the scaled values
+into $B = 256$ bins spread uniformly over a scaled range of width $W = 4.0$. The
+mean absolute value used for scaling is $\nu = 50$. Compute the bin width in
+scaled units, and the worst-case reconstruction error in original units when each
+token de-quantizes to its bin center.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Uniform bins of count $B$ over a range of width $W$ have width
+$\Delta = W / B = 4.0 / 256 = 0.015625$ in scaled units.
+
+**Step 2.** De-quantizing to the bin center means any value lands at most half a
+bin from its center, so the scaled error is at most $\Delta/2 = 0.0078125$.
+
+**Step 3.** Un-scaling multiplies back by $\nu = 50$, so the worst-case error in
+original units is $\frac{\Delta}{2}\,\nu = 0.0078125 \cdot 50 = 0.390625$. This is
+the quantization floor: no forecast can be more accurate than this regardless of
+the model, which is why $B$ trades vocabulary size against precision.
+
+</details>
+
+**Exercise 2.** Lag-Llama feeds the value plus its lags at $\{1, 7, 24, 168\}$ to
+a univariate model. How many initial steps of a series have no complete lag-feature
+vector, and explain in one sentence why handing the model these lags directly helps
+a zero-shot foundation model compared with learning periodicity from scratch.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The lag feature at offset $\ell$ needs a value $\ell$ steps in the
+past. The largest offset is $\max\{1,7,24,168\} = 168$, so the first $168$ steps
+lack at least one lag and cannot form a complete feature vector; usable steps begin
+at index $168$.
+
+**Step 2.** The lags $\{1,7,24,168\}$ are chosen to span common seasonalities
+(hourly, daily, weekly), so the autoregressive model is handed the periodic context
+directly instead of having to rediscover those periods, which is exactly what makes
+a single pretrained model transfer to a new series zero-shot.
+
+</details>
+
+**Exercise 3 (code).** Implement Chronos-style mean-scaling and uniform
+quantization, then verify that the round-trip reconstruction error never exceeds
+half a bin width in original units.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+series = 50 + 10*np.sin(2*np.pi*np.arange(300)/24) + rng.normal(0, 1, 300)
+
+scale = np.mean(np.abs(series))          # mean absolute scaling
+scaled = series / scale
+
+B = 256
+lo, hi = scaled.min(), scaled.max()
+edges = np.linspace(lo, hi, B + 1)
+tokens = np.clip(np.digitize(scaled, edges) - 1, 0, B - 1)
+
+centers = 0.5*(edges[:-1] + edges[1:])
+recon = centers[tokens] * scale          # de-quantize then un-scale
+half_bin = 0.5 * (hi - lo)/B * scale     # half bin width in original units
+
+print(f"max abs error {np.abs(recon - series).max():.4f}, bound {half_bin:.4f}")
+assert np.abs(recon - series).max() <= half_bin + 1e-9
+```
+
+Every reconstructed value sits within half a bin of its original, confirming the
+quantization floor: the tokenization is lossy only at the bin-width scale, which is
+the controllable price of representing a real series as discrete tokens.
+
+</details>
 
 Deep models excel at forecasting the expected path. The next subsection turns to a
 different question: detecting when a series departs from its normal behaviour,

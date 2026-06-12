@@ -4,7 +4,7 @@ pillar: G
 subId: G2
 lessonId: hierarchical-forecasting
 order: 3
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Define a hierarchy of series, state the coherence constraint, and reconcile base forecasts with bottom-up and the optimal MinT projection."
 prerequisites: ["gbdt-forecasting", "A1/least-squares"]
 ---
@@ -123,6 +123,99 @@ print("coherent:", np.isclose(y_tilde[0], y_tilde[1] + y_tilde[2]))
 The reconciled forecast is coherent (the total equals the sum of the stores) and
 MinT has nudged all three numbers using their relative error variances, rather than
 trusting any single level outright.
+
+## Exercises
+
+**Exercise 1.** For the two-store hierarchy with
+$S = \left(\begin{smallmatrix} 1 & 1 \\ 1 & 0 \\ 0 & 1 \end{smallmatrix}\right)$,
+the base forecasts are $\hat{\mathbf{y}} = (\text{total}, \text{store}_1, \text{store}_2) = (100, 55, 40)$.
+Reconcile them bottom-up by hand and confirm the result is coherent. Then check
+whether the base forecasts were coherent to begin with.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bottom-up uses $G = [\,0 \mid I\,]$, which discards the total row and
+keeps the base bottom-level forecasts:
+$\hat{\mathbf{b}} = (\text{store}_1, \text{store}_2) = (55, 40)$.
+
+**Step 2.** Resum with $S$ to get the coherent full vector:
+
+$$
+\tilde{\mathbf{y}} = S \hat{\mathbf{b}} = (55 + 40,\ 55,\ 40) = (95,\ 55,\ 40).
+$$
+
+**Step 3.** Coherence check: the top entry $95$ equals the sum of the bottom
+entries $55 + 40 = 95$. Coherent by construction. The original base forecast had
+$\text{total} = 100 \ne 55 + 40 = 95$, so it was incoherent; bottom-up resolved the
+conflict by trusting the bottom level and overwriting the total.
+
+</details>
+
+**Exercise 2.** Show that the MinT map $G = (S^\top W^{-1} S)^{-1} S^\top W^{-1}$
+recovers the identity on the bottom level: prove $GS = I$. Explain why this property
+is exactly what makes the reconciled forecast $\tilde{\mathbf{y}} = SG\hat{\mathbf{y}}$
+coherent and unbiased.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute $S$ in place of $\hat{\mathbf{y}}$ inside $G$:
+
+$$
+GS = (S^\top W^{-1} S)^{-1} S^\top W^{-1} S.
+$$
+
+**Step 2.** The trailing factor $S^\top W^{-1} S$ cancels its own inverse:
+$(S^\top W^{-1} S)^{-1}(S^\top W^{-1} S) = I$. So $GS = I$, the
+$m \times m$ identity on the bottom level.
+
+**Step 3 (coherence).** Any reconciled vector has the form
+$\tilde{\mathbf{y}} = SG\hat{\mathbf{y}} = S\hat{\mathbf{b}}$ with
+$\hat{\mathbf{b}} = G\hat{\mathbf{y}}$. It lies in the column space
+$\{S\mathbf{b}\}$, the coherent subspace, so children sum to parents automatically.
+
+**Step 4 (unbiasedness).** If the base forecasts are unbiased,
+$\mathbb{E}[\hat{\mathbf{y}}] = S\mathbf{b}_t$ (the true coherent mean). Then
+$\mathbb{E}[\tilde{\mathbf{y}}] = SG\,S\mathbf{b}_t = S(GS)\mathbf{b}_t = S\mathbf{b}_t$,
+using $GS = I$. The reconciliation introduces no bias; it only projects onto the
+coherent subspace.
+
+</details>
+
+**Exercise 3 (code).** With the lesson's $S$ and the diagonal weight
+$W = \mathrm{diag}(9, 4, 4)$, build the MinT map $G$, reconcile the incoherent base
+forecast $(100, 55, 40)$, and verify two facts: the result is coherent, and
+$GS = I$. End with asserts. (Solve the linear systems directly with `numpy`.)
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+S = np.array([[1., 1.], [1., 0.], [0., 1.]])     # bottom (2) -> all series (3)
+W = np.diag([9., 4., 4.])                          # forecast-error variances
+Wi = np.linalg.inv(W)
+
+G = np.linalg.inv(S.T @ Wi @ S) @ S.T @ Wi         # MinT map, shape (2, 3)
+
+yhat = np.array([100., 55., 40.])                  # incoherent: 100 != 95
+b_tilde = G @ yhat                                  # reconciled bottom level
+y_tilde = S @ b_tilde                               # coherent full vector
+
+# Coherence: total equals sum of stores
+assert np.isclose(y_tilde[0], y_tilde[1] + y_tilde[2])
+# MinT recovers the identity on the bottom level: G S = I
+assert np.allclose(G @ S, np.eye(2))
+print("reconciled:", np.round(y_tilde, 3),
+      " coherent:", bool(np.isclose(y_tilde[0], y_tilde[1] + y_tilde[2])))
+```
+
+The reconciled total equals the sum of the stores, and $GS$ is the identity, so
+the MinT projection lands in the coherent subspace exactly as the algebra predicts.
+
+</details>
 
 GBDT, hierarchical reconciliation, and the next model all live in the classical-ML
 camp. The next lesson covers Prophet, a decomposable additive model designed for

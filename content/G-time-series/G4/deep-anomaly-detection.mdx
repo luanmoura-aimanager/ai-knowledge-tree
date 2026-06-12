@@ -4,7 +4,7 @@ pillar: G
 subId: G4
 lessonId: deep-anomaly-detection
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Score anomalies by reconstruction error from a sequence autoencoder, set a threshold from the residual distribution, and explain the LSTM-AE and transformer-AE variants."
 prerequisites: ["cusum-changepoint", "D4/autoencoders"]
 ---
@@ -117,6 +117,106 @@ print(f"false positives among first 100 normal windows: {flags[:100].sum()} / 10
 Windows that follow the learned daily pattern reconstruct within the threshold,
 while the injected square-wave windows blow past it, showing how reconstruction
 error separates off-manifold anomalies from normal behaviour with few false alarms.
+
+## Exercises
+
+**Exercise 1.** A linear autoencoder projects a centered vector
+$\mathbf{x} \in \mathbb{R}^n$ onto an orthonormal basis $P$ of $d < n$ rows
+($PP^\top = I_d$) and reconstructs $\hat{\mathbf{x}} = P^\top P \mathbf{x}$. Show
+that the reconstruction error equals the squared norm of the component of
+$\mathbf{x}$ lying in the discarded subspace, and that it is zero exactly when
+$\mathbf{x}$ lies in the row space of $P$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The residual is
+$\mathbf{x} - \hat{\mathbf{x}} = \mathbf{x} - P^\top P \mathbf{x} = (I - P^\top P)\mathbf{x}$.
+Both $P^\top P$ and $I - P^\top P$ are orthogonal projectors: with $PP^\top = I_d$,
+$(P^\top P)(P^\top P) = P^\top (PP^\top) P = P^\top P$, so $I - P^\top P$ is
+idempotent and symmetric, projecting onto the orthogonal complement of $P$'s row
+space.
+
+**Step 2.** The error is the squared norm of that projection:
+
+$$
+\| \mathbf{x} - \hat{\mathbf{x}} \|^2 = \mathbf{x}^\top (I - P^\top P)^\top (I - P^\top P) \mathbf{x} = \mathbf{x}^\top (I - P^\top P) \mathbf{x},
+$$
+
+using idempotence and symmetry. This is the squared length of the part of
+$\mathbf{x}$ in the discarded subspace.
+
+**Step 3.** A projector's quadratic form is zero only when its argument is in the
+kernel, here the row space of $P$. So the error vanishes exactly when $\mathbf{x}$
+lies entirely in the retained subspace, and grows with whatever energy spills into
+the discarded directions, which is the off-manifold anomaly signal.
+
+</details>
+
+**Exercise 2.** You hold out 1000 normal reconstruction errors and set the threshold
+at the 99th percentile. Assuming future normal errors follow the same distribution,
+what false-positive rate does this target, and how many false alarms do you expect
+per 10,000 normal windows? Why does a robust z-score on the errors (median plus MAD)
+give a more stable threshold than the sample mean plus $3s$ when the held-out set is
+lightly contaminated with a few real anomalies?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The 99th percentile leaves 1% of normal errors above it by construction,
+so the targeted false-positive rate is $0.01$. Over 10,000 normal windows the
+expected count of false alarms is $10{,}000 \times 0.01 = 100$.
+
+**Step 2.** If the held-out set is contaminated, a few large anomaly errors inflate
+the mean and especially the standard deviation $s$, pushing the $\bar{x} + 3s$
+threshold up and masking later anomalies, the same masking failure as the
+point-anomaly z-score.
+
+**Step 3.** The median and MAD have a 50% breakdown point, so a handful of
+contaminating errors barely move them. The robust threshold
+$\text{median} + 3 \cdot 1.4826\,\text{MAD}$ stays anchored to the bulk of the
+normal errors, keeping the false-positive rate near its target even when the
+calibration set is not perfectly clean.
+
+</details>
+
+**Exercise 3 (code).** Reproduce the masking argument on a score series. Build 1000
+normal reconstruction errors plus 20 large anomalous errors, then compare the
+fraction of anomalies caught by a mean-plus-$3s$ threshold against a robust
+median-plus-MAD threshold. Show the robust threshold catches at least as many.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+normal_err = np.abs(rng.normal(0, 1, 1000))      # normal reconstruction errors
+anom_err = rng.uniform(6, 10, 20)                # large anomalous errors
+scores = np.concatenate([normal_err, anom_err])
+is_anom = np.concatenate([np.zeros(1000, bool), np.ones(20, bool)])
+
+# Non-robust threshold: mean + 3*std (inflated by the anomalies themselves)
+thr_classic = scores.mean() + 3 * scores.std()
+caught_classic = (scores[is_anom] > thr_classic).mean()
+
+# Robust threshold: median + 3 * 1.4826 * MAD
+med = np.median(scores)
+mad = np.median(np.abs(scores - med))
+thr_robust = med + 3 * 1.4826 * mad
+caught_robust = (scores[is_anom] > thr_robust).mean()
+
+assert caught_robust >= caught_classic
+print(f"classic thr={thr_classic:.2f} catches {caught_classic:.0%}; "
+      f"robust thr={thr_robust:.2f} catches {caught_robust:.0%}")
+```
+
+The anomalies inflate the standard deviation and pull the classic threshold up,
+while the median and MAD ignore them, so the robust cut-off sits lower and recovers
+at least as many true anomalies.
+
+</details>
 
 Detecting *that* something changed is one task; explaining *why* one series moves
 another is causal. The next subsection turns to causal time series, beginning with
