@@ -4,7 +4,7 @@ pillar: F
 subId: F4
 lessonId: junction-tree
 order: 3
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Triangulate a graph, build its clique tree, verify the running intersection property, and perform exact inference via the calibration (collect-distribute) schedule."
 prerequisites: ["belief-propagation"]
 ---
@@ -125,6 +125,103 @@ print(f"P(D) brute:  {p_d_brute.round(4)}")
 
 The junction tree recovers exact marginals by running BP on the clique tree rather than
 the original graph, with complexity exponential only in the clique size (the treewidth plus 1).
+
+## Exercises
+
+**Exercise 1.** Consider a 4-cycle $A - B - C - D - A$ (each node connected to its two
+neighbors, no diagonals). Show it is not chordal, list the two distinct ways to
+triangulate it with a single fill edge, and give the resulting maximal cliques for one
+of them.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cycle $A - B - C - D - A$ has length 4. Chordality requires every cycle
+of length at least 4 to have a chord. The only possible chords are the diagonals
+$A - C$ and $B - D$, and neither is present, so the graph is not chordal.
+
+**Step 2.** A single fill edge along either diagonal triangulates it. Option one adds
+$A - C$; option two adds $B - D$. Each splits the 4-cycle into two triangles, so one
+fill edge suffices in both cases.
+
+**Step 3.** Take the fill edge $A - C$. The graph now has triangles
+$\{A, B, C\}$ and $\{A, C, D\}$, which are the two maximal cliques. They share the
+separator $\{A, C\}$, exactly the added chord, giving a two-clique junction tree
+$ABC - AC - ACD$.
+
+</details>
+
+**Exercise 2.** The running intersection property requires that for any two cliques,
+their shared variables appear in every clique on the path between them. Take the clique
+chain $\{A,B,C\} - \{B,C,D\} - \{C,D,E\}$. Verify RIP holds for the pair
+$\{A,B,C\}$ and $\{C,D,E\}$, and explain what would break if the middle clique were
+$\{B,D,F\}$ instead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The intersection of the endpoints is
+$\{A,B,C\} \cap \{C,D,E\} = \{C\}$. RIP demands $C$ appear in every clique on the path,
+which is the single middle clique $\{B,C,D\}$. Since $C \in \{B,C,D\}$, RIP holds for
+this pair.
+
+**Step 2.** Replace the middle clique with $\{B,D,F\}$. The endpoint intersection is
+still $\{C\}$, but $C \notin \{B,D,F\}$, so the shared variable $C$ is missing from a
+clique on the path. RIP is violated.
+
+**Step 3.** With RIP broken, the two cliques carry information about $C$ that the middle
+clique cannot reconcile, so message passing can leave the two beliefs disagreeing on the
+marginal of $C$. The calibration step then fails to produce consistent exact marginals,
+which is why the tree must be built to satisfy RIP (the maximum-weight spanning tree
+construction guarantees it).
+
+</details>
+
+**Exercise 3 (code).** Build the junction tree for the triangulated 4-cycle of
+Exercise 1 with cliques $\{A,B,C\}$ and $\{A,C,D\}$, separator $\{A,C\}$, on binary
+variables. Initialize with random clique potentials, calibrate with one collect and one
+distribute message, and verify the marginal of $D$ against the brute-force joint.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(21)
+k = 2
+
+# Clique potentials. Axes: phi_abc[a,b,c], phi_acd[a,c,d]
+phi_abc = np.abs(rng.normal(1, 0.4, (k, k, k)))
+phi_acd = np.abs(rng.normal(1, 0.4, (k, k, k)))
+
+belief_abc = phi_abc.copy()
+belief_acd = phi_acd.copy()
+
+# Collect: ACD -> ABC over separator {A,C}: sum out D
+m_acd_to_abc = phi_acd.sum(axis=2)              # [a, c]
+belief_abc *= m_acd_to_abc[:, np.newaxis, :]    # broadcast over b: [a,b,c]
+
+# Distribute: ABC -> ACD over {A,C}: sum out B, divide old, multiply new
+m_abc_to_acd = belief_abc.sum(axis=1)           # [a, c]
+belief_acd *= (m_abc_to_acd / (m_acd_to_abc + 1e-12))[:, :, np.newaxis]
+
+p_d = belief_acd.sum(axis=(0, 1)); p_d /= p_d.sum()
+
+# Brute force joint over (a,b,c,d)
+joint = phi_abc[:, :, :, np.newaxis] * phi_acd[:, np.newaxis, :, :]  # [a,b,c,d]
+joint /= joint.sum()
+p_d_brute = joint.sum(axis=(0, 1, 2)); p_d_brute /= p_d_brute.sum()
+
+assert np.allclose(p_d, p_d_brute)
+print("P(D) JT:    ", p_d.round(4))
+print("P(D) brute: ", p_d_brute.round(4))
+```
+
+The calibrated clique tree reproduces the brute-force marginal of $D$, confirming exact
+inference on the triangulated graph.
+
+</details>
 
 The next subsection turns to approximate inference, which scales to problems where the
 treewidth makes exact methods infeasible.

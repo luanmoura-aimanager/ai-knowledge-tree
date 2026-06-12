@@ -4,7 +4,7 @@ pillar: F
 subId: F6
 lessonId: hamiltonian-mc
 order: 4
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Frame MCMC proposals as Hamiltonian dynamics, derive the leapfrog integrator, show that the volume-preserving property keeps acceptance high, and explain what NUTS adds."
 prerequisites: ["gibbs-sampling"]
 ---
@@ -147,6 +147,101 @@ correlation $\rho$, directly demonstrating faster mixing.
 A negative lag-1 value (which can arise when the trajectory slightly over-rotates)
 is a stronger signal than zero: it means successive samples partially cancel,
 yielding an effective sample size greater than $N$.
+
+## Exercises
+
+**Exercise 1.** An HMC proposal moves from $(q, p)$ to $(q^*, p^*)$ with
+$H(q, p) = 3.0$ and $H(q^*, p^*) = 2.7$. Compute the acceptance probability. Then
+do the same for a proposal that ends at $H(q^*, p^*) = 3.5$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The HMC acceptance probability is
+$\min\!\left(1,\, e^{H(q, p) - H(q^*, p^*)}\right)$, so the exponent is the energy
+the trajectory loses.
+
+**Step 2.** For the first proposal the exponent is $3.0 - 2.7 = 0.3 > 0$, giving
+$e^{0.3} \approx 1.35 > 1$, so $\alpha = 1$. A trajectory that lowers the energy is
+always accepted.
+
+**Step 3.** For the second proposal the exponent is $3.0 - 3.5 = -0.5$, giving
+$\alpha = e^{-0.5} \approx 0.607$. Energy gained from integration error is
+accepted in proportion to the gap, which is why a small step size, keeping that
+gap near zero, holds acceptance close to $1$.
+
+</details>
+
+**Exercise 2.** The exact Hamiltonian flow preserves $H$, but the leapfrog
+integrator does not. Explain why HMC still samples the target exactly despite this
+numerical error, naming the two leapfrog properties that make the MH correction
+valid.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** HMC wraps each leapfrog trajectory in a Metropolis-Hastings
+accept/reject step with ratio $e^{H(q,p) - H(q^*, p^*)}$. Any energy drift from
+discretization is exactly the quantity this ratio penalizes, so the stationary
+distribution is the target $e^{-H}$ regardless of integration error. The error
+costs acceptance, not correctness.
+
+**Step 2.** For that MH ratio to be the valid correction, the proposal must be
+**volume-preserving** (Jacobian $1$, so no extra Jacobian factor enters the ratio)
+and **time-reversible** (flipping $p \to -p$ retraces the path, so the forward and
+reverse proposal densities match and cancel). Leapfrog has both properties exactly,
+even at finite step size.
+
+**Step 3.** Together these mean the only approximation is in the energy, which the
+accept step absorbs. Shrinking $\varepsilon$ raises acceptance toward $1$ without
+ever biasing the samples.
+
+</details>
+
+**Exercise 3 (code).** For a 1D standard normal target, $U(q) = \tfrac12 q^2$ and
+$\nabla U(q) = q$. Implement the leapfrog integrator and verify two structural
+facts on a single trajectory: it nearly conserves the Hamiltonian (drift below
+$10^{-2}$), and it is exactly reversible (running forward, flipping the momentum,
+and running again returns to the start).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def grad_U(q):  return q          # -grad log pi for N(0,1)
+def U(q):       return 0.5 * q**2
+
+def leapfrog(q, p, eps, L):
+    p = p - 0.5 * eps * grad_U(q)
+    for _ in range(L - 1):
+        q = q + eps * p
+        p = p - eps * grad_U(q)
+    q = q + eps * p
+    p = p - 0.5 * eps * grad_U(q)
+    return q, p
+
+q0, p0 = 1.0, 0.5
+eps, L = 0.1, 20
+
+H0 = U(q0) + 0.5 * p0**2
+q1, p1 = leapfrog(q0, p0, eps, L)
+H1 = U(q1) + 0.5 * p1**2
+print(f"H drift: {abs(H1 - H0):.2e}")
+assert abs(H1 - H0) < 1e-2                 # energy nearly conserved
+
+# reverse: flip momentum, integrate again, recover the start
+q2, p2 = leapfrog(q1, -p1, eps, L)
+print(f"returned q: {q2:.6f}  (start {q0})")
+assert abs(q2 - q0) < 1e-9 and abs(p2 + p0) < 1e-9   # exact reversibility
+```
+
+The Hamiltonian drifts by only $\approx 10^{-3}$ over $20$ steps, the $O(\varepsilon^4)$
+per-step error that keeps acceptance near $1$, while reversal returns to the
+starting position to machine precision, the property the MH correction relies on.
+
+</details>
 
 The next lesson introduces Langevin dynamics, a gradient-based method that connects
 MCMC to stochastic gradient descent.

@@ -4,7 +4,7 @@ pillar: F
 subId: F5
 lessonId: normalizing-flow-posteriors
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Apply the change-of-variables formula for flows to express the log-density of a transformed variable, incorporate a flow posterior into the ELBO, and implement a simple planar flow."
 prerequisites: ["amortized-vi", "A2/change-of-variables"]
 ---
@@ -135,6 +135,95 @@ print(f"Variance of log q_K: {log_qK.var():.3f}  (0 for uniform, larger = peaked
 The flow transforms the Gaussian base into a distribution with different shape and
 dispersion; the log-density at each transformed sample can be computed exactly,
 making the ELBO gradient tractable.
+
+## Exercises
+
+**Exercise 1.** Derive the planar-flow log-determinant
+$\log|\det J| = \log|1 + u^\top h'(w^\top z + b)\, w|$ from the matrix determinant lemma,
+starting from the map $f(z) = z + u\, h(w^\top z + b)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate $f$ with respect to $z$. The first term gives the identity $I$. For the second, $h(w^\top z + b)$ is a scalar function of $z$, so by the chain rule $\frac{\partial}{\partial z} h(w^\top z + b) = h'(w^\top z + b)\, w^\top$ (a row vector). Multiplying by the constant column $u$,
+
+$$
+J = \frac{\partial f}{\partial z} = I + u\,\big(h'(w^\top z + b)\, w\big)^\top.
+$$
+
+**Step 2.** This is a rank-1 update of the identity, $J = I + u v^\top$ with $v = h'(w^\top z + b)\, w$. The matrix determinant lemma gives $\det(I + u v^\top) = 1 + v^\top u$.
+
+**Step 3.** Substitute $v$ back: $\det J = 1 + (h'(w^\top z + b)\, w)^\top u = 1 + u^\top h'(w^\top z + b)\, w$ (the scalar $h'$ commutes). Taking the log of the absolute value gives $\log|\det J| = \log|1 + u^\top h'(w^\top z + b)\, w|$, which costs $O(d)$ rather than the $O(d^3)$ of a general determinant.
+
+</details>
+
+**Exercise 2.** A single planar flow with $\tanh$ nonlinearity can become
+non-invertible if $u$ is chosen freely. Using $h'(\cdot) = 1 - \tanh^2(\cdot) \in (0, 1]$,
+find the condition on $u^\top w$ that guarantees $\det J > 0$ for all $z$, so the flow
+stays invertible.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** From Exercise 1, $\det J = 1 + u^\top w\, h'(w^\top z + b)$, where the scalar $h'(w^\top z + b) = 1 - \tanh^2(w^\top z + b)$ ranges over $(0, 1]$ as $z$ varies. Write $s = h' \in (0, 1]$ and $\beta = u^\top w$, so $\det J = 1 + \beta s$.
+
+**Step 2.** If $\beta \ge 0$, then $1 + \beta s \ge 1 > 0$ for all $s$, so invertibility is automatic. The binding case is $\beta < 0$, where $\det J$ is smallest at the largest $s = 1$: $\det J = 1 + \beta$.
+
+**Step 3.** Requiring $1 + \beta > 0$ gives $\beta = u^\top w > -1$. So the flow is invertible for all $z$ whenever $u^\top w > -1$; the standard fix when this fails is to reparameterize $u$ so the constraint holds.
+
+</details>
+
+**Exercise 3 (code).** Verify the planar-flow log-determinant formula against a
+numerical Jacobian determinant at a random point, and confirm the matrix determinant
+lemma $\det(I + uv^\top) = 1 + v^\top u$ directly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d = 4
+
+# Matrix determinant lemma, checked against a full determinant
+for _ in range(5):
+    u = rng.normal(0, 1, d)
+    v = rng.normal(0, 1, d)
+    J = np.eye(d) + np.outer(u, v)
+    assert np.isclose(np.linalg.det(J), 1 + v @ u)
+
+# Planar flow: analytic log|det J| vs a central-difference Jacobian
+def tanh(x):  return np.tanh(x)
+def dtanh(x): return 1.0 - np.tanh(x)**2
+
+w = rng.normal(0, 1, d)
+u = rng.normal(0, 0.3, d)
+b = 0.2
+z = rng.normal(0, 1, d)
+
+lin = w @ z + b
+psi = dtanh(lin) * w                       # v = h'(w^T z + b) w
+logdet_analytic = np.log(abs(1 + u @ psi))
+
+def f(zz):
+    return zz + u * tanh(w @ zz + b)
+
+eps = 1e-6
+Jn = np.zeros((d, d))
+for j in range(d):
+    dz = np.zeros(d); dz[j] = eps
+    Jn[:, j] = (f(z + dz) - f(z - dz)) / (2 * eps)
+logdet_numeric = np.log(abs(np.linalg.det(Jn)))
+
+print("analytic:", round(logdet_analytic, 6), " numeric:", round(logdet_numeric, 6))
+assert np.isclose(logdet_analytic, logdet_numeric, atol=1e-4)
+```
+
+The $O(d)$ closed form matches the full $O(d^3)$ determinant to numerical precision,
+confirming the rank-1 structure the planar flow exploits.
+
+</details>
 
 The next subsection covers sampling methods that explore the posterior by simulation
 rather than optimization, starting with the foundational rejection and importance sampling.

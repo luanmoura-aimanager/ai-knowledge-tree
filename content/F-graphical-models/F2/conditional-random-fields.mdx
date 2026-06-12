@@ -4,7 +4,7 @@ pillar: F
 subId: F2
 lessonId: conditional-random-fields
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Formulate a linear-chain CRF as a discriminative log-linear model over sequences, derive the partition function, and contrast CRFs with generative HMMs."
 prerequisites: ["markov-random-fields"]
 ---
@@ -133,6 +133,123 @@ print(f"log Z (forward):     {log_Z_forward:.4f}")
 ```
 
 Both methods agree on $\log Z$; the forward algorithm achieves this in $O(T \cdot |\mathcal{Y}|^2)$ rather than $O(|\mathcal{Y}|^T)$.
+
+## Exercises
+
+**Exercise 1.** A linear-chain CRF over $T = 2$ positions with binary labels has
+log-potentials $\psi(y_1, y_2)$ for the only pair, given by the matrix
+$\psi = \begin{pmatrix} 1 & 0 \\ 0 & 2 \end{pmatrix}$ where rows index $y_1$ and
+columns index $y_2$ (no separate START or emission terms). Compute $Z$ and
+$P(\mathbf{y} = (1, 1))$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The unnormalized score of a label pair is $\exp(\psi(y_1, y_2))$. Enumerate
+the four pairs:
+
+$$
+(0,0): e^{1}, \quad (0,1): e^{0}, \quad (1,0): e^{0}, \quad (1,1): e^{2}.
+$$
+
+**Step 2.** Sum for the partition function:
+
+$$
+Z = e^{1} + 1 + 1 + e^{2} = 2.7183 + 2 + 7.3891 = 12.1074.
+$$
+
+**Step 3.** Normalize the $(1,1)$ score:
+
+$$
+P((1,1)) = \frac{e^{2}}{Z} = \frac{7.3891}{12.1074} = 0.6103.
+$$
+
+The strong $\psi(1,1) = 2$ potential makes the all-ones labeling the most probable
+sequence, at about $0.61$.
+
+</details>
+
+**Exercise 2.** Explain, using the definitions in this lesson, why an HMM must model
+$P(\mathbf{x})$ while a linear-chain CRF does not, and name one practical capability this
+buys the CRF.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** An HMM is generative: it defines the joint $P(\mathbf{x}, \mathbf{y}) =
+\prod_t P(y_t \mid y_{t-1}) P(x_t \mid y_t)$. The emission factors $P(x_t \mid y_t)$ are
+distributions over the observation, so the model commits to a full generative story for
+$\mathbf{x}$, and computing $P(\mathbf{y} \mid \mathbf{x})$ requires that the input
+likelihood be normalized as part of the joint.
+
+**Step 2.** A CRF is discriminative: it defines $P(\mathbf{y} \mid \mathbf{x})$ directly,
+with $\mathbf{x}$ a fixed conditioning argument inside the feature vector
+$\mathbf{f}(y_{t-1}, y_t, \mathbf{x}, t)$. The normalizer $Z(\mathbf{x})$ sums only over
+label sequences $\mathbf{y}'$, never over inputs, so no distribution over $\mathbf{x}$ is
+ever defined or estimated.
+
+**Step 3.** Because the features may read any part of $\mathbf{x}$ without a generative
+penalty, the CRF can use arbitrary, overlapping, long-range input features (prefixes,
+gazetteers, the next word, capitalization) that would force an intractable input model in
+an HMM. This is the main practical advantage in NLP tasks such as named-entity recognition.
+
+</details>
+
+**Exercise 3 (code).** For the toy CRF in the lesson, add Viterbi decoding: replace the
+$\log\sum\exp$ recursion with a $\max$ recursion plus back-pointers, and verify the
+recovered MAP sequence has the highest score among all $2^T$ brute-force sequences.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(11)
+T, n_labels = 4, 2
+w = rng.normal(0, 1, 6)
+x = rng.normal(0, 1, T)
+
+def log_potential(y_prev, y_curr, x_t):
+    feat = np.zeros(6)
+    feat[y_curr] = x_t
+    feat[2 + y_prev * 2 + y_curr] = 1.0
+    return w @ feat
+
+# Brute-force best sequence
+best_seq, best_score = None, -np.inf
+for seq_int in range(2**T):
+    seq = [(seq_int >> t) & 1 for t in range(T)]
+    s = sum(log_potential(seq[t-1] if t > 0 else 0, seq[t], x[t]) for t in range(T))
+    if s > best_score:
+        best_score, best_seq = s, seq
+
+# Viterbi
+delta = np.array([log_potential(0, y, x[0]) for y in range(n_labels)])
+back = []
+for t in range(1, T):
+    scores = np.array([[delta[yp] + log_potential(yp, y, x[t])
+                        for yp in range(n_labels)] for y in range(n_labels)])
+    back.append(scores.argmax(axis=1))
+    delta = scores.max(axis=1)
+
+y_T = int(delta.argmax())
+viterbi_seq = [y_T]
+for bp in reversed(back):
+    y_T = int(bp[y_T])
+    viterbi_seq.append(y_T)
+viterbi_seq.reverse()
+
+assert viterbi_seq == best_seq
+assert np.isclose(delta.max(), best_score)
+print(f"Viterbi sequence: {viterbi_seq}, score {best_score:.4f}")
+```
+
+Viterbi recovers the identical sequence and score as the exhaustive search, since the
+$\max$ recursion factors over the chain exactly as the $\log\sum\exp$ recursion did for
+the partition function.
+
+</details>
 
 The next lesson generalizes the message-passing view of these algorithms to factor graphs.
 

@@ -4,7 +4,7 @@ pillar: F
 subId: F5
 lessonId: amortized-vi
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Replace per-datapoint variational parameters with a shared encoder network, derive the amortized ELBO objective, and identify the trade-off between flexibility and amortization gap."
 prerequisites: ["stochastic-vi"]
 ---
@@ -115,6 +115,88 @@ print(f"Learned encoder sigma: {np.exp(log_c):.3f} (true {(0.2**0.5):.3f})")
 The encoder converges toward the true posterior slope ($4/5 = 0.8$) by maximizing
 the ELBO, demonstrating that amortized VI can learn the posterior structure from data
 without ever running per-datapoint optimization.
+
+## Exercises
+
+**Exercise 1.** The toy model in the implementation is $z \sim \mathcal{N}(0, 1)$ and
+$x \mid z \sim \mathcal{N}(z, \sigma^2)$ with $\sigma^2 = 0.25$. Derive the exact
+posterior $p(z \mid x)$, and read off the slope of its mean in $x$ and its variance.
+Confirm the slope equals the target $0.8$ used in the code.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Both prior and likelihood are Gaussian in $z$, so the posterior is Gaussian and combines precisions additively. The prior contributes precision $1$ (variance $1$); the likelihood $\mathcal{N}(x; z, \sigma^2)$ contributes precision $1/\sigma^2 = 1/0.25 = 4$. The posterior precision is $1 + 4 = 5$, so the posterior variance is $1/5 = 0.2$.
+
+**Step 2.** The posterior mean is the precision-weighted average of the prior mean ($0$) and the likelihood's estimate of $z$ (which is $x$):
+
+$$
+\mathbb{E}[z \mid x] = \frac{0 \cdot 1 + x \cdot (1/\sigma^2)}{1 + 1/\sigma^2}
+= \frac{1/0.25}{5}\, x = \frac{4}{5}\, x = 0.8\, x.
+$$
+
+**Step 3.** The slope of the posterior mean in $x$ is $0.8$ and the posterior standard deviation is $\sqrt{0.2} \approx 0.447$, the targets the encoder converges to. A linear encoder $\mu_\phi(x) = a x + b$ with constant log-variance is rich enough to represent this exact posterior, so the amortization gap here is zero.
+
+</details>
+
+**Exercise 2.** The amortization gap inequality states
+$\sum_n \mathrm{KL}(q^*_n \| p(z \mid x_n)) \le \sum_n \mathrm{KL}(q_\phi(\cdot \mid x_n) \| p(z \mid x_n))$.
+Explain why the direction of this inequality holds, and state the one condition on the
+encoder family under which it becomes an equality.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For each $n$, $q^*_n$ is defined as the minimizer of $\mathrm{KL}(q \| p(z \mid x_n))$ over the chosen variational family for that single datapoint, with its own free parameters. By definition of a minimizer, no other member of the family achieves a smaller KL for datapoint $n$.
+
+**Step 2.** The amortized $q_\phi(\cdot \mid x_n)$ is one specific member of that family (the one the shared encoder outputs for input $x_n$), constrained to be produced by a single function $\phi$ across all $n$. Being a particular choice rather than the per-datapoint minimizer, it satisfies $\mathrm{KL}(q^*_n \| \cdot) \le \mathrm{KL}(q_\phi(\cdot \mid x_n) \| \cdot)$ termwise. Summing over $n$ gives the stated inequality.
+
+**Step 3.** Equality holds when the encoder is flexible enough that, for every $n$, its output $q_\phi(\cdot \mid x_n)$ coincides with the per-datapoint optimum $q^*_n$. That requires sufficient encoder capacity to realize the mapping $x_n \mapsto q^*_n$ exactly; then the amortization gap vanishes.
+
+</details>
+
+**Exercise 3 (code).** Reproduce the encoder fit by gradient ascent on the amortized
+ELBO for the toy model, and assert the learned slope converges to the posterior slope
+$0.8$ derived in Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+N = 400
+s2 = 0.25                                  # likelihood variance
+z_true = rng.normal(0, 1, N)
+x = z_true + rng.normal(0, np.sqrt(s2), N)
+
+a, log_c = 0.0, 0.0                        # encoder: mu = a*x, log sigma = log_c
+lr = 0.05
+
+def elbo(a_, log_c_):
+    mu_  = a_ * x
+    sig_ = np.exp(log_c_)
+    recon = -0.5 / s2 * ((x - mu_)**2 + sig_**2)     # E[log p(x|z)] up to const
+    kl    = 0.5 * (mu_**2 + sig_**2 - 1 - 2 * log_c_) # KL(q || N(0,1))
+    return (recon - kl).mean()
+
+h = 1e-4
+for _ in range(2000):
+    ga = (elbo(a + h, log_c) - elbo(a - h, log_c)) / (2 * h)
+    gc = (elbo(a, log_c + h) - elbo(a, log_c - h)) / (2 * h)
+    a     += lr * ga
+    log_c += lr * gc
+
+print(f"learned slope a: {a:.3f} (target 0.800)")
+print(f"learned sigma:   {np.exp(log_c):.3f} (target {np.sqrt(0.2):.3f})")
+assert abs(a - 0.8) < 0.05
+```
+
+The encoder slope climbs to $0.8$ and its standard deviation to $\sqrt{0.2} \approx 0.447$,
+matching the exact posterior from Exercise 1 with no per-datapoint optimization.
+
+</details>
 
 The next lesson replaces the Gaussian encoder with a normalizing flow to represent
 more expressive posterior families.

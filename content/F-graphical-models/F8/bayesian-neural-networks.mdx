@@ -4,7 +4,7 @@ pillar: F
 subId: F8
 lessonId: bayesian-neural-networks
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Place a prior over network weights, derive the Laplace approximation to the posterior, and formulate the mean-field variational objective for BNNs."
 prerequisites: ["mc-dropout-ensembles", "F5/mean-field-vi"]
 ---
@@ -155,6 +155,105 @@ print(f"Std  (in / far): {preds_cal.std(axis=1).round(3)}  (far is ~6x wider)")
 The Laplace posterior gives calibrated predictive uncertainty for points near the
 decision boundary; the posterior covariance reflects both data noise and limited
 sample size.
+
+## Exercises
+
+**Exercise 1.** Derive the Laplace approximation by second-order Taylor-expanding the
+log-posterior $\log p(\theta \mid \mathcal{D})$ around the MAP estimate $\theta^*$, and
+show why the linear term vanishes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $g(\theta) = \log p(\theta \mid \mathcal{D})$. Expand to second order
+about $\theta^*$:
+
+$$
+g(\theta) \approx g(\theta^*) + \nabla g(\theta^*)^\top (\theta - \theta^*)
++ \tfrac12 (\theta - \theta^*)^\top \nabla^2 g(\theta^*) (\theta - \theta^*).
+$$
+
+**Step 2.** $\theta^*$ is the MAP, a maximizer of $g$, so its gradient is zero:
+$\nabla g(\theta^*) = 0$. The linear term drops, leaving a pure quadratic in
+$\theta - \theta^*$.
+
+**Step 3.** Write $H = -\nabla^2 g(\theta^*)$ (the negative Hessian, positive definite at
+a maximum). Then $g(\theta) \approx g(\theta^*) - \tfrac12 (\theta - \theta^*)^\top H (\theta - \theta^*)$.
+Exponentiating, $p(\theta \mid \mathcal{D}) \propto \exp(-\tfrac12 (\theta - \theta^*)^\top H (\theta - \theta^*))$,
+which is the unnormalized density of $\mathcal{N}(\theta^*, H^{-1})$. The approximation
+is exact when $g$ is itself quadratic, i.e. for a Gaussian prior with a Gaussian
+likelihood.
+
+</details>
+
+**Exercise 2.** A scalar parameter $\theta$ has prior $\mathcal{N}(0, 1/\lambda_0)$ and a
+Gaussian likelihood $y_n = \theta + \varepsilon_n$ with $\varepsilon_n \sim \mathcal{N}(0, 1/\tau)$
+over $N$ observations. Compute the Laplace precision (Hessian of the negative
+log-posterior) and explain why Laplace is exact here.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The negative log-posterior, up to a constant, is
+$\tfrac12 \lambda_0 \theta^2 + \tfrac12 \tau \sum_n (y_n - \theta)^2$.
+
+**Step 2.** Differentiate twice with respect to $\theta$. The first derivative is
+$\lambda_0 \theta - \tau \sum_n (y_n - \theta)$; the second derivative is
+
+$$
+H = \lambda_0 + N\tau,
+$$
+
+a constant independent of $\theta$. The Laplace covariance is $1/H = 1/(\lambda_0 + N\tau)$.
+
+**Step 3.** Because the Hessian is constant, the negative log-posterior is exactly
+quadratic, so the second-order Taylor expansion has no truncation error and the Gaussian
+fit is the true posterior. More data ($N$ larger) raises the precision linearly and
+shrinks the posterior variance, the limited-sample effect the lesson describes.
+
+</details>
+
+**Exercise 3 (code).** For the conjugate Gaussian model of Exercise 2, find the MAP by
+gradient descent, form the Laplace covariance from the Hessian, and verify both match the
+analytic conjugate posterior mean and variance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(11)
+lam0, tau, N = 1.0, 2.0, 50
+theta_true = 1.5
+y = theta_true + rng.normal(0, 1 / np.sqrt(tau), N)
+
+# Analytic conjugate posterior
+post_prec = lam0 + N * tau
+post_mean = tau * y.sum() / post_prec
+post_var  = 1.0 / post_prec
+
+# MAP by gradient descent on the negative log-posterior
+theta, lr = 0.0, 1e-3
+for _ in range(2000):
+    grad = lam0 * theta - tau * (y - theta).sum()
+    theta -= lr * grad
+
+# Laplace covariance from the (constant) Hessian
+H = lam0 + N * tau
+laplace_var = 1.0 / H
+
+assert np.isclose(theta, post_mean, atol=1e-3)
+assert np.isclose(laplace_var, post_var)
+print("MAP:", round(theta, 4), " posterior mean:", round(post_mean, 4))
+print("Laplace var:", round(laplace_var, 6), " posterior var:", round(post_var, 6))
+```
+
+The MAP equals the conjugate posterior mean and the Laplace variance equals the posterior
+variance to machine precision, confirming that Laplace is exact when the log-posterior is
+quadratic.
+
+</details>
 
 The next lesson covers conformal prediction, a distribution-free approach to
 uncertainty that provides guaranteed coverage without any model of the weights.

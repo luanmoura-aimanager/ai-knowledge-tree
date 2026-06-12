@@ -4,7 +4,7 @@ pillar: F
 subId: F7
 lessonId: probabilistic-pca
 order: 3
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Derive the maximum-likelihood solution for the PPCA loading matrix showing it recovers the top principal components, formulate the EM update, and explain how factor analysis generalizes PPCA with heteroscedastic noise."
 prerequisites: ["em-algorithm", "A1/low-rank-pca"]
 ---
@@ -165,6 +165,98 @@ print(f"Sigma2 MLE: {sigma2_mle:.4f}, EM: {sigma2:.4f}, True: {sigma2_true}")
 
 Both MLE and EM recover the same two-dimensional subspace (canonical cosines near 1),
 and both correctly estimate the noise variance.
+
+## Exercises
+
+**Exercise 1.** A PPCA model has $D = 5$, $q = 1$, and sample-covariance eigenvalues
+$\lambda = (8, 1, 1, 1, 1)$. Compute $\sigma^2_\text{MLE}$ and the loading scale
+$\sqrt{\lambda_1 - \sigma^2_\text{MLE}}$, and compare the loading scale to what plain
+PCA would use.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The MLE noise variance averages the $D - q = 4$ discarded eigenvalues:
+
+$$
+\sigma^2_\text{MLE} = \frac{1}{D - q} \sum_{j=q+1}^{D} \lambda_j
+= \frac{1}{4}(1 + 1 + 1 + 1) = 1.
+$$
+
+**Step 2.** The single retained column of $W$ is scaled by $\sqrt{\lambda_1 - \sigma^2_\text{MLE}}$:
+
+$$
+\sqrt{8 - 1} = \sqrt{7} = 2.6458.
+$$
+
+**Step 3.** Plain PCA scales the same direction by $\sqrt{\lambda_1} = \sqrt{8} = 2.8284$.
+PPCA shrinks the loading by the factor $\sqrt{7}/\sqrt{8} = 0.9354$, attributing one
+unit of the observed variance along the top axis to isotropic noise rather than signal.
+As $\sigma^2 \to 0$ the noise floor vanishes and the two scales coincide.
+
+</details>
+
+**Exercise 2.** Starting from the generative model $z \sim \mathcal{N}(0, I_q)$ and
+$x \mid z \sim \mathcal{N}(Wz + \mu, \sigma^2 I_D)$, derive the marginal covariance of
+$x$, showing it equals $WW^\top + \sigma^2 I_D$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $x = Wz + \mu + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_D)$
+independent of $z$. The mean is $\mathbb{E}[x] = W\,\mathbb{E}[z] + \mu + \mathbb{E}[\varepsilon] = \mu$,
+since $z$ and $\varepsilon$ are zero-mean.
+
+**Step 2.** The covariance is $\mathbb{E}[(x - \mu)(x - \mu)^\top]$ with
+$x - \mu = Wz + \varepsilon$. Expanding,
+
+$$
+(x - \mu)(x - \mu)^\top = Wzz^\top W^\top + Wz\varepsilon^\top + \varepsilon z^\top W^\top + \varepsilon\varepsilon^\top.
+$$
+
+**Step 3.** Take expectations. The two cross terms vanish because $z$ and $\varepsilon$
+are independent and zero-mean, so $\mathbb{E}[z\varepsilon^\top] = 0$. The remaining
+terms use $\mathbb{E}[zz^\top] = I_q$ and $\mathbb{E}[\varepsilon\varepsilon^\top] = \sigma^2 I_D$:
+
+$$
+\mathrm{Cov}(x) = W\,\mathbb{E}[zz^\top]\,W^\top + \mathbb{E}[\varepsilon\varepsilon^\top]
+= WW^\top + \sigma^2 I_D.
+$$
+
+A low-rank signal term $WW^\top$ (rank $q$) plus an isotropic floor $\sigma^2 I_D$ is
+the structural signature PPCA fits.
+
+</details>
+
+**Exercise 3 (code).** Sample from the PPCA generative model and verify empirically
+that the marginal covariance of $x$ matches $WW^\top + \sigma^2 I_D$ within Monte Carlo
+tolerance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+D, q, N = 5, 2, 200_000
+W  = rng.normal(0, 1, (D, q))
+s2 = 0.4
+
+z = rng.normal(0, 1, (N, q))                       # latent codes
+x = z @ W.T + rng.normal(0, np.sqrt(s2), (N, D))   # observations
+
+S_emp   = np.cov(x.T, bias=True)                   # empirical covariance
+S_model = W @ W.T + s2 * np.eye(D)                 # marginal covariance
+
+assert np.abs(S_emp - S_model).max() < 0.05
+print("max abs deviation:", round(np.abs(S_emp - S_model).max(), 4))
+```
+
+The empirical covariance of the sampled observations converges to the low-rank-plus-isotropic
+form $WW^\top + \sigma^2 I_D$, confirming the marginal derived in Exercise 2.
+
+</details>
 
 The next subsection covers modern Bayesian deep learning, starting with the VAE
 as the deep generative extension of PPCA.

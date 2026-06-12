@@ -4,7 +4,7 @@ pillar: F
 subId: F5
 lessonId: stochastic-vi
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the mini-batch ELBO estimator, apply the reparameterization trick to obtain low-variance gradient estimates, and contrast it with the score-function estimator."
 prerequisites: ["mean-field-vi"]
 ---
@@ -133,6 +133,81 @@ print(f"Fitted sigma: {np.exp(log_sigma):.3f} (target {target_sigma})")
 
 The reparameterized gradient converges toward the target parameters because it provides
 low-variance, unbiased gradient estimates through the stochastic node.
+
+## Exercises
+
+**Exercise 1.** Show that the mini-batch ELBO $\mathcal{L}_\mathcal{B}$ is an unbiased
+estimator of the full ELBO $\mathcal{L}$, where $\mathcal{B}$ is a uniform random subset
+of $M$ of the $N$ likelihood terms, rescaled by $N/M$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the per-datapoint likelihood contributions as $g_n = \mathbb{E}_{q(z_n)}[\log P(x_n \mid z_n, \theta)] - \mathrm{KL}(q(z_n) \| P(z_n))$, so the data-dependent part of $\mathcal{L}$ is $\sum_{n=1}^{N} g_n$. The mini-batch version is $\frac{N}{M}\sum_{n \in \mathcal{B}} g_n$.
+
+**Step 2.** For a uniform subset of size $M$ drawn without replacement, each index $n$ is included with probability $M/N$. Let $\mathbb{1}_n$ indicate $n \in \mathcal{B}$, so $\mathbb{E}[\mathbb{1}_n] = M/N$. Then
+
+$$
+\mathbb{E}\!\left[\frac{N}{M}\sum_{n \in \mathcal{B}} g_n\right]
+= \frac{N}{M}\sum_{n=1}^{N} \mathbb{E}[\mathbb{1}_n]\, g_n
+= \frac{N}{M}\sum_{n=1}^{N} \frac{M}{N}\, g_n
+= \sum_{n=1}^{N} g_n.
+$$
+
+**Step 3.** The $\mathrm{KL}(q(\theta) \| P(\theta))$ term carries no $n$ index and appears in both, so adding it back leaves $\mathbb{E}[\mathcal{L}_\mathcal{B}] = \mathcal{L}$. The estimator is unbiased; the $N/M$ factor corrects the subsampling.
+
+</details>
+
+**Exercise 2.** For $q_\phi = \mathcal{N}(\mu, 1)$ and $f(z) = z^2$, compute the
+per-sample variance of both gradient estimators of $\nabla_\mu \mathbb{E}_q[z^2]$ at
+$\mu = 1$: the pathwise estimate $2z$ and the score-function estimate $z^2(z - \mu)$.
+Confirm both are unbiased with mean $2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $z = \mu + \epsilon$ with $\epsilon \sim \mathcal{N}(0,1)$, so at $\mu = 1$ the moments of $z$ are $\mathbb{E}[z] = 1$, $\mathbb{E}[z^2] = 2$, $\mathbb{E}[z^3] = 4$, $\mathbb{E}[z^4] = 10$ (central moments of a unit Gaussian shifted to mean $1$).
+
+**Step 2.** Pathwise estimator $2z$: mean $\mathbb{E}[2z] = 2$, and $\mathrm{Var}(2z) = 4\,\mathrm{Var}(z) = 4 \cdot 1 = 4$.
+
+**Step 3.** Score-function estimator $z^2(z - \mu) = z^2\epsilon$: its mean is $\mathbb{E}[z^2\epsilon]$. Expanding $z^2 = (1+\epsilon)^2 = 1 + 2\epsilon + \epsilon^2$ gives $z^2\epsilon = \epsilon + 2\epsilon^2 + \epsilon^3$, whose expectation is $0 + 2 \cdot 1 + 0 = 2$. For the variance, expand $(\epsilon + 2\epsilon^2 + \epsilon^3)^2 = \epsilon^2 + 4\epsilon^3 + (4{+}2)\epsilon^4 + 4\epsilon^5 + \epsilon^6$, where the $\epsilon^4$ term collects $b^2 = 4\epsilon^4$ and the cross term $2ac = 2\epsilon^4$. Using $\mathbb{E}[\epsilon^2]=1, \mathbb{E}[\epsilon^4]=3, \mathbb{E}[\epsilon^6]=15$ and dropping the odd moments, $\mathbb{E}[(z^2\epsilon)^2] = 1 + 6 \cdot 3 + 15 = 34$, so $\mathrm{Var}(z^2\epsilon) = 34 - 2^2 = 30$.
+
+**Step 4.** Both estimators average to $2$, but the score-function variance $30$ is $7.5\times$ the pathwise variance $4$. The pathwise gradient is the lower-noise choice whenever $q_\phi$ is reparameterizable.
+
+</details>
+
+**Exercise 3 (code).** Verify both estimators of $\nabla_\mu \mathbb{E}_q[z^2]$ at
+$\mu = 1$ have mean $2$, and that the score-function variance ($30$) is about $7.5\times$
+the pathwise variance ($4$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+mu = 1.0
+S = 2_000_000
+eps = rng.normal(0, 1, S)
+z = mu + eps
+
+pathwise = 2 * z                 # d/dmu f(g(eps)) = 2z, since dz/dmu = 1
+score    = z**2 * (z - mu)       # f(z) * d/dmu log q(z), with d log q/dmu = z - mu
+
+print("pathwise mean:", round(pathwise.mean(), 3), "var:", round(pathwise.var(), 3))
+print("score    mean:", round(score.mean(), 3), "var:", round(score.var(), 3))
+print("variance ratio:", round(score.var() / pathwise.var(), 2))
+
+assert abs(pathwise.mean() - 2.0) < 0.01 and abs(score.mean() - 2.0) < 0.02
+assert abs(pathwise.var() - 4.0) < 0.05      # Var(2z) = 4
+assert abs(score.var() - 30.0) < 0.3         # Var(z^2 eps) = 30
+```
+
+Both estimators center on $2$; the score-function variance lands near $30$ against the
+pathwise $4$, the $7.5\times$ gap from Exercise 2.
+
+</details>
 
 The next lesson replaces the per-datapoint variational parameters with a shared encoder
 network, which is the amortized VI strategy behind VAEs.

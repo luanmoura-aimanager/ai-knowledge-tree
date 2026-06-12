@@ -4,7 +4,7 @@ pillar: F
 subId: F5
 lessonId: mean-field-vi
 order: 1
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Derive the evidence lower bound (ELBO) via Jensen's inequality, write the mean-field factorization, and derive the coordinate ascent VI (CAVI) update for each factor."
 prerequisites: ["F1/bayesian-networks", "B2/prior-likelihood-posterior", "A2/kl-cross-entropy"]
 ---
@@ -155,6 +155,87 @@ For the Gaussian model, the mean-field update is exact because the true posterio
 already factorizes as a single Gaussian.
 The approximation bites in models where the posterior has correlations between latent
 groups, which the factorized family cannot represent.
+
+## Exercises
+
+**Exercise 1.** Starting from the identity
+$\log P(\mathbf{X}) = \mathcal{L}(q) + \mathrm{KL}(q \| P(\cdot \mid \mathbf{X}))$,
+explain in two steps why maximizing the ELBO over $q$ minimizes the KL divergence to
+the true posterior, and why the ELBO can never exceed $\log P(\mathbf{X})$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The left side $\log P(\mathbf{X})$ does not depend on $q$: it is a fixed
+property of the data and model. The right side splits into $\mathcal{L}(q)$ plus
+$\mathrm{KL}(q \| P(\cdot \mid \mathbf{X}))$, and that sum is pinned to the constant
+$\log P(\mathbf{X})$. Raising one summand must lower the other by the same amount, so
+maximizing $\mathcal{L}(q)$ minimizes $\mathrm{KL}(q \| P(\cdot \mid \mathbf{X}))$.
+
+**Step 2.** KL divergence is nonnegative, $\mathrm{KL}(q \| P(\cdot \mid \mathbf{X})) \ge 0$,
+with equality only when $q = P(\cdot \mid \mathbf{X})$. Subtracting a nonnegative
+quantity from $\log P(\mathbf{X})$ gives $\mathcal{L}(q) \le \log P(\mathbf{X})$, so the
+bound is tight exactly when $q$ equals the true posterior.
+
+</details>
+
+**Exercise 2.** Take a true posterior $P = \mathcal{N}(0, \Sigma)$ with unit marginal
+variances and correlation $\rho$, so $\Sigma = \begin{pmatrix} 1 & \rho \\ \rho & 1 \end{pmatrix}$.
+Mean-field minimization of $\mathrm{KL}(q \| P)$ over factorized Gaussians sets each
+$q_j$ variance to $1/\Lambda_{jj}$, where $\Lambda = \Sigma^{-1}$ is the precision
+matrix. Compute the optimal mean-field marginal variance as a function of $\rho$, and
+evaluate it at $\rho = 0.9$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Invert the $2 \times 2$ covariance. With determinant $1 - \rho^2$,
+
+$$
+\Lambda = \Sigma^{-1} = \frac{1}{1 - \rho^2}\begin{pmatrix} 1 & -\rho \\ -\rho & 1 \end{pmatrix},
+\qquad \Lambda_{11} = \Lambda_{22} = \frac{1}{1 - \rho^2}.
+$$
+
+**Step 2.** The mean-field variance is the reciprocal of the diagonal precision:
+
+$$
+\mathrm{Var}_{\text{MF}} = \frac{1}{\Lambda_{jj}} = 1 - \rho^2.
+$$
+
+**Step 3.** At $\rho = 0.9$, this is $1 - 0.81 = 0.19$, against the true marginal
+variance of $1$. The factorized fit underestimates the spread, the overconfidence
+named in the lesson, and the gap grows with $\rho^2$.
+
+</details>
+
+**Exercise 3 (code).** Verify the closed form $\mathrm{Var}_{\text{MF}} = 1 - \rho^2$
+numerically by inverting the covariance matrix and reading off the diagonal precision,
+for several values of $\rho$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def mean_field_var(rho):
+    Sigma = np.array([[1.0, rho], [rho, 1.0]])
+    Lambda = np.linalg.inv(Sigma)        # precision matrix
+    return 1.0 / np.diag(Lambda)          # optimal mean-field variances
+
+for rho in [0.0, 0.5, 0.9]:
+    mf = mean_field_var(rho)
+    closed = 1.0 - rho**2
+    assert np.allclose(mf, closed)        # both diagonal entries match 1 - rho^2
+    print(f"rho={rho}: mean-field var={mf[0]:.4f}, 1-rho^2={closed:.4f}")
+
+assert np.isclose(mean_field_var(0.9)[0], 0.19)
+```
+
+The diagonal-precision variance equals $1 - \rho^2$ at every correlation, dropping to
+$0.19$ at $\rho = 0.9$, matching Exercise 2.
+
+</details>
 
 The next lesson scales VI to large datasets with stochastic gradient updates.
 

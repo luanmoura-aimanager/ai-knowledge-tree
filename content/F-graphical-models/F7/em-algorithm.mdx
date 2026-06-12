@@ -4,7 +4,7 @@ pillar: F
 subId: F7
 lessonId: em-algorithm
 order: 1
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Derive the E-step and M-step from the ELBO lower bound on the marginal log-likelihood, prove the monotone increase property, and apply EM to a Gaussian mixture model."
 prerequisites: ["F5/mean-field-vi", "A2/mle"]
 ---
@@ -144,6 +144,120 @@ print(f"True means:    {np.sort(true_mu[:, 0]).round(3)}")
 
 The log-likelihood increases monotonically across iterations, confirming the theoretical
 guarantee.
+
+## Exercises
+
+**Exercise 1.** A two-component GMM has equal weights $\pi = (0.5, 0.5)$, means
+$\mu = (0, 2)$, and unit variances $\sigma_1 = \sigma_2 = 1$. Compute the E-step
+responsibilities $r_{n1}, r_{n2}$ for the point $x_n = 1.5$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The responsibility is the posterior $r_{nk} \propto \pi_k \mathcal{N}(x_n; \mu_k, \sigma_k^2)$.
+With equal weights and equal variances the $\pi_k$ and the normalizing constant
+$1/(\sigma\sqrt{2\pi})$ cancel in the ratio, leaving only the exponentials.
+
+**Step 2.** Evaluate the squared distances at $x_n = 1.5$:
+$(1.5 - 0)^2 = 2.25$ and $(1.5 - 2)^2 = 0.25$. The unnormalized weights are
+$e^{-2.25/2}$ and $e^{-0.25/2}$, so
+
+$$
+r_{n2} = \frac{e^{-0.125}}{e^{-1.125} + e^{-0.125}}
+       = \frac{1}{1 + e^{-1.125 + 0.125}}
+       = \frac{1}{1 + e^{-1}} = 0.7311.
+$$
+
+**Step 3.** The other responsibility is the complement, $r_{n1} = 1 - 0.7311 = 0.2689$.
+
+The point sits closer to the second mean, so it is claimed mostly (but not entirely)
+by component 2. With two equal-variance Gaussians the responsibility reduces to a
+logistic of the squared-distance gap, which is why the answer is $\sigma(1)$.
+
+</details>
+
+**Exercise 2.** Derive the M-step update for a component mean $\mu_k$ by maximizing
+the expected complete-data log-likelihood $Q$, holding the responsibilities fixed.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With responsibilities $r_{nk}$ fixed, the part of $Q$ that depends on
+$\mu_k$ comes from the Gaussian log-density $\log \mathcal{N}(x_n; \mu_k, \Sigma_k)$,
+weighted by $r_{nk}$:
+
+$$
+Q(\mu_k) = -\frac{1}{2} \sum_n r_{nk} (x_n - \mu_k)^\top \Sigma_k^{-1} (x_n - \mu_k) + \text{const}.
+$$
+
+**Step 2.** Differentiate with respect to $\mu_k$ and set to zero. The gradient of
+the quadratic is $\Sigma_k^{-1}(x_n - \mu_k)$, so
+
+$$
+\nabla_{\mu_k} Q = \sum_n r_{nk}\, \Sigma_k^{-1} (x_n - \mu_k) = 0.
+$$
+
+**Step 3.** $\Sigma_k^{-1}$ is invertible, so the bracket must vanish:
+$\sum_n r_{nk}(x_n - \mu_k) = 0$. Solving for $\mu_k$ gives the responsibility-weighted
+mean,
+
+$$
+\mu_k^{\text{new}} = \frac{\sum_n r_{nk} x_n}{\sum_n r_{nk}} = \frac{\sum_n r_{nk} x_n}{N_k},
+$$
+
+with effective count $N_k = \sum_n r_{nk}$. This is the soft analogue of the $k$-means
+centroid update: a hard assignment ($r_{nk} \in \{0, 1\}$) recovers the ordinary mean
+of each cluster.
+
+</details>
+
+**Exercise 3 (code).** Run EM on a two-component 1D mixture and verify numerically
+that the data log-likelihood is non-decreasing at every iteration (the monotone
+increase property), within floating-point tolerance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def norm_pdf(x, mu, sigma):
+    return np.exp(-0.5 * ((x - mu) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
+
+K, N = 2, 200
+x = np.concatenate([rng.normal(-2, 1, N // 2), rng.normal(2, 1, N // 2)])
+
+pi  = np.ones(K) / K
+mu  = np.array([-0.5, 0.5])
+sig = np.ones(K)
+
+def log_lik(x, pi, mu, sig):
+    L = np.array([pi[k] * norm_pdf(x, mu[k], sig[k]) for k in range(K)])
+    return np.log(L.sum(axis=0)).sum()
+
+lls = []
+for _ in range(50):
+    r = np.array([pi[k] * norm_pdf(x, mu[k], sig[k]) for k in range(K)]).T
+    r /= r.sum(axis=1, keepdims=True)             # E-step
+    Nk = r.sum(axis=0)                            # M-step
+    pi = Nk / N
+    for k in range(K):
+        mu[k]  = (r[:, k] * x).sum() / Nk[k]
+        sig[k] = np.sqrt((r[:, k] * (x - mu[k])**2).sum() / Nk[k])
+    lls.append(log_lik(x, pi, mu, sig))
+
+lls = np.array(lls)
+assert np.all(np.diff(lls) >= -1e-9)              # never decreases
+print("log-lik first three:", lls[:3].round(3))
+print("log-lik final:      ", round(lls[-1], 3))
+```
+
+The differences between consecutive log-likelihoods are all nonnegative, matching
+the proof: the E-step makes the ELBO tight, and the M-step can only raise it.
+
+</details>
 
 The next lesson applies EM to LDA, a latent variable model for discrete text data.
 

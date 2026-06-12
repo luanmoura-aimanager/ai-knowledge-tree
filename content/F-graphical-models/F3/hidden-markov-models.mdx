@@ -4,7 +4,7 @@ pillar: F
 subId: F3
 lessonId: hidden-markov-models
 order: 1
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Derive the forward-backward algorithm for marginal state posteriors and the Viterbi algorithm for the MAP sequence in an HMM."
 prerequisites: ["F1/bayesian-networks", "A2/bayes-rule"]
 ---
@@ -162,6 +162,124 @@ print(f"Viterbi states: {z_viterbi}")
 ```
 
 Viterbi is often more interpretable than the marginal posteriors: it gives a single consistent sequence rather than per-step mode estimates, which can be inconsistent across time steps.
+
+## Exercises
+
+**Exercise 1.** A two-state HMM has $\pi = (0.6, 0.4)$, transition
+$A = \begin{pmatrix} 0.7 & 0.3 \\ 0.4 & 0.6 \end{pmatrix}$, and discrete emissions
+with $P(X = a \mid Z = 1) = 0.9$, $P(X = a \mid Z = 2) = 0.2$. The first observation
+is $X_1 = a$. Compute the forward variables $\alpha_1(1)$ and $\alpha_1(2)$ by hand,
+then run one recursion step to get $\alpha_2(1)$ and $\alpha_2(2)$ assuming
+$X_2 = a$ as well.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Initialization is $\alpha_1(k) = \pi_k \cdot P(X_1 = a \mid Z_1 = k)$:
+
+$$
+\alpha_1(1) = 0.6 \cdot 0.9 = 0.54, \qquad \alpha_1(2) = 0.4 \cdot 0.2 = 0.08.
+$$
+
+**Step 2.** The recursion is $\alpha_2(j) = P(X_2 = a \mid Z_2 = j) \sum_k \alpha_1(k) A_{kj}$.
+First the inner sums, with $A_{kj}$ read column-wise:
+
+$$
+\sum_k \alpha_1(k) A_{k1} = 0.54 \cdot 0.7 + 0.08 \cdot 0.4 = 0.378 + 0.032 = 0.410,
+$$
+$$
+\sum_k \alpha_1(k) A_{k2} = 0.54 \cdot 0.3 + 0.08 \cdot 0.6 = 0.162 + 0.048 = 0.210.
+$$
+
+**Step 3.** Multiply by the emission for $X_2 = a$:
+
+$$
+\alpha_2(1) = 0.9 \cdot 0.410 = 0.369, \qquad \alpha_2(2) = 0.2 \cdot 0.210 = 0.042.
+$$
+
+The marginal likelihood of the two-symbol prefix is $P(X_{1:2}) = 0.369 + 0.042 = 0.411$.
+
+</details>
+
+**Exercise 2.** Show that the state marginal formula is consistent: prove that
+$\sum_k \alpha_t(k) \beta_t(k) = P(X_{1:T})$ for every fixed $t$, so dividing by
+$P(X_{1:T})$ in $P(Z_t = k \mid X_{1:T}) = \alpha_t(k)\beta_t(k) / P(X_{1:T})$ yields a
+normalized distribution over $k$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Use the definitions. The forward variable is the joint
+$\alpha_t(k) = P(X_{1:t}, Z_t = k)$ and the backward variable is the conditional
+$\beta_t(k) = P(X_{t+1:T} \mid Z_t = k)$. Their product is
+
+$$
+\alpha_t(k)\beta_t(k) = P(X_{1:t}, Z_t = k) \cdot P(X_{t+1:T} \mid Z_t = k).
+$$
+
+**Step 2.** By the Markov property, conditional on $Z_t = k$ the past evidence
+$X_{1:t}$ and future evidence $X_{t+1:T}$ are independent, so the product is the joint
+$P(X_{1:T}, Z_t = k)$.
+
+**Step 3.** Sum over the states $k$ to marginalize out $Z_t$:
+
+$$
+\sum_k \alpha_t(k)\beta_t(k) = \sum_k P(X_{1:T}, Z_t = k) = P(X_{1:T}).
+$$
+
+This holds for every $t$, which is why $P(X_{1:T})$ can be recovered from $\alpha_T$
+alone (with $\beta_T \equiv 1$) or from any intermediate column.
+
+</details>
+
+**Exercise 3 (code).** Implement the forward algorithm in linear (not log) space for
+the discrete HMM of Exercise 1 with the observation sequence $(a, a, b)$, where
+$P(X = b \mid Z = k) = 1 - P(X = a \mid Z = k)$. Verify that $\alpha_2$ matches the
+hand computation and that the total likelihood $\sum_k \alpha_3(k)$ equals the sum
+over all $K^3$ state paths computed by brute force.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+pi = np.array([0.6, 0.4])
+A  = np.array([[0.7, 0.3],
+               [0.4, 0.6]])
+# emission[k, symbol]: symbol 0 = 'a', symbol 1 = 'b'
+emit = np.array([[0.9, 0.1],
+                 [0.2, 0.8]])
+obs = [0, 0, 1]   # a, a, b
+K = 2
+
+# Forward recursion in linear space
+alpha = np.zeros((len(obs), K))
+alpha[0] = pi * emit[:, obs[0]]
+for t in range(1, len(obs)):
+    for j in range(K):
+        alpha[t, j] = emit[j, obs[t]] * (alpha[t-1] @ A[:, j])
+
+assert np.allclose(alpha[1], [0.369, 0.042])   # matches Exercise 1
+fwd_likelihood = alpha[-1].sum()
+
+# Brute force: sum over all K**3 state paths
+from itertools import product
+brute = 0.0
+for path in product(range(K), repeat=len(obs)):
+    p = pi[path[0]] * emit[path[0], obs[0]]
+    for t in range(1, len(obs)):
+        p *= A[path[t-1], path[t]] * emit[path[t], obs[t]]
+    brute += p
+
+assert np.isclose(fwd_likelihood, brute)
+print("forward likelihood:", round(fwd_likelihood, 6))
+```
+
+The forward sum collapses the exponential path enumeration into $O(T K^2)$ work while
+returning the identical likelihood.
+
+</details>
 
 The next lesson extends the HMM to continuous Gaussian states, yielding the Kalman filter.
 
