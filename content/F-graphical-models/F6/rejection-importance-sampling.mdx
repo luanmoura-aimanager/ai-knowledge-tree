@@ -4,7 +4,7 @@ pillar: F
 subId: F6
 lessonId: rejection-importance-sampling
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Derive the acceptance probability for rejection sampling from an envelope distribution, derive the importance weights for importance sampling, and compute the effective sample size."
 prerequisites: ["A2/bayes-rule", "A2/mle"]
 ---
@@ -135,6 +135,101 @@ print(f"  ESS: {ess:.0f} / {N}  ({100*ess/N:.1f}%)")
 The rejection sampler achieves near the theoretical $1/M$ acceptance rate;
 the IS ESS quantifies that a wide proposal captures a modest fraction of the
 effective information.
+
+## Exercises
+
+**Exercise 1.** A rejection sampler uses an envelope with $M = 5$. On average,
+how many proposals must be drawn to accept one sample, and what fraction of
+compute is wasted?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The acceptance probability is $P(\text{accept}) = 1/M = 1/5 = 0.2$.
+
+**Step 2.** The number of trials until the first acceptance is geometric with
+success probability $0.2$, so its expectation is $1 / P(\text{accept}) = M = 5$
+proposals per accepted sample.
+
+**Step 3.** Of every $5$ proposals, $1$ is kept and $4$ are discarded, so the
+wasted fraction is $4/5 = 0.8$, i.e. $80\%$ of the draws are thrown away. A loose
+envelope is expensive precisely because this waste grows linearly in $M$.
+
+</details>
+
+**Exercise 2.** Self-normalized importance sampling draws $N = 3$ points with
+unnormalized weights $\tilde{w} = (6, 3, 1)$ and function values
+$f = (2, 0, -4)$. Compute the SNIS estimate of $\mathbb{E}_p[f]$ and the
+effective sample size.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Normalize the weights. The sum is $6 + 3 + 1 = 10$, so
+$w = (0.6, 0.3, 0.1)$.
+
+**Step 2.** The SNIS estimate is the weighted average
+$\sum_i w_i f(x_i)$:
+
+$$
+0.6 \cdot 2 + 0.3 \cdot 0 + 0.1 \cdot (-4) = 1.2 + 0 - 0.4 = 0.8.
+$$
+
+**Step 3.** The effective sample size uses the normalized weights:
+
+$$
+N_\text{eff} = \frac{1}{\sum_i w_i^2}
+= \frac{1}{0.6^2 + 0.3^2 + 0.1^2}
+= \frac{1}{0.36 + 0.09 + 0.01} = \frac{1}{0.46} \approx 2.17.
+$$
+
+With one weight carrying $60\%$ of the mass, the three draws are worth only about
+$2.2$ equally weighted ones.
+
+</details>
+
+**Exercise 3 (code).** Estimate $\mathbb{E}[x^2]$ under a standard normal target
+by importance sampling from two proposals: a matched $\mathcal{N}(0, 1)$ and a
+too-narrow $\mathcal{N}(0, 0.5^2)$. Confirm the matched proposal is both more
+accurate (true value $1$) and yields a larger effective sample size.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def norm_pdf(x, mu=0.0, sigma=1.0):
+    return np.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * np.sqrt(2 * np.pi))
+
+N = 20_000
+
+def is_estimate(prop_sigma):
+    x = rng.normal(0, prop_sigma, N)
+    w = norm_pdf(x, 0, 1) / norm_pdf(x, 0, prop_sigma)   # target / proposal
+    wn = w / w.sum()
+    est = (wn * x**2).sum()
+    ess = 1.0 / (wn**2).sum()
+    return est, ess
+
+est_match, ess_match = is_estimate(1.0)    # proposal == target
+est_narrow, ess_narrow = is_estimate(0.5)  # misses the tails
+
+print(f"matched: E[x^2]={est_match:.3f}  ESS={ess_match:.0f}")
+print(f"narrow:  E[x^2]={est_narrow:.3f}  ESS={ess_narrow:.0f}")
+
+assert abs(est_match - 1.0) < 0.1   # accurate when proposal covers the target
+assert ess_match > ess_narrow       # matched proposal keeps weights even
+```
+
+The matched proposal returns $\mathbb{E}[x^2] \approx 0.99$ with $N_\text{eff} = N$
+(all weights equal), while the narrow proposal underweights the tails that
+dominate the second moment, biasing the estimate and collapsing the effective
+sample size.
+
+</details>
 
 The next lesson builds on these ideas to construct Markov chains whose stationary
 distribution is the target, escaping the curse of dimensionality.

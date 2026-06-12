@@ -4,7 +4,7 @@ pillar: F
 subId: F6
 lessonId: langevin-sgld
 order: 5
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the unadjusted Langevin algorithm from overdamped Langevin diffusion, apply stochastic gradient noise to obtain SGLD, and interpret SGLD as approximate Bayesian posterior sampling."
 prerequisites: ["hamiltonian-mc"]
 ---
@@ -125,6 +125,107 @@ by a factor related to $\varepsilon$ (Langevin discretization bias), which is th
 cost of skipping the MH correction step.
 The lesson is still clear: a small noise injection transforms gradient optimization
 into approximate Bayesian posterior sampling.
+
+## Exercises
+
+**Exercise 1.** Write the ULA update for a 1D Gaussian target
+$\pi(q) \propto e^{-(q - \mu)^2 / (2 s^2)}$, i.e. give $\nabla U(q)$ and the full
+Euler-Maruyama step. Then state the size of the injected noise relative to the
+drift as $\varepsilon \to 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Here $U(q) = -\log \pi(q) = \frac{(q - \mu)^2}{2 s^2}$ up to a
+constant, so $\nabla U(q) = \frac{q - \mu}{s^2}$.
+
+**Step 2.** Substituting into
+$q_{t+1} = q_t - \varepsilon \nabla U(q_t) + \sqrt{2\varepsilon}\, \xi_t$ with
+$\xi_t \sim \mathcal{N}(0, 1)$ gives
+
+$$
+q_{t+1} = q_t - \varepsilon \frac{q_t - \mu}{s^2} + \sqrt{2\varepsilon}\, \xi_t.
+$$
+
+**Step 3.** The drift term scales as $\varepsilon$ while the noise term scales as
+$\sqrt{2\varepsilon}$. As $\varepsilon \to 0$ the noise $\sqrt{\varepsilon}$
+dominates the drift $\varepsilon$ (their ratio diverges), so the random kicks, not
+the gradient, set the local step scale. This is why ULA keeps exploring instead of
+collapsing onto the mode $\mu$.
+
+</details>
+
+**Exercise 2.** SGLD replaces the full log-likelihood gradient with the
+mini-batch estimate $\frac{N}{M} \sum_{n \in \mathcal{B}} \nabla \log p(x_n \mid \theta)$
+over a batch of size $M$. Show this estimate is unbiased for the full-data
+gradient $\sum_{n=1}^N \nabla \log p(x_n \mid \theta)$ when the batch is sampled
+uniformly without replacement.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $g_n = \nabla \log p(x_n \mid \theta)$. The mini-batch estimate is
+$\hat{g} = \frac{N}{M} \sum_{n \in \mathcal{B}} g_n$. Take its expectation over the
+random batch $\mathcal{B}$.
+
+**Step 2.** Under uniform sampling without replacement, each index $n$ is included
+with probability $M/N$. Writing the sum with indicator $\mathbb{1}[n \in \mathcal{B}]$,
+
+$$
+\mathbb{E}[\hat{g}] = \frac{N}{M} \sum_{n=1}^N \mathbb{E}\big[\mathbb{1}[n \in \mathcal{B}]\big]\, g_n
+= \frac{N}{M} \sum_{n=1}^N \frac{M}{N}\, g_n.
+$$
+
+**Step 3.** The factors $\frac{N}{M}$ and $\frac{M}{N}$ cancel:
+
+$$
+\mathbb{E}[\hat{g}] = \sum_{n=1}^N g_n,
+$$
+
+the full-data gradient. The $N/M$ rescaling is exactly what makes the cheap batch
+estimate unbiased, so the only effect of subsampling is added variance, which the
+$\sum_t \varepsilon_t^2 < \infty$ schedule controls.
+
+</details>
+
+**Exercise 3 (code).** Run ULA on a 1D Gaussian target $\mathcal{N}(2, 1.5)$ with
+step size $\varepsilon = 0.05$. From a fixed seed, draw many samples and check
+that the empirical mean recovers $2$ and the variance recovers $1.5$ within a
+generous tolerance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+mu, s2 = 2.0, 1.5
+def grad_U(q):                 # -grad log pi for N(mu, s2)
+    return (q - mu) / s2
+
+eps = 0.05
+N = 200_000
+q = 0.0
+samples = np.empty(N)
+
+for t in range(N):
+    q = q - eps * grad_U(q) + np.sqrt(2 * eps) * rng.normal()
+    samples[t] = q
+
+post = samples[5000:]          # discard burn-in
+print(f"mean {post.mean():.3f} (true {mu}), var {post.var():.3f} (true {s2})")
+
+assert abs(post.mean() - mu) < 0.1    # drift centers the chain at mu
+assert abs(post.var() - s2) < 0.2     # noise reproduces the target spread
+```
+
+The chain recovers mean $\approx 2.0$ and variance $\approx 1.5$. At this small
+$\varepsilon$ the $O(\varepsilon)$ discretization bias stays inside the tolerance,
+so the unadjusted chain samples the Gaussian without any accept/reject step.
+
+</details>
 
 The next subsection introduces latent variable models, starting with the EM algorithm
 that maximizes the marginal likelihood when the latent structure is not directly observed.

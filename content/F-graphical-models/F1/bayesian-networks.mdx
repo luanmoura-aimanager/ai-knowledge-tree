@@ -4,7 +4,7 @@ pillar: F
 subId: F1
 lessonId: bayesian-networks
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Factor a joint distribution over a DAG, read local Markov independence from parent sets, and compute exact probabilities from conditional probability tables."
 prerequisites: ["A2/bayes-rule", "A2/mle"]
 ---
@@ -123,6 +123,99 @@ print(f"Corr(S,R) | C=1 (explaining away): {corr_sr_given_c:.4f}")
 The correlation between $S$ and $R$ is near zero unconditionally, but nonzero once
 we condition on $C$: observing that the grass is wet makes rain and sprinkler negatively
 correlated (each partly explains the other), confirming the collider pattern.
+
+## Exercises
+
+**Exercise 1.** Consider the chain DAG $A \to B \to C$ with binary variables. Write the
+joint factorization implied by the graph, and count the free parameters it stores against
+the $2^3 - 1 = 7$ of the unconstrained joint.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the factorization rule $P(\mathbf{X}) = \prod_i P(X_i \mid \mathrm{Pa}(X_i))$
+with parents $\mathrm{Pa}(A) = \varnothing$, $\mathrm{Pa}(B) = \{A\}$, $\mathrm{Pa}(C) = \{B\}$:
+
+$$
+P(A, B, C) = P(A)\, P(B \mid A)\, P(C \mid B).
+$$
+
+**Step 2.** Count free parameters per factor. $P(A)$ needs $1$ (one number, the other
+fixed by summing to one). $P(B \mid A)$ has two parent rows, each needing $1$, so $2$.
+$P(C \mid B)$ likewise needs $2$. Total $1 + 2 + 2 = 5$.
+
+The DAG stores $5$ parameters against $7$ for the full joint. The saving comes from
+$C$ depending on $B$ alone, not on $(A, B)$ jointly.
+
+</details>
+
+**Exercise 2.** In the sprinkler graph $S \to C \leftarrow R$ with $P(S{=}1) = 0.4$,
+$P(R{=}1) = 0.2$, and the CPT $P(C{=}1 \mid S, R)$ given in the code block, compute
+$P(C{=}1)$ by total probability, by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Marginalize over the four parent configurations, weighting each by
+$P(S)P(R)$ since $S \perp R$ a priori:
+
+$$
+P(C{=}1) = \sum_{s, r} P(C{=}1 \mid s, r)\, P(s)\, P(r).
+$$
+
+**Step 2.** Compute the four parent-configuration weights:
+$P(0,0) = 0.6 \cdot 0.8 = 0.48$, $P(1,0) = 0.4 \cdot 0.8 = 0.32$,
+$P(0,1) = 0.6 \cdot 0.2 = 0.12$, $P(1,1) = 0.4 \cdot 0.2 = 0.08$.
+
+**Step 3.** Weight each by its CPT entry and sum:
+
+$$
+P(C{=}1) = 0.01(0.48) + 0.90(0.32) + 0.80(0.12) + 0.99(0.08)
+$$
+
+$$
+= 0.0048 + 0.288 + 0.096 + 0.0792 = 0.468.
+$$
+
+So $P(C{=}1) = 0.468$, matching the empirical estimate from forward sampling above.
+
+</details>
+
+**Exercise 3 (code).** Build the full $2 \times 2 \times 2$ joint table for the sprinkler
+network directly from the factorization, then verify it sums to one and reproduces the
+marginal $P(C{=}1) = 0.468$ by summing out $S$ and $R$. Use no sampling.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+p_s = 0.4
+p_r = 0.2
+p_c_given_sr = {(0, 0): 0.01, (1, 0): 0.90, (0, 1): 0.80, (1, 1): 0.99}
+
+# joint[s, r, c] = P(S=s) P(R=r) P(C=c | s, r)
+joint = np.zeros((2, 2, 2))
+for s in (0, 1):
+    for r in (0, 1):
+        ps = p_s if s else 1 - p_s
+        pr = p_r if r else 1 - p_r
+        pc1 = p_c_given_sr[(s, r)]
+        joint[s, r, 1] = ps * pr * pc1
+        joint[s, r, 0] = ps * pr * (1 - pc1)
+
+assert np.isclose(joint.sum(), 1.0)            # valid distribution
+
+p_c1 = joint[:, :, 1].sum()                    # sum out S and R
+assert np.isclose(p_c1, 0.468)
+print(f"P(C=1) = {p_c1:.4f}")
+```
+
+The factorization builds an 8-cell table that normalizes to one, and marginalizing
+over the parents recovers the hand-computed $0.468$.
+
+</details>
 
 The next lesson introduces plate notation for compactly drawing models with repeated structure.
 

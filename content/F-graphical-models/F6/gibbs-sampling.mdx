@@ -4,7 +4,7 @@ pillar: F
 subId: F6
 lessonId: gibbs-sampling
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Derive Gibbs updates as a special case of Metropolis-Hastings using full conditional distributions, implement a Gibbs sampler for a bivariate Gaussian, and identify when full conditionals are tractable."
 prerequisites: ["metropolis-hastings"]
 ---
@@ -128,6 +128,101 @@ print(f"(High rho={rho} causes slow mixing: lag-1 autocorr is nonzero)")
 
 The sampler recovers the true covariance, but high correlation $\rho$ induces high
 autocorrelation between successive samples, reducing the effective sample size.
+
+## Exercises
+
+**Exercise 1.** For the bivariate Gaussian $p(x_1, x_2) = \mathcal{N}(0, \Sigma)$
+with $\Sigma = \begin{bmatrix} 1 & \rho \\ \rho & 1 \end{bmatrix}$, the full
+conditional is $x_1 \mid x_2 \sim \mathcal{N}(\rho x_2,\, 1 - \rho^2)$. With
+$\rho = 0.6$ and a current value $x_2 = 2$, give the mean and variance of the
+distribution from which $x_1$ is drawn.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The conditional mean is $\rho x_2 = 0.6 \cdot 2 = 1.2$. The Gibbs
+update centers $x_1$ on this value, pulled toward the current $x_2$ in proportion
+to the correlation.
+
+**Step 2.** The conditional variance is $1 - \rho^2 = 1 - 0.36 = 0.64$,
+independent of $x_2$. So $x_1 \mid x_2 = 2 \sim \mathcal{N}(1.2,\, 0.64)$, i.e.
+standard deviation $0.8$.
+
+The conditional spread $0.64$ is narrower than the marginal variance $1$: knowing
+$x_2$ removes part of the uncertainty in $x_1$.
+
+</details>
+
+**Exercise 2.** Show that every Gibbs update is a Metropolis-Hastings step with
+acceptance probability $1$. Use the MH acceptance ratio for a proposal that moves
+only $x_i$ and sets $q(x_i' \mid x_i, \mathbf{x}_{-i}) = P(x_i' \mid \mathbf{x}_{-i})$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the MH ratio for a move changing only coordinate $i$, with the
+full conditional as the proposal:
+
+$$
+\alpha = \frac{P(\mathbf{x}_{-i}, x_i') \, P(x_i \mid \mathbf{x}_{-i})}
+              {P(\mathbf{x}_{-i}, x_i) \, P(x_i' \mid \mathbf{x}_{-i})}.
+$$
+
+**Step 2.** Factor each joint as conditional times marginal,
+$P(\mathbf{x}_{-i}, x_i') = P(x_i' \mid \mathbf{x}_{-i}) P(\mathbf{x}_{-i})$ and
+likewise for $x_i$. The shared factor $P(\mathbf{x}_{-i})$ appears in numerator
+and denominator:
+
+$$
+\alpha = \frac{P(x_i' \mid \mathbf{x}_{-i}) P(\mathbf{x}_{-i}) \, P(x_i \mid \mathbf{x}_{-i})}
+              {P(x_i \mid \mathbf{x}_{-i}) P(\mathbf{x}_{-i}) \, P(x_i' \mid \mathbf{x}_{-i})}.
+$$
+
+**Step 3.** Numerator and denominator are identical, so $\alpha = 1$. Sampling
+from the exact conditional makes the proposal and target agree, and no proposal is
+ever rejected.
+
+</details>
+
+**Exercise 3 (code).** Implement the bivariate Gaussian Gibbs sampler for
+$\rho = 0.6$. Run it from a fixed seed and verify that the empirical covariance
+recovers $\Sigma$ (off-diagonal within $0.1$ of $\rho$) and the sample mean is
+near zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+rho = 0.6
+cond_var = 1 - rho**2          # variance of each full conditional
+
+N = 40_000
+x = np.zeros((N, 2))
+
+for t in range(1, N):
+    x1 = rng.normal(rho * x[t-1, 1], np.sqrt(cond_var))   # x1 | x2
+    x2 = rng.normal(rho * x1,        np.sqrt(cond_var))   # x2 | x1 (updated)
+    x[t] = [x1, x2]
+
+post = x[2000:]                 # discard burn-in
+emp_cov = np.cov(post.T)
+print(f"sample mean: {post.mean(axis=0).round(3)}  (true [0, 0])")
+print(f"emp cov[0,1]: {emp_cov[0, 1]:.3f}  (true {rho})")
+
+assert abs(emp_cov[0, 1] - rho) < 0.1   # off-diagonal recovers rho
+assert abs(post.mean()) < 0.1           # centered at the origin
+```
+
+The empirical off-diagonal lands at $\approx 0.60$, matching $\rho$, because each
+update samples its exact conditional and every draw is accepted. The recovered
+correlation is the same target structure that drives the slow mixing at large
+$\rho$.
+
+</details>
 
 The next lesson introduces Hamiltonian Monte Carlo, which uses gradient information
 to make large, accepted proposals even in high dimensions.

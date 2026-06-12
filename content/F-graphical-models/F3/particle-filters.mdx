@@ -4,7 +4,7 @@ pillar: F
 subId: F3
 lessonId: particle-filters
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Implement sequential importance resampling (SIR) to approximate a non-Gaussian filtering distribution, and explain why systematic resampling controls weight degeneracy."
 prerequisites: ["kalman-filter", "F6/rejection-importance-sampling"]
 ---
@@ -146,6 +146,107 @@ print(f"First 5 PF estimates:    {est[:5].round(2)}")
 ```
 
 The particle filter tracks the highly nonlinear dynamics where the Kalman filter would diverge.
+
+## Exercises
+
+**Exercise 1.** Four particles carry normalized weights $w = (0.1, 0.2, 0.3, 0.4)$.
+Compute the effective sample size $N_\text{eff}$ by hand. With the trigger set at
+$N/2 = 2$, does the filter resample?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The effective sample size is
+$N_\text{eff} = 1 / \sum_i (w^{(i)})^2$. Compute the sum of squares:
+
+$$
+\sum_i (w^{(i)})^2 = 0.1^2 + 0.2^2 + 0.3^2 + 0.4^2 = 0.01 + 0.04 + 0.09 + 0.16 = 0.30.
+$$
+
+**Step 2.** Invert:
+
+$$
+N_\text{eff} = \frac{1}{0.30} \approx 3.33.
+$$
+
+**Step 3.** Since $3.33$ is greater than the trigger $N/2 = 2$, the filter does not
+resample this step. The weights are uneven but the cloud is still healthy enough that
+roughly three of the four particles contribute.
+
+</details>
+
+**Exercise 2.** Show that systematic resampling is unbiased in expectation: for a
+particle with normalized weight $w^{(i)}$, the expected number of copies it produces
+among the $N$ equally spaced draws equals $N w^{(i)}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Place the weights on the unit interval as consecutive bins: particle $i$
+occupies $[c_{i-1}, c_i)$ where $c_i = \sum_{j \le i} w^{(j)}$ is the cumulative weight,
+so the bin has width $w^{(i)}$.
+
+**Step 2.** Systematic resampling draws $u \sim \text{Uniform}(0, 1/N)$ and selects the
+$N$ points $u, u + 1/N, \ldots, u + (N-1)/N$. Particle $i$ is chosen once for each grid
+point that falls inside its bin. The number of grid points in a bin of width $w^{(i)}$
+is either $\lfloor N w^{(i)} \rfloor$ or $\lceil N w^{(i)} \rceil$, depending on $u$.
+
+**Step 3.** Because the grid has spacing $1/N$ and $u$ is uniform over one full spacing,
+the probability that an extra point lands in the bin is exactly the fractional part of
+$N w^{(i)}$. The expected count is therefore
+
+$$
+\mathbb{E}[\text{copies of } i] = \lfloor N w^{(i)} \rfloor + \{N w^{(i)}\} = N w^{(i)}.
+$$
+
+Each particle's expected number of offspring is proportional to its weight, so
+resampling preserves the represented distribution on average while equalizing the
+weights.
+
+</details>
+
+**Exercise 3 (code).** Implement systematic resampling directly and verify Exercise 2
+empirically: with weights $w = (0.05, 0.15, 0.30, 0.50)$ and $N = 4$, average the
+offspring counts over many random $u$ draws and check they approach $N w$. Confirm each
+single draw returns exactly $N$ indices.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(13)
+weights = np.array([0.05, 0.15, 0.30, 0.50])
+N = len(weights)
+cumsum = np.cumsum(weights)
+
+def systematic_resample(u):
+    positions = u + np.arange(N) / N
+    return np.searchsorted(cumsum, positions)
+
+# every single draw returns exactly N indices
+idx = systematic_resample(rng.uniform(0, 1.0 / N))
+assert idx.shape == (N,)
+
+# average offspring counts over many draws approach N * weights
+trials = 200_000
+counts = np.zeros(N)
+for _ in range(trials):
+    u = rng.uniform(0, 1.0 / N)
+    idx = systematic_resample(u)
+    counts += np.bincount(idx, minlength=N)
+counts /= trials
+
+assert np.allclose(counts, N * weights, atol=0.02)
+print("mean offspring:", counts.round(3))
+print("target N*w   :", (N * weights).round(3))
+```
+
+The empirical offspring counts converge to $N w^{(i)}$, confirming the unbiasedness
+derived by hand.
+
+</details>
 
 The next subsection turns to exact inference algorithms for general graphical models,
 starting with variable elimination.

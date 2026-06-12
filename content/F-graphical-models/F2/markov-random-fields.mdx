@@ -4,7 +4,7 @@ pillar: F
 subId: F2
 lessonId: markov-random-fields
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Represent a joint distribution as a Gibbs distribution over clique potentials, identify Markov blankets from graph structure, and state the Hammersley-Clifford theorem."
 prerequisites: ["F1/bayesian-networks", "A2/bayes-rule"]
 ---
@@ -148,6 +148,109 @@ print(f"P(X_center=+1 | all neighbors=+1): {p_center_up_given_nb:.4f}")
 
 The partition function covers all $2^9 = 512$ configurations; at scale, exactly
 computing $Z$ is NP-hard, which motivates the approximate inference methods in F5 and F6.
+
+## Exercises
+
+**Exercise 1.** A two-node MRF $X_1 - X_2$ over binary spins $X_i \in \{-1, +1\}$ has a
+single edge clique with potential $\phi(x_1, x_2) = \exp(J x_1 x_2)$ and $J = 0.5$.
+Compute the partition function $Z$ and the probability $P(X_1 = X_2)$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Enumerate the four configurations and their unnormalized weights
+$\phi = e^{J x_1 x_2}$. Agreeing spins give $x_1 x_2 = +1$, disagreeing give $-1$:
+
+$$
+(+,+): e^{0.5}, \quad (-,-): e^{0.5}, \quad (+,-): e^{-0.5}, \quad (-,+): e^{-0.5}.
+$$
+
+**Step 2.** Sum for the partition function:
+
+$$
+Z = 2 e^{0.5} + 2 e^{-0.5} = 2(1.6487) + 2(0.6065) = 3.2974 + 1.2131 = 4.5105.
+$$
+
+**Step 3.** $P(X_1 = X_2)$ collects the two agreeing configurations:
+
+$$
+P(X_1 = X_2) = \frac{2 e^{0.5}}{Z} = \frac{3.2974}{4.5105} = 0.7311.
+$$
+
+A positive coupling $J = 0.5$ pushes the two spins to agree with probability about $0.73$
+rather than the unbiased $0.5$.
+
+</details>
+
+**Exercise 2.** In the $3 \times 3$ Ising grid from the lesson, the center spin (index 4)
+has neighbors $\{1, 3, 5, 7\}$. Using only the local Markov property, state the smallest
+set of spins you must condition on to make $X_4$ independent of the four corner spins
+$\{0, 2, 6, 8\}$, and justify it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The local Markov property says $X_i \perp \mathbf{X}_{\text{rest}} \mid \mathbf{X}_{N(i)}$,
+where $N(i)$ is the set of graph neighbors. For the center, $N(4) = \{1, 3, 5, 7\}$.
+
+**Step 2.** Conditioning on $N(4) = \{1, 3, 5, 7\}$ makes $X_4$ independent of every
+non-neighbor, which includes all four corners. No corner is adjacent to the center, so
+none needs to be in the conditioning set. The four edge-midpoint neighbors are the
+Markov blanket and they screen off the rest of the grid.
+
+**Step 3.** It is also the smallest such set: dropping any one neighbor, say $X_1$, leaves
+an open path from $X_4$ to that neighbor and onward to corners through it, so independence
+from the corners would no longer be guaranteed.
+
+The minimal conditioning set is the Markov blanket $\{1, 3, 5, 7\}$.
+
+</details>
+
+**Exercise 3 (code).** For the same $3 \times 3$ Ising model ($J = 0.5$, $h = 0$),
+verify numerically that the Markov blanket screens off the corners: compute
+$P(X_4 = +1 \mid X_1{=}X_3{=}X_5{=}X_7{=}+1)$ and show it is unchanged whether or not you
+additionally condition corner $X_0$ on $+1$ or $-1$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+J, h, n = 0.5, 0.0, 9
+edges = [(0,1),(1,2),(3,4),(4,5),(6,7),(7,8),
+         (0,3),(1,4),(2,5),(3,6),(4,7),(5,8)]
+
+configs = np.array([[(c >> i & 1) * 2 - 1 for i in range(n)] for c in range(2**n)])
+
+def energy(cfg):
+    return -J * sum(cfg[i] * cfg[j] for i, j in edges) - h * cfg.sum()
+
+energies = np.array([energy(c) for c in configs])
+log_Z = np.log(np.sum(np.exp(-energies)))
+probs = np.exp(-energies - log_Z)
+
+def cond_center_up(mask):
+    up = mask & (configs[:, 4] == 1)
+    return probs[up].sum() / probs[mask].sum()
+
+nb = np.all(configs[:, [1, 3, 5, 7]] == 1, axis=1)          # blanket = +1
+p_blanket   = cond_center_up(nb)
+p_corner_up = cond_center_up(nb & (configs[:, 0] == 1))     # add corner X0=+1
+p_corner_dn = cond_center_up(nb & (configs[:, 0] == -1))    # add corner X0=-1
+
+assert np.isclose(p_corner_up, p_blanket)                   # corner adds nothing
+assert np.isclose(p_corner_dn, p_blanket)
+print(f"P(X4=+1 | blanket)        = {p_blanket:.4f}")
+print(f"P(X4=+1 | blanket, X0=+1) = {p_corner_up:.4f}")
+print(f"P(X4=+1 | blanket, X0=-1) = {p_corner_dn:.4f}")
+```
+
+All three probabilities equal $0.9820$: once the four neighbors are fixed, the corner
+carries zero additional information about the center, the local Markov property holding
+on real numbers.
+
+</details>
 
 The next lesson introduces conditional random fields, which extend MRFs into a
 discriminative setting by conditioning the entire model on an input.

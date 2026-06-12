@@ -4,7 +4,7 @@ pillar: F
 subId: F8
 lessonId: mc-dropout-ensembles
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Interpret MC dropout as approximate Bayesian inference, decompose predictive uncertainty into epistemic and aleatoric components, and contrast the diversity mechanisms in dropout vs. deep ensembles."
 prerequisites: ["vae-reparameterization"]
 ---
@@ -142,6 +142,90 @@ print(f"Uncertainty far from training region (|x|>3): "
 
 Uncertainty is higher outside the training range, demonstrating that the method captures
 epistemic uncertainty: the model is uncertain where it has not seen data.
+
+## Exercises
+
+**Exercise 1.** Four MC-dropout forward passes at a test input produce predictions
+$\hat{y} = (2, 3, 4, 3)$. The model emits no separate noise estimate. Compute the
+predictive mean and the predictive variance by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The predictive mean is the average over passes:
+$\bar{y} = \tfrac14(2 + 3 + 4 + 3) = \tfrac{12}{4} = 3$.
+
+**Step 2.** With no separate noise term ($\hat{\sigma}^2 = 0$), the predictive variance
+is the sample variance of the passes, $\tfrac1T \sum_t \hat{y}_t^2 - \bar{y}^2$. The mean
+of the squares is $\tfrac14(4 + 9 + 16 + 9) = \tfrac{38}{4} = 9.5$, so
+
+$$
+\mathrm{Var}[y \mid x] = 9.5 - 3^2 = 9.5 - 9 = 0.5.
+$$
+
+The spread of $0.5$ is purely epistemic here: it comes entirely from the disagreement
+between dropout masks, not from any modeled observation noise.
+
+</details>
+
+**Exercise 2.** The total predictive variance decomposes as epistemic plus aleatoric.
+Using the law of total variance on the predictive mixture $p(y \mid x) = \frac{1}{T}\sum_t p(y \mid x, \theta_t)$,
+identify which term is the epistemic part and which is aleatoric.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Treat the pass index $t$ as a latent uniform variable and $y$ as drawn from
+component $t$. The law of total variance reads
+$\mathrm{Var}(y) = \mathbb{E}_t[\mathrm{Var}(y \mid t)] + \mathrm{Var}_t(\mathbb{E}[y \mid t])$.
+
+**Step 2.** $\mathbb{E}_t[\mathrm{Var}(y \mid t)]$ is the average of each pass's own
+output variance $\sigma_t^2$, the irreducible per-model noise. This is the **aleatoric**
+term: it survives even if all passes agreed on their means.
+
+**Step 3.** $\mathrm{Var}_t(\mathbb{E}[y \mid t])$ is the variance of the per-pass means
+$m_t$, the disagreement between the sampled predictors. This is the **epistemic** term:
+it shrinks as more data pins the function down and the masks stop disagreeing. A model
+reporting one number collapses both into a single output and cannot separate them.
+
+</details>
+
+**Exercise 3 (code).** Build a mixture predictive from $T$ passes, each a Gaussian with
+its own mean and variance. Verify numerically that the total sampled variance equals the
+mean of the per-pass variances (aleatoric) plus the variance of the per-pass means
+(epistemic).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(43)
+
+T = 5
+means = rng.normal(0, 1, T)          # per-pass predictive means
+vars_ = rng.uniform(0.1, 0.5, T)     # per-pass aleatoric variances
+
+# Sample from the uniform mixture over the T Gaussian passes
+n = 2_000_000
+t = rng.integers(0, T, n)
+samples = rng.normal(means[t], np.sqrt(vars_[t]))
+
+total     = samples.var()
+aleatoric = vars_.mean()             # E_t[Var(y|t)]
+epistemic = means.var()              # Var_t(E[y|t])
+
+assert np.isclose(total, aleatoric + epistemic, atol=2e-3)
+print("total:", round(total, 4), " = epistemic", round(epistemic, 4),
+      "+ aleatoric", round(aleatoric, 4))
+```
+
+The sampled total variance splits exactly into the across-pass disagreement (epistemic)
+and the within-pass noise (aleatoric), which is the decomposition the law of total
+variance predicts.
+
+</details>
 
 The next lesson shows how to place a prior directly over network weights for a more
 principled Bayesian neural network.

@@ -4,7 +4,7 @@ pillar: F
 subId: F1
 lessonId: plate-notation
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Use plate diagrams to compactly represent models with i.i.d. replication, and translate a plate diagram into its full joint factorization."
 prerequisites: ["bayesian-networks"]
 ---
@@ -100,6 +100,93 @@ for k in range(K):
 ```
 
 The plate model samples each $(Z_n, X_n)$ pair independently given the shared parameters $(\pi, \mu_{1:K})$, exactly as the factorization specifies.
+
+## Exercises
+
+**Exercise 1.** A plate over $n = 1, \ldots, N$ encloses a single observed node $X_n$,
+with one shared parameter $\theta$ outside the plate connected to every $X_n$. Write the
+full joint factorization the plate expands to.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The node outside the plate, $\theta$, appears once and is the root, so it
+contributes the factor $P(\theta)$.
+
+**Step 2.** The node inside the plate is replicated $N$ times. Each copy $X_n$ has $\theta$
+as its parent (the edge crosses the plate boundary), so each contributes $P(X_n \mid \theta)$.
+
+**Step 3.** Multiply the shared factor by the product over plate iterations:
+
+$$
+P(\theta, X_{1:N}) = P(\theta) \prod_{n=1}^{N} P(X_n \mid \theta).
+$$
+
+This is the i.i.d. likelihood with a prior on $\theta$, the canonical one-plate model.
+
+</details>
+
+**Exercise 2.** Take the naive Bayes plate model with joint
+$P(\theta, Y_{1:N}, X_{1:N}) = P(\theta) \prod_{n} P(Y_n \mid \theta) P(X_n \mid Y_n)$.
+Argue, from the factorization alone, that $X_1$ and $X_2$ are independent given $\theta$
+and $Y_1, Y_2$, but not independent given $\theta$ alone.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Condition on $\theta, Y_1, Y_2$. The relevant factors are
+$P(X_1 \mid Y_1)$ and $P(X_2 \mid Y_2)$. With $Y_1, Y_2$ fixed, these are two separate
+functions, one of $X_1$ and one of $X_2$, so the conditional joint factors as a product:
+$P(X_1, X_2 \mid \theta, Y_1, Y_2) = P(X_1 \mid Y_1) P(X_2 \mid Y_2)$. A product over the
+two variables is exactly independence.
+
+**Step 2.** Now condition on $\theta$ alone. Then $Y_1, Y_2$ are latent and must be summed
+out: $P(X_1, X_2 \mid \theta) = \sum_{y_1, y_2} P(Y_1{=}y_1 \mid \theta) P(Y_2{=}y_2 \mid \theta)
+P(X_1 \mid y_1) P(X_2 \mid y_2)$. Because the same $\theta$ governs the distribution of both
+labels, observing $X_1$ shifts beliefs about $Y_1$ and, through $\theta$, about $Y_2$ and
+hence $X_2$. The path $X_1 \leftarrow Y_1 \leftarrow \theta \to Y_2 \to X_2$ is a chain of
+forks, open when $\theta$ is the only conditioning variable. So $X_1$ and $X_2$ are dependent
+given $\theta$.
+
+</details>
+
+**Exercise 3 (code).** Forward-sample the one-plate Bayesian model
+$\theta \sim \text{Beta}(2, 2)$, $X_n \mid \theta \sim \text{Bernoulli}(\theta)$ for
+$N = 2000$. Confirm that conditioning on $\theta$ makes the $X_n$ independent (the within-
+$\theta$ correlation vanishes) while pooling across $\theta$ leaves them positively correlated.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+M = 4000          # number of independent plate instances
+N = 2000          # observations per instance
+
+theta = rng.beta(2.0, 2.0, size=M)
+# Two observations per instance, both Bernoulli(theta)
+x1 = (rng.random(M) < theta).astype(float)
+x2 = (rng.random(M) < theta).astype(float)
+
+# Pooled across theta: positively correlated (shared parent)
+corr_pooled = np.corrcoef(x1, x2)[0, 1]
+
+# Given theta fixed (a narrow band), correlation should vanish
+band = np.abs(theta - 0.5) < 0.02
+corr_fixed = np.corrcoef(x1[band], x2[band])[0, 1]
+
+assert corr_pooled > 0.05            # shared theta couples the observations
+assert abs(corr_fixed) < 0.05        # fixing theta screens them off
+print(f"Corr pooled = {corr_pooled:.3f}, Corr | theta~0.5 = {corr_fixed:.3f}")
+```
+
+The pooled correlation is positive because both draws inherit the same $\theta$; inside a
+narrow $\theta$ band the correlation drops to noise, confirming the plate's conditional
+independence given the shared parameter.
+
+</details>
 
 The next lesson covers d-separation, the graphical criterion for reading conditional
 independence directly from a DAG.

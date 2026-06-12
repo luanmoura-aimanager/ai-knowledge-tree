@@ -4,7 +4,7 @@ pillar: F
 subId: F4
 lessonId: belief-propagation
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the BP message-update equations from first principles on a tree, show they return exact marginals in one pass, and explain why loopy BP is only approximate."
 prerequisites: ["variable-elimination"]
 ---
@@ -134,6 +134,114 @@ print("Max abs error:", np.abs(belief_c - p_c_brute).max())
 ```
 
 BP on the star graph returns exact marginals in a single pass because the graph has no cycles.
+
+## Exercises
+
+**Exercise 1.** A three-node chain $1 - 2 - 3$ has two binary states per node, node
+potentials $\phi(x_i) = (1, 1)$ for all $i$, and identical edge potentials
+$\psi(x_i, x_j) = \begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix}$ (rows indexed by the
+left variable). Compute the message $m_{1 \to 2}(x_2)$ by hand, then the message
+$m_{2 \to 3}(x_3)$ that incorporates it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Node 1 is a leaf, so the message is
+$m_{1 \to 2}(x_2) = \sum_{x_1} \psi(x_1, x_2)\,\phi(x_1)$ with no incoming messages to
+include. With $\phi(x_1) = (1, 1)$ this sums the columns of $\psi$:
+
+$$
+m_{1 \to 2}(x_2 = 1) = 2 + 1 = 3, \qquad m_{1 \to 2}(x_2 = 2) = 1 + 2 = 3.
+$$
+
+So $m_{1 \to 2} = (3, 3)$.
+
+**Step 2.** Node 2 sends to node 3 using its node potential and the incoming message
+from node 1:
+
+$$
+m_{2 \to 3}(x_3) = \sum_{x_2} \psi(x_2, x_3)\,\phi(x_2)\,m_{1 \to 2}(x_2).
+$$
+
+The factor $\phi(x_2)\,m_{1 \to 2}(x_2) = (1 \cdot 3, 1 \cdot 3) = (3, 3)$.
+
+**Step 3.** Sum against the columns of $\psi$:
+
+$$
+m_{2 \to 3}(x_3 = 1) = 3 \cdot 2 + 3 \cdot 1 = 9, \quad
+m_{2 \to 3}(x_3 = 2) = 3 \cdot 1 + 3 \cdot 2 = 9.
+$$
+
+Both messages are uniform because the symmetric potentials favor neither state; the
+belief at node 3 will be $(0.5, 0.5)$ after normalization.
+
+</details>
+
+**Exercise 2.** Count messages on a tree. A tree with $n$ nodes has $n - 1$ edges.
+Explain why the full collect-distribute schedule sends exactly $2(n - 1)$ messages, and
+why each variable-to-variable message can be computed only after all of that node's
+other incoming messages are ready.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each edge carries one message in each direction: one during the collect
+phase (toward the root) and one during the distribute phase (away from the root). With
+$n - 1$ edges, that is $2(n - 1)$ messages, and no message is ever recomputed because
+the tree has no cycles.
+
+**Step 2.** The update
+$m_{i \to j}(x_j) = \sum_{x_i} \psi(x_i, x_j)\,\phi(x_i)\prod_{k \in N(i) \setminus j} m_{k \to i}(x_i)$
+multiplies the incoming messages from every neighbor of $i$ except $j$. Until all those
+$m_{k \to i}$ have arrived, the product is incomplete.
+
+**Step 3.** This dependency is what fixes the schedule: a node can send toward $j$ only
+once it has heard from all its other neighbors. On a tree this ordering always exists
+(leaves first), so a single sweep inward then outward computes every message exactly
+once, giving the $O(n)$ cost for all marginals.
+
+</details>
+
+**Exercise 3 (code).** Implement two-pass sum-product on the three-node chain of
+Exercise 1 and verify the node-2 belief against a brute-force marginal of the full
+joint over the $2^3$ configurations.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+phi = [np.array([1.0, 1.0]) for _ in range(3)]
+psi = np.array([[2.0, 1.0],
+                [1.0, 2.0]])   # shared edge potential, rows = left var
+
+# Collect toward node 2 from both ends, then belief at node 2
+m_1to2 = psi.T @ phi[0]                     # leaf 1 -> 2
+m_3to2 = psi @ phi[2]                       # leaf 3 -> 2  (edge 2-3, 3 is right var)
+belief_2 = phi[1] * m_1to2 * m_3to2
+belief_2 /= belief_2.sum()
+
+# Brute force joint over (x1, x2, x3)
+joint = np.zeros((2, 2, 2))
+for a in range(2):
+    for b in range(2):
+        for c in range(2):
+            joint[a, b, c] = (phi[0][a] * phi[1][b] * phi[2][c]
+                              * psi[a, b] * psi[b, c])
+joint /= joint.sum()
+p2_brute = joint.sum(axis=(0, 2))
+
+assert np.allclose(belief_2, p2_brute)
+assert np.allclose(belief_2, [0.5, 0.5])
+print("belief node 2 (BP):    ", belief_2.round(4))
+print("marginal node 2 (brute):", p2_brute.round(4))
+```
+
+The single forward-backward pass reproduces the brute-force marginal, confirming BP is
+exact on the chain.
+
+</details>
 
 The next lesson extends this to general graphs by first converting them to a junction tree.
 

@@ -4,7 +4,7 @@ pillar: F
 subId: F1
 lessonId: d-separation
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Identify the three canonical motifs (chain, fork, collider) and apply the Bayes-ball algorithm to determine which pairs of variables are d-separated given an observation set."
 prerequisites: ["bayesian-networks"]
 ---
@@ -117,6 +117,85 @@ print(f"Corr(A,B2) | C (collider activated): {corr_ab2_given_c:.3f}")
 The chain example shows near-zero partial correlation once $Z$ is controlled for;
 the collider example shows that $A$ and $B_2$ are uncorrelated marginally but correlated
 once their common effect $C$ is conditioned on.
+
+## Exercises
+
+**Exercise 1.** In the graph $A \to Z \to B$ (a chain), state whether $A$ and $B$ are
+d-separated (i) given the empty set, and (ii) given $\{Z\}$. Name the rule that decides
+each case.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The single path $A \to Z \to B$ is a chain through $Z$. The chain rule says
+the path is blocked exactly when $Z$ is in the evidence set.
+
+**Step 2 (i), evidence $\varnothing$.** $Z \notin \varnothing$, so the chain is open.
+The only path is unblocked, so $A$ and $B$ are not d-separated. They are dependent.
+
+**Step 3 (ii), evidence $\{Z\}$.** $Z \in \{Z\}$, so the chain is blocked. Every path
+(there is one) is blocked, so $A$ and $B$ are d-separated, giving $A \perp B \mid Z$.
+
+</details>
+
+**Exercise 2.** Consider $A \to Z \leftarrow B$ with a child $D$ of $Z$ ($Z \to D$).
+Determine whether $A$ and $B$ are d-separated given each of $\varnothing$, $\{Z\}$, and
+$\{D\}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The path $A \to Z \leftarrow B$ has a collider at $Z$. A collider blocks the
+path unless $Z$ or a descendant of $Z$ is in the evidence set.
+
+**Step 2, evidence $\varnothing$.** Neither $Z$ nor its descendant $D$ is observed, so
+the collider blocks. $A$ and $B$ are d-separated; $A \perp B$.
+
+**Step 3, evidence $\{Z\}$.** The collider $Z$ is observed, which unblocks the path.
+$A$ and $B$ are not d-separated; they become dependent (explaining away).
+
+**Step 4, evidence $\{D\}$.** $D$ is a descendant of the collider $Z$, which also
+unblocks the path. $A$ and $B$ are not d-separated. Conditioning on a downstream effect
+of a collider activates it just as conditioning on the collider itself does.
+
+</details>
+
+**Exercise 3 (code).** Build the fork $A \leftarrow Z \to B$ with linear-Gaussian
+structure and confirm numerically that $A$ and $B$ are correlated marginally but
+near-independent once $Z$ is regressed out, the d-separation prediction $A \perp B \mid Z$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+n = 50_000
+
+# Fork: A <- Z -> B
+z = rng.normal(0, 1, n)
+a = 0.9 * z + rng.normal(0, 0.4, n)
+b = 0.8 * z + rng.normal(0, 0.4, n)
+
+def partial_corr(x, y, g):
+    rx = x - np.polyval(np.polyfit(g, x, 1), g)
+    ry = y - np.polyval(np.polyfit(g, y, 1), g)
+    return np.corrcoef(rx, ry)[0, 1]
+
+corr = np.corrcoef(a, b)[0, 1]
+pcorr = partial_corr(a, b, z)
+
+assert corr > 0.5                  # shared common cause -> strong marginal correlation
+assert abs(pcorr) < 0.02           # blocked by conditioning on Z
+print(f"Corr(A,B) = {corr:.3f}, Corr(A,B | Z) = {pcorr:.3f}")
+```
+
+The marginal correlation is large because $Z$ drives both, while the partial correlation
+collapses to near zero once $Z$ is controlled for, which is the fork being blocked by its
+common parent.
+
+</details>
 
 D-separation in F1 governs the independence structure of directed models.
 The next lesson shifts to undirected graphical models, where independence is encoded differently.

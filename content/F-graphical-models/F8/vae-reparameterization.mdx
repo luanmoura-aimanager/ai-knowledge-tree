@@ -4,7 +4,7 @@ pillar: F
 subId: F8
 lessonId: vae-reparameterization
 order: 1
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Derive the VAE objective as an amortized ELBO, apply the reparameterization trick to pass gradients through a stochastic latent variable, and identify the KL term as a regularizer on the latent code."
 prerequisites: ["F5/amortized-vi", "A2/kl-cross-entropy"]
 ---
@@ -164,6 +164,97 @@ print(f"\nFinal ELBO: {compute_elbo(A, b, C, x_data, eps_full):.3f}")
 
 The ELBO increases as the decoder learns to reconstruct the data; the KL term keeps
 the latent distribution close to the prior throughout.
+
+## Exercises
+
+**Exercise 1.** A Gaussian encoder outputs $\mu = (1, 0)$ and $\sigma = (1, 2)$ for a
+two-dimensional latent code. Compute $\mathrm{KL}(q \| p)$ against the standard normal
+prior $p(z) = \mathcal{N}(0, I)$ in nats, by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The closed form is a sum over independent dimensions:
+$\mathrm{KL} = \tfrac12 \sum_j (\mu_j^2 + \sigma_j^2 - 1 - \log \sigma_j^2)$.
+
+**Step 2.** Dimension 1 ($\mu = 1$, $\sigma = 1$): $\tfrac12(1 + 1 - 1 - \log 1) = \tfrac12(1) = 0.5$.
+The $\mu^2 = 1$ is the only cost, since the variance already matches the prior.
+
+**Step 3.** Dimension 2 ($\mu = 0$, $\sigma = 2$): $\tfrac12(0 + 4 - 1 - \log 4) = \tfrac12(3 - 1.3863) = 0.8069$.
+The mean is on target, but a posterior wider than the prior ($\sigma^2 = 4$) is penalized.
+
+**Step 4.** Sum the two: $\mathrm{KL} = 0.5 + 0.8069 = 1.3069$ nats. The total charges
+separately for the off-center mean in one dimension and the over-spread variance in the
+other.
+
+</details>
+
+**Exercise 2.** Show that the reparameterized gradient is unbiased: that
+$\nabla_\phi \mathbb{E}_{q_\phi}[f(z)] = \mathbb{E}_{\epsilon \sim \mathcal{N}(0,I)}[\nabla_\phi f(\mu_\phi + \sigma_\phi \odot \epsilon)]$
+for a smooth $f$, with $q_\phi(z) = \mathcal{N}(\mu_\phi, \mathrm{diag}(\sigma_\phi^2))$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Rewrite the expectation under $q_\phi$ as an expectation under the
+$\phi$-free base distribution. The change of variables $z = \mu_\phi + \sigma_\phi \odot \epsilon$
+with $\epsilon \sim \mathcal{N}(0, I)$ maps the standard normal to $q_\phi$, so
+
+$$
+\mathbb{E}_{q_\phi(z)}[f(z)] = \mathbb{E}_{\epsilon \sim \mathcal{N}(0,I)}[f(\mu_\phi + \sigma_\phi \odot \epsilon)].
+$$
+
+**Step 2.** On the right-hand side the distribution of $\epsilon$ does not depend on
+$\phi$, so the gradient passes through the expectation (dominated convergence lets the
+$\nabla_\phi$ and the integral over $\epsilon$ swap):
+
+$$
+\nabla_\phi \mathbb{E}_{\epsilon}[f(\mu_\phi + \sigma_\phi \odot \epsilon)]
+= \mathbb{E}_{\epsilon}[\nabla_\phi f(\mu_\phi + \sigma_\phi \odot \epsilon)].
+$$
+
+**Step 3.** A single draw $\epsilon$ gives the one-sample estimator
+$\nabla_\phi f(\mu_\phi + \sigma_\phi \odot \epsilon)$, whose expectation is the true
+gradient by Step 2, hence unbiased. Differentiating the density $q_\phi$ directly (the
+score-function estimator) is also unbiased but typically much higher variance, which is
+why the reparameterized form is preferred.
+
+</details>
+
+**Exercise 3 (code).** Verify that the closed-form KL of a diagonal Gaussian against the
+standard normal prior matches a Monte Carlo estimate $\mathbb{E}_q[\log q(z) - \log p(z)]$,
+for $\mu = (1, 0)$, $\sigma = (1, 2)$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(5)
+mu  = np.array([1.0, 0.0])
+sig = np.array([1.0, 2.0])
+
+# Closed form: 0.5 * sum(mu^2 + sigma^2 - 1 - log sigma^2)
+kl_closed = 0.5 * np.sum(mu**2 + sig**2 - 1 - np.log(sig**2))
+
+# Monte Carlo: E_q[log q(z) - log p(z)]
+n = 4_000_000
+z = rng.normal(mu, sig, (n, 2))
+log_q = (-0.5 * (((z - mu) / sig)**2).sum(1)
+         - np.log(sig).sum() - 2 * 0.5 * np.log(2 * np.pi))
+log_p = -0.5 * (z**2).sum(1) - 2 * 0.5 * np.log(2 * np.pi)
+kl_mc = (log_q - log_p).mean()
+
+assert np.isclose(kl_closed, kl_mc, atol=2e-3)
+print("closed-form KL:", round(kl_closed, 4))
+print("Monte Carlo KL:", round(kl_mc, 4))
+```
+
+The two agree to three decimals ($\approx 1.307$ nats), confirming the closed form used
+in the ELBO is the exact KL the Monte Carlo average estimates.
+
+</details>
 
 The next lesson covers how to estimate uncertainty in neural networks without
 a full variational treatment, using MC dropout and deep ensembles.

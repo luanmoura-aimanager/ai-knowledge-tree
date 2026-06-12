@@ -4,7 +4,7 @@ pillar: F
 subId: F6
 lessonId: metropolis-hastings
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the detailed balance condition, construct the MH acceptance ratio, prove that the chain's stationary distribution is the target, and diagnose mixing with trace plots."
 prerequisites: ["rejection-importance-sampling"]
 ---
@@ -139,6 +139,112 @@ print(f"True Sigma:\n{Sigma_target}")
 The chain recovers the true mean and covariance structure; acceptance near 0.23 is
 consistent with the asymptotically optimal rate for the random-walk proposal in
 moderate dimensions.
+
+## Exercises
+
+**Exercise 1.** A standard normal target $\pi(x) \propto e^{-x^2/2}$ is sampled
+with a symmetric random-walk proposal. Compute the acceptance probability
+$\alpha$ for a proposed move from $x = 0$ to $x' = 2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The proposal is symmetric, so $q(x \mid x') = q(x' \mid x)$ and those
+factors cancel from the ratio. What remains is
+$\alpha = \min(1, \pi(x') / \pi(x))$.
+
+**Step 2.** Substitute the unnormalized target $\tilde{\pi}(x) = e^{-x^2/2}$:
+
+$$
+\frac{\pi(x')}{\pi(x)} = \frac{e^{-x'^2/2}}{e^{-x^2/2}} = e^{-(x'^2 - x^2)/2}
+= e^{-(4 - 0)/2} = e^{-2}.
+$$
+
+**Step 3.** Since $e^{-2} \approx 0.135 < 1$, the acceptance probability is
+$\alpha = e^{-2} \approx 0.135$. The move steps downhill into the tail, so it is
+accepted only about one time in seven.
+
+</details>
+
+**Exercise 2.** Show that the Metropolis-Hastings kernel
+$T(x' \mid x) = q(x' \mid x)\,\alpha(x' \mid x)$ satisfies detailed balance in the
+remaining case: a pair $(x, x')$ where the forward move has $\alpha = 1$, so the
+reverse move has $\alpha < 1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The forward direction has $\alpha(x' \mid x) = 1$, which means
+$\pi(x') q(x \mid x') \ge \pi(x) q(x' \mid x)$. The reverse direction then has
+ratio at most $1$, so
+
+$$
+\alpha(x \mid x') = \frac{\pi(x) q(x' \mid x)}{\pi(x') q(x \mid x')}.
+$$
+
+**Step 2.** Write both sides of detailed balance. The left side uses the forward
+kernel with $\alpha(x' \mid x) = 1$:
+
+$$
+\pi(x) T(x' \mid x) = \pi(x) q(x' \mid x) \cdot 1 = \pi(x) q(x' \mid x).
+$$
+
+**Step 3.** The right side uses the reverse kernel; the $\pi(x') q(x \mid x')$
+factors cancel:
+
+$$
+\pi(x') T(x \mid x') = \pi(x') q(x \mid x') \cdot
+\frac{\pi(x) q(x' \mid x)}{\pi(x') q(x \mid x')} = \pi(x) q(x' \mid x).
+$$
+
+Both sides equal $\pi(x) q(x' \mid x)$, so detailed balance holds. By symmetry of
+the argument this covers every pair, and $\pi$ is therefore stationary.
+
+</details>
+
+**Exercise 3 (code).** Implement random-walk Metropolis-Hastings for a 1D
+standard normal target with proposal step $\sigma = 2.4$. Run $40{,}000$ steps
+from a fixed seed and check that the sample mean is near $0$ and the sample
+variance near $1$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def log_target(x):           # standard normal, unnormalized
+    return -0.5 * x**2
+
+N = 40_000
+step = 2.4
+x = 0.0
+samples = np.empty(N)
+n_accept = 0
+
+for t in range(N):
+    x_prop = x + rng.normal(0, step)
+    if np.log(rng.random()) < log_target(x_prop) - log_target(x):
+        x = x_prop
+        n_accept += 1
+    samples[t] = x
+
+post = samples[2000:]                  # discard burn-in
+print(f"acceptance: {n_accept / N:.3f}")
+print(f"mean {post.mean():.3f} (true 0), var {post.var():.3f} (true 1)")
+
+assert abs(post.mean()) < 0.1          # converges to the target mean
+assert abs(post.var() - 1.0) < 0.15    # and the target variance
+```
+
+The chain recovers mean $\approx 0$ and variance $\approx 1$ with an acceptance
+rate near $0.44$, the range a moderate step size produces for a 1D Gaussian. The
+asserts confirm convergence to the target moments rather than to a flatter or
+narrower distribution.
+
+</details>
 
 The next lesson introduces Gibbs sampling, which eliminates the proposal entirely by
 sampling each variable from its full conditional.

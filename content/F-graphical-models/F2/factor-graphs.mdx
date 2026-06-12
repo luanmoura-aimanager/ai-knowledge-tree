@@ -4,7 +4,7 @@ pillar: F
 subId: F2
 lessonId: factor-graphs
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Convert any directed or undirected graphical model to a factor graph, and express the sum-product algorithm as message passing on the bipartite factor-variable graph."
 prerequisites: ["markov-random-fields", "F1/d-separation"]
 ---
@@ -111,6 +111,106 @@ print(f"P(X2) brute force:     {p_x2_brute.round(4)}")
 ```
 
 The sum-product result matches the brute-force marginalization exactly on the tree-structured chain.
+
+## Exercises
+
+**Exercise 1.** A factor graph has two factors over three binary variables:
+$f_1(X_1, X_2)$ and $f_2(X_2, X_3)$, so the joint is
+$P(\mathbf{X}) = \frac{1}{Z} f_1(X_1, X_2) f_2(X_2, X_3)$. Write the factor-to-variable
+message $\mu_{f_1 \to X_2}(x_2)$ when $X_1$ is a leaf sending the uniform message
+$\mu_{X_1 \to f_1}(x_1) = 1$, and state what summation it performs.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The factor-to-variable rule is
+$\mu_{f_j \to X_i}(x_i) = \sum_{\sim \{x_i\}} f_j(\mathbf{x}_j) \prod_{X_k \in N(f_j) \setminus X_i} \mu_{X_k \to f_j}(x_k)$.
+Here $f_j = f_1$, target $X_i = X_2$, and the only other neighbor is $X_1$.
+
+**Step 2.** Substitute the incoming message $\mu_{X_1 \to f_1}(x_1) = 1$ and sum over
+$X_1$ (the variable not equal to the target):
+
+$$
+\mu_{f_1 \to X_2}(x_2) = \sum_{x_1} f_1(x_1, x_2) \cdot 1 = \sum_{x_1} f_1(x_1, x_2).
+$$
+
+The message is the column sum of the potential matrix $f_1$ over its first argument: it
+marginalizes $X_1$ out of the factor, leaving a function of $x_2$.
+
+</details>
+
+**Exercise 2.** In the chain factor graph $X_1 - f_{12} - X_2 - f_{23} - X_3$, the
+marginal at $X_2$ is $P(X_2) \propto \mu_{f_{12} \to X_2} \cdot \mu_{f_{23} \to X_2}$.
+Prove this product equals the brute-force marginal $\sum_{x_1, x_3} f_{12}(x_1, x_2) f_{23}(x_2, x_3)$
+(up to the shared normalizer).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** From Exercise 1, the message from $f_{12}$ with a uniform leaf message at $X_1$
+is $\mu_{f_{12} \to X_2}(x_2) = \sum_{x_1} f_{12}(x_1, x_2)$. By the same rule applied to
+the other side, $\mu_{f_{23} \to X_2}(x_2) = \sum_{x_3} f_{23}(x_2, x_3)$.
+
+**Step 2.** Their product is
+
+$$
+\left(\sum_{x_1} f_{12}(x_1, x_2)\right)\left(\sum_{x_3} f_{23}(x_2, x_3)\right).
+$$
+
+**Step 3.** Each sum involves disjoint variables ($x_1$ versus $x_3$) and the factors share
+only $x_2$, which is held fixed, so the product of sums equals the sum of the product:
+
+$$
+= \sum_{x_1}\sum_{x_3} f_{12}(x_1, x_2) f_{23}(x_2, x_3).
+$$
+
+This is the brute-force marginal of $X_2$ from the joint $f_{12} f_{23}$. Sum-product
+factors the double sum into two single sums, which is where the $O(n k^2)$ cost comes from
+instead of $O(k^3)$.
+
+</details>
+
+**Exercise 3 (code).** Extend the lesson's chain to four variables
+$X_1 - f_{12} - X_2 - f_{23} - X_3 - f_{34} - X_4$ and compute the marginal $P(X_3)$ by
+sum-product message passing. Verify it against brute-force marginalization of the full joint.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(5)
+k = 2
+f12 = np.abs(rng.normal(1, 0.5, (k, k)))
+f23 = np.abs(rng.normal(1, 0.5, (k, k)))
+f34 = np.abs(rng.normal(1, 0.5, (k, k)))
+
+# Messages flowing inward to X3 from both ends
+# From the left: X1 (leaf) -> f12 -> X2 -> f23 -> X3
+m_f12_x2 = f12.sum(axis=0)                 # sum over x1
+m_x2_f23 = m_f12_x2                         # X2 has only f12 and f23
+m_f23_x3 = f23.T @ m_x2_f23                 # sum over x2
+# From the right: X4 (leaf) -> f34 -> X3
+m_f34_x3 = f34.sum(axis=1)                  # sum over x4
+
+p_x3 = m_f23_x3 * m_f34_x3
+p_x3 /= p_x3.sum()
+
+# Brute force over the full 4-variable joint
+joint = np.einsum("ab,bc,cd->abcd", f12, f23, f34)
+joint /= joint.sum()
+p_x3_brute = joint.sum(axis=(0, 1, 3))
+
+assert np.allclose(p_x3, p_x3_brute)
+print(f"P(X3) sum-product: {p_x3.round(4)}")
+print(f"P(X3) brute force: {p_x3_brute.round(4)}")
+```
+
+The inward messages from both ends meet at $X_3$, and their product (normalized) matches
+the exact marginal from collapsing the full four-way joint.
+
+</details>
 
 The next subsection moves to temporal graphical models, where the chain structure models
 dynamics over time.

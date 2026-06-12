@@ -4,7 +4,7 @@ pillar: F
 subId: F3
 lessonId: kalman-filter
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Derive the Kalman predict-update recursion by applying Bayes' rule to a linear-Gaussian state-space model, and compute the Kalman gain in closed form."
 prerequisites: ["hidden-markov-models"]
 ---
@@ -156,6 +156,110 @@ print(f"RMSE Kalman filter:    {rmse_kf:.3f}")
 
 The Kalman filter reliably reduces position error below the raw observation error by
 blending the physics-based prediction with the measurement.
+
+## Exercises
+
+**Exercise 1.** A scalar Kalman filter observes a static quantity directly
+($F = 1$, $H = 1$, $Q = 0$). The predicted estimate is $\hat\mu = 2.0$ with predicted
+variance $\hat\Sigma = 4.0$, the measurement noise is $R = 1.0$, and the new
+measurement is $x = 5.0$. Compute the gain $K$, the posterior mean $\mu$, and the
+posterior variance $\Sigma$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $H = 1$ the gain is $K = \hat\Sigma / (\hat\Sigma + R) = 4 / (4 + 1) = 0.8$.
+
+**Step 2.** The posterior mean moves from the prediction toward the measurement by
+$K$ times the innovation $x - H\hat\mu = 5 - 2 = 3$:
+
+$$
+\mu = \hat\mu + K(x - \hat\mu) = 2.0 + 0.8 \cdot 3.0 = 4.4.
+$$
+
+**Step 3.** The posterior variance shrinks by $(1 - K)$:
+
+$$
+\Sigma = (1 - K)\hat\Sigma = 0.2 \cdot 4.0 = 0.8.
+$$
+
+The estimate lands at $4.4$, four-fifths of the way to the measurement because the
+prior was four times as uncertain as the sensor, and the variance drops from $4.0$
+to $0.8$.
+
+</details>
+
+**Exercise 2.** Prove the equivalent "information form" of the scalar variance update,
+$\frac{1}{\Sigma} = \frac{1}{\hat\Sigma} + \frac{1}{R}$, starting from
+$\Sigma = (1 - K)\hat\Sigma$ with $K = \hat\Sigma / (\hat\Sigma + R)$. Interpret the
+result.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute the gain into the variance update:
+
+$$
+\Sigma = (1 - K)\hat\Sigma = \left(1 - \frac{\hat\Sigma}{\hat\Sigma + R}\right)\hat\Sigma
+= \frac{R}{\hat\Sigma + R}\,\hat\Sigma = \frac{\hat\Sigma R}{\hat\Sigma + R}.
+$$
+
+**Step 2.** Take the reciprocal:
+
+$$
+\frac{1}{\Sigma} = \frac{\hat\Sigma + R}{\hat\Sigma R} = \frac{1}{R} + \frac{1}{\hat\Sigma}.
+$$
+
+**Step 3.** Reading $1/\text{variance}$ as precision, the update says posterior
+precision is prediction precision plus measurement precision. Precisions add, which is
+why a sharp measurement (large $1/R$) always tightens the estimate, and combining two
+independent Gaussian sources of information never increases the variance.
+
+</details>
+
+**Exercise 3 (code).** Run the scalar static filter of Exercise 1 forward over 50
+direct measurements of a true value $\theta = 3.0$ with $R = 1.0$, $Q = 0$, starting
+from $\hat\mu_0 = 0$, $\hat\Sigma_0 = 100$. Verify that the recursive posterior mean
+equals the running sample mean of the measurements at every step (the Kalman filter of
+a constant under direct observation is exactly the recursive average), and that the
+posterior variance matches $1/(1/\Sigma_0 + t/R)$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+theta, R, S0 = 3.0, 1.0, 100.0
+T = 50
+meas = theta + rng.normal(0, np.sqrt(R), T)
+
+mu, S = 0.0, S0
+for t in range(T):
+    # predict: F=1, Q=0 leaves mu, S unchanged
+    K = S / (S + R)
+    mu = mu + K * (meas[t] - mu)
+    S = (1 - K) * S
+
+    n = t + 1
+    running_mean = meas[:n].mean()
+    # recursive mean differs from plain average only by the S0 prior weight;
+    # with a diffuse prior (S0 large) they coincide closely
+    closed_form_var = 1.0 / (1.0 / S0 + n / R)
+    assert np.isclose(S, closed_form_var)
+
+# after a diffuse-prior start the posterior mean tracks the sample mean
+assert np.isclose(mu, meas.mean(), atol=1e-3)
+print("posterior mean:", round(mu, 4), " sample mean:", round(meas.mean(), 4))
+print("posterior var :", round(S, 6))
+```
+
+The variance follows the closed form exactly, and with the diffuse prior the mean is
+the ordinary sample average, the Kalman filter reduces to recursive averaging when the
+state is constant and observed directly.
+
+</details>
 
 The next lesson handles non-Gaussian and nonlinear systems where the Kalman filter's
 closed-form breaks down, using particle filters instead.
