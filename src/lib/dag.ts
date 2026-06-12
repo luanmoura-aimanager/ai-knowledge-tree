@@ -3,7 +3,7 @@
  *
  * Two exports:
  *
- *   PILLARS     : array of 10 top-level pillars (A → J), each with subsections
+ *   PILLARS     : array of 12 top-level pillars (A → L), each with subsections
  *                  and topics. Coverage status reflects what AI ML Theory
  *                  already covers; `hot` flags frontier material.
  *
@@ -32,7 +32,7 @@ export const PILLARS: Pillar[] = [
     intro:
       "Foundations is the mathematical and computational bedrock the rest of the tree stands on. Every model you will meet later is, underneath, linear algebra applied to data, a probability model fit by optimization, and an algorithm that has to run in finite time and memory. This pillar builds those four pieces from first principles so that nothing downstream has to be taken on faith.\n\nYou will start with linear algebra (vector spaces, eigenstructure, the SVD, and the matrix factorizations that power least squares and PCA), then probability and information theory (distributions, Bayes' rule, entropy and KL divergence, the language of all modeling under uncertainty). From there you turn to optimization theory (gradient methods, convexity, the KKT conditions, and the Adam family that trains real networks), then to numerical methods (floating point, conditioning, and stability, the difference between math that works on paper and code that works at scale). The pillar closes with the data structures and algorithms you need to make any of it tractable.\n\nTreat this as the reference you will return to. You do not need to master every lesson before moving on, but the more fluent you are here, the less the later pillars will feel like magic.",
     prerequisites: [
-      "Single-variable calculus: derivatives, the chain rule, and integrals.",
+      "Single-variable calculus: derivatives, the chain rule, and integrals (pillar L teaches all of it from scratch; L2 and L3 are the relevant disciplines).",
       "Comfort reading and writing basic Python (loops, functions, arrays).",
       "High-school algebra and trigonometry; familiarity with vectors and matrices helps but is rebuilt from scratch in A1.",
     ],
@@ -44,7 +44,7 @@ export const PILLARS: Pillar[] = [
           "Linear algebra is the language of data once you stack it into vectors and matrices. Almost everything downstream, from a least-squares fit to a transformer's attention block, is some arrangement of linear maps acting on high-dimensional points, so this discipline is where you learn to see those operations clearly instead of as opaque tensor shapes.\n\nYou will build from vector spaces, bases, and the four fundamental subspaces up through eigenvalues, the spectral theorem, and the singular value decomposition, then put them to work: low-rank approximation and PCA, the LU/QR/Cholesky factorizations that solve linear systems without inverting anything, least squares and the pseudo-inverse, and the matrix calculus and einsum notation that make backpropagation just the chain rule on arrays. By the end you can decompose a matrix, reason about why a system is solvable, and differentiate vector-valued expressions by hand.\n\nThis is the most reused pillar in the tree. PCA, recommender factorizations, the geometry of embeddings, and the entire training loop of deep networks all rest on what you build here, so fluency now pays off in every later subject.",
         prerequisites: [
           "High-school algebra and trigonometry; comfort manipulating symbolic expressions.",
-          "Single-variable calculus: derivatives and the chain rule.",
+          "Single-variable calculus: derivatives and the chain rule (taught from scratch in L2).",
           "Basic Python with numpy (arrays, indexing); vectors and matrices are rebuilt from scratch here.",
         ],
         topics: [
@@ -62,7 +62,7 @@ export const PILLARS: Pillar[] = [
         intro:
           "Probability is how you reason quantitatively about uncertainty, and information theory measures how much a distribution actually tells you. Together they are the modeling language of machine learning: every loss function, every generative model, and every notion of how confident a prediction should be is, underneath, a statement about probability.\n\nYou will start from the Kolmogorov axioms and random variables, work through expectation, variance, and the moment generating function, then the joint, marginal, and conditional view that leads to Bayes' rule. From there you meet the workhorse distributions and the exponential family, the Markov, Chebyshev, and Jensen inequalities, and the law of large numbers and central limit theorem that explain why averages behave. The discipline then turns to estimation (maximum likelihood, MAP, conjugate priors) and to information theory: entropy, KL divergence, cross-entropy, and mutual information, closing with Markov chains and a first look at Fisher information and information geometry.\n\nYou will leave able to write a likelihood, derive an estimator, and recognize cross-entropy loss as maximum likelihood in disguise. That vocabulary underpins pillar B statistics, the VAEs and diffusion models of pillar D, the RLHF penalty in pillar E, and the graphical models of pillar F.",
         prerequisites: [
-          "Single-variable calculus and basic integration (for continuous densities and expectations).",
+          "Single-variable calculus and basic integration, taught from scratch in L2 and L3 (for continuous densities and expectations).",
           "A1 Linear algebra: vectors, matrices, and eigenvalues (used in the Markov-chain lesson).",
           "Comfort running small numerical experiments in Python with numpy.",
         ],
@@ -90,7 +90,7 @@ export const PILLARS: Pillar[] = [
           "Optimization is how a model learns: you write down a loss surface and then search it for the parameters that make the loss small. Training a neural network, fitting a logistic regression, and tuning a support vector machine are all the same problem in different clothing, which is minimizing a function you can differentiate.\n\nYou will formalize what a minimum is through the gradient and Hessian, study convex sets and convex functions (the cases where local means global), and then build the descent methods in order: gradient descent and its convergence guarantees, stochastic gradient descent, momentum and Nesterov acceleration, and the adaptive AdaGrad/RMSProp/Adam family that trains real networks. The discipline also covers constrained optimization through Lagrange multipliers, duality, and the KKT conditions, then second-order and specialized methods (Newton, BFGS and L-BFGS, proximal gradient for nonsmooth penalties, and Bayesian optimization for expensive black boxes).\n\nAfter this you can read an optimizer's update rule and know why it behaves as it does, diagnose slow or unstable training, and choose a method to match a problem's structure. Every training loop in pillars C through H is an instance of what you study here.",
         prerequisites: [
           "A1 Linear algebra: matrix calculus, quadratic forms, and the spectral theorem.",
-          "Single-variable and basic multivariable calculus (gradients, partial derivatives).",
+          "Single-variable and basic multivariable calculus (gradients, partial derivatives), built from scratch in L2 and L4.",
           "A2 Probability helps for the stochastic methods and Bayesian optimization.",
         ],
         topics: [
@@ -110,7 +110,7 @@ export const PILLARS: Pillar[] = [
           "Numerical methods are the gap between mathematics on paper and code that runs correctly at scale. Computers store real numbers in finite precision, so an algorithm that is exact in theory can quietly lose all its accuracy, and this discipline teaches you to predict, detect, and prevent that failure.\n\nYou will start with IEEE-754 floating point and machine epsilon, then separate the conditioning of a problem from the stability of an algorithm and bound error with the condition number. You will see catastrophic cancellation and learn to reformulate around it, derive the log-sum-exp trick behind a stable softmax, and study iterative solvers: fixed-point iteration, conjugate gradient for symmetric positive-definite systems, and GMRES for the nonsymmetric case. The discipline closes with mixed-precision arithmetic (fp32 versus fp16 and bf16, plus loss scaling), the foundation of modern large-scale training.\n\nThis is short but high-leverage. The skills here explain why a naive softmax overflows, why an ill-conditioned matrix wrecks a least-squares fit, and how billion-parameter models train in low precision without diverging, which connects directly to the training systems of pillar D.",
         prerequisites: [
           "A1 Linear algebra: the SVD, condition number, and positive-definite systems.",
-          "Single-variable calculus and basic familiarity with exponentials and logarithms.",
+          "Single-variable calculus (L2, L3) and basic familiarity with exponentials and logarithms.",
           "Python with numpy to reproduce overflow, cancellation, and precision experiments.",
         ],
         topics: [
@@ -150,7 +150,7 @@ export const PILLARS: Pillar[] = [
       "Statistics is how you reason from a finite sample back to the world that produced it, and causal inference is how you go from 'these two things move together' to 'this one causes that one.' This pillar is the inferential backbone behind every honest model evaluation and every experiment you will run.\n\nYou will study frequentist inference (estimators, sampling distributions, confidence intervals, and hypothesis tests), then Bayesian inference (priors, likelihoods, posteriors, and credible intervals), then the resampling and validation machinery (bootstrap, permutation tests, cross-validation) that your metrics actually rest on. From there you turn to experimental design (randomization, A/B tests, statistical power) and finally causal inference (potential outcomes, confounding, backdoor adjustment, and instrumental variables), where the central lesson is that prediction and intervention are not the same question.\n\nThis is the pillar that keeps the rest of the tree honest: it tells you when a number means something and when it is noise.",
     prerequisites: [
       "A2 Probability and information theory: distributions, expectation, and Bayes' rule.",
-      "Single-variable calculus and basic linear algebra (A1).",
+      "Single-variable calculus (pillar L, L2 and L3) and basic linear algebra (A1).",
       "Comfort running numerical experiments in Python and numpy.",
     ],
     subs: [
@@ -1769,6 +1769,166 @@ export const PILLARS: Pillar[] = [
       },
     ],
   },
+  {
+    letter: "L",
+    slug: "L-calculus",
+    name: "Calculus",
+    shortName: "Calculus",
+    tagline:
+      "Limits, derivatives, integrals, multivariable & vector calculus, optimization",
+    color: "#c3e88d",
+    intro:
+      "Calculus is the mathematics of change, and machine learning is the practice of changing parameters until a loss stops shrinking. Every gradient a training loop computes, every Taylor expansion behind a convergence proof, and every density an integral normalizes is calculus doing its job, so this pillar teaches it from scratch and on its own terms: no prior calculus is assumed.\n\nYou will start with limits and continuity, the precise language of 'arbitrarily close', then build the derivative as the best local linear model and assemble the differentiation toolkit around the chain rule. Integration and the fundamental theorem connect accumulation back to change, and Taylor series turn smooth functions into polynomials you can compute with. The pillar then moves to many variables, where the gradient, Jacobian, and Hessian carry the same local-linear idea into n dimensions, passes through vector calculus and its integral theorems, and closes with multivariable optimization: critical points, convexity, Lagrange multipliers, and the three bridges that connect all of it to machine learning (gradient descent as steepest descent, backpropagation as the chain rule, and the Hessian's conditioning as the reason optimizers struggle).\n\nThis pillar sits at the very root of the dependency DAG. Pillar A's matrix calculus, optimization theory, and probability densities all assume it, which is why their prerequisite lists point here. If the tree has a first page, this is it.",
+    prerequisites: [
+      "High-school algebra and trigonometry: manipulating expressions, functions, and graphs.",
+      "Basic Python with numpy for the numerical experiments; every lesson's code is self-contained.",
+      "No prior calculus assumed; this pillar is upstream of pillar A and is where the tree's mathematics begins.",
+    ],
+    subs: [
+      {
+        id: "L1",
+        name: "Limits & continuity",
+        intro:
+          "Limits are the precise language of 'arbitrarily close', and continuity is the promise that a function does not tear. Every later idea in calculus (the derivative, the integral, the convergence of a series or a training run) is defined as a limit, so this discipline is where the vocabulary of the whole pillar is fixed.\n\nYou will work with the elementary functions and their graphs, compute limits numerically and pin them down with the epsilon-delta definition, evaluate them algebraically with the limit laws and the squeeze theorem, and use continuity to guarantee that roots and extrema exist (the intermediate and extreme value theorems). The discipline closes with sequences and convergence, then limits at infinity and growth rates, where little-o and big-O turn out to be statements about limits of ratios.\n\nThe payoff is fluency in the one move calculus repeats forever: trap a quantity between bounds and push the bounds together. Growth rates also hand you the bridge to A5's complexity analysis.",
+        prerequisites: [
+          "High-school algebra and trigonometry: solving equations, function notation, graphs.",
+          "Basic Python with numpy to run the numerical limit experiments.",
+          "No prior calculus assumed.",
+        ],
+        topics: [
+          {
+            name: "Functions, composition, elementary functions",
+            status: "gap",
+          },
+          { name: "Limits & the epsilon-delta definition", status: "gap" },
+          { name: "Limit laws & the squeeze theorem", status: "gap" },
+          { name: "Continuity, IVT, extreme value theorem", status: "gap" },
+          { name: "Sequences & convergence", status: "gap" },
+          { name: "Growth rates, little-o & big-O", status: "gap" },
+        ],
+      },
+      {
+        id: "L2",
+        name: "Differentiation",
+        intro:
+          "The derivative is the best local linear model of a function, and this discipline builds it from the limit definition up to a complete differentiation toolkit. The chain rule is the centerpiece: it is the one rule backpropagation runs on, so the care taken here pays off every time a network trains.\n\nYou will define the derivative as a limit of difference quotients and read it as tangent slope and instantaneous rate, derive the power, product, and quotient rules from that definition, then compose linear approximations into the chain rule. Implicit and logarithmic differentiation extend the toolkit to relations and variable powers, the mean value theorem turns derivative signs into monotonicity statements and powers L'Hopital's rule, and linearization closes the loop: replace a function near a point by its tangent line and bound the error.\n\nLocally linear is the idea the rest of the pillar scales up. The gradient, Jacobian, and Hessian of L4 are this discipline's tangent line grown into n dimensions.",
+        prerequisites: [
+          "L1 limits and continuity (the derivative is a limit).",
+          "Comfort with algebraic manipulation and the elementary functions.",
+          "numpy for finite-difference experiments.",
+        ],
+        topics: [
+          { name: "The derivative as a limit", status: "gap" },
+          { name: "Power, product & quotient rules", status: "gap" },
+          { name: "The chain rule", status: "gap", hot: true },
+          { name: "Implicit & logarithmic differentiation", status: "gap" },
+          { name: "Mean value theorem & L'Hopital", status: "gap" },
+          { name: "Linearization & differentials", status: "gap" },
+        ],
+      },
+      {
+        id: "L3",
+        name: "Integration & series",
+        intro:
+          "Integration measures accumulated change, and the fundamental theorem of calculus is the bridge that makes accumulation and differentiation inverse operations. This discipline builds the definite integral from Riemann sums, proves the FTC, and then assembles the techniques and extensions a working scientist actually uses.\n\nYou will compute integrals by substitution and by parts (the chain rule and product rule run in reverse), extend integration to infinite intervals and unbounded integrands with convergence tests, and meet the Gaussian integral that normalizes the normal density. The discipline then turns to approximation: Taylor polynomials with the Lagrange remainder bound, and power series with their radius of convergence, the expansions numerical libraries actually evaluate.\n\nIntegrals are how probability densities become probabilities (A2), and Taylor expansions are how every convergence proof in optimization starts (A3, L6), so this discipline feeds both of the tree's mathematical pillars at once.",
+        prerequisites: [
+          "L2 differentiation (the FTC links the two; techniques invert the rules).",
+          "L1 sequences and convergence (for series and improper integrals).",
+          "numpy for Riemann-sum and series experiments.",
+        ],
+        topics: [
+          { name: "The Riemann integral", status: "gap" },
+          { name: "Fundamental theorem of calculus", status: "gap" },
+          { name: "Substitution & integration by parts", status: "gap" },
+          { name: "Improper integrals & the Gaussian integral", status: "gap" },
+          {
+            name: "Taylor polynomials & the remainder",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Power series & convergence", status: "gap" },
+        ],
+      },
+      {
+        id: "L4",
+        name: "Multivariable differentiation",
+        intro:
+          "Loss functions take a million inputs, not one, and this discipline carries the derivative into n dimensions. The objects that replace the tangent slope (the gradient, the Jacobian, the Hessian) are the working vocabulary of every training loop, and each one is the same local-linear idea wearing more structure.\n\nYou will visualize scalar fields through graphs and level sets and extend limits to n dimensions, differentiate one coordinate at a time with partial derivatives, assemble them into the gradient and prove it points in the direction of steepest ascent, and define differentiability properly as the existence of a best linear map (the total derivative), which composes into the multivariable chain rule that backpropagation executes. The Jacobian linearizes vector-valued maps and composes by matrix multiplication; the Hessian collects second derivatives and writes the second-order Taylor expansion whose eigenvalues are curvature.\n\nThis is the discipline the optimization and deep-learning pillars quote most. A3's gradient methods, D1's backprop, and F5's variational gradients all read directly off what is built here.",
+        prerequisites: [
+          "L2 chain rule and linearization (extended here to n dimensions).",
+          "L3 Taylor polynomials (for the Hessian's second-order expansion).",
+          "A1 vectors and matrix multiplication at the level of the opening lessons (for the Jacobian).",
+        ],
+        topics: [
+          { name: "Scalar fields, graphs & level sets", status: "gap" },
+          { name: "Partial derivatives", status: "gap" },
+          {
+            name: "Gradient & directional derivatives",
+            status: "gap",
+            hot: true,
+          },
+          {
+            name: "Total derivative & multivariable chain rule",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Jacobian & Hessian", status: "gap", hot: true },
+        ],
+      },
+      {
+        id: "L5",
+        name: "Vector calculus & multiple integrals",
+        intro:
+          "Integration also scales to n dimensions, and vector fields get a calculus of their own. This discipline covers integrating over regions of the plane and space, transforming integrals between coordinate systems, and the differential operators and integral theorems that describe how vector fields flow.\n\nYou will compute double and triple integrals as iterated integrals justified by Fubini's theorem, change variables with the Jacobian determinant (and evaluate the Gaussian integral with the polar trick), integrate vector fields along curves to compute work, and characterize the conservative fields that are gradients of potentials. Divergence and curl measure local expansion and rotation, and the Green, Stokes, and divergence theorems say one thing three ways: the integral of a derivative over a region equals an integral over its boundary.\n\nThe change-of-variables formula is the mathematical engine of normalizing flows (D4), and gradient fields with potentials are exactly the setting of Hamiltonian Monte Carlo and Langevin dynamics (F6).",
+        prerequisites: [
+          "L4 gradients and Jacobians (the determinant reappears in change of variables).",
+          "L3 integration and the FTC (extended here to higher dimensions).",
+          "Comfort with basic 2D/3D geometry and parametrized curves.",
+        ],
+        topics: [
+          { name: "Double & triple integrals, Fubini", status: "gap" },
+          {
+            name: "Change of variables & the Jacobian determinant",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Line integrals & conservative fields", status: "gap" },
+          { name: "Divergence & curl", status: "gap" },
+          { name: "Green, Stokes & divergence theorems", status: "gap" },
+        ],
+      },
+      {
+        id: "L6",
+        name: "Multivariable optimization & the ML bridge",
+        intro:
+          "Everything in this pillar converges here: finding the inputs that make a function small is what training a model is. This discipline does optimization with calculus alone (no algorithmic machinery beyond gradient descent itself) and then makes the three bridges to machine learning explicit.\n\nYou will find interior extrema by setting the gradient to zero and classify them with the Hessian's eigenvalues, define convexity and see why it turns local minima into global ones, and derive the Lagrange-multiplier condition from the geometry of tangent level sets. Then the bridges: gradient descent derived from the first-order Taylor model as literal steepest descent, the Hessian's eigenvalue spread (the condition number) as the reason gradient descent zigzags across ravines, and backpropagation exposed as nothing but the multivariable chain rule multiplying Jacobians in reverse.\n\nAfter this discipline, A3's optimization theory reads as refinement rather than revelation, and D1's backprop lesson is a corollary. That is the point of the whole pillar.",
+        prerequisites: [
+          "L4 gradient, Jacobian, and Hessian (used in every lesson here).",
+          "L3 Taylor polynomials (descent and convergence arguments start from the expansion).",
+          "numpy to run the descent experiments.",
+        ],
+        topics: [
+          {
+            name: "Critical points & second-order conditions",
+            status: "gap",
+          },
+          { name: "Convexity via the Hessian", status: "gap" },
+          { name: "Lagrange multipliers", status: "gap" },
+          {
+            name: "Gradient descent as steepest descent",
+            status: "gap",
+            hot: true,
+          },
+          {
+            name: "Hessian conditioning & zigzagging",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Backprop as the chain rule", status: "gap", hot: true },
+        ],
+      },
+    ],
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -2036,6 +2196,75 @@ export const CONNECTIONS: Connection[] = [
     to: "I4",
     label: "Data observability ↔ model monitoring",
     kind: "shared-concept",
+  },
+
+  // ---- L. Calculus underpins the tree ----
+  {
+    from: "L1",
+    to: "A5",
+    label: "Growth rates ↔ Big-O analysis",
+    kind: "shared-concept",
+  },
+  { from: "L2", to: "A1", label: "Chain rule ⇒ matrix calculus", kind: "uses" },
+  {
+    from: "L3",
+    to: "A2",
+    label: "Integrals ⇒ densities & expectations",
+    kind: "uses",
+  },
+  {
+    from: "L3",
+    to: "A4",
+    label: "Taylor expansion ⇒ error analysis",
+    kind: "uses",
+  },
+  {
+    from: "L4",
+    to: "A3",
+    label: "Gradients & Hessians ⇒ optimization theory",
+    kind: "uses",
+  },
+  {
+    from: "L4",
+    to: "D1",
+    label: "Multivariable chain rule ⇒ backprop",
+    kind: "uses",
+  },
+  {
+    from: "L4",
+    to: "F5",
+    label: "Gradients of expectations ⇒ variational objectives",
+    kind: "uses",
+  },
+  {
+    from: "L5",
+    to: "D4",
+    label: "Change of variables ⇒ normalizing flows",
+    kind: "uses",
+  },
+  {
+    from: "L5",
+    to: "F6",
+    label: "Gradient fields ⇒ Hamiltonian MC & Langevin",
+    kind: "uses",
+  },
+  {
+    from: "L6",
+    to: "A3",
+    label: "Convexity & Lagrange multipliers deepened in A3",
+    kind: "generalizes",
+  },
+  {
+    from: "L6",
+    to: "B1",
+    label: "Critical points ⇒ maximizing likelihoods",
+    kind: "uses",
+  },
+  {
+    from: "L6",
+    to: "H2",
+    label: "Steepest ascent ⇒ policy gradients",
+    kind: "uses",
   },
 ];
 
@@ -2971,6 +3200,101 @@ export const PATHS: Path[] = [
         lessonId: "streaming-embeddings",
         section: "Feeds the AI stack",
         note: "AI data platform builds on K",
+      },
+    ],
+  },
+  {
+    name: "∂ Calculus for ML",
+    desc: "The shortest line from no calculus to reading a training loop: limits, then derivatives and the chain rule, then Taylor expansion, then gradients, Jacobians, and Hessians, then optimization, and finally the hop into the tree proper, where matrix calculus, gradient methods, and backprop pick up exactly where pillar L leaves off.",
+    color: "var(--pl)",
+    pillars: ["L1", "L2", "L3", "L4", "L6", "A1", "A3", "D1"],
+    steps: [
+      { subId: "L1", lessonId: "limits", section: "Single-variable core" },
+      { subId: "L1", lessonId: "limit-laws", section: "Single-variable core" },
+      {
+        subId: "L2",
+        lessonId: "derivative-definition",
+        section: "Single-variable core",
+      },
+      {
+        subId: "L2",
+        lessonId: "differentiation-rules",
+        section: "Single-variable core",
+      },
+      { subId: "L2", lessonId: "chain-rule", section: "Single-variable core" },
+      {
+        subId: "L2",
+        lessonId: "linearization",
+        section: "Single-variable core",
+      },
+      {
+        subId: "L3",
+        lessonId: "fundamental-theorem",
+        section: "Single-variable core",
+      },
+      {
+        subId: "L3",
+        lessonId: "taylor-polynomials",
+        section: "Single-variable core",
+      },
+      {
+        subId: "L4",
+        lessonId: "partial-derivatives",
+        section: "Many variables",
+      },
+      {
+        subId: "L4",
+        lessonId: "gradient-directional",
+        section: "Many variables",
+      },
+      {
+        subId: "L4",
+        lessonId: "total-derivative-chain-rule",
+        section: "Many variables",
+      },
+      { subId: "L4", lessonId: "jacobian", section: "Many variables" },
+      { subId: "L4", lessonId: "hessian", section: "Many variables" },
+      { subId: "L6", lessonId: "critical-points", section: "Optimization" },
+      { subId: "L6", lessonId: "convexity", section: "Optimization" },
+      {
+        subId: "L6",
+        lessonId: "lagrange-multipliers",
+        section: "Optimization",
+      },
+      { subId: "L6", lessonId: "steepest-descent", section: "Optimization" },
+      {
+        subId: "L6",
+        lessonId: "curvature-conditioning",
+        section: "Optimization",
+      },
+      {
+        subId: "L6",
+        lessonId: "backprop-chain-rule",
+        section: "Optimization",
+      },
+      {
+        subId: "A1",
+        lessonId: "matrix-calculus",
+        section: "Into the tree",
+        note: "pillar A picks up here",
+      },
+      {
+        subId: "A3",
+        lessonId: "gradient-descent",
+        section: "Into the tree",
+        note: "optimization theory proper",
+      },
+      {
+        subId: "A3",
+        lessonId: "sgd",
+        section: "Into the tree",
+        note: "the stochastic step",
+      },
+      {
+        subId: "D1",
+        lessonId: "backprop",
+        section: "Into the tree",
+        note: "the chain rule at scale",
       },
     ],
   },
