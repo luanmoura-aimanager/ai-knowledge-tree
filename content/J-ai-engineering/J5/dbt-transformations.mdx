@@ -4,7 +4,7 @@ pillar: J
 subId: J5
 lessonId: dbt-transformations
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Build warehouse transformations as version-controlled SQL models wired into a dependency DAG with built-in tests and lineage, the backbone of an analytics-engineering workflow."
 prerequisites: ["J3/multi-source-ingestion"]
 codeExempt: true
@@ -72,7 +72,81 @@ browsable lineage graph showing exactly which sources feed which marts.
 
 Put together, `ref`-inferred DAG, per-model materializations, and built-in tests and docs,
 dbt makes warehouse transformations version-controlled, tested, and traceable, which is why
-it anchors the analytics-engineering workflow<FN n="2" />. Transformations assume the data already
+it anchors the analytics-engineering workflow<FN n="2" />.
+
+## Exercises
+
+**Exercise 1.** A model `daily_active_users` is queried by a dashboard that refreshes every
+few seconds, all day, and the underlying logic is a heavy aggregation over a large events
+table. Pick a materialization for it and justify the choice against the freshness-versus-compute
+tradeoff. What would you pick instead if the dashboard were read once a day?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A view recomputes the heavy aggregation on every read. With reads arriving every
+few seconds all day, that is the aggregation run thousands of times per day: maximum compute,
+and slow per query. So a view is the wrong choice here.
+
+**Step 2.** A table materializes the result once per run and serves stored rows on each read.
+The dashboard then reads a precomputed table cheaply and fast; the cost is one rebuild per dbt
+run, and staleness bounded by the run cadence. For a frequently-read mart, that is the standard
+choice, so pick **table**.
+
+**Step 3.** If the dashboard were read once a day, the per-read cost stops mattering. A single
+view evaluation per day is cheaper than maintaining a stored table and is always fresh, so a
+**view** becomes the better trade. The materialization choice follows the read/write ratio:
+many reads favor table, few reads favor view.
+
+</details>
+
+**Exercise 2.** A teammate proposes hard-coding production table names inside each model's
+`SELECT` instead of using `ref('other_model')`, arguing it is "more explicit." Name two
+capabilities dbt would lose, and explain why each depends specifically on `ref`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** dbt infers the dependency DAG by reading the `ref` calls in each file. Hard-coded
+table names are opaque strings, so dbt can no longer tell which model feeds which. The
+automatic DAG, and therefore correct topological build order, is lost: dbt could try to build
+a model before its input exists.
+
+**Step 2.** `ref` is also how dbt rewrites table names per environment (dev, staging, prod
+schemas). A hard-coded production name points every environment at production, so a dev run
+reads from and could clobber production tables. The environment isolation depends on dbt
+controlling the name resolution, which it only does through `ref`.
+
+**Step 3.** Lineage docs and `relationships` test wiring also ride on the inferred DAG, so
+"explicit" hard-coding actually removes the explicit, machine-checkable lineage `ref` provides.
+The string is more literal but less informative.
+
+</details>
+
+**Exercise 3.** An `orders` model should satisfy two invariants: `order_id` is unique and
+never null, and every `customer_id` in it exists in the `customers` model. Map each invariant
+to a dbt test, and explain what concretely happens to a pipeline run when a new upstream batch
+introduces a duplicate `order_id`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Uniqueness and non-nullity of the key map to the `unique` and `not_null` tests
+declared on `order_id` in the model's YAML. The cross-model existence requirement maps to a
+`relationships` test pointing `customer_id` at `customers.id` (referential integrity).
+
+**Step 2.** When an upstream batch introduces a duplicate `order_id`, the `unique` test runs
+in the same pipeline as the build and finds more than one row per key, so the test fails. dbt
+reports the failing test and the run is marked failed.
+
+**Step 3.** Because the test gate sits in the transformation layer, the duplicate is caught
+before any downstream mart consuming `orders` is trusted: the failure stops the bad data from
+silently propagating, the same fail-fast posture a data-quality gate gives, moved into the
+transformation step itself.
+
+</details>
+
+Transformations assume the data already
 arrived correctly; guaranteeing *that* at the boundary is the job of
 [data contracts](data-contracts).
 

@@ -4,7 +4,7 @@ pillar: J
 subId: J4
 lessonId: multi-agent-orchestration
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Decompose a hard task across a supervisor and specialized workers with explicit handoffs and shared memory, and weigh that against the simpler single-agent baseline."
 prerequisites: ["J1/langgraph-state-machines", "E6/multi-agent"]
 codeExempt: true
@@ -62,7 +62,87 @@ the task genuinely decomposes into distinct skills (research *and* code *and* wr
 one agent's tool set or context has grown unmanageable, or when parts can run in parallel.
 If a single well-prompted agent with a reasonable tool set does the job, that is the right
 answer, simpler, cheaper, and easier to observe. Add agents to solve a *demonstrated*
-problem, not in anticipation of one. Whether one agent or many, each call costs tokens and
+problem, not in anticipation of one.
+
+## Exercises
+
+**Exercise 1.** For each task, decide whether a single agent or a supervisor-worker
+multi-agent system is the better starting point, and justify it from the
+decompose-when-distinct-skills rule: (a) summarize a single PDF, (b) build a research
+report that needs web search, code execution for charts, and prose writing, (c) classify
+support tickets into five categories.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Task (a) is one skill (read and condense) over a bounded input. A single agent
+with no tools, or one retrieval tool, covers it. Multi-agent adds handoffs and cost with no
+distinct skill to assign, so single agent.
+
+**Step 2.** Task (b) genuinely decomposes into distinct skills: searching, running code,
+and writing each want a different tool set and a different reasoning style. This is the
+case multi-agent is for: a supervisor plans and routes, a researcher searches, a coder runs
+the chart code, a writer composes. Multi-agent.
+
+**Step 3.** Task (c) is a single narrow skill (classification) with a small fixed output
+space. A well-prompted single agent, or even a non-agentic classifier, is right; splitting
+it across agents only adds coordination overhead. Single agent.
+
+The rule: reach for multiple agents only when the task splits into distinct skills, a tool
+set has grown unmanageable, or parts can run in parallel.
+
+</details>
+
+**Exercise 2.** Name the four structural elements of the supervisor-worker pattern
+(supervisor, workers, handoffs, shared memory) and, for each, state one failure that arises
+when it is missing or done badly.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** *Supervisor.* Without a coordinator holding the plan, no agent owns
+decomposition and routing; workers either duplicate work or leave gaps, and there is no
+single place to assemble the final result.
+
+**Step 2.** *Workers.* If workers are not specialized (each given a focused role and small
+tool set), every agent carries the full tool schema and reasons over unrelated concerns,
+losing the sharpness that was the reason to split.
+
+**Step 3.** *Handoffs.* A handoff that fails to transfer the relevant context drops
+information at the boundary; the receiving agent reasons from a partial picture, and the
+system becomes a free-for-all rather than a coherent pipeline.
+
+**Step 4.** *Shared memory.* Without a common state that agents read and write, work done
+by one is invisible to the others, so they cannot build on each other and may redo or
+contradict prior steps.
+
+</details>
+
+**Exercise 3.** A team replaces a working single agent with a five-agent system and
+observes higher latency, higher cost, and a new class of bugs. Explain the source of each
+of the three regressions, and state the principle that should have governed the decision.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** *Latency and cost.* Each agent is its own model call (often several, for its
+own reasoning loop), so five agents mean many more calls than one. Every call adds tokens
+and round-trip time, so both the bill and the wall-clock time rise roughly with the number
+of agents and handoffs.
+
+**Step 2.** *New bugs.* Multi-agent introduces coordination failures that a single trace
+never had: two agents stepping on each other's state, context lost at a handoff, or an
+infinite hand-off loop. These are distributed-system bugs, harder to reproduce and debug
+than one linear trace.
+
+**Step 3.** *The governing principle.* The single agent is the baseline to beat; add agents
+only to solve a demonstrated problem (a task that genuinely decomposes, an unmanageable
+tool set, or parallelizable parts), not in anticipation of one. Adding five agents to a
+task the single agent already handled spent all the overhead and bought nothing.
+
+</details>
+
+Whether one agent or many, each call costs tokens and
 time; the next lesson attacks that bill directly with [routing and caching](cost-latency-routing).
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: J
 subId: J3
 lessonId: deployment-cicd
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Package an AI service into a reproducible container, ship it through a CI/CD pipeline, and manage configuration and secrets across environments without baking them into the image."
 prerequisites: ["serving-api-design"]
 codeExempt: true
@@ -57,6 +57,85 @@ them); they are stored in a dedicated **secrets manager** (AWS Secrets Manager, 
 and handed to the container at startup. The rule is blunt and absolute: configuration
 and especially secrets are externalized, so the artifact stays the same across
 environments and a leaked image never leaks a credential.
+
+## Exercises
+
+**Exercise 1.** A teammate proposes baking the 14 GB model weights directly into
+the Docker image "so deployment is one self-contained artifact." Give two
+concrete costs of this choice, and state the alternative the lesson recommends.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Cost one, image size and transfer. Every build, push, and pull moves
+the full 14 GB. CI gets slower, the registry fills up, and rolling out to many
+nodes multiplies the transfer. A lean image of a few hundred MB pushes and pulls
+in seconds; a 14 GB one does not.
+
+**Step 2.** Cost two, rebuild coupling. The image is rebuilt for any code or
+dependency change, so a one-line code fix forces a fresh 14 GB artifact even
+though the weights did not change. Code and weights have different change rates
+and should version independently.
+
+**Step 3.** The recommended alternative is to keep the weights out of the image
+and mount or pull them at startup (from object storage or a model registry),
+keeping the image lean and decoupling the model artifact from the code artifact.
+
+</details>
+
+**Exercise 2.** The same immutable image is promoted dev to staging to
+production, yet each environment must talk to a different database and use a
+different API key. Explain how configuration and secrets reach the container
+without changing the image, and why secrets are handled differently from
+ordinary configuration.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Anything that differs per environment cannot live inside the image,
+because the image is identical across all three. It is injected at runtime as
+environment configuration (environment variables or mounted config), so the same
+bytes run everywhere and only the surrounding environment changes.
+
+**Step 2.** The database URL is ordinary configuration: it differs per
+environment but is not itself dangerous if seen. It can sit in plain environment
+config for that environment.
+
+**Step 3.** The API key is a secret. If baked into the image, anyone who pulls
+the image reads the credential; if committed to source control, it leaks through
+history. Secrets are therefore stored in a dedicated secrets manager (Vault, AWS
+Secrets Manager) and handed to the container at startup, never written into the
+image or the repo. The image stays identical and a leaked image leaks no
+credential.
+
+</details>
+
+**Exercise 3.** Your CI pipeline already runs unit tests and the image build on
+every commit. For an LLM service, name one additional gate the pipeline should
+enforce before a build reaches users, and explain why a green unit-test suite is
+not sufficient to catch the regression it guards against.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The additional gate is an evaluation suite: the same quality
+benchmark the team uses to judge the model (an offline eval set, an LLM-as-judge
+scoring pass, or a held-out task suite) runs in CI, and a build whose quality
+score regressed is blocked from promotion.
+
+**Step 2.** Unit tests check that code behaves as specified: the function returns
+the right shape, the endpoint returns 200, the parser handles edge cases. They
+say nothing about *answer quality*. A prompt-template tweak, a model-version
+bump, or a retrieval change can pass every unit test while making answers worse,
+because the output is still well-formed text, just less correct or less helpful.
+
+**Step 3.** Quality is a property of the model's outputs, not the code path, so
+only an evaluation that scores those outputs can catch the regression. Gating the
+pipeline on the eval suite makes "the pipeline is the only path to production"
+also mean "no quality regression ships," the same way unit tests mean "no
+behavioral regression ships."
+
+</details>
 
 Together, an immutable image, an automated pipeline, and externalized config give you
 deployments that are reproducible and safe to repeat, the [idempotent](I1/orchestration-dags)

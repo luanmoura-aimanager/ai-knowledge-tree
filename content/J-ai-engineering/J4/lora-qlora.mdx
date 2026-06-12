@@ -4,7 +4,7 @@ pillar: J
 subId: J4
 lessonId: lora-qlora
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Count exactly how few parameters a low-rank adapter trains, and see how QLoRA's quantized base weights make fine-tuning a large model fit on one GPU."
 prerequisites: ["E4/lora", "I3/quantization"]
 ---
@@ -89,7 +89,106 @@ assert mem16 / mem4 == 4
 
 LoRA trains $0.39\%$ of the parameters of a full fine-tune, the update really is rank
 $r$, and QLoRA's 4-bit base cuts the frozen-weight memory fourfold, the three numbers
-that together put fine-tuning a large model within reach of one GPU. Adapting the weights
+that together put fine-tuning a large model within reach of one GPU.
+
+## Exercises
+
+**Exercise 1.** For a weight matrix of shape $d \times d$ with $d = 4096$, compute the
+LoRA trainable-parameter fraction $2r/d$ at ranks $r = 4$ and $r = 16$. By what factor
+does the count grow when $r$ doubles?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The fraction is $2dr / d^2 = 2r/d$. At $r = 4$:
+
+$$
+\frac{2 \cdot 4}{4096} = \frac{8}{4096} \approx 0.195\%.
+$$
+
+**Step 2.** At $r = 16$:
+
+$$
+\frac{2 \cdot 16}{4096} = \frac{32}{4096} \approx 0.781\%.
+$$
+
+**Step 3.** The fraction $2r/d$ is linear in $r$, so doubling $r$ doubles the trainable
+count. Going $4 \to 8 \to 16$ each doubles it; from $r=4$ to $r=16$ is two doublings, a
+factor of $4$ (and indeed $0.781 / 0.195 = 4$).
+
+</details>
+
+**Exercise 2.** A non-square projection has shape $d_\text{out} \times d_\text{in}$. Write
+the LoRA parameter count for rank $r$, and give the break-even rank $r^\star$ above which
+LoRA stops saving parameters versus full fine-tuning.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** LoRA factors $\Delta W = A B$ with $A \in \mathbb{R}^{d_\text{out} \times r}$
+and $B \in \mathbb{R}^{r \times d_\text{in}}$, so the trainable count is
+
+$$
+r\,d_\text{out} + r\,d_\text{in} = r\,(d_\text{out} + d_\text{in}).
+$$
+
+**Step 2.** Full fine-tuning trains $d_\text{out}\,d_\text{in}$ entries. LoRA saves when
+
+$$
+r\,(d_\text{out} + d_\text{in}) < d_\text{out}\,d_\text{in}
+\quad\Longrightarrow\quad
+r^\star = \frac{d_\text{out}\,d_\text{in}}{d_\text{out} + d_\text{in}}.
+$$
+
+For the square case $d_\text{out} = d_\text{in} = d$ this is $r^\star = d/2$, far above the
+$r = 8$ or $16$ used in practice, which is why LoRA is a large saving and only degenerates
+to no saving at half the dimension.
+
+</details>
+
+**Exercise 3 (code).** Tabulate the LoRA parameter fraction across ranks, confirm a
+rank-$r$ product $AB$ has exactly $r$ nonzero singular values, and check that the fp16
+adapter memory is under $0.1\%$ of full fine-tuning's gradient-plus-optimizer memory.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+d = 4096
+for r in [4, 8, 16, 32]:
+    full = d * d
+    lora = 2 * d * r
+    print(f"r={r:2d}: {lora:,} params, {lora / full:.3%} of full")
+assert np.isclose(2 * d * 16 / (d * d), 2 * 16 / d)   # 16/4096 = 0.78125%
+
+# A rank-r product has exactly r nonzero singular values.
+r = 8
+A = rng.normal(size=(64, r))
+B = rng.normal(size=(r, 64))
+dW = np.dot(A, B)
+s = np.linalg.svd(dW, compute_uv=False)
+nonzero = int(np.sum(s > 1e-9))
+print("nonzero singular values:", nonzero, "(== r)")
+assert nonzero == r
+
+# Adapter memory (fp16) vs full-ft training memory (16 B/param: weight, grad, 2 Adam moments).
+bytes_lora = 2 * d * r * 2
+bytes_full = d * d * 16
+print("LoRA adapter:", f"{bytes_lora:,} B", " full-ft train:", f"{bytes_full:,} B",
+      f"({bytes_lora / bytes_full:.4%})")
+assert bytes_lora / bytes_full < 0.001
+```
+
+The fraction grows linearly with $r$, the decomposition is exactly rank $r$, and the
+adapter's training memory is under $0.05\%$ of full fine-tuning's, which is why LoRA fits
+where a full update never could.
+
+</details>
+
+Adapting the weights
 is one lever on quality; optimizing the *prompt* programmatically is another, which is
 [DSPy](dspy-context-engineering).
 

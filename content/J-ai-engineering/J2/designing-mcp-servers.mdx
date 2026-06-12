@@ -4,7 +4,7 @@ pillar: J
 subId: J2
 lessonId: designing-mcp-servers
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Choose the right tool granularity, name and document tools for a model rather than a human, and version a server so existing clients keep working as it evolves."
 prerequisites: ["mcp-protocol"]
 codeExempt: true
@@ -65,6 +65,98 @@ the same as any public API: treat removals and signature changes as a new versio
 keep the old surface working through a deprecation window, and never repurpose an
 existing tool name to mean something new. A model that learned to call `search_users`
 with a keyword should never one day find that name now deletes users.
+
+## Exercises
+
+**Exercise 1.** A server exposes a single tool `manage_files(action, path, content)`
+where `action` is one of `"read"`, `"write"`, `"list"`, `"delete"`. Identify which
+granularity failure mode this is, explain the concrete symptom a model will exhibit,
+and propose a tool set that fixes it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** This is the **too-coarse** failure: one mega-tool dispatching on an
+`action` argument. The schema shows the model the parameter names but gives it no
+per-action signal, so the model cannot see from the schema that `content` is required
+for `"write"` but meaningless for `"list"`.
+
+**Step 2.** The concrete symptom is malformed calls: the model invokes
+`manage_files("delete", path)` while omitting `content` (correct here) but also
+`manage_files("write", path)` with no `content` (now broken), because nothing in the
+schema couples the action to its required arguments. It guesses argument combinations
+and gets them wrong.
+
+**Step 3.** Split into one tool per coherent action, each with only the arguments that
+action needs: `read_file(path)`, `write_file(path, content)`, `list_files(path)`,
+`delete_file(path)`. Now `content` appears only where it is required, and the model
+reasons over four clear verbs instead of one overloaded dispatcher.
+
+</details>
+
+**Exercise 2.** Classify each change to a live server as backward-compatible or
+breaking, and justify each in one sentence: (a) adding a new tool `archive_ticket`;
+(b) adding an optional `priority` argument to `create_ticket`; (c) renaming
+`search_users` to `find_users`; (d) making the previously optional `limit` argument of
+`search_users` required.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) **Compatible.** Adding a tool cannot break existing clients; none of
+them called a tool that did not exist, so every prior call still resolves.
+
+**Step 2.** (b) **Compatible.** An optional argument defaults when omitted, so existing
+`create_ticket` calls that never pass `priority` keep working unchanged.
+
+**Step 3.** (c) **Breaking.** Every client that calls `search_users` by name now hits
+an unknown tool; the old name stops resolving, which is a removal in disguise.
+
+**Step 4.** (d) **Breaking.** Calls that omitted `limit` (valid before) now fail
+validation, so a previously correct client is silently rejected. The safe path for
+(c) and (d) is to ship the change as a new tool or version and keep the old surface
+through a deprecation window.
+
+</details>
+
+**Exercise 3.** A support team has internal REST endpoints `GET /users?q=`,
+`GET /users/{id}`, `GET /users/{id}/tickets`, and `POST /tickets`. A junior engineer
+proposes mirroring them one-to-one as MCP tools `get_users`, `get_user_by_id`,
+`get_user_tickets`, `post_tickets`. Critique this mapping against the lesson's three
+design principles and give a revised tool set with model-facing descriptions for two
+of the tools.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** **Granularity.** Mirroring the API one-to-one matches the *internal API
+surface*, not the model's decision, which the lesson warns against. The four endpoints
+happen to be reasonably coherent actions here, so the count is acceptable, but the
+mapping principle is wrong: tools should be chosen for the actions a model wants to
+take, and a tool like `get_user_tickets` is justified only if "list a user's tickets"
+is a real model task, not because the REST route exists.
+
+**Step 2.** **Descriptions.** The names are HTTP-shaped (`post_tickets`,
+`get_user_by_id`) rather than model-facing verbs. `post_tickets` reads as plumbing;
+`create_ticket` reads as an action the model can reason about. The descriptions and
+parameter meanings (what `q` searches, what a ticket payload contains) are absent, and
+for a model the description *is* the documentation.
+
+**Step 3.** Revised tool set: `search_users(search_terms)`, `get_user(user_id)`,
+`list_user_tickets(user_id)`, `create_ticket(user_id, summary)`. Two model-facing
+descriptions:
+
+- `search_users`: "Search the user directory by name or email keyword; returns up to
+  20 matching users with their ids. Use this when you have a name or email but not a
+  user id."
+- `create_ticket`: "Open a new support ticket for an existing user. Requires the
+  user's id (from `search_users` or `get_user`) and a one-line summary of the issue."
+
+**Step 4.** **Versioning** is untouched by the initial design, but the revised names
+must now be treated as a stable contract: once `create_ticket` ships, it can gain
+optional arguments but must never be renamed or repurposed.
+
+</details>
 
 Get these three right, sensible granularity, model-facing descriptions, compatible
 evolution, and your server is one a model can use correctly and that keeps working as

@@ -4,7 +4,7 @@ pillar: J
 subId: J7
 lessonId: ai-governance-compliance
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Build the controls that data-protection regimes (GDPR, LGPD) demand of AI systems: data residency, purpose limitation, the right to deletion, and an audit trail for automated decisions."
 prerequisites: ["J6/cloud-identity-security"]
 codeExempt: true
@@ -53,7 +53,83 @@ The throughline is that compliance is a **design input**, not a feature bolted o
 residency shapes the deployment topology; the right to deletion forces end-to-end lineage; auditability
 forces decision logging; purpose limitation constrains what data the [pipeline](J3/multi-source-ingestion)
 may even carry. An architect who treats these as first-class requirements, alongside latency and cost,
-designs a system that can satisfy a regulator and a deletion request without a rebuild. Governance also
+designs a system that can satisfy a regulator and a deletion request without a rebuild.
+
+## Exercises
+
+**Exercise 1.** A user invokes the right to deletion. Their data was ingested, embedded into a vector
+index, and also included in the training set of a fine-tuned model now in production. Walk the
+deletion through the system and identify which step is genuinely hard and why, naming the architectural
+feature that makes the request answerable at all.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Trace the data's footprint. The raw record sits in a primary store; an embedding of it
+sits in the vector index; and its content was folded into the fine-tuned model's weights during
+training. Deletion must reach all three locations.
+
+**Step 2.** Resolve the easy steps. Deleting the source row is a direct delete. Removing the
+corresponding vector from the index is also tractable, find the vector keyed to that record and
+delete it, provided the system tracked which vector came from which record.
+
+**Step 3.** Identify the hard step. Data baked into model weights cannot be deleted by erasing a row;
+the contribution is diffused across parameters. The practical remedies are retraining or fine-tuning
+without that data, both expensive. What makes the whole request answerable is data lineage: tracking
+where every piece of personal data flows, so each copy can be located. Lineage is a compliance
+feature, not just analytics, which is why an architect designs it in from the start.
+
+</details>
+
+**Exercise 2.** Personal data was collected to provide a support chatbot. A team proposes reusing the
+stored conversations to fine-tune a separate sales-recommendation model. Decide whether purpose
+limitation permits this, and state the design principle that would have prevented the question from
+arising.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply purpose limitation. Personal data may be used only for the specific purpose the
+user consented to. The consent here was for support, and sales recommendation is a different purpose,
+so feeding the conversations into that training set is a violation absent fresh consent for the new
+purpose.
+
+**Step 2.** Note the AI-specific bite. Folding the data into a second model's weights also entangles
+it with the deletion problem from Exercise 1, compounding the violation with a hard-to-reverse copy.
+
+**Step 3.** Name the preventing principle. Data minimization, the data analogue of least privilege:
+collect only what the stated purpose needs and scope its use tightly. Had use been scoped to support
+from the outset, the proposal would have been blocked by design rather than debated after the data
+was already broadly available.
+
+</details>
+
+**Exercise 3.** An AI system screens loan applications and rejects one. The applicant exercises a
+right to an explanation and human review. List the minimum the system must have logged at decision
+time to satisfy this, and explain why the audit trail must be immutable rather than a regular
+mutable log.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Enumerate what auditability requires. To reconstruct and justify the decision after the
+fact, the system must have logged the decision itself (reject), the inputs it acted on (the
+application features and any retrieved context), the model or version that produced it, and a
+timestamp. Without the inputs and the version, the decision cannot be reproduced or explained.
+
+**Step 2.** Explain immutability. A mutable log can be altered after a decision is challenged,
+deliberately or by a bug, which would let the recorded justification be rewritten to fit the outcome.
+An immutable, append-only audit trail guarantees the record reflects what the system actually saw and
+did at decision time, which is what gives the explanation and the human review something trustworthy
+to stand on.
+
+**Step 3.** Connect to the obligation. The right to explanation and human review is only meaningful if
+the reconstructed decision is the real one, so immutability is what turns logging into evidence rather
+than a story told afterward.
+
+</details>
+
+Governance also
 covers *safety* obligations, the duty to test the system against misuse, which the next lesson scales up
 as [red teaming](red-teaming-at-scale).
 

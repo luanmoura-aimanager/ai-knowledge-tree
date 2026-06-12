@@ -4,7 +4,7 @@ pillar: J
 subId: J1
 lessonId: tool-use
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Give a model the ability to call functions by injecting tool schemas, parsing the structured call it emits, dispatching to real code, and feeding the result back."
 prerequisites: ["E6/function-calling"]
 ---
@@ -98,8 +98,133 @@ for bad in [{"name": "delete_db", "arguments": {}},
 
 The well-formed call runs and returns the price for the model to use, while the
 hallucinated `delete_db` and the under-specified `add` are rejected at the boundary
-before any code runs. One tool call answers one question; looping the model so it can
-chain several calls toward a goal is the [ReAct loop](react-loop).
+before any code runs.
+
+## Exercises
+
+**Exercise 1.** The lesson calls the validate-and-dispatch step "a security
+boundary, not a formality," because "the model's output is untrusted input." Given
+the registry from the worked example, classify each of the following model-emitted
+calls as accepted or rejected by `dispatch`, and name the precise check that
+decides each.
+
+```json
+{"name": "get_stock", "arguments": {"ticker": "GOOG"}}
+{"name": "add", "arguments": {"a": 3, "b": 4}}
+{"name": "wipe_disk", "arguments": {}}
+{"name": "get_stock", "arguments": {}}
+```
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recall the two checks in `dispatch`: first, the name must be a key in
+`TOOLS` (else `unknown tool`); second, every parameter in the tool's `params` list
+must be present in `arguments` (else `missing args`).
+
+**Step 2.** Apply them in order to each call.
+
+- `get_stock` with `ticker` present: known tool, all params present. **Accepted**,
+  returns the price for `GOOG`.
+- `add` with `a` and `b` present: known tool, both required params present.
+  **Accepted**, returns `7`.
+- `wipe_disk`: not a key in `TOOLS`. **Rejected** by the unknown-tool check, before
+  any arguments are looked at.
+- `get_stock` with empty arguments: known tool, but the required `ticker` is
+  missing. **Rejected** by the missing-args check.
+
+**Step 3.** The two rejections are exactly the boundary's job: a hallucinated tool
+name and an under-specified call are both stopped before any function runs.
+
+</details>
+
+**Exercise 2.** Suppose a model emits a call whose `name` is a real tool but whose
+`arguments` contains an extra key the tool does not accept, for example `get_stock`
+with `{"ticker": "AAPL", "exchange": "NYSE"}`. Trace `dispatch` on it and state
+what happens, then explain what additional validation a stricter boundary would add
+and why the model's untrusted-output status motivates it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Trace the current `dispatch`. The name `get_stock` is in `TOOLS`, so
+the unknown-tool check passes. The missing-args check tests only that each declared
+param (`ticker`) is present; it does not test for *extra* keys, so it passes too.
+Then `TOOLS["get_stock"]["fn"](**args)` is called as `get_stock(ticker="AAPL",
+exchange="NYSE")`, and since `get_stock` takes only `ticker`, Python raises a
+`TypeError` for the unexpected keyword argument.
+
+**Step 2.** Name the stricter check. A robust boundary would reject any argument
+key not in the tool's declared `params` (an allowlist on arguments), returning a
+clean validation error instead of letting an unexpected keyword reach the function.
+
+**Step 3.** Motivate it. The model's output is untrusted; an extra or misspelled
+key is the kind of malformed call the boundary exists to catch. Validating the full
+argument set, not just presence of required keys, keeps a single confused or
+adversarial call from crashing or misdriving the real function.
+
+</details>
+
+**Exercise 3 (code).** Extend the worked dispatcher with strict argument validation:
+reject a call if its name is unknown, if any required parameter is missing, *or* if
+it carries any argument key the tool does not declare. Then route a batch of model
+calls and assert exactly which ones are accepted.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def add(a, b): return a + b
+def get_stock(ticker): return {"AAPL": 192.3, "GOOG": 141.8}.get(ticker)
+
+TOOLS = {
+    "add":       {"fn": add,       "params": ["a", "b"]},
+    "get_stock": {"fn": get_stock, "params": ["ticker"]},
+}
+
+def dispatch(call):
+    name, args = call["name"], call["arguments"]
+    if name not in TOOLS:
+        raise ValueError(f"unknown tool '{name}'")
+    declared = set(TOOLS[name]["params"])
+    missing = declared - set(args)
+    extra = set(args) - declared
+    if missing:
+        raise ValueError(f"missing args {sorted(missing)}")
+    if extra:
+        raise ValueError(f"unexpected args {sorted(extra)}")     # strict allowlist
+    return TOOLS[name]["fn"](**args)
+
+batch = [
+    {"name": "get_stock", "arguments": {"ticker": "AAPL"}},      # ok
+    {"name": "add",       "arguments": {"a": 1, "b": 2}},        # ok
+    {"name": "wipe_disk", "arguments": {}},                      # unknown name
+    {"name": "get_stock", "arguments": {}},                      # missing ticker
+    {"name": "get_stock", "arguments": {"ticker": "AAPL", "exchange": "NYSE"}},  # extra
+]
+
+accepted = []
+for call in batch:
+    try:
+        dispatch(call)
+        accepted.append(call["name"])
+    except ValueError:
+        pass
+
+assert accepted == ["get_stock", "add"]
+print("accepted calls:", accepted)
+```
+
+Only the two well-formed calls survive the boundary; the unknown tool, the missing
+required argument, and the undeclared extra argument are each rejected before any
+function runs.
+
+</details>
+
+One tool call answers one question; looping the model so it can chain several calls
+toward a goal is the [ReAct loop](react-loop).
 
 <Footnotes>
   <FNItem n="1">**Schick, T., et al.** (2023). "Toolformer: language models can teach themselves to use tools". *NeurIPS*. [arXiv:2302.04761](https://arxiv.org/abs/2302.04761). Models learn when and how to call external APIs.</FNItem>

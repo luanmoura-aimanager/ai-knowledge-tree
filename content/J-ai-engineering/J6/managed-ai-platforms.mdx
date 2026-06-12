@@ -4,7 +4,7 @@ pillar: J
 subId: J6
 lessonId: managed-ai-platforms
 order: 1
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Read a managed stack like AWS Bedrock (knowledge bases, agents, guardrails) as pre-assembled building blocks, and decide build-versus-buy against control, lock-in, and time-to-ship."
 prerequisites: ["J2/production-rag"]
 codeExempt: true
@@ -64,8 +64,79 @@ four forces:
   large scale the [economics](J6/finops-for-ai) can flip toward self-hosting.
 
 The mature pattern is rarely all-or-nothing: buy the standard, undifferentiated blocks (model
-access, guardrails) and build only the parts that are your actual differentiator. Whichever you
-choose, the system still needs to be secured, which the next lesson takes up as
+access, guardrails) and build only the parts that are your actual differentiator.
+
+## Exercises
+
+**Exercise 1.** Map each managed Bedrock block back to the open-component pattern it operates for
+you, and state, for each, the one capability you would lose by adopting the managed version over a
+hand-built stack.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Model access maps to the gateway pattern: one API routing across many foundation models.
+Adopting the managed version, you lose the ability to route to models outside the provider's catalog
+and to set custom routing logic beyond its exposed knobs.
+
+**Step 2.** Knowledge Bases maps to the RAG pipeline (chunking, embedding, vector store, retrieval).
+You lose control over the exact chunking strategy and the retrieval/reranking logic, which the
+managed service fixes to a small set of configurable options.
+
+**Step 3.** Agents maps to the reason-act-observe tool loop. You lose control over the orchestration
+itself: how the loop decides, retries, and budgets steps is the platform's, not yours. Guardrails
+maps to the safety layer (filtering, PII redaction, topic blocking); you lose the ability to define
+detectors the managed policy set does not offer.
+
+</details>
+
+**Exercise 2.** A four-person startup must ship a standard internal-docs Q&A assistant in three
+weeks. Walk the four build-versus-buy forces (time to ship, control, operational burden, lock-in and
+cost) and reach a recommendation, justifying it from the forces rather than asserting it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Time to ship: the deadline is three weeks and the use case is standard, so a managed
+Knowledge Base reaches production in days. This force points to buy.
+
+**Step 2.** Control: the requirement is a standard docs Q&A with no stated non-standard chunking or
+retrieval need, so the managed service's ceiling is not a wall here. This force does not push toward
+build.
+
+**Step 3.** Operational burden: four people cannot afford to run scaling, patching, and uptime for a
+self-hosted vector store and serving stack. This force points strongly to buy. Lock-in and cost: at
+a small team's scale the provider margin is small in absolute dollars and the convenience dominates;
+lock-in is a future concern, not a launch blocker. Recommendation: buy the managed block now, and
+revisit only if scale or a non-standard requirement later turns the ceiling into a wall.
+
+</details>
+
+**Exercise 3.** A company runs 50 million model calls a month on a managed platform whose per-call
+margin over raw compute is roughly 40%. Their workload is one standard pattern at steady, predictable
+load. Argue when the economics justify migrating that block to self-hosting, and which single
+managed block you would keep regardless.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At small scale the managed margin is small in absolute terms and the offloaded
+operational burden is worth it. At 50 million calls a month, a 40% margin is a large absolute sum,
+and steady predictable load is exactly the case self-hosted (or reserved) capacity serves
+efficiently, so the economics begin to favor building the high-volume serving block.
+
+**Step 2.** The migration only pays off if the team can actually operate what it takes over: scaling,
+patching, and uptime for the serving stack. The decision is the margin saved against the engineering
+cost to run it reliably at that volume, so self-hosting wins once saved margin clearly exceeds that
+operating cost.
+
+**Step 3.** Keep guardrails managed regardless. Safety filtering and PII redaction are
+undifferentiated, change as new attacks appear, and carry compliance risk if mis-built, so the
+managed block's maintained policy set is worth its margin even when raw serving is brought in-house.
+
+</details>
+
+Whichever you choose, the system still needs to be secured, which the next lesson takes up as
 [cloud identity and security](cloud-identity-security).
 
 <Footnotes>

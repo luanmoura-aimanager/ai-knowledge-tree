@@ -4,7 +4,7 @@ pillar: J
 subId: J1
 lessonId: react-loop
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Implement the reason-act-observe loop that turns a single tool call into multi-step agency, alternating model thoughts with tool actions until it reaches an answer."
 prerequisites: ["tool-use", "E6/react-agents"]
 ---
@@ -84,9 +84,111 @@ print("loop reached the answer in-budget:", answer)
 ```
 
 The agent chains two tool calls, each using the previous observation, and stops on
-its own once it can answer, all inside a `for` loop with a step cap. This hand-written
-loop is exactly what production frameworks wrap in nicer abstractions; the next lesson
-asks what [those frameworks](agent-frameworks) actually add.
+its own once it can answer, all inside a `for` loop with a step cap.
+
+## Exercises
+
+**Exercise 1.** The worked loop computes $12 \times 7 + 5$ in two tool calls. By
+hand, write out the full ReAct trace as the sequence of (Thought, Action,
+Observation) triples the scripted policy produces, and state how many model turns
+(policy calls) the run takes including the final-answer turn.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The policy branches on how many observations are in the history. The
+loop appends one action and one observation per non-final step, so the policy sees
+0, then 1, then 2 observations on its three calls.
+
+**Step 2.** Unroll the trace.
+
+- Turn 1 (0 observations): Thought "I need 12*7 first." Action `multiply(12, 7)`.
+  Observation `84`.
+- Turn 2 (1 observation): Thought "Got 84; now add 5." Action `add(84, 5)`.
+  Observation `89`.
+- Turn 3 (2 observations): Thought "The result is 89." Action `final` with payload
+  `89`. No observation; the loop breaks.
+
+**Step 3.** Count the turns. The policy is called 3 times: two action turns plus
+the final-answer turn. Two tool calls (`multiply`, `add`) run, and the final turn
+emits the answer $89$ rather than an action.
+
+</details>
+
+**Exercise 2.** The lesson calls the step budget a "non-negotiable safety rail."
+Suppose the policy had a bug and never emitted `final` (it kept requesting more
+tool calls). With the budget set to `range(5)`, state exactly how many tool calls
+run and what value `answer` holds when the loop ends, and explain why the program
+still terminates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Trace the buggy run. Each iteration that is not `final` runs one tool
+and appends an action and observation, then continues. With no `final` ever
+returned, the `if name == "final"` branch is never taken, so `break` never fires.
+
+**Step 2.** Apply the budget. `for step in range(5)` runs exactly 5 iterations
+(steps 0 through 4), then the loop ends because the iterator is exhausted, not
+because of a `break`. Five iterations each run one tool, so 5 tool calls run.
+
+**Step 3.** State the final state. `answer` was initialized to `None` and is only
+assigned inside the `final` branch, which never executes, so `answer` is still
+`None` when the loop ends. The program terminates because the budget caps the
+iteration count regardless of the agent's behavior, which is the safety rail's
+purpose: a stuck agent stops instead of looping forever.
+
+</details>
+
+**Exercise 3 (code).** Write a parser that consumes a recorded ReAct trace (a list
+of Thought/Action/Observation entries) and a tool registry, replays each action by
+dispatching it to the real tool, and asserts every recorded observation matches the
+freshly computed result. This is the check you would run to validate a saved agent
+trace. Drive it on the $12 \times 7 + 5$ trace.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+TOOLS = {"multiply": lambda a, b: a * b, "add": lambda a, b: a + b}
+
+# A recorded trace: each action is (tool_name, args), each paired with the
+# observation that was logged when the agent first ran.
+trace = [
+    {"thought": "need 12*7",  "action": ("multiply", (12, 7)), "observation": 84},
+    {"thought": "add 5",      "action": ("add", (84, 5)),      "observation": 89},
+    {"thought": "done",       "action": ("final", 89),         "observation": None},
+]
+
+def replay(trace, tools):
+    answer = None
+    for entry in trace:
+        name, payload = entry["action"]
+        if name == "final":
+            answer = payload
+            break
+        recomputed = tools[name](*payload)           # dispatch to the real tool
+        assert recomputed == entry["observation"]    # logged obs must reproduce
+    return answer
+
+answer = replay(trace, TOOLS)
+assert answer == 89
+# Every dependent step used the prior observation: add consumed multiply's 84.
+assert trace[1]["action"][1][0] == trace[0]["observation"]
+print("trace validated; final answer:", answer)
+```
+
+Replaying the recorded actions reproduces every logged observation, the second
+action's first argument equals the first action's observation (confirming the
+dependency chain), and the final answer is $89$.
+
+</details>
+
+This hand-written loop is exactly what production frameworks wrap in nicer
+abstractions; the next lesson asks what [those frameworks](agent-frameworks)
+actually add.
 
 <Footnotes>
   <FNItem n="1">**Yao, S., et al.** (2023). "ReAct: synergizing reasoning and acting in language models". *ICLR*. [arXiv:2210.03629](https://arxiv.org/abs/2210.03629). Interleaving reasoning traces with tool actions, the loop built here.</FNItem>

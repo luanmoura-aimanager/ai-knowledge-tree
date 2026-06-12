@@ -4,7 +4,7 @@ pillar: J
 subId: J1
 lessonId: langgraph-state-machines
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Model an agent as an explicit graph of nodes, edges, and routers over a shared state, and see why a graph beats a linear chain when control flow branches, loops, or needs checkpoints."
 prerequisites: ["agent-frameworks"]
 codeExempt: true
@@ -79,10 +79,98 @@ later, or recover from a crash mid-run.
 
 The cost is upfront structure: you must name the nodes and draw the edges before
 running anything, which is heavier than a one-line agent. The payoff is that complex,
-auditable, human-in-the-loop workflows stay manageable. With the agent-building toolkit
-in hand (RAG, tools, the loop, frameworks, graphs), the next subsection steps up to
-*systems thinking*: how these agents talk to the outside world through a standard
-protocol, [MCP](J2/mcp-protocol).
+auditable, human-in-the-loop workflows stay manageable.
+
+## Exercises
+
+**Exercise 1.** Trace the corrective-RAG graph from this lesson (`START` ->
+`retrieve` -> `generate` -> router) on a run where the first generation is judged
+not good enough, the retry retrieves better context, the second generation needs a
+tool, and after the tool the third generation is accepted. Write the ordered
+sequence of nodes visited, and state how many times each of `retrieve`,
+`generate`, and `call_tool` ran.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read the router from the diagram. After `generate`, the router returns
+one of: `no, retry` (back to `retrieve`), `needs a tool` (to `call_tool`, which
+returns to `generate`), or `yes` (to `END`).
+
+**Step 2.** Walk the described run step by step.
+
+1. `START` enters and the unconditional edge goes to `retrieve`. (retrieve #1)
+2. Edge `retrieve -> generate` runs `generate`. (generate #1)
+3. Router returns `no, retry` -> back to `retrieve`. (retrieve #2)
+4. Edge `retrieve -> generate`. (generate #2)
+5. Router returns `needs a tool` -> `call_tool`. (call_tool #1)
+6. Edge `call_tool -> generate`. (generate #3)
+7. Router returns `yes` -> `END`.
+
+**Step 3.** The ordered node sequence is
+
+$$
+\text{retrieve} \to \text{generate} \to \text{retrieve} \to \text{generate} \to \text{call\_tool} \to \text{generate} \to \text{END}.
+$$
+
+Counts: `retrieve` ran 2 times, `generate` ran 3 times, `call_tool` ran 1 time.
+
+</details>
+
+**Exercise 2.** The lesson lists three properties that fall out of making control
+flow explicit: cycles are first-class, the structure is inspectable, and
+checkpointing is natural. For each, name a concrete capability it gives a
+human-in-the-loop refund workflow that a linear agent executor cannot offer.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Cycles are first-class. The refund workflow can retrieve account
+history, check whether it is sufficient to decide, and loop back to retrieve more,
+with the loop expressed as a single edge pointing back rather than a special-cased
+counter inside one flat loop.
+
+**Step 2.** The structure is inspectable. Because the graph is a data object, a
+reviewer can visualize every path the refund agent can take and test the
+"escalate" node in isolation, instead of tracing nested conditionals to prove the
+agent never issues a refund without the lookup.
+
+**Step 3.** Checkpointing is natural. Since all work lives in the shared state, the
+framework can snapshot the state at the "ask a human" node, pause the run while the
+human reviews, and resume from that exact state on approval (or recover it after a
+crash). A linear executor has no first-class place to suspend and resume a run.
+
+</details>
+
+**Exercise 3.** Consider replacing the graph's runtime **router** (a conditional
+edge whose target is a function of the state) with a plain unconditional edge that
+always sends `generate` straight to `END`. Describe precisely which behaviors of
+the corrective-RAG graph are lost, and explain why this collapses the state machine
+back to a linear chain.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify what the router controlled. The router after `generate` chose
+among `retry` (loop back to `retrieve`), `tool` (go to `call_tool`), and `done`
+(go to `END`), inspecting the state each time.
+
+**Step 2.** Remove it. If `generate -> END` is now unconditional, the graph can
+only run `retrieve -> generate -> END` once. The retry loop is gone (no path back
+to `retrieve`), the tool branch is gone (no path to `call_tool`), and the
+"good enough?" check no longer influences control flow.
+
+**Step 3.** Explain the collapse. The branching and the cycle were the only parts
+that made this a state machine rather than a sequence; both lived in the router. A
+graph with only unconditional edges and no cycles is just a fixed linear pipeline,
+which is exactly the linear chain the lesson contrasts the graph against. The
+upfront structure remains, but it now buys nothing over a one-line chain.
+
+</details>
+
+With the agent-building toolkit in hand (RAG, tools, the loop, frameworks, graphs),
+the next subsection steps up to *systems thinking*: how these agents talk to the
+outside world through a standard protocol, [MCP](J2/mcp-protocol).
 
 <Footnotes>
   <FNItem n="1">**Huyen, C.** (2024). *AI Engineering: Building Applications with Foundation Models.* O'Reilly. Branching, looping, and human-in-the-loop control flow in agent systems.</FNItem>

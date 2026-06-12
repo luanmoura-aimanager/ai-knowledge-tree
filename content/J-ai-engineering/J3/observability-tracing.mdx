@@ -4,7 +4,7 @@ pillar: J
 subId: J3
 lessonId: observability-tracing
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Instrument a multi-step AI request as a tree of spans so you can see where latency and tokens go, the trace-based observability that tools like LangSmith provide."
 prerequisites: ["I4/slos-and-error-budgets"]
 codeExempt: true
@@ -57,7 +57,99 @@ timing data alone. This is precisely what LLM-focused tracing tools (LangSmith, 
 OpenTelemetry-based stacks) capture: the span tree *plus* the content flowing through it.
 Recording prompts and outputs also raises a privacy concern, those traces can contain
 user data, which is one more reason [security](prompt-injection-security) and governance
-run through every layer. With the service observable, the next lesson confronts the
+run through every layer.
+
+## Exercises
+
+**Exercise 1.** A trace for one `POST /chat` request has a root span of 2.1 s
+containing three child spans: `retrieve` 0.3 s, `rerank` 0.2 s, and
+`llm.generate` 1.5 s. A teammate, looking only at the p99 latency metric, plans
+to spend a sprint caching the retriever to cut latency. Using the trace, compute
+the best-case speedup that effort can deliver and say where the effort should go
+instead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read the span durations. Retrieval is 0.3 s out of the 2.1 s request,
+about 14 percent. Even reducing retrieval to zero removes at most 0.3 s, taking
+the request from 2.1 s to 1.8 s, a 14 percent improvement, and only if retrieval
+is not overlapped with other work.
+
+**Step 2.** The model call is 1.5 s, about 71 percent of the request. It
+dominates, so latency work (smaller model, shorter outputs, speculative decoding,
+streaming to cut perceived latency) targeting `llm.generate` has far more headroom
+than caching retrieval.
+
+**Step 3.** The metric alone could not have told the team this: p99 latency says
+*that* the request is slow, not *which span* owns the time. The trace decomposes
+the 2.1 s into its steps and redirects the sprint from a 0.3 s target to the 1.5 s
+one.
+
+</details>
+
+**Exercise 2.** Metrics and logs are the traditional pillars of monitoring.
+Construct a single AI-specific failure that neither a p99-latency metric nor a
+stream of log lines can diagnose on its own, and explain what property of a trace
+resolves it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The failure: under load, a fraction of `/chat` requests return
+plausible but wrong answers, and a fraction are slow. The two problems may or may
+not be the same requests.
+
+**Step 2.** Why the metric fails. p99 latency reports that some requests are slow
+but attributes nothing: it cannot say whether the slow ones are the wrong ones,
+nor which internal step (retrieval, rerank, generation, a tool call) is
+responsible. It is an aggregate with the causal structure averaged away.
+
+**Step 3.** Why logs fail. Logs record events, but once many requests interleave
+under concurrency, which log line belongs to which request, and which step
+emitted it, is guesswork. The causal chain of a single request is lost in the
+interleaving.
+
+**Step 4.** What the trace resolves. Every span carries the trace id of its
+request, so the full nested causal path of one request is reconstructable even
+under heavy concurrency. The wrong-answer request's trace shows the exact prompt
+and retrieved documents (revealing a bad-retrieval cause), and its span durations
+show whether that same request was also the slow one. Structure and content per
+request are precisely what metrics and logs discard.
+
+</details>
+
+**Exercise 3.** For an ordinary web service, a trace of timing-only spans (name,
+start, end) is usually enough to debug. The lesson argues AI tracing must also
+record the actual inputs and outputs of each step. Give the reason this extra
+demand is specific to AI systems, and name the privacy cost it introduces and one
+mitigation implied by the lesson.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Why timing is not enough for AI. A "wrong answer" bug is almost never
+a timing problem; it is a bad prompt or bad retrieval. The exact prompt sent, the
+documents retrieved, and the raw model response are invisible in duration data
+alone, so a trace of timings can show *that* generation ran but not *why* it
+produced a wrong answer. Reproducing the bug requires seeing the content that
+flowed through each span.
+
+**Step 2.** Why this is AI-specific. In a CRUD service the failure modes
+(a 500, a slow query, a null) are visible in status codes and timings. In an AI
+service the output is free-form text whose correctness depends on the inputs that
+produced it, so the content itself is the diagnostic signal, not just the timing.
+
+**Step 3.** The privacy cost. Recorded prompts and outputs can contain user data
+(personal information, confidential documents), so the trace store now holds
+sensitive content. The lesson ties this to security and governance running
+through every layer: the traces must be access-controlled and governed (and in
+practice redacted or retention-limited) like any other store of user data,
+rather than treated as harmless telemetry.
+
+</details>
+
+With the service observable, the next lesson confronts the
 threat unique to giving a model instructions and untrusted data in the same context:
 [prompt injection](prompt-injection-security).
 

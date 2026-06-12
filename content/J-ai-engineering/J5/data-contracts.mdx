@@ -4,7 +4,7 @@ pillar: J
 subId: J5
 lessonId: data-contracts
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Make a schema an enforced contract between data producers and consumers, validating type, presence, and range at the boundary so a bad upstream change fails fast instead of silently."
 prerequisites: ["I1/feature-stores"]
 ---
@@ -91,7 +91,116 @@ assert len(accepted) == 1 and len(rejected) == 3
 
 The one conforming record passes; the out-of-range age, the missing required field, and the
 mistyped id are each caught at the boundary with a precise reason, instead of slipping
-through to corrupt a downstream model. Contracts keep the data *correct*; the rest of the
+through to corrupt a downstream model.
+
+## Exercises
+
+**Exercise 1.** A contract marks `score` as optional with range $[0, 1]$. A producer
+starts emitting records where `score` is present but set to the integer $0$ instead of a
+float. Using the `validate` function from the lesson, walk through which checks fire and
+explain why the record is rejected even though $0$ is inside the allowed range.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** `score` is present, so the missing-field branch is skipped. Validation moves
+to the type check: the rule says `"type": float`, and `isinstance(0, float)` is `False`
+because $0$ is an `int`.
+
+**Step 2.** The type check appends an error (`expected float, got int`) and runs
+`continue`, which skips the range checks entirely. The record never even reaches the
+`min`/`max` comparison.
+
+**Step 3.** So the rejection is on *type*, not range. The value $0$ would satisfy
+$0 \le \text{score} \le 1$, but a contract enforces the declared type first; a downstream
+consumer expecting a float that does arithmetic on it could behave differently on an int
+(integer division, for example), so the contract refuses to guess. The fix belongs to the
+producer: emit $0.0$.
+
+</details>
+
+**Exercise 2.** Two consumers depend on the same producer. Consumer X requires the field
+`region`; consumer Y does not use it at all. The producer wants to stop sending `region`.
+Frame this as a contract-compatibility question: under what contract is this change safe,
+and what makes it a breaking change for X?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A field is part of the contract only if some consumer relies on it. If
+`region` is declared `required: True`, dropping it violates the presence check for every
+record, so X's validation rejects the whole stream: a breaking change.
+
+**Step 2.** The change is safe only if the contract no longer marks `region` as required
+(or removes it). That is a contract renegotiation, not a unilateral producer edit: X must
+first stop depending on `region` (or accept a default), and the contract is updated to
+make the field optional or drop it.
+
+**Step 3.** Y is irrelevant to the decision because Y never read `region`; compatibility
+is governed by the strictest consumer. This is why a contract is the agreement plus the
+enforcement: the schema encodes which removals are safe, so the producer can check
+compatibility before shipping instead of discovering X broke in production.
+
+</details>
+
+**Exercise 3 (code).** Implement the validator and confirm it accepts exactly one of four
+records. One subtlety: in Python `bool` is a subclass of `int`, so `isinstance(True, int)`
+is `True`. Guard the integer fields so a boolean does not sneak past an `int` type check,
+then assert the per-record error counts.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+CONTRACT = {
+    "user_id": {"type": int, "required": True},
+    "age":     {"type": int, "required": True, "min": 0, "max": 120},
+    "active":  {"type": bool, "required": False},
+}
+
+def validate(record, contract):
+    errors = []
+    for field, rule in contract.items():
+        if field not in record:
+            if rule["required"]:
+                errors.append(f"{field}: missing")
+            continue
+        val = record[field]
+        # bool subclasses int, so an int field must reject a bool explicitly
+        if rule["type"] is int and isinstance(val, bool):
+            errors.append(f"{field}: bool is not int")
+            continue
+        if not isinstance(val, rule["type"]):
+            errors.append(f"{field}: wrong type")
+            continue
+        if "min" in rule and val < rule["min"]:
+            errors.append(f"{field}: below min")
+        if "max" in rule and val > rule["max"]:
+            errors.append(f"{field}: above max")
+    return errors
+
+records = [
+    {"user_id": 1, "age": 30, "active": True},   # valid
+    {"user_id": 2, "age": 150},                  # age above max
+    {"user_id": True, "age": 40},                # user_id is a bool, not an int
+    {"age": 22},                                 # missing required user_id
+]
+n_errs = np.array([len(validate(r, CONTRACT)) for r in records])
+accepted = int((n_errs == 0).sum())
+print("error counts:", n_errs.tolist(), "accepted:", accepted)
+assert accepted == 1
+assert n_errs.tolist() == [0, 1, 1, 1]
+```
+
+The first record alone has zero errors; the others trip the range, type, and presence
+checks respectively, and the boolean `user_id` is caught because the int field guards
+against `bool` before the generic `isinstance`.
+
+</details>
+
+Contracts keep the data *correct*; the rest of the
 subsection makes the retrieval *fast at scale*, starting with
 [approximate nearest neighbors](vector-infra-ann).
 
