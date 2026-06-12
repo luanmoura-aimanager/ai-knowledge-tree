@@ -1,0 +1,247 @@
+---
+title: "The Riemann integral"
+pillar: L
+subId: L3
+lessonId: riemann-integral
+order: 1
+estimatedMinutes: 33
+goal: "Define the definite integral as a limit of Riemann sums, compute one from the definition, and read integrals as signed area and accumulated change."
+prerequisites: ["L1/continuity", "L1/sequences"]
+---
+
+Differentiation answered "how fast is it changing here?"; the dual question is
+"how much accumulated over this stretch?" Distance from a varying speed, total
+probability from a density, energy from a power draw: each is an
+accumulation, and each runs into the same obstacle, the rate keeps changing,
+so multiplication alone cannot finish the job. The **definite integral**
+solves it by the most calculus move there is: chop, approximate each piece by
+something constant, sum, and take the limit.
+
+## Riemann sums
+
+Take $f$ on the interval $[a, b]$. Split the interval into $n$ pieces with
+breakpoints $a = x_0 \lt x_1 \lt \dots \lt x_n = b$, the $i$-th piece having
+width $\Delta x_i = x_i - x_{i-1}$. On each piece, pretend $f$ is constant at
+its value at some chosen sample point $x_i^* \in [x_{i-1}, x_i]$, and add up
+the resulting rectangle areas:
+
+$$
+S_n = \sum_{i=1}^{n} f(x_i^*) \, \Delta x_i .
+$$
+
+This is a **Riemann sum**: an honest product of rate times width, piece by
+piece. Choosing each $x_i^*$ at the left endpoint gives the left sum, right
+endpoint the right sum, midpoint the midpoint sum; choosing the largest and
+smallest values of $f$ in each piece gives the upper and lower sums that
+bracket all others.
+
+$f$ is **integrable** on $[a,b]$ if all these sums converge to one number as
+the widest piece's width goes to $0$, regardless of how breakpoints and
+sample points are chosen. That common limit is the **definite integral**
+
+$$
+\int_a^b f(x)\, dx = \lim_{\max \Delta x_i \to 0} \; \sum_{i=1}^n f(x_i^*)\, \Delta x_i .
+$$
+
+The notation is fossilized Riemann sum: $\int$ is an elongated S for sum,
+$f(x)\,dx$ the height-times-width of an infinitesimally thin rectangle. The
+central existence theorem, proved by trapping upper and lower sums with the
+machinery of L1: **every continuous function on $[a, b]$ is
+integrable**<FN n="1" />. (So are functions with finitely many jumps;
+integration is more forgiving than differentiation.)
+
+![Left-endpoint Riemann sums for x squared on the unit interval at n = 4, 16, and 64: the staircase hugs the curve ever closer, and the printed sums 0.2188, 0.3027, 0.3255 climb toward the limit one third.](/figures/L3/riemann-integral.svg)
+
+## A computation from the definition
+
+Claim: $\displaystyle \int_0^1 x^2\, dx = \frac{1}{3}$.
+
+**Step 1.** Use $n$ equal pieces, width $\Delta x = 1/n$, right endpoints
+$x_i^* = i/n$:
+
+$$
+S_n = \sum_{i=1}^{n} \left( \frac{i}{n} \right)^{\!2} \cdot \frac{1}{n}
+= \frac{1}{n^3} \sum_{i=1}^{n} i^2 .
+$$
+
+**Step 2.** The power sum has a closed form,
+$\sum_{i=1}^n i^2 = \frac{n(n+1)(2n+1)}{6}$ (provable by induction), so
+
+$$
+S_n = \frac{n(n+1)(2n+1)}{6 n^3}
+= \frac{1}{6} \left( 1 + \frac{1}{n} \right)\left( 2 + \frac{1}{n} \right) .
+$$
+
+**Step 3.** Limits of sequences (L1): as $n \to \infty$ both parenthesized
+factors converge, giving $\frac{1}{6} \cdot 1 \cdot 2 = \frac{1}{3}$.
+Continuity of $x^2$ guarantees every other choice of pieces and sample points
+agrees.
+
+One computation from the definition is character-building; a second would be
+punishment. The fundamental theorem next lesson replaces this entire ritual
+with an antiderivative lookup, which is why this is the only integral the
+pillar evaluates the hard way.
+
+## Signed area and the basic properties
+
+When $f \ge 0$, the integral is the area between graph and axis. When $f$
+dips negative, those rectangles have negative heights, so the integral counts
+area below the axis with a minus sign: it is **signed** area, or better, net
+accumulation. Velocity that turns negative shrinks net displacement;
+$\int_0^{2\pi} \sin x \, dx = 0$ because the two lobes cancel. When total
+magnitude is wanted regardless of sign, the object is
+$\int_a^b \lvert f(x) \rvert\, dx$, a different number ($4$ for sine over a
+full period). Confusing net with total is the classic units error of this
+topic: an odometer and a GPS displacement disagree the moment you backtrack.
+
+Properties, all inherited from finite sums by the limit laws:
+
+- **Linearity:** $\int_a^b (c f + g) = c \int_a^b f + \int_a^b g$.
+- **Additivity over intervals:** $\int_a^b f = \int_a^c f + \int_c^b f$, with
+  the convention $\int_b^a f = -\int_a^b f$ making it hold in any order.
+- **Monotonicity:** $f \le g$ on $[a,b]$ implies $\int_a^b f \le \int_a^b g$;
+  in particular bounds on $f$ give
+  $m (b - a) \le \int_a^b f \le M (b - a)$.
+
+The last property has a mean-value corollary: for continuous $f$, the
+**average value** $\frac{1}{b-a}\int_a^b f$ lies between $\min f$ and
+$\max f$, so by the IVT it is *attained* at some point. Integrals are how
+"average of a continuum" is defined at all, which is how expectations of
+continuous random variables will be built in A2.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+f = lambda x: x**2
+
+# Right-endpoint Riemann sums for x^2 on [0,1] converge to 1/3
+for n in [4, 16, 64, 1024, 65536]:
+    xi = np.arange(1, n + 1) / n
+    print(f"n = {n:>6}: sum = {np.sum(f(xi)) / n:.8f}")
+S = lambda n: np.sum(f(np.arange(1, n + 1) / n)) / n
+assert abs(S(65536) - 1 / 3) < 1e-4
+# The closed form S_n = (1+1/n)(2+1/n)/6 matches the brute-force sum
+n = 1000
+assert np.isclose(S(n), (1 + 1 / n) * (2 + 1 / n) / 6)
+
+# Signed vs total: sine over a full period
+x = np.linspace(0, 2 * np.pi, 2_000_001)
+dx = x[1] - x[0]
+net = np.sum(np.sin(x[:-1])) * dx              # net accumulation ~ 0
+total = np.sum(np.abs(np.sin(x[:-1]))) * dx    # total magnitude ~ 4
+print("net:", round(net, 6), " total:", round(total, 6))
+assert abs(net) < 1e-6 and abs(total - 4) < 1e-6
+
+# Monotonicity bound: m(b-a) <= integral <= M(b-a) on a random function
+g = lambda t: 2 + np.sin(3 * t) * np.cos(t)
+t = np.linspace(1, 4, 1_000_001)
+I = np.sum(g(t[:-1])) * (t[1] - t[0])
+assert g(t).min() * 3 <= I <= g(t).max() * 3
+```
+
+The sums march to $1/3$ along the closed form, sine's lobes cancel to zero
+net while totaling four in magnitude, and the integral respects its min-max
+bracket.
+
+## Exercises
+
+**Exercise 1.** Compute $\displaystyle \int_0^2 (3x + 1)\, dx$ from the
+definition with right-endpoint sums, using
+$\sum_{i=1}^n i = \frac{n(n+1)}{2}$, and check the answer against the
+trapezoid geometry of the region.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Equal pieces of width $\Delta x = 2/n$, right endpoints
+$x_i = 2i/n$:
+
+$$
+S_n = \sum_{i=1}^{n} \left( 3 \cdot \frac{2i}{n} + 1 \right) \frac{2}{n}
+= \frac{12}{n^2} \sum_{i=1}^n i + \frac{2}{n} \cdot n
+= \frac{12}{n^2} \cdot \frac{n(n+1)}{2} + 2 .
+$$
+
+**Step 2.** Simplify: $S_n = 6 \left(1 + \frac{1}{n}\right) + 2$.
+
+**Step 3.** Limit: $S_n \to 6 + 2 = 8$.
+
+**Geometry check.** The region under $y = 3x + 1$ from $0$ to $2$ is a
+trapezoid with parallel sides $f(0) = 1$ and $f(2) = 7$ and width $2$: area
+$= \frac{1 + 7}{2} \cdot 2 = 8$. The definition agrees with Euclid.
+
+</details>
+
+**Exercise 2.** Suppose $\int_0^5 f = 12$, $\int_3^5 f = 4$, and
+$\int_0^3 g = 6$. Compute (a) $\int_0^3 f$, (b) $\int_0^3 (2f - g)$, and
+(c) $\int_3^0 f$.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Additivity over $[0,5] = [0,3] \cup [3,5]$:
+$\int_0^3 f = \int_0^5 f - \int_3^5 f = 12 - 4 = 8$.
+
+**(b)** Linearity on $[0, 3]$:
+$\int_0^3 (2f - g) = 2 \cdot 8 - 6 = 10$.
+
+**(c)** Orientation convention: $\int_3^0 f = -\int_0^3 f = -8$.
+
+</details>
+
+**Exercise 3 (code).** For $f(x) = \sin x$ on $[0, \pi]$ (true integral $2$,
+taken on faith until next lesson), compare left, right, and midpoint sums at
+$n = 10, 100, 1000$. Verify the midpoint error shrinks like $1/n^2$ while
+left/right errors shrink like $1/n$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+a, b, true = 0.0, np.pi, 2.0
+
+def sums(n):
+    edges = np.linspace(a, b, n + 1)
+    w = (b - a) / n
+    left = np.sum(np.sin(edges[:-1])) * w
+    right = np.sum(np.sin(edges[1:])) * w
+    mid = np.sum(np.sin((edges[:-1] + edges[1:]) / 2)) * w
+    return left, right, mid
+
+errs = {}
+for n in [10, 100, 1000]:
+    l, r, m = sums(n)
+    errs[n] = (abs(l - true), abs(r - true), abs(m - true))
+    print(f"n={n:>4}: left err {errs[n][0]:.2e}, right err {errs[n][1]:.2e}, "
+          f"mid err {errs[n][2]:.2e}")
+
+# Midpoint gains ~100x per 10x in n (order 2); here left/right do too,
+# by a symmetry accident of sin on [0, pi]: sin(0) = sin(pi) kills the
+# usual O(1/n) boundary term. Midpoint is ~2x better even so.
+assert errs[1000][2] < errs[100][2] / 90
+assert errs[100][2] < errs[10][2] / 90
+assert errs[1000][2] < errs[1000][0]
+```
+
+The midpoint rule's error drops by a factor of about $100$ per tenfold $n$,
+the $1/n^2$ signature (it cancels the linear error term inside each slice,
+the same symmetry as the central difference in L2). On this particular
+integrand the endpoint sums also enjoy order $2$, because
+$\sin 0 = \sin \pi$ makes their usual leading error terms cancel; on a
+generic interval they fall back to $1/n$.
+
+</details>
+
+Summing thousands of rectangles to eight digits is still brute force; the
+next lesson proves the fundamental theorem of calculus, which computes the
+same integrals by running differentiation backwards.
+
+<Footnotes>
+  <FNItem n="1">**Abbott, S.** (2015). *Understanding Analysis* (2nd ed.). Springer. Ch. 7, the Riemann integral and the integrability of continuous functions. [doi:10.1007/978-1-4939-2712-8](https://doi.org/10.1007/978-1-4939-2712-8)</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 5.1-5.2, areas, distances, and the definite integral.</FNItem>
+  <FNItem n="3">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 13, integrals via upper and lower sums.</FNItem>
+</Footnotes>
