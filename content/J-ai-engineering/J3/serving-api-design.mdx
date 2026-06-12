@@ -4,7 +4,7 @@ pillar: J
 subId: J3
 lessonId: serving-api-design
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Design the HTTP surface of an AI service: stream tokens as they generate, serve concurrent requests with async I/O, and version the API so contracts do not break."
 prerequisites: ["I3/llm-serving"]
 codeExempt: true
@@ -69,6 +69,97 @@ backward-incompatible changes as a new version, `/v2/`, run alongside `/v1/` thr
 deprecation window. Additive changes (a new optional field) are safe within a version;
 removals and semantic changes are not. This is the same evolution discipline as
 [MCP server versioning](J2/designing-mcp-servers), applied to the HTTP boundary.
+
+## Exercises
+
+**Exercise 1.** A non-streaming `/chat` endpoint returns the full completion in
+one response. For a request whose total generation takes 4 s, contrast the
+non-streaming time to first token with the streaming time to first token, and
+explain why streaming improves the user's experience even though total generation
+time is unchanged.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Non-streaming. The server buffers the entire completion and sends it
+only when generation finishes, so the user sees nothing until the full 4 s have
+elapsed. Time to first token equals total generation time, about 4 s of blank
+screen.
+
+**Step 2.** Streaming. Each token is pushed (over server-sent events) the instant
+the model produces it, so the first token arrives roughly when the model emits it,
+on the order of milliseconds to a few hundred milliseconds, not 4 s. Time to first
+token drops to that initial latency.
+
+**Step 3.** Total generation time is identical: all 4 s of tokens still have to be
+produced. What changed is *perceived* latency. The user starts reading
+immediately and watches the answer build, which is the latency a person actually
+feels, rather than staring at a blank screen for the same 4 s.
+
+</details>
+
+**Exercise 2.** A synchronous server runs 16 workers. Each `/chat` request takes
+5 s, of which roughly 4.9 s is spent awaiting the model and about 0.1 s is CPU
+work. Explain why this server collapses under concurrency, and why async I/O on a
+single worker can serve far more concurrent requests on the same hardware.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Synchronous bottleneck. A synchronous worker is occupied for the
+whole 5 s of a request, including the 4.9 s it spends merely waiting on the model,
+during which it does no CPU work but still cannot serve anyone else. With 16
+workers, at most 16 requests are in flight at once; the 17th waits, even though
+the machine's CPU is almost idle. Concurrency is capped by worker count, not by
+real resource use.
+
+**Step 2.** Async frees the waiting worker. With async I/O, a worker that hits the
+slow model call `await`s it and, instead of blocking, picks up other requests
+while that call is pending. The 4.9 s of waiting per request is now overlapped
+across many requests on the same worker.
+
+**Step 3.** Why the gain is large here. The work is dominated by waiting (4.9 s of
+5 s), and waiting is exactly what async overlaps. A single async worker can hold
+hundreds or thousands of `await`ing requests because each consumes almost no CPU
+while waiting, so the same hardware goes from tens of concurrent requests to
+thousands. Async is decisive precisely because AI serving is wait-bound, not
+CPU-bound.
+
+</details>
+
+**Exercise 3.** Your API is at `/v1/chat`. Classify each proposed change as safe
+within `v1` or as requiring a new `/v2/`, and justify the rule you are applying:
+(a) add a new optional `temperature` field to the request; (b) rename the response
+field `text` to `content`; (c) change the default `max_tokens` from 1024 to 256;
+(d) start rejecting requests that were previously accepted with a missing
+`model` field.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The rule. The API is a contract clients integrate against without
+redeploying when you do. Additive, backward-compatible changes are safe within a
+version; backward-incompatible changes (renames, removals, semantic or default
+changes, tighter validation) silently break live integrations and require a new
+version run alongside the old one through a deprecation window.
+
+**Step 2.** (a) Add an optional `temperature` field: safe within `v1`. It is
+additive; existing clients that omit it are unaffected.
+
+**Step 3.** (b) Rename `text` to `content`: new `/v2/`. Every client reading
+`response.text` breaks the moment the field disappears; a rename is a removal plus
+an addition, backward-incompatible.
+
+**Step 4.** (c) Change the default `max_tokens` from 1024 to 256: new `/v2/`. It is
+a semantic change to behavior clients rely on; a client that omitted `max_tokens`
+expecting 1024 now silently gets truncated output. Same response shape, different
+meaning, still a break.
+
+**Step 5.** (d) Reject previously accepted requests missing `model`: new `/v2/`.
+Tightening validation rejects inputs that used to succeed, breaking any client
+that relied on the lenient behavior.
+
+</details>
 
 Streaming for perceived latency, async for concurrency, versioning for stability: these
 make the API usable. What sits *in front* of it, deciding who may call and how much,

@@ -4,7 +4,7 @@ pillar: J
 subId: J4
 lessonId: when-not-to-finetune
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Reach for prompting, RAG, and long context before fine-tuning, and recognize the narrow conditions (stable task, latency or format constraints, enough data) where fine-tuning actually pays."
 prerequisites: ["J2/production-rag", "E4/sft"]
 codeExempt: true
@@ -65,7 +65,77 @@ Fine-tuning earns its cost in a narrow set of conditions, usually several at onc
 
 The honest default: try prompting, then RAG or long context, and fine-tune only when a
 stable task has a behavior or economics requirement that the cheaper rungs genuinely
-cannot meet. When that case *does* arrive, the next lesson makes fine-tuning itself cheap,
+cannot meet.
+
+## Exercises
+
+**Exercise 1.** Classify each gap as a *knowledge* gap or a *behavior* gap, and name the
+right tool: (a) the model does not know your company's internal product names, (b) the
+model answers in paragraphs but you need strict JSON every time, (c) the model is unaware
+of events after its training cutoff.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) is a knowledge gap: the facts (product names) live in your documents, not
+the model's weights. The fix is RAG or long context, which inject the facts at query time.
+Fine-tuning facts tends to cause hallucination, the model learns the shape of answers
+without the underlying knowledge.
+
+**Step 2.** (b) is a behavior gap: the model knows how to answer but not in the required
+form. A consistent output format is exactly what fine-tuning changes (behavior and style),
+and what few-shot prompting often cannot pin down reliably. Try prompting first; if format
+adherence is still unreliable, this is a candidate for fine-tuning.
+
+**Step 3.** (c) is a knowledge gap about recent facts. The model cannot know post-cutoff
+events; retrieval or pasted context supplies them. Fine-tuning would freeze a new cutoff
+and still miss tomorrow's events, so RAG or context is right.
+
+</details>
+
+**Exercise 2.** Two of fine-tuning's four "when it pays" conditions are *task is stable*
+and *enough high-quality data*. For each, describe a project that violates it and explain
+the concrete failure that follows.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** *Violating stability.* A compliance assistant whose rules change weekly. If you
+fine-tune the rules into the weights, every rule change forces a retraining cycle (days to
+weeks), and between cycles the model serves stale behavior. The same rules in a prompt are
+edited in minutes, so the unstable task belongs in the prompt, not the weights.
+
+**Step 2.** *Violating the data requirement.* A niche task with only 30 hand-written
+examples. Fine-tuning on that little data either overfits (memorizes the 30 and
+generalizes poorly) or barely moves the model at all. The training cost buys no reliable
+gain; prompting with those 30 as few-shot examples, or RAG, extracts more from them.
+
+</details>
+
+**Exercise 3.** A team reports: "We fine-tuned a small model on our task and it now matches
+a much larger model at a fraction of the inference cost." Which of fine-tuning's payoff
+conditions does this exemplify, what one-time cost did they accept, and what ongoing
+liability did they take on?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** This is the *latency or cost constraints favor a small model* condition, often
+the real reason to fine-tune. Fine-tuning lifts a small, cheap model to a large model's
+quality on the specific task, trading a one-time training cost for a permanently cheaper
+and faster forward pass.
+
+**Step 2.** The accepted one-time cost is the training effort: assembling enough clean
+task-specific data and running (and validating) the fine-tune.
+
+**Step 3.** The ongoing liability is that the weights are frozen at training time. If the
+task drifts or requirements change, the small model's behavior is now stale and a fresh
+fine-tune is needed, which is why this payoff only holds when the task is also stable. The
+small model is cheap to run but expensive to change.
+
+</details>
+
+When that case *does* arrive, the next lesson makes fine-tuning itself cheap,
 with [LoRA and QLoRA](lora-qlora).
 
 <Footnotes>

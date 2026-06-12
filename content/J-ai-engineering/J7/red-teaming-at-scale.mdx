@@ -4,7 +4,7 @@ pillar: J
 subId: J7
 lessonId: red-teaming-at-scale
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Turn one-off safety testing into a continuous, automated red-teaming pipeline, and layer defenses so no single bypass compromises the system."
 prerequisites: ["I4/safety-evals-red-teaming", "J3/prompt-injection-security"]
 codeExempt: true
@@ -62,7 +62,81 @@ leaves the attacker facing the next:
 The layers are deliberately **independent**: an attacker who crafts a prompt past the input filter still
 faces a model that *cannot* reach sensitive data (architecture), whose output is scanned (output), and
 whose anomaly is logged (monitoring). Safety comes from the *combination*, designed so no single failure
-is catastrophic, not from any one perfect filter. Capturing these layered decisions so a team can build
+is catastrophic, not from any one perfect filter.
+
+## Exercises
+
+**Exercise 1.** A team runs one expert red-team exercise before launch, finds and fixes the attacks,
+and considers safety done. Two months later a new model version ships. Explain why the original
+exercise no longer certifies the system, and describe the two changes that turn it into a process that
+keeps pace.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Explain the staleness. A one-time exercise tests a single snapshot: a fixed prompt, model,
+and tool set. Shipping a new model (or prompt) changes the system under test, so the old results no
+longer describe the deployed system, and the attackers themselves keep adapting. The certificate
+expired the moment the snapshot changed.
+
+**Step 2.** First change: make execution continuous. Run the attack suite on every release and on a
+schedule, tracking the attack success rate over time, so a new version that regresses safety is caught
+the same way a quality regression is, by the metric moving.
+
+**Step 3.** Second change: make the corpus grow. Every newly discovered bypass, from the pipeline, bug
+bounties, or real incidents, is added to the suite, so coverage compounds and the system is permanently
+re-tested against every attack it has ever seen rather than a frozen set.
+
+</details>
+
+**Exercise 2.** An input filter catches $90\%$ of attack attempts. A teammate argues that tightening
+it to $99\%$ is the priority investment. Argue from defense in depth why a single stronger filter is
+the wrong place to concentrate, and which layer offers the most durable protection and why.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** State the limit of one layer. The input space is natural language, so no detector catches
+every attack; a $99\%$ filter still lets $1\%$ through, and those are the cases that matter. Raising
+one layer's catch rate buys diminishing returns while the system still falls entirely on that layer's
+misses.
+
+**Step 2.** Name the durable layer. The architecture layer, least privilege and trust boundaries, is
+the most durable, because it does not rely on *detecting* the attack at all. A successful injection
+that gets past every filter still faces a model that cannot reach sensitive data, so the blast radius
+is small regardless of detection.
+
+**Step 3.** Conclude. The investment belongs in independent layers (architecture, output scanning,
+monitoring) so a bypass of the filter is not catastrophic, not in pushing one filter from $90\%$ to
+$99\%$. Safety comes from the combination, not a single near-perfect filter.
+
+</details>
+
+**Exercise 3.** Design a four-layer defense for an agent that can call a payments tool. For each
+layer (input, architecture, output, monitoring), give one concrete control specific to this agent, and
+show how a single injection that slips past the input layer is still contained.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Input and architecture layers. Input: classify incoming prompts for known injection
+patterns and reject obvious payment-manipulation phrasings. Architecture: scope the agent's
+permissions so it can only initiate payments below a small limit and only to pre-approved payees, so
+even a hijacked agent cannot move large or arbitrary funds.
+
+**Step 2.** Output and monitoring layers. Output: scan the agent's proposed tool call before it
+executes, blocking any payment that violates the limit or payee allowlist. Monitoring: trace and log
+every payment attempt, alert on anomalies (unusual amounts, new payees), and feed novel bypasses back
+into the red-team corpus.
+
+**Step 3.** Show containment. An injection that gets past the input filter reaches an agent that
+*cannot* exceed the payment limit or pay an unknown payee (architecture), whose proposed call is
+scanned and blocked if it tries (output), and whose attempt is logged and alerted (monitoring).
+Getting past one layer leaves the attacker facing the next, so no single bypass is catastrophic.
+
+</details>
+
+Capturing these layered decisions so a team can build
 and maintain them is the documentation discipline of [reference architectures and ADRs](reference-architectures-adrs).
 
 <Footnotes>

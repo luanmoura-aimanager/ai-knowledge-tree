@@ -4,7 +4,7 @@ pillar: J
 subId: J1
 lessonId: agent-frameworks
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Map the manual ReAct loop onto the abstractions a framework provides (tools, agent executors, memory) and judge what the framework buys you and what it hides."
 prerequisites: ["react-loop"]
 codeExempt: true
@@ -81,6 +81,95 @@ write, and matching the framework's assumptions to your model can be its own wor
 The judgment call: reach for a framework when you want the solved tail and your use
 case fits its shape, and stay with the hand-written loop when you need to see and
 control every token, which is common for latency-critical or high-stakes systems.
+
+## Exercises
+
+**Exercise 1.** For each of the three core abstractions (tool, agent executor,
+memory), name the exact piece of the hand-written ReAct loop it replaces, and
+state one detail the abstraction handles that the hand-written version left for
+you to write.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Map each abstraction to the loop piece it stands in for, taken
+directly from the mapping in this lesson.
+
+- **Tool** replaces the **manual tool registry**: the dict that paired each tool
+  name with its function, schema, and parameter list.
+- **Agent executor** replaces the **`for` loop plus dispatcher**: the Thought-
+  Action-Observation cycle, the model calls, the routing to the right function,
+  and the step budget.
+- **Memory** replaces the **`history` list** you passed around by hand each turn.
+
+**Step 2.** Name a detail each abstraction adds beyond the bare loop piece.
+
+- Tool: it generates the JSON schema from the function signature and docstring,
+  so the schema cannot drift out of sync with the function.
+- Agent executor: it parses tool calls when the model does not return clean JSON
+  and retries on malformed output.
+- Memory: it threads the conversation history back into the prompt automatically,
+  including any summarization or windowing the store applies.
+
+</details>
+
+**Exercise 2.** A team runs a customer-support agent in a regulated domain where
+every model output must be logged verbatim and a compliance reviewer must be able
+to trace why any given tool was called. They are choosing between a framework
+executor and the hand-written loop. Argue which side the transparency requirement
+pushes them toward, and name the one framework benefit they would forfeit.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify the dominant requirement. The constraint is auditability:
+verbatim logging plus a traceable reason for each tool call. The lesson notes that
+with a framework "the bug is now inside the framework's prompt templating or output
+parser, layers you did not write," so the reasoning that drove a tool call is
+partly hidden inside abstractions the team does not control.
+
+**Step 2.** Weigh it against the framework's gains. The framework buys the solved
+tail (parsing, retries, memory, streaming, swappable backends). None of those
+removes the audit problem; some (hidden prompt templating) make it worse.
+
+**Step 3.** Conclude. The transparency requirement pushes them toward the
+hand-written loop, where they see and control every token and can log the exact
+prompt and the exact parsed call. What they forfeit is the solved tail: they must
+write and maintain their own parsing, retries, and memory rather than inheriting
+the ecosystem's.
+
+</details>
+
+**Exercise 3.** The lesson says a framework's *linear* executor "strains" once
+control flow branches, loops back, or pauses for human input. Take a refund agent
+that must: look up an account, then either issue a refund or escalate to a human,
+and if it escalates, pause until the human approves. Explain why a single linear
+Thought-Action-Observation loop cannot express this cleanly, and name the property
+a graph-structured agent adds to fix it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Describe the control flow the task needs. After the account lookup the
+agent must choose between two distinct paths (refund vs escalate), and one of those
+paths must *stop* mid-run and wait for an external event (human approval) before
+continuing.
+
+**Step 2.** Show where a linear loop strains. A single Thought-Action-Observation
+loop has one path: think, act, observe, repeat. Branching to two outcomes forces
+the choice into conditionals smuggled inside the model's prompt or the dispatcher,
+and there is no first-class place to *suspend* the loop and resume it later from
+the same state. The control flow becomes an implicit tangle rather than an explicit
+object.
+
+**Step 3.** Name the fix. A graph-structured agent makes branching an explicit
+router edge and makes pause/resume natural through checkpointing of the shared
+state, so the escalate path can halt and resume on approval. That is exactly the
+case the next lesson on [graph-structured agents](langgraph-state-machines) takes
+up.
+
+</details>
+
 Either way, the loop underneath is the one from the last lesson. When control flow
 gets more complex than a single loop, branching, looping back, pausing for human
 input, even a framework's linear executor strains, which is the case for

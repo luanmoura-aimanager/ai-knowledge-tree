@@ -4,7 +4,7 @@ pillar: J
 subId: J3
 lessonId: multi-source-ingestion
 order: 6
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Pull data from REST APIs, object storage, and databases into one place, and adopt the ELT-plus-transformation mental model that dbt formalizes for the warehouse."
 prerequisites: ["I1/orchestration-dags"]
 codeExempt: true
@@ -57,6 +57,88 @@ already covered:
 - **Lineage is explicit.** Because the DAG is declared, dbt knows which downstream tables
   depend on which sources, so you can trace any column back to its origin and see the
   blast radius of a schema change before you make it.
+
+## Exercises
+
+**Exercise 1.** A team using ETL transforms data the moment it is extracted and
+loads only the cleaned result, discarding the raw payload. Six months later a new
+use case needs a field the original transformation dropped. Explain what ELT with
+raw landing would have made possible here, and the general principle behind it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under ETL, the dropped field is gone from the warehouse: the only way
+to recover it is to re-extract from the source, which may have changed,
+rate-limited the pull, or no longer hold the historical rows. The new requirement
+is blocked on a fresh and possibly impossible extraction.
+
+**Step 2.** Under ELT, the raw payload was landed as-is and kept. The new field
+is already sitting in the raw landing zone, so serving the use case is a *new
+transformation* over data already present, not a re-extraction.
+
+**Step 3.** The principle: landing raw decouples extraction from transformation.
+Extraction happens once and preserves the original; any number of transformations
+can be added later without touching the source. This is why ELT displaced ETL for
+analytics and ML, where requirements evolve and re-extraction is costly or
+lossy.
+
+</details>
+
+**Exercise 2.** You must ingest from three sources: a SaaS CRM behind a REST API,
+a bucket of Parquet files in object storage, and a production Postgres database
+whose rows change continuously and must be mirrored with low lag. For each,
+choose an extraction strategy from the lesson and justify it in one sentence.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** CRM REST API: paginated, incremental-by-timestamp HTTP pulls. The API
+is rate-limited and returns pages, so respect pagination and auth, and fetch only
+records changed since the last run to stay within limits and avoid re-pulling
+everything.
+
+**Step 2.** Object storage Parquet: bulk list-and-read. The files are static
+objects, so enumerate the bucket and read the files in bulk; there is no
+incremental protocol to honor beyond reading new objects.
+
+**Step 3.** Production Postgres with continuous low-lag mirroring: change data
+capture (CDC). A periodic snapshot query would miss intermediate changes and lag;
+CDC streams the row-level inserts, updates, and deletes as they happen, mirroring
+the database with low lag and without hammering it with repeated full scans.
+
+</details>
+
+**Exercise 3.** dbt's core idea is that a transformation is a `SELECT` statement
+and a model is a named query other models can reference. A schema change is
+proposed on a raw source table. Explain how the three dbt properties (DAG,
+version control plus tests, explicit lineage) together let the team assess and
+ship that change safely, where a folder of ad-hoc SQL scripts could not.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Explicit lineage answers "what breaks." Because each model declares
+the models and sources it references, dbt knows the full set of downstream tables
+that depend on the changed source. The team sees the blast radius (every affected
+column and table) *before* touching anything, instead of discovering breakage in
+production.
+
+**Step 2.** The DAG makes the rebuild correct and ordered. Once the change is
+made, dbt re-runs the affected models in topological order, so each model rebuilds
+only after its dependencies, and nothing runs against stale upstream output.
+
+**Step 3.** Version control plus tests make the change reviewable and validated.
+The modified models live in Git, so the change is a reviewed diff, and the data
+tests (not null, unique, accepted values) run as part of the build, catching a
+transformation that now violates an invariant before it ships.
+
+**Step 4.** A folder of ad-hoc scripts has none of this: no declared dependency
+graph (so the blast radius is unknown), no guaranteed run order, no review trail,
+and no automated tests. The change is shipped blind and breakage surfaces
+downstream. Treating transformations as software is exactly what closes that gap.
+
+</details>
 
 The shift dbt encodes is treating analytics transformations like *software*, versioned,
 tested, dependency-managed, which is why it anchors the [data platform](J5/dbt-transformations)

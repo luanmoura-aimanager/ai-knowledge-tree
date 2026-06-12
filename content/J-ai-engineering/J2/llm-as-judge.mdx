@@ -4,7 +4,7 @@ pillar: J
 subId: J2
 lessonId: llm-as-judge
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Score open-ended outputs with a model judge, measure whether the judge agrees with humans using Cohen's kappa, and build a regression suite that catches quality drops before release."
 prerequisites: ["I4/llm-evaluation", "B4/ab-testing"]
 ---
@@ -100,9 +100,110 @@ assert regressed
 
 The judge agrees with humans at $\kappa = 0.75$, well past the "substantial" bar, so it
 is trustworthy enough to gate on; and the regression check catches the degraded build,
-whose pass rate fell far enough below baseline to clear the noise threshold. Evaluation
-tells you *whether* the system works; the next lesson improves the part most often
-responsible when it does not, the [retrieval pipeline](production-rag).
+whose pass rate fell far enough below baseline to clear the noise threshold.
+
+## Exercises
+
+**Exercise 1.** A judge and a human each label $100$ items as accept/reject. They agree
+on $90$ items. The judge accepts $80$ of the $100$; the human accepts $85$. Compute
+Cohen's kappa by hand, and explain why the raw $90\%$ agreement overstates the judge's
+quality here.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Observed agreement is the fraction labelled identically:
+$p_o = 90/100 = 0.90$.
+
+**Step 2.** Chance agreement uses each rater's positive rate, $p_J = 0.80$ and
+$p_H = 0.85$:
+
+$$
+p_e = p_J p_H + (1 - p_J)(1 - p_H) = 0.80 \cdot 0.85 + 0.20 \cdot 0.15 = 0.68 + 0.03 = 0.71.
+$$
+
+**Step 3.** Apply the kappa formula:
+
+$$
+\kappa = \frac{p_o - p_e}{1 - p_e} = \frac{0.90 - 0.71}{1 - 0.71} = \frac{0.19}{0.29} \approx 0.655.
+$$
+
+**Step 4.** Both raters accept most items ($80\%$ and $85\%$), so two raters that just
+echoed "accept" would already agree about $71\%$ of the time. The raw $0.90$ counts
+that chance agreement as skill; kappa subtracts it, leaving $\kappa \approx 0.66$,
+"substantial" but well short of what $90\%$ suggested.
+
+</details>
+
+**Exercise 2.** Suppose the human accept rate is $p_H$ and the judge is a pure
+chance-guesser that accepts independently at rate $p_J$. Show that Cohen's kappa is
+exactly $0$ in expectation, regardless of $p_H$ and $p_J$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** "Pure chance-guesser, independent of the human" means the judge's label is
+statistically independent of the human's. Then the probability they agree is computed
+by summing the independent joint probabilities of (both accept) and (both reject).
+
+**Step 2.** Both accept with probability $p_J p_H$; both reject with probability
+$(1 - p_J)(1 - p_H)$. So the expected observed agreement is
+
+$$
+p_o = p_J p_H + (1 - p_J)(1 - p_H).
+$$
+
+**Step 3.** That expression is the definition of $p_e$. Substituting $p_o = p_e$:
+
+$$
+\kappa = \frac{p_o - p_e}{1 - p_e} = \frac{0}{1 - p_e} = 0.
+$$
+
+The kappa denominator $1 - p_e$ is positive whenever the raters are not both
+degenerate, so kappa is exactly $0$. Kappa reports "no skill above chance" for an
+independent guesser at any accept rate, which is the property raw agreement lacks.
+
+</details>
+
+**Exercise 3 (code).** A judge has a known **positivity bias**: when the true (human)
+label is reject, the judge wrongly accepts $20\%$ of the time, but when the true label
+is accept, the judge agrees $97\%$ of the time. Simulate $5000$ items with a $60\%$
+human accept rate, then (a) confirm the judge's measured accept rate exceeds the
+human's, and (b) compute Cohen's kappa from the simulated labels. Use numpy only.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+N = 5000
+
+human = rng.binomial(1, 0.60, size=N)              # 1 = accept (the true label)
+# judge: 97% agree when human accepts; 20% false-accept when human rejects
+p_accept = np.where(human == 1, 0.97, 0.20)
+judge = rng.binomial(1, p_accept)
+
+# (a) positivity bias inflates the judge's accept rate above the human's
+pJ, pH = judge.mean(), human.mean()
+assert pJ > pH
+
+# (b) Cohen's kappa from the simulated labels, implemented directly
+po = np.mean(judge == human)
+pe = pJ * pH + (1 - pJ) * (1 - pH)
+kappa = (po - pe) / (1 - pe)
+print(f"human accept {pH:.3f}  judge accept {pJ:.3f}  kappa {kappa:.3f}")
+assert 0.5 < kappa < 0.8                            # real but imperfect agreement
+```
+
+The false-accepts on rejected items push the judge's accept rate above the human's, and
+kappa lands in the "moderate-to-substantial" band rather than near $1$, flagging that
+the bias erodes agreement even though the judge is right most of the time.
+
+</details>
+
+Evaluation tells you *whether* the system works; the next lesson improves the part most
+often responsible when it does not, the [retrieval pipeline](production-rag).
 
 <Footnotes>
   <FNItem n="1">**Zheng, L., et al.** (2023). "Judging LLM-as-a-judge with MT-Bench and Chatbot Arena". *NeurIPS*. [arXiv:2306.05685](https://arxiv.org/abs/2306.05685). Establishes and validates the LLM-as-judge methodology against human preferences.</FNItem>

@@ -4,7 +4,7 @@ pillar: J
 subId: J4
 lessonId: cost-latency-routing
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Cut serving cost with a model cascade that routes easy queries to a cheap model and escalates only hard ones, and quantify the blended cost-quality tradeoff."
 prerequisites: ["I4/cost-monitoring"]
 ---
@@ -84,7 +84,99 @@ print(f"=> {correct.mean() / exp_correct.mean():.0%} of strong-model accuracy "
 ```
 
 The cascade reaches $98\%$ of the strong model's accuracy at $55\%$ of its cost by paying
-the premium only on the $45\%$ of queries the router flags as hard. Routing and caching
+the premium only on the $45\%$ of queries the router flags as hard.
+
+## Exercises
+
+**Exercise 1.** A cascade always runs a cheap model at cost $c_1 = 1$ and escalates a
+fraction $e$ of queries to a strong model at cost $c_2 = 12$ (the cheap call still counts,
+since it ran first). Write the blended expected cost per query as a function of $e$, then
+evaluate it at $e = 0.30$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Every query pays $c_1$. An escalated query additionally pays $c_2$, and a
+fraction $e$ of queries escalate, so the expected extra is $e\,c_2$. The blended cost is
+
+$$
+\mathbb{E}[\text{cost}] = c_1 + e\,c_2.
+$$
+
+**Step 2.** Substitute $c_1 = 1$, $c_2 = 12$, $e = 0.30$:
+
+$$
+\mathbb{E}[\text{cost}] = 1 + 0.30 \cdot 12 = 1 + 3.6 = 4.6.
+$$
+
+That is $4.6 / 12 \approx 38\%$ of the always-strong cost, a $62\%$ saving, bought by
+escalating fewer than a third of queries.
+
+</details>
+
+**Exercise 2.** You have a cost budget of $B = 6$ per query for the same cascade
+($c_1 = 1$, $c_2 = 12$). What is the largest escalation rate $e^\star$ the budget allows,
+and what does exceeding it mean operationally?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set the blended cost from Exercise 1 equal to the budget and solve for $e$:
+
+$$
+c_1 + e\,c_2 \le B \quad\Longrightarrow\quad e \le \frac{B - c_1}{c_2}.
+$$
+
+**Step 2.** Substitute the numbers:
+
+$$
+e^\star = \frac{6 - 1}{12} = \frac{5}{12} \approx 0.417.
+$$
+
+So up to about $42\%$ of traffic can escalate before the budget breaks. If the router
+flags more than that as hard, the confidence threshold must be tightened (accept more
+cheap answers) or the budget raised; the threshold is the single knob trading accuracy
+against this cost ceiling.
+
+</details>
+
+**Exercise 3 (code).** Simulate the cascade's blended cost on a stream of queries with a
+given escalation rate, confirm it matches the closed form $c_1 + e\,c_2$, and find the
+threshold escalation rate that keeps the blended cost under a budget.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+N = 200_000
+c1, c2 = 1.0, 12.0
+e = 0.30                                   # target escalation rate
+
+escalate = rng.random(N) < e               # mark ~30% of queries hard
+cost = np.where(escalate, c1 + c2, c1)     # cheap always runs; +strong if escalated
+
+empirical = cost.mean()
+closed_form = c1 + e * c2
+print("empirical blended cost:", round(empirical, 3))
+print("closed form  c1 + e*c2:", round(closed_form, 3))
+assert np.isclose(empirical, closed_form, atol=0.05)
+
+# Largest escalation rate under a budget B (Exercise 2's formula).
+B = 6.0
+e_star = (B - c1) / c2
+print("max escalation rate under budget", B, ":", round(e_star, 4))
+assert np.isclose(e_star, 5 / 12)
+```
+
+The simulated cost tracks $c_1 + e\,c_2$ to within sampling noise, and the threshold
+$e^\star = 5/12 \approx 0.417$ matches the hand computation.
+
+</details>
+
+Routing and caching
 close the advanced-patterns subsection; the next subsection drops back down to the data
 platform that feeds all of this, starting with [dbt](J5/dbt-transformations).
 

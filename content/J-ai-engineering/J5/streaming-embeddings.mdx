@@ -4,7 +4,7 @@ pillar: J
 subId: J5
 lessonId: streaming-embeddings
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Keep an index fresh with event-driven updates and change data capture, and manage the embedding lifecycle (reindexing on model upgrades) that keeps retrieval honest over time."
 prerequisites: ["vector-infra-ann", "I1/pipeline-paradigms"]
 codeExempt: true
@@ -57,6 +57,77 @@ large corpus is expensive and slow, embedding-model upgrades are planned migrati
 config changes, the same backfill discipline as any [versioned data](I1/data-versioning)
 migration. Treating the embedding model as a versioned dependency of the index, one whose change
 triggers a full rebuild, is what keeps retrieval coherent across upgrades.
+
+## Exercises
+
+**Exercise 1.** A document is deleted at the source database, but the CDC consumer is written
+to handle only inserts and updates (it upserts a vector on each event and ignores delete
+events). Describe the concrete failure this produces in retrieval, and the minimal fix.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The delete event fires on the stream but the consumer ignores it, so the document's
+vector stays in the index even though the document no longer exists at the source. The index
+and the source have diverged.
+
+**Step 2.** At query time that orphaned vector is still a candidate, so the deleted document can
+be retrieved and surfaced to the user, content that was supposed to be gone (a removed policy
+page, a retracted record). The bug is silent: nothing errors, the wrong document just keeps
+appearing.
+
+**Step 3.** The minimal fix is to make deletes propagate: the consumer must handle the delete
+event by removing (not upserting) the vector, so the index stays a faithful materialized view
+of the source. Freshness for inserts and updates is not enough; the delete path is part of
+correctness.
+
+</details>
+
+**Exercise 2.** A team upgrades from embedding model v1 to v2 and, to save cost, embeds only
+*new* documents with v2 while leaving existing v1 vectors in place in the same index. Explain
+why retrieval quality degrades, in terms of the vector spaces involved.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A query is embedded once, with v2. Similarity is then computed between the v2 query
+vector and whatever is in the index. For old documents the index holds v1 vectors.
+
+**Step 2.** v1 and v2 are different models trained to different parameters, so they map text to
+*different* vector spaces. A v2 query vector and a v1 document vector have no shared geometry;
+their cosine similarity is not a meaningful relevance signal, it is comparing coordinates from
+two unrelated spaces.
+
+**Step 3.** So old documents get effectively random similarity scores against the new query,
+while new documents are scored coherently. Relevant old documents can be ranked far too low and
+irrelevant ones too high, and the corpus's retrievability now depends on which model embedded
+each item rather than on relevance. Mixing model versions in one index breaks the comparability
+that retrieval relies on.
+
+</details>
+
+**Exercise 3.** You must upgrade the embedding model for a large production corpus with zero
+downtime. Lay out the backfill-with-cutover procedure step by step, and state what guarantees
+each step provides (no stale spaces, no downtime, safe rollback).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Keep the current (old-model) index serving all live queries untouched. This is the
+no-downtime guarantee: users never hit a half-built index.
+
+**Step 2.** In the background, build a *new* index by re-embedding the entire corpus with the
+new model, every document, not just new ones. Re-embedding everything is what guarantees the new
+index is internally single-space and comparable, avoiding the mixed-version failure of Exercise 2.
+
+**Step 3.** When the new index is fully built and validated, switch query traffic to it
+**atomically** (a single pointer/alias flip), so no query ever spans both indexes. Keep the old
+index around briefly after cutover: if the new one misbehaves, flip the pointer back, which is
+the safe-rollback guarantee. Only then decommission the old index. Because the rebuild is
+expensive and slow, this is a planned migration with the same discipline as any versioned-data
+migration, not a casual config change.
+
+</details>
 
 Fresh content via streaming, coherent vectors via lifecycle management: together they keep the
 retrieval layer trustworthy in production. That closes the data-platform subsection. The next

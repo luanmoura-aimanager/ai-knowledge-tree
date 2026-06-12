@@ -4,7 +4,7 @@ pillar: J
 subId: J5
 lessonId: hybrid-search-rrf
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Combine dense (semantic) and sparse (keyword) retrieval with reciprocal rank fusion, and show why fusing two rankings beats either one on queries where they disagree."
 prerequisites: ["J2/production-rag", "vector-infra-ann"]
 ---
@@ -92,7 +92,108 @@ print("RRF beats either retriever alone:", True)
 ```
 
 Each retriever alone lands the relevant document at an MRR around $0.46$; fusing their ranks
-lifts it to $0.59$, because the document rarely ranks badly in *both* independent lists. The
+lifts it to $0.59$, because the document rarely ranks badly in *both* independent lists.
+
+## Exercises
+
+**Exercise 1.** Two retrievers return ranked lists for a query. Keyword search ranks
+$[A, B, C, D]$ (so $A$ is rank $1$); vector search ranks $[D, B, E, A]$. With $K = 60$,
+compute the RRF score of each document by hand and give the fused order. Which document wins,
+and why does it beat the two list-leaders $A$ and $D$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** RRF sums $\frac{1}{K + \text{rank}}$ across the lists in which a document appears,
+with $K = 60$:
+
+$$
+\text{RRF}(A) = \tfrac{1}{61} + \tfrac{1}{64}, \quad
+\text{RRF}(B) = \tfrac{1}{62} + \tfrac{1}{62}, \quad
+\text{RRF}(D) = \tfrac{1}{64} + \tfrac{1}{61}.
+$$
+
+$C$ appears only in keyword ($\tfrac{1}{63}$) and $E$ only in vector ($\tfrac{1}{63}$).
+
+**Step 2.** Numerically $\text{RRF}(B) = 2/62 \approx 0.03226$, while
+$\text{RRF}(A) = \text{RRF}(D) = \tfrac{1}{61} + \tfrac{1}{64} \approx 0.03202$. So
+$B > A = D > \{C, E\}$, giving the fused order $[B, D, A, E, C]$ (the $A$/$D$ tie broken
+arbitrarily).
+
+**Step 3.** $B$ wins because it is rank $2$ in *both* lists. The reciprocal $\tfrac{1}{K+r}$
+is nearly flat near the top (rank $1$ and rank $2$ differ by little once $K = 60$ is added),
+so two solid second places out-sum one first place plus one fourth place. That is exactly the
+design intent: $K$ damps the top so a document liked by both retrievers beats one that only a
+single retriever ranked first.
+
+</details>
+
+**Exercise 2.** Show that as $K \to \infty$, RRF stops distinguishing rank $1$ from rank $2$,
+and as $K \to 0$ it weights the very top rank overwhelmingly. What does the common default
+$K = 60$ trade off between these two regimes?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The contribution of rank $r$ is $\frac{1}{K + r}$. The ratio between rank $1$ and
+rank $2$ is
+
+$$
+\frac{1/(K+1)}{1/(K+2)} = \frac{K+2}{K+1} = 1 + \frac{1}{K+1}.
+$$
+
+**Step 2.** As $K \to \infty$ this ratio $\to 1$: rank $1$ and rank $2$ contribute almost
+equally, so RRF nearly ignores position and just counts list membership. As $K \to 0$ the
+ratio $\to 2$ (and rank $1$'s absolute value $\tfrac{1}{0+1} = 1$ dwarfs deeper ranks), so a
+single first-place finish dominates the fused score.
+
+**Step 3.** $K = 60$ sits in the damped regime: $1 + \tfrac{1}{61} \approx 1.016$, so the top
+few ranks are treated as roughly interchangeable and agreement across retrievers matters more
+than which retriever placed a document first. That is the behavior you want when the two
+retrievers' score scales are incomparable and you trust their *rough* ordering, not their
+exact top pick.
+
+</details>
+
+**Exercise 3 (code).** Implement RRF directly. Reproduce Exercise 1's two lists, confirm the
+fused winner is $B$ with $K = 60$ and that $A$ and $D$ tie. Then drop to $K = 1$ and confirm
+the list-leader $A$ now overtakes the consistent-second $B$, demonstrating the small-$K$
+top-heavy regime.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def rrf_scores(rank_lists, K):
+    docs = set().union(*rank_lists)
+    return {d: sum(1.0 / (K + rl[d]) for rl in rank_lists if d in rl)
+            for d in docs}
+
+keyword = {"A": 1, "B": 2, "C": 3, "D": 4}   # A leads
+vector  = {"D": 1, "B": 2, "E": 3, "A": 4}   # D leads, B is #2 in both
+
+scores = rrf_scores([keyword, vector], K=60)
+order = sorted(scores, key=lambda d: scores[d], reverse=True)
+print("K=60 order:", order)
+assert order[0] == "B"                          # the consistent #2 wins
+assert np.isclose(scores["B"], 2 / 62)
+assert np.isclose(scores["A"], 1 / 61 + 1 / 64)
+assert np.isclose(scores["A"], scores["D"])     # the two list-leaders tie
+
+small = rrf_scores([keyword, vector], K=1)      # top-heavy regime
+print("K=1  A:", round(small["A"], 4), " B:", round(small["B"], 4))
+assert small["A"] > small["B"]                  # now the single first place wins
+```
+
+At $K = 60$ the fused order is $[B, D, A, E, C]$ and $B$ leads on two second places; at
+$K = 1$ the reciprocal of rank $1$ ($\tfrac{1}{2}$) dominates and $A$ overtakes $B$, matching
+the regime analysis of Exercise 2.
+
+</details>
+
+The
 index has to stay fresh as documents and embedding models change, which is the
 [streaming and embedding-lifecycle](streaming-embeddings) problem that closes the subsection.
 

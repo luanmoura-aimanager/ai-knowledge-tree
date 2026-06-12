@@ -4,7 +4,7 @@ pillar: J
 subId: J6
 lessonId: finops-for-ai
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Plan AI spend past per-request cost: model the break-even between on-demand and reserved capacity, and layer caching tiers to cut the bill at scale."
 prerequisites: ["J4/cost-latency-routing"]
 ---
@@ -85,8 +85,96 @@ assert effective < base_monthly
 ```
 
 Below $60\%$ utilization on-demand wins and above it reserving the capacity is cheaper, while a
-$40\%$ cache hit rate trims the request bill by nearly the same fraction, levers that compound. This
-closes the cloud subsection. The final subsection steps up to the architect's view, where these cost
+$40\%$ cache hit rate trims the request bill by nearly the same fraction, levers that compound.
+
+## Exercises
+
+**Exercise 1.** Reserved capacity is priced at $40\%$ of the on-demand rate. By hand, find the
+break-even utilization, then decide whether to reserve a workload that runs $35\%$ of the time and
+one that runs $55\%$ of the time.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The break-even utilization is the price ratio $p_{\text{res}} / p_{\text{od}}$. Here that
+is $0.40 / 1.00 = 0.40$, so reserving pays off for any workload used more than $40\%$ of the time.
+
+**Step 2.** Apply the threshold. The $35\%$ workload is below $40\%$, so on-demand is cheaper, pay
+only for the third of the time it runs. The $55\%$ workload is above $40\%$, so reserving is cheaper
+even though it idles $45\%$ of the time, because the $60\%$ discount on continuous billing beats
+paying full rate for $55\%$ of the hours.
+
+</details>
+
+**Exercise 2.** A caching tier sits in front of the model. Each miss costs a full call; each hit
+costs $f = 0.05$ of a full call. Derive the hit rate $h$ needed to halve the effective cost relative
+to no cache, then state why a perfect cache ($f \to 0$) needs a lower hit rate for the same saving.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The effective cost factor is $(1 - h) + h f$. Halving the bill means this factor equals
+$0.5$:
+
+$$
+(1 - h) + 0.05\,h = 0.5 \quad\Longrightarrow\quad 1 - 0.95\,h = 0.5 \quad\Longrightarrow\quad h = \frac{0.5}{0.95} \approx 0.526.
+$$
+
+So a hit rate of about $52.6\%$ halves the cost.
+
+**Step 2.** Why a cheaper hit needs less. Solving $(1 - h) + h f = 0.5$ gives $h = 0.5 / (1 - f)$,
+which increases with $f$. As $f \to 0$ a hit is free, so $h = 0.5$ suffices: half the requests served
+free is exactly half the cost. A nonzero hit cost $f$ means each hit still pays a little, so a higher
+hit rate is needed to reach the same total saving.
+
+</details>
+
+**Exercise 3 (code).** Reproduce the break-even and a stacked-lever estimate numerically. With
+on-demand at \$3.00/GPU-hour and reserved at \$1.80/GPU-hour over $H = 730$ hours, confirm the
+break-even utilization, then compute the combined monthly cost when a $40\%$ cache hit rate (hit cost
+$f = 0.05$) lowers the load *before* a reserved-versus-on-demand choice at $70\%$ baseline
+utilization. Use numpy only.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+price_od, price_res, H = 3.0, 1.8, 730
+
+# Break-even utilization is the price ratio.
+breakeven_u = price_res / price_od
+assert np.isclose(breakeven_u, 0.6)
+
+# Caching lowers the effective request load first.
+h, f = 0.40, 0.05
+load_factor = (1 - h) + h * f          # fraction of full-price work remaining
+assert np.isclose(load_factor, 0.62)
+
+# At 70% baseline utilization (> 60% break-even), reserved is cheaper.
+u = 0.70
+od_cost  = u * H * price_od
+res_cost = H * price_res
+assert res_cost < od_cost              # reserve the steady baseline
+cheaper = res_cost                     # the chosen capacity cost
+
+# Caching scales the served work, then commitment prices the capacity.
+combined = cheaper * load_factor
+print(f"break-even u = {breakeven_u:.0%}")
+print(f"cache load factor = {load_factor:.2f}")
+print(f"reserved ${res_cost:,.0f} vs on-demand ${od_cost:,.0f}/mo")
+print(f"combined after caching = ${combined:,.0f}/mo")
+assert combined < cheaper              # caching strictly lowers the bill
+```
+
+The break-even sits at $60\%$, caching leaves $62\%$ of the work to pay for, and at $70\%$
+utilization reserving the capacity then applying the cache compounds the two levers into a strictly
+lower bill than either alone.
+
+</details>
+
+This closes the cloud subsection. The final subsection steps up to the architect's view, where these cost
 models become one input to whole-[system design](J7/system-design-for-ai), beginning with
 [AI governance](J7/ai-governance-compliance).
 

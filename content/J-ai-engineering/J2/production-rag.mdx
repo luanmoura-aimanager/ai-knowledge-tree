@@ -4,7 +4,7 @@ pillar: J
 subId: J2
 lessonId: production-rag
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Move past naive RAG with deliberate chunking and a two-stage retrieve-then-rerank pipeline, and quantify the ranking-quality gain a reranker buys with nDCG."
 prerequisites: ["J1/rag-from-scratch", "E6/advanced-rag"]
 ---
@@ -107,9 +107,122 @@ print(f"rerank lifts nDCG by {np.mean(s2_ndcg) - np.mean(s1_ndcg):.3f}")
 
 The reranker lifts nDCG@5 from $0.83$ to $0.98$, pushing the genuinely most-relevant
 documents to the top where the model will actually use them, for the cost of scoring
-only a short shortlist. RAG, agents, evaluation, and retrieval are the application
-layer; where the documents and vectors physically *live* is the platform question,
-which the last lesson of this subsection frames as the [lakehouse](lakehouse-architecture).
+only a short shortlist.
+
+## Exercises
+
+**Exercise 1.** A ranking returns five documents with true relevance grades
+$(3, 0, 2, 0, 1)$ in that order. Compute DCG@5 by hand, then the ideal DCG@5, and
+report nDCG@5.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** DCG@5 discounts each grade by $\log_2(i+1)$ for position $i$:
+
+$$
+\text{DCG@}5 = \frac{3}{\log_2 2} + \frac{0}{\log_2 3} + \frac{2}{\log_2 4} + \frac{0}{\log_2 5} + \frac{1}{\log_2 6}.
+$$
+
+**Step 2.** Evaluate the discounts: $\log_2 2 = 1$, $\log_2 4 = 2$,
+$\log_2 6 \approx 2.585$. The zero-grade terms vanish, leaving
+
+$$
+\text{DCG@}5 = 3 + \frac{2}{2} + \frac{1}{2.585} = 3 + 1 + 0.387 = 4.387.
+$$
+
+**Step 3.** The ideal ranking sorts the grades descending: $(3, 2, 1, 0, 0)$.
+
+$$
+\text{IDCG@}5 = \frac{3}{1} + \frac{2}{\log_2 3} + \frac{1}{\log_2 4} = 3 + \frac{2}{1.585} + \frac{1}{2} = 3 + 1.262 + 0.5 = 4.762.
+$$
+
+**Step 4.** Normalize: $\text{nDCG@}5 = 4.387 / 4.762 \approx 0.921$. The ranking is
+close to ideal; it loses a little only because the grade-$2$ document sits at position
+$3$ instead of $2$.
+
+</details>
+
+**Exercise 2.** Stage 1 is "optimized for recall, not precise ordering." Define
+recall@$k$ for retrieval, and explain why a high stage-1 recall@$50$ is a precondition
+for the reranker to help, no matter how accurate the reranker is.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recall@$k$ is the fraction of all truly relevant documents that appear
+anywhere in the top $k$ returned: (relevant docs retrieved in the top $k$) divided by
+(total relevant docs). It measures coverage, not ordering, a document counts whether it
+lands at rank $1$ or rank $k$.
+
+**Step 2.** The reranker only ever sees the stage-1 shortlist; it reorders those $50$
+candidates and cannot conjure a document stage 1 missed. So any relevant document
+absent from the top $50$ is unrecoverable downstream.
+
+**Step 3.** Therefore stage-1 recall@$50$ caps the best achievable final result: if a
+relevant document is not in the shortlist, even a perfect reranker leaves it out of the
+prompt. High shortlist recall is the precondition; the reranker's job is precision
+*within* a shortlist that already contains the good documents.
+
+</details>
+
+**Exercise 3 (code).** Quantify Exercise 2's claim. With the same relevance grades as
+the worked example, treat "relevant" as grade $\geq 1$ and compare two stage-1
+retrievers: a good one (noise $\sigma = 1.0$) and a poor one (noise $\sigma = 3.0$).
+Over many query realizations, compute (a) mean recall@$5$ of each retriever's
+shortlist, and (b) the mean nDCG@$5$ after a fixed reranker ($\sigma = 0.5$) is applied
+to each shortlist of size $5$. Show the poor retriever's lower recall caps the reranked
+nDCG. Use numpy only.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(7)
+rel = np.array([3, 2, 3, 0, 1, 2, 0, 1, 0, 0])     # true relevance grades per doc
+relevant = rel >= 1                                  # binary relevance for recall
+n_relevant = relevant.sum()
+k = 5
+
+def dcg(order, rel, k):
+    g = rel[order][:k]
+    return np.sum(g / np.log2(np.arange(2, k + 2)))
+def ndcg(order, rel, k):
+    ideal = np.argsort(rel)[::-1]
+    return dcg(order, rel, k) / dcg(ideal, rel, k)
+
+def run(stage1_sigma, trials=4000):
+    recalls, ndcgs = [], []
+    for _ in range(trials):
+        s1 = rel + rng.normal(0, stage1_sigma, size=rel.size)
+        shortlist = np.argsort(s1)[::-1][:k]           # stage 1: keep top k
+        recalls.append(relevant[shortlist].sum() / n_relevant)
+        # stage 2: reranker scores only the shortlist, then we order it
+        rr = rel[shortlist] + rng.normal(0, 0.5, size=k)
+        reordered = shortlist[np.argsort(rr)[::-1]]
+        ndcgs.append(ndcg(reordered, rel, k))
+    return np.mean(recalls), np.mean(ndcgs)
+
+good_recall, good_ndcg = run(1.0)
+poor_recall, poor_ndcg = run(3.0)
+print(f"good retriever: recall@{k}={good_recall:.3f}  reranked nDCG@{k}={good_ndcg:.3f}")
+print(f"poor retriever: recall@{k}={poor_recall:.3f}  reranked nDCG@{k}={poor_ndcg:.3f}")
+
+assert good_recall > poor_recall                     # better stage 1 covers more relevant docs
+assert good_ndcg > poor_ndcg                         # and that recall ceiling lifts final nDCG
+```
+
+The poor retriever drops relevant documents from the shortlist, so its recall@$5$ is
+lower, and the reranker, confined to that worse shortlist, cannot recover them: its
+final nDCG@$5$ stays below the good retriever's. Recall sets the ceiling; reranking
+only realizes what is already inside it.
+
+</details>
+
+RAG, agents, evaluation, and retrieval are the application layer; where the documents
+and vectors physically *live* is the platform question, which the last lesson of this
+subsection frames as the [lakehouse](lakehouse-architecture).
 
 <Footnotes>
   <FNItem n="1">**Lewis, P., et al.** (2020). "Retrieval-augmented generation for knowledge-intensive NLP tasks". *NeurIPS*. [arXiv:2005.11401](https://arxiv.org/abs/2005.11401). The base RAG architecture this lesson hardens.</FNItem>

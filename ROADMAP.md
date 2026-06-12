@@ -14,7 +14,7 @@ campaign + remark-gfm both shipped).
   `<details>` solutions, per the new STYLE.md §6.7. Infrastructure (STYLE §6.7,
   `.mdx-body details` CSS, `render-check.mjs --exercises` gate, exemplar
   `A2/entropy.mdx`) shipped first; then one PR per pillar retrofits all 458
-  lessons. Pillar status: A ☑ B ☑ C ☑ D ☑ E ☑ F ☑ G ☑ H ☑ I ☑ J ☐ K ☐.
+  lessons. Pillar status: A ☑ B ☑ C ☑ D ☑ E ☑ F ☑ G ☑ H ☑ I ☑ J ☑ K ☐.
 
 Two efforts shipped on 2026-06-11:
 

@@ -4,7 +4,7 @@ pillar: J
 subId: J4
 lessonId: dspy-context-engineering
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Treat prompts as parameters to be optimized rather than strings to be hand-tuned, the shift from prompt engineering to context engineering that DSPy automates."
 prerequisites: ["J1/react-loop"]
 codeExempt: true
@@ -58,7 +58,84 @@ LLM pipeline improvable and portable:
 
 The takeaway is not "use DSPy specifically" but the principle it embodies: the prompt and
 the context are parameters of your system, and parameters should be optimized against a
-metric, not hand-set. The next lesson scales the *structure* the same way, coordinating
+metric, not hand-set.
+
+## Exercises
+
+**Exercise 1.** A team hand-tunes a prompt that scores well on GPT-4, then upgrades to a
+newer model and quality drops. Using the prompts-as-parameters framing, explain why this
+is expected and what the DSPy workflow does differently.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A hand-tuned prompt is a point chosen to work for one specific model. The
+wording, instruction phrasing, and few-shot examples were selected (implicitly) to score
+well under that model's behavior. They are parameters fit to that model, even though no one
+called them parameters.
+
+**Step 2.** A new model has different behavior, so the old point is no longer near optimal
+for it. Nothing carried the prompt to the new model's optimum, because the fitting was
+manual and unrecorded; the prompt is stuck where the human left it.
+
+**Step 3.** In DSPy the human specifies only the signature (`question -> answer`) and
+control flow, and the optimizer fits the prompt text and few-shot picks against a metric.
+On a model switch you re-run the optimizer against the same metric and it re-fits the
+prompts for the new model automatically. The portable artifact is the program plus the
+metric, not the frozen prompt string.
+
+</details>
+
+**Exercise 2.** Two engineers both want a question-answering step. One writes a polished
+prompt string with three hand-picked examples. The other writes a DSPy signature
+`question -> answer` plus a metric (exact match) and a pool of 50 candidate examples.
+Identify which inputs each provides by hand, and which DSPy fills in by optimization.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The first engineer hand-provides everything that reaches the model: the
+instruction wording, the format, and the three demonstrations. There is no metric in the
+loop; "good" is whatever they eyeballed.
+
+**Step 2.** The second engineer hand-provides only the structure (the signature, the input
+and output fields) and the optimization target (the metric and the candidate pool). The
+exact instruction phrasing and which examples to include as few-shot demonstrations are
+left blank.
+
+**Step 3.** DSPy's optimizer fills the blanks: it searches phrasings and selects which of
+the 50 candidates to show as demonstrations, keeping the choices that maximize the exact-
+match metric. So the second engineer specifies a search problem; the first specifies a
+fixed answer. Only the second has a number to gate releases on and a procedure to re-run
+after a model change.
+
+</details>
+
+**Exercise 3.** "Context engineering" is broader than the prompt string. List the kinds of
+content that share the context window in a RAG-plus-tools pipeline, and argue why ordering
+and selection of that content can matter more than which base model is used.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The context window is assembled from several sources: the system and task
+instructions, retrieved documents, few-shot demonstrations, tool-call results, and any
+running memory or scratchpad. All of these compete for the same finite window.
+
+**Step 2.** The model can only condition on what is in the window, and only as well as the
+ordering surfaces it. Irrelevant or poorly ordered retrieved chunks crowd out the relevant
+ones and can bury the key fact deep where the model attends to it less. A strong base model
+fed the wrong context answers the wrong question confidently; a weaker model fed precisely
+the right context often answers correctly.
+
+**Step 3.** So the assembly (what to retrieve, how much, in what order, which
+demonstrations) is a high-leverage design surface. Context engineering treats that assembly
+as something to optimize against a metric, which is why a measured pipeline on a modest
+model can beat an unmeasured one on a stronger model.
+
+</details>
+
+The next lesson scales the *structure* the same way, coordinating
 several models with [multi-agent orchestration](multi-agent-orchestration).
 
 <Footnotes>
