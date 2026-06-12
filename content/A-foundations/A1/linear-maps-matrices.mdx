@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: linear-maps-matrices
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Show every linear map between finite-dimensional spaces is a matrix once bases are fixed, and that composition is matrix multiplication."
 prerequisites: ["basis-dimension"]
 ---
@@ -108,7 +108,98 @@ print("B@(A@v):", B @ (A @ v))  # identical
 ```
 
 Both routes give the same result, confirming that composition equals matrix
-multiplication. The next lesson asks: given the matrix of $T$, how much of the
+multiplication.
+
+## Exercises
+
+**Exercise 1.** A linear map $T: \mathbb{R}^2 \to \mathbb{R}^2$ acts on the
+standard basis by $T(e_1) = (1, 2)$ and $T(e_2) = (3, -1)$. Write the matrix of
+$T$ and compute $T(4, 5)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The $j$-th column of the matrix is the coordinate vector of $T(e_j)$,
+so
+
+$$
+A = \begin{pmatrix} 1 & 3 \\ 2 & -1 \end{pmatrix}.
+$$
+
+**Step 2.** Apply the matrix to the coordinate vector $(4, 5)$, or equivalently
+use linearity $T(4e_1 + 5e_2) = 4\,T(e_1) + 5\,T(e_2)$:
+
+$$
+A\begin{pmatrix} 4 \\ 5 \end{pmatrix}
+= \begin{pmatrix} 1\cdot 4 + 3\cdot 5 \\ 2\cdot 4 + (-1)\cdot 5 \end{pmatrix}
+= \begin{pmatrix} 19 \\ 3 \end{pmatrix}.
+$$
+
+The two computations agree because the matrix encodes exactly the action of $T$
+on the basis.
+
+</details>
+
+**Exercise 2.** Prove from the linearity axioms that if $v_1, \dots, v_k$ are
+linearly dependent, then $T(v_1), \dots, T(v_k)$ are linearly dependent. Then give
+a one-line reason why this forces $\operatorname{rank}(T) \le \dim V$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Linear dependence means there are scalars $c_1, \dots, c_k$, not all
+zero, with $\sum_i c_i v_i = 0$. Apply $T$ to both sides.
+
+**Step 2.** By linearity $T$ carries the combination through with the same
+coefficients:
+
+$$
+T\!\left(\sum_i c_i v_i\right) = \sum_i c_i\,T(v_i) = T(0) = 0.
+$$
+
+The same nonzero coefficients $c_i$ now witness a dependence among the images, so
+$T(v_1), \dots, T(v_k)$ are linearly dependent.
+
+**Step 3.** The image is spanned by $T(e_1), \dots, T(e_n)$ where $n = \dim V$, so
+it has at most $n$ independent vectors: $\operatorname{rank}(T) = \dim(\operatorname{im} T) \le \dim V$.
+
+</details>
+
+**Exercise 3 (code).** Pick two random matrices $A$ ($4 \times 3$) and $B$
+($2 \times 4$). Verify on a batch of random input vectors that applying the
+composition $S \circ T$ as $B(Ax)$ equals applying the single matrix $BA$, and
+that the matrix of the composite is exactly $BA$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+A = rng.normal(size=(4, 3))   # T: R^3 -> R^4
+B = rng.normal(size=(2, 4))   # S: R^4 -> R^2
+
+X = rng.normal(size=(3, 100))         # 100 input vectors as columns
+two_step = B @ (A @ X)                 # apply T then S
+one_step = (B @ A) @ X                 # apply the composite matrix
+assert np.allclose(two_step, one_step)
+
+# The composite's matrix is BA: its j-th column is (S o T)(e_j).
+BA = B @ A
+for j in range(3):
+    e_j = np.zeros(3); e_j[j] = 1.0
+    assert np.allclose(B @ (A @ e_j), BA[:, j])
+print("composite matrix shape:", BA.shape)
+```
+
+Every input gives the same output under both routes, and each column of $BA$ is
+the image of a basis vector under $S \circ T$, which is the definition of the
+composite's matrix.
+
+</details>
+
+The next lesson asks: given the matrix of $T$, how much of the
 input does $T$ annihilate, and how much of the output does it fill?
 
 <Footnotes>

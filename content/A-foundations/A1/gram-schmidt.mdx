@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: gram-schmidt
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Construct an orthonormal basis by Gram–Schmidt, prove orthogonal matrices are isometries, and connect the result to the QR factorization."
 prerequisites: ["inner-products", "basis-dimension"]
 ---
@@ -131,7 +131,83 @@ print("||Qv|| =", np.linalg.norm(Q @ v))   # same
 ```
 
 The $Q^\top Q$ block comes out as the identity (up to float error), and $R$ is
-upper triangular. The orthonormal basis in hand, the next lesson turns to
+upper triangular.
+
+## Exercises
+
+**Exercise 1.** Apply Gram–Schmidt by hand to $v_1 = (3, 0)$ and $v_2 = (1, 2)$ to
+produce an orthonormal basis $\{q_1, q_2\}$ of $\mathbb{R}^2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Normalize $v_1$: $\lVert v_1\rVert = 3$, so $q_1 = (1, 0)$.
+
+**Step 2.** Subtract from $v_2$ its projection onto $q_1$:
+$\langle v_2, q_1\rangle = 1$, so
+$\tilde q_2 = v_2 - 1\cdot q_1 = (1, 2) - (1, 0) = (0, 2)$.
+
+**Step 3.** Normalize: $\lVert \tilde q_2\rVert = 2$, so $q_2 = (0, 1)$. The
+orthonormal basis is $\{(1, 0),\ (0, 1)\}$, and indeed
+$\langle q_1, q_2\rangle = 0$.
+
+</details>
+
+**Exercise 2.** Prove that if $Q$ is orthogonal, then $\det Q = \pm 1$. (Use the
+product and transpose rules for determinants from the determinants lesson.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Orthogonality means $Q^\top Q = I$. Take determinants of both sides:
+$\det(Q^\top Q) = \det I = 1$.
+
+**Step 2.** Apply the product rule $\det(Q^\top Q) = \det(Q^\top)\det(Q)$ and the
+transpose rule $\det(Q^\top) = \det(Q)$, giving $(\det Q)^2 = 1$.
+
+**Step 3.** So $\det Q = \pm 1$. The sign distinguishes rotations ($\det Q = +1$,
+orientation preserved) from reflections ($\det Q = -1$), consistent with $Q$ being
+a length-preserving isometry.
+
+</details>
+
+**Exercise 3 (code).** Modified Gram–Schmidt subtracts each projection
+immediately as it is computed rather than all at once, which is numerically more
+stable. Implement it for the columns of a matrix, run it on a random
+$5\times 4$ matrix, and assert the output columns are orthonormal.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def modified_gram_schmidt(A):
+    A = A.astype(float).copy()
+    n = A.shape[1]
+    Q = np.zeros_like(A)
+    for j in range(n):
+        q = A[:, j].copy()
+        for i in range(j):
+            q -= np.dot(Q[:, i], q) * Q[:, i]   # subtract as we go
+        Q[:, j] = q / np.linalg.norm(q)
+    return Q
+
+rng = np.random.default_rng(0)
+A = rng.normal(size=(5, 4))
+Q = modified_gram_schmidt(A)
+
+# Columns orthonormal: Q^T Q is the 4x4 identity.
+assert np.allclose(Q.T @ Q, np.eye(4))
+print("max off-diagonal:", round(np.abs(Q.T @ Q - np.eye(4)).max(), 12))
+```
+
+$Q^\top Q$ comes out as the identity, so the four output columns are an
+orthonormal set spanning the same space as the input columns.
+
+</details>
+
+The orthonormal basis in hand, the next lesson turns to
 determinants, which measure how a linear map stretches or collapses volume.
 
 <Footnotes>

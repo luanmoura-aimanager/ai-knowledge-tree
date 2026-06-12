@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: inner-products
 order: 6
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define the inner product, prove the Cauchy–Schwarz inequality step by step from positivity of a quadratic, and use it to give precise meaning to angle and orthogonality."
 prerequisites: ["norms"]
 ---
@@ -160,6 +160,91 @@ print("orthogonal dot:", a @ b, "-> angle", np.degrees(np.arccos(a @ b)))
 
 The random ratios crowd under $1$ but never cross it; the parallel pair sits
 exactly at $1$ (the equality case of the proof); the orthogonal pair gives $0$.
+
+## Exercises
+
+**Exercise 1.** For $u = (1, 2, 2)$ and $v = (2, 0, 1)$ under the standard dot
+product, compute $\langle u, v\rangle$, the two norms, and the cosine of the angle
+between them. Confirm the Cauchy–Schwarz inequality holds.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Inner product:
+$\langle u, v\rangle = 1\cdot 2 + 2\cdot 0 + 2\cdot 1 = 4$.
+
+**Step 2.** Norms: $\lVert u\rVert = \sqrt{1 + 4 + 4} = 3$ and
+$\lVert v\rVert = \sqrt{4 + 0 + 1} = \sqrt 5$.
+
+**Step 3.** Cosine:
+$\cos\theta = \dfrac{4}{3\sqrt 5} \approx 0.596$. Cauchy–Schwarz requires
+$|\langle u,v\rangle| = 4 \le \lVert u\rVert\,\lVert v\rVert = 3\sqrt 5 \approx
+6.71$, which holds, and the ratio $0.596$ lies in $[-1, 1]$ as it must.
+
+</details>
+
+**Exercise 2.** Prove the **parallelogram law**
+$\lVert u + v\rVert^2 + \lVert u - v\rVert^2 = 2\lVert u\rVert^2 + 2\lVert v\rVert^2$
+for any inner-product norm.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expand each squared norm with the inner product, using symmetry and
+linearity:
+
+$$
+\lVert u + v\rVert^2 = \lVert u\rVert^2 + 2\langle u, v\rangle + \lVert v\rVert^2.
+$$
+
+**Step 2.** Likewise, replacing $v$ with $-v$:
+
+$$
+\lVert u - v\rVert^2 = \lVert u\rVert^2 - 2\langle u, v\rangle + \lVert v\rVert^2.
+$$
+
+**Step 3.** Add the two. The cross terms $\pm 2\langle u, v\rangle$ cancel,
+leaving $2\lVert u\rVert^2 + 2\lVert v\rVert^2$, which is the claim.
+
+</details>
+
+**Exercise 3 (code).** A valid inner product can weight coordinates differently:
+$\langle u, v\rangle_W = u^\top W v$ for a diagonal $W$ with positive entries.
+Pick $W = \operatorname{diag}(1, 2, 3)$, draw many random pairs in $\mathbb{R}^3$,
+and verify Cauchy–Schwarz holds in this weighted inner product (using its induced
+norm).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+W = np.diag([1.0, 2.0, 3.0])      # positive diagonal -> valid inner product
+
+def ip(u, v):                      # weighted inner product u^T W v
+    return u @ W @ v
+
+U = rng.normal(size=(100_000, 3))
+V = rng.normal(size=(100_000, 3))
+
+dots = np.einsum("ij,jk,ik->i", U, W, V)        # <u, v>_W per row
+nu = np.sqrt(np.einsum("ij,jk,ik->i", U, W, U)) # induced norms
+nv = np.sqrt(np.einsum("ij,jk,ik->i", V, W, V))
+ratio = np.abs(dots) / (nu * nv)
+
+assert ratio.max() <= 1.0 + 1e-12               # Cauchy-Schwarz, weighted
+print("max weighted ratio:", round(ratio.max(), 6))
+```
+
+Every weighted ratio stays at or below $1$, so Cauchy–Schwarz holds in the
+weighted inner product just as in the standard one; the proof never used anything
+beyond the three defining properties, which $\langle\cdot,\cdot\rangle_W$
+satisfies.
+
+</details>
+
 The next lesson turns orthogonality into a construction, Gram–Schmidt, that
 manufactures an orthonormal basis from any basis.
 

@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: spectral-theorem
 order: 10
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Prove that real symmetric matrices have real eigenvalues and an orthonormal eigenbasis, giving A = QΛQᵀ."
 prerequisites: ["eigenvalues", "gram-schmidt"]
 ---
@@ -126,7 +126,99 @@ print("spectral sum error:", np.max(np.abs(A - A_spectral)))   # ~1e-15
 ```
 
 The reconstruction from the spectral decomposition recovers $A$ to machine
-precision. The eigenvalue signs in that decomposition determine whether the
+precision.
+
+## Exercises
+
+**Exercise 1.** Diagonalize $A = \begin{bmatrix} 2 & 1 \\ 1 & 2 \end{bmatrix}$ by
+hand: find its eigenvalues and an orthonormal eigenbasis, and write $A = Q\Lambda
+Q^\top$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Eigenvalues from $\det(A - \lambda I) = 0$:
+$(2 - \lambda)^2 - 1 = 0$, so $2 - \lambda = \pm 1$, giving $\lambda_1 = 3$ and
+$\lambda_2 = 1$. Both are real, as the spectral theorem guarantees for a
+symmetric matrix.
+
+**Step 2.** Eigenvector for $\lambda_1 = 3$: solve $(A - 3I)v = 0$, i.e.
+$\begin{bmatrix} -1 & 1 \\ 1 & -1 \end{bmatrix} v = 0$, giving $v_1 \propto
+(1, 1)$. Normalized: $q_1 = \tfrac{1}{\sqrt 2}(1, 1)$.
+
+**Step 3.** Eigenvector for $\lambda_2 = 1$: solve $(A - I)v = 0$, i.e.
+$\begin{bmatrix} 1 & 1 \\ 1 & 1 \end{bmatrix} v = 0$, giving $v_2 \propto
+(1, -1)$. Normalized: $q_2 = \tfrac{1}{\sqrt 2}(1, -1)$. The two are orthogonal,
+as required for distinct eigenvalues.
+
+**Step 4.** Assemble:
+
+$$
+Q = \frac{1}{\sqrt 2}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix}, \qquad
+\Lambda = \begin{bmatrix} 3 & 0 \\ 0 & 1 \end{bmatrix}, \qquad A = Q\Lambda Q^\top.
+$$
+
+</details>
+
+**Exercise 2.** Using the spectral decomposition $A = \sum_i \lambda_i q_i
+q_i^\top$, prove that $\operatorname{tr}(A) = \sum_i \lambda_i$ for a symmetric
+$A$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the trace of the decomposition and use linearity:
+$\operatorname{tr}(A) = \sum_i \lambda_i \operatorname{tr}(q_i q_i^\top)$.
+
+**Step 2.** Evaluate each rank-1 trace with the cyclic property
+$\operatorname{tr}(q_i q_i^\top) = \operatorname{tr}(q_i^\top q_i) = q_i^\top q_i
+= \lVert q_i \rVert^2 = 1$, since the $q_i$ are unit vectors.
+
+**Step 3.** Therefore $\operatorname{tr}(A) = \sum_i \lambda_i \cdot 1 = \sum_i
+\lambda_i$. The trace equals the sum of eigenvalues.
+
+</details>
+
+**Exercise 3 (code).** For a random symmetric $4 \times 4$ matrix, verify with
+`np.linalg.eigh` that (i) the eigenvalues are real, (ii) the eigenvector matrix
+$Q$ is orthogonal, and (iii) eigenvectors for distinct eigenvalues are
+orthogonal.
+
+<details>
+<summary>Solution</summary>
+
+Symmetrizing $\tfrac12(M + M^\top)$ produces a symmetric matrix, so the spectral
+theorem applies: real eigenvalues and an orthonormal eigenbasis, hence
+$Q^\top Q = I$.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+M = rng.normal(size=(4, 4))
+A = 0.5 * (M + M.T)                      # symmetric
+
+w, Q = np.linalg.eigh(A)
+
+# (i) eigenvalues are real: eigh returns real arrays for symmetric input.
+assert np.isrealobj(w)
+
+# (ii) Q is orthogonal: Q^T Q = I.
+assert np.allclose(Q.T @ Q, np.eye(4), atol=1e-12)
+
+# (iii) distinct eigenvalues -> orthogonal eigenvectors (off-diagonals ~ 0).
+gram = Q.T @ Q
+assert np.allclose(gram - np.diag(np.diag(gram)), 0, atol=1e-12)
+print("eigenvalues:", np.round(w, 6))
+```
+
+The eigenvalues are real, $Q^\top Q$ is the identity, and the zero off-diagonals
+of $Q^\top Q$ confirm mutual orthogonality of the eigenvectors, all three
+conclusions of the spectral theorem.
+
+</details>
+
+The eigenvalue signs in that decomposition determine whether the
 associated quadratic form is positive definite, the subject of the next lesson.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: proximal-methods
 order: 14
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define the proximal operator and use proximal gradient descent for nonsmooth objectives like the L1 penalty."
 prerequisites: ["gradient-descent", "convex-functions"]
 ---
@@ -121,8 +121,113 @@ print("reconstruction error:", round(np.linalg.norm(x - x_true), 4))
 ```
 
 ISTA recovers the correct sparse support through repeated soft-thresholding, with
-small coordinates driven to exact zero. The final A3 lesson optimizes functions with
-no gradient at all, using a probabilistic surrogate: Bayesian optimization.
+small coordinates driven to exact zero.
+
+## Exercises
+
+**Exercise 1.** Apply soft-thresholding with threshold $t = \eta\lambda = 0.5$ to the
+vector $v = (2.0,\, 0.8,\, 0.3,\, -1.2,\, -0.4)$ by hand, coordinate by coordinate.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The operator is
+$\operatorname{prox}(v)_i = \operatorname{sign}(v_i)\max(|v_i| - 0.5,\, 0)$. Apply it to
+each entry.
+
+**Step 2.** Work through the coordinates:
+
+$$
+\begin{aligned}
+2.0 &\to \operatorname{sign}(2.0)\max(2.0 - 0.5, 0) = +1.5, \\
+0.8 &\to \max(0.8 - 0.5, 0) = +0.3, \\
+0.3 &\to \max(0.3 - 0.5, 0) = 0, \\
+-1.2 &\to \operatorname{sign}(-1.2)\max(1.2 - 0.5, 0) = -0.7, \\
+-0.4 &\to \operatorname{sign}(-0.4)\max(0.4 - 0.5, 0) = 0.
+\end{aligned}
+$$
+
+The result is $(1.5,\, 0.3,\, 0,\, -0.7,\, 0)$. Every surviving coordinate is pulled
+toward zero by the same $0.5$, and the two coordinates below the threshold become exactly
+zero.
+
+</details>
+
+**Exercise 2.** Derive soft-thresholding from the proximal definition. For one
+coordinate, minimize $\phi(x) = \lambda|x| + \frac{1}{2\eta}(x - v)^2$ over $x \in
+\mathbb{R}$ and recover the formula. Treat the cases $x > 0$, $x < 0$, and $x = 0$
+separately, since $|x|$ is nondifferentiable at zero.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Where $x > 0$, $|x| = x$ is smooth and
+$\phi'(x) = \lambda + \frac{1}{\eta}(x - v) = 0$ gives $x = v - \eta\lambda$. This is a
+valid (positive) solution only when $v > \eta\lambda$.
+
+**Step 2.** Where $x < 0$, $|x| = -x$ and
+$\phi'(x) = -\lambda + \frac{1}{\eta}(x - v) = 0$ gives $x = v + \eta\lambda$, valid
+(negative) only when $v < -\eta\lambda$.
+
+**Step 3.** For $-\eta\lambda \le v \le \eta\lambda$ neither branch is feasible, so the
+minimizer sits at the kink $x = 0$. The optimality condition there uses the subgradient
+$\partial|0| = [-1, 1]$:
+
+$$
+0 \in \lambda\,\partial|0| + \tfrac{1}{\eta}(0 - v).
+$$
+
+This holds exactly when $|v| \le \eta\lambda$, confirming $x = 0$ on that interval.
+
+**Step 4.** Stitch the three cases together:
+
+$$
+x^\star = \operatorname{sign}(v)\max(|v| - \eta\lambda,\, 0),
+$$
+
+the soft-thresholding operator.
+
+</details>
+
+**Exercise 3 (code).** The prox of the indicator of a convex set is Euclidean
+projection onto that set. Take the box $C = [-1, 1]^d$, whose prox is clamping. Implement
+the projection and verify the defining property of a projection: the projected point is
+the closest point of $C$ to $v$, so for any other $u \in C$, $\lVert v - P(v)\rVert \le
+\lVert v - u\rVert$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def project_box(v):
+    return np.clip(v, -1.0, 1.0)            # prox of indicator of [-1,1]^d
+
+d = 6
+for _ in range(2000):
+    v = rng.normal(size=d) * 2.0           # often outside the box
+    p = project_box(v)
+    # any other point u inside the box is no closer to v than p is
+    u = rng.uniform(-1.0, 1.0, size=d)
+    assert np.linalg.norm(v - p) <= np.linalg.norm(v - u) + 1e-12
+
+# Projection is idempotent: projecting an in-box point returns it unchanged.
+inside = rng.uniform(-1.0, 1.0, size=d)
+assert np.allclose(project_box(inside), inside)
+print("box projection verified for d =", d)
+```
+
+Clamping returns the nearest box point: each coordinate is moved the least possible
+amount to satisfy $|x_i| \le 1$. The inequality confirms it is a genuine Euclidean
+projection, the prox of the box indicator.
+
+</details>
+
+The final A3 lesson optimizes functions with no gradient at all, using a probabilistic
+surrogate: Bayesian optimization.
 
 <Footnotes>
   <FNItem n="1">**Parikh, N., & Boyd, S.** (2014). "Proximal algorithms". *Foundations and Trends in Optimization*, 1(3), 127-239. The proximal operator and proximal gradient method ([doi:10.1561/2400000003](https://doi.org/10.1561/2400000003)).</FNItem>

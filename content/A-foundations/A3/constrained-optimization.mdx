@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: constrained-optimization
 order: 9
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Turn an equality-constrained problem into stationarity of a Lagrangian."
 prerequisites: ["optimization-landscape"]
 ---
@@ -114,8 +114,95 @@ print("grad f == lambda grad h:", np.allclose(grad_f, lam * grad_h))
 ```
 
 Solving the Lagrange system lands on $(1/2, 1/2)$ with multiplier 1, the shadow price
-matches the multiplier, and the objective and constraint gradients align. The next
-lesson generalizes the Lagrangian into a dual problem with its own optimization.
+matches the multiplier, and the objective and constraint gradients align.
+
+## Exercises
+
+**Exercise 1.** Minimize $f(x, y) = x^2 + 4y^2$ subject to $x + y = 3$ using a
+Lagrangian. Find $x^\star, y^\star$, and the multiplier $\lambda$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form $\mathcal{L} = x^2 + 4y^2 - \lambda(x + y - 3)$. Stationarity in
+$x$ and $y$ gives $2x - \lambda = 0$ and $8y - \lambda = 0$, so $x = \lambda/2$ and
+$y = \lambda/8$.
+
+**Step 2.** Impose the constraint $x + y = 3$:
+
+$$
+\frac{\lambda}{2} + \frac{\lambda}{8} = \frac{4\lambda + \lambda}{8} = \frac{5\lambda}{8} = 3,
+\quad\text{so}\quad \lambda = \frac{24}{5} = 4.8.
+$$
+
+**Step 3.** Back-substitute: $x = \lambda/2 = 2.4$ and $y = \lambda/8 = 0.6$. Check
+the constraint: $2.4 + 0.6 = 3$. The optimum is $(2.4, 0.6)$ with $\lambda = 4.8$,
+and $f^\star = 2.4^2 + 4 \cdot 0.6^2 = 5.76 + 1.44 = 7.2$.
+
+</details>
+
+**Exercise 2.** Verify the shadow-price interpretation for Exercise 1 directly.
+Relax the constraint to $x + y = 3 + c$, find the optimal value $f^\star(c)$ as a
+function of $c$, and confirm $\frac{d f^\star}{dc}\big|_{c=0} = \lambda$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With the right-hand side $3 + c$, Steps 1 and 2 of Exercise 1 repeat
+with $3$ replaced by $3 + c$: the constraint becomes $\frac{5\lambda}{8} = 3 + c$,
+so $\lambda = \frac{8(3+c)}{5}$, and $x = \lambda/2$, $y = \lambda/8$.
+
+**Step 2.** Then $x = \frac{4(3+c)}{5}$ and $y = \frac{3+c}{5}$. The optimal value is
+
+$$
+f^\star(c) = x^2 + 4y^2 = \frac{16(3+c)^2}{25} + 4\cdot\frac{(3+c)^2}{25}
+= \frac{20(3+c)^2}{25} = \frac{4(3+c)^2}{5}.
+$$
+
+**Step 3.** Differentiate:
+$\frac{d f^\star}{dc} = \frac{8(3+c)}{5}$, and at $c = 0$ this is
+$\frac{24}{5} = 4.8 = \lambda$. The multiplier is the marginal change in the optimum
+per unit relaxation, as claimed.
+
+</details>
+
+**Exercise 3 (code).** Solve Exercise 1 by assembling and solving the KKT linear
+system, then verify the shadow price numerically with a central difference. Every
+result must match the hand answers ($x = 2.4$, $y = 0.6$, $\lambda = 4.8$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# min x^2 + 4y^2 s.t. x + y = 3, KKT system:
+#  2x        - lam = 0
+#         8y - lam = 0
+#  x +  y          = 3
+M = np.array([[2.0, 0.0, -1.0],
+              [0.0, 8.0, -1.0],
+              [1.0, 1.0,  0.0]])
+rhs = np.array([0.0, 0.0, 3.0])
+x, y, lam = np.linalg.solve(M, rhs)
+
+assert np.allclose([x, y, lam], [2.4, 0.6, 4.8])
+
+# Shadow price by central difference of f*(c) = 4(3+c)^2 / 5
+f_star = lambda c: 4 * (3 + c)**2 / 5
+c = 1e-5
+slope = (f_star(c) - f_star(-c)) / (2 * c)
+assert np.isclose(slope, lam, atol=1e-4)
+print(f"x={x}, y={y}, lambda={lam}, df*/dc={slope:.4f}")
+```
+
+The KKT solve recovers $(2.4, 0.6)$ with $\lambda = 4.8$, and the numerical slope of
+the optimal value matches the multiplier.
+
+</details>
+
+The next lesson generalizes the Lagrangian into a dual problem with its own
+optimization.
 
 <Footnotes>
   <FNItem n="1">**Bertsekas, D. P.** (1999). *Nonlinear Programming* (2nd ed.), §3.1. Athena Scientific. The Lagrange multiplier theorem for equality-constrained problems.</FNItem>

@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: convergence-rates
 order: 5
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Use L-smoothness and strong convexity to prove sublinear and linear convergence rates."
 prerequisites: ["gradient-descent", "convex-functions"]
 ---
@@ -134,8 +134,116 @@ for mu, L in [(1.0, 2.0), (1.0, 10.0), (1.0, 100.0)]:
 ```
 
 The per-step contraction factor stays at or below the predicted $1 - 1/\kappa$, and
-worsens as the condition number grows. The next lesson replaces the full gradient
-with a noisy estimate, the stochastic setting of real training.
+worsens as the condition number grows.
+
+## Exercises
+
+**Exercise 1.** A problem is $L$-smooth with $L = 20$ and $\mu$-strongly convex with
+$\mu = 2$. Compute the condition number $\kappa$, the linear-rate contraction factor
+$1 - \mu/L$, and the number of steps the bound predicts to shrink the gap to
+$\varepsilon = 10^{-6}$ of its starting value.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The condition number is $\kappa = L/\mu = 20/2 = 10$.
+
+**Step 2.** Each step multiplies the gap by at most
+$1 - \mu/L = 1 - 1/\kappa = 1 - 0.1 = 0.9$.
+
+**Step 3.** The gap after $t$ steps is at most $0.9^t$ of the start. Set
+$0.9^t = 10^{-6}$ and solve:
+
+$$
+t = \frac{\log 10^{-6}}{\log 0.9} = \frac{-6\log 10}{\log 0.9}
+\approx \frac{-13.8155}{-0.10536} \approx 131.1,
+$$
+
+so about $131$ steps, matching the $\kappa = 10$ row of the lesson.
+
+</details>
+
+**Exercise 2.** Derive the PL inequality
+$\lVert \nabla f(x)\rVert^2 \ge 2\mu\,(f(x) - f(x^\star))$ from the strong-convexity
+inequality. Show each step.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Strong convexity gives, for all $y$,
+
+$$
+f(y) \ge f(x) + \nabla f(x)^\top (y - x) + \frac{\mu}{2}\lVert y - x\rVert^2.
+$$
+
+The right side is a quadratic in $y$; minimizing it lower-bounds the left side's
+minimum, which is $f(x^\star)$.
+
+**Step 2.** Minimize the right side over $y$. Setting its gradient in $y$ to zero,
+$\nabla f(x) + \mu(y - x) = 0$, gives the minimizer
+$y = x - \frac{1}{\mu}\nabla f(x)$.
+
+**Step 3.** Substitute that $y$ back. The linear and quadratic terms become
+
+$$
+\nabla f(x)^\top\!\left(-\tfrac{1}{\mu}\nabla f(x)\right)
++ \frac{\mu}{2}\left\lVert \tfrac{1}{\mu}\nabla f(x)\right\rVert^2
+= -\frac{1}{\mu}\lVert\nabla f(x)\rVert^2 + \frac{1}{2\mu}\lVert\nabla f(x)\rVert^2
+= -\frac{1}{2\mu}\lVert\nabla f(x)\rVert^2.
+$$
+
+So the minimized right side is $f(x) - \frac{1}{2\mu}\lVert\nabla f(x)\rVert^2$.
+
+**Step 4.** Since the left side's minimum is $f(x^\star)$,
+
+$$
+f(x^\star) \ge f(x) - \frac{1}{2\mu}\lVert\nabla f(x)\rVert^2,
+$$
+
+and rearranging gives
+$\lVert\nabla f(x)\rVert^2 \ge 2\mu\,(f(x) - f(x^\star))$.
+
+</details>
+
+**Exercise 3 (code).** For the diagonal quadratic $f(x) = \tfrac12 x^\top A x$ with
+$A = \mathrm{diag}(\mu, L)$, $\mu = 1$, $L = 50$, run gradient descent with step
+$\eta = 1/L$ from $x_0 = (1, 1)$. Confirm the gap shrinks by no more than the
+predicted factor $1 - 1/\kappa$ per step, and that the bound
+$\Delta_t \le (1 - 1/\kappa)^t \Delta_0$ holds at $t = 100$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+mu, L = 1.0, 50.0
+kappa = L / mu
+A = np.diag([mu, L])
+eta = 1.0 / L
+
+x = np.array([1.0, 1.0])
+f = lambda z: 0.5 * z @ A @ z          # f(x*) = 0, so gap = f(x)
+gaps = [f(x)]
+for _ in range(100):
+    x = x - eta * (A @ x)
+    gaps.append(f(x))
+gaps = np.array(gaps)
+
+factors = gaps[1:] / gaps[:-1]
+assert np.all(factors <= (1 - 1/kappa) + 1e-9)          # per-step contraction
+assert gaps[100] <= (1 - 1/kappa)**100 * gaps[0] + 1e-12  # iterated bound
+print("worst per-step factor:", round(factors.max(), 4),
+      " predicted bound:", round(1 - 1/kappa, 4))
+```
+
+Every step contracts by at most $1 - 1/\kappa = 0.98$, and the iterated bound at
+$t = 100$ holds, confirming the linear rate.
+
+</details>
+
+The next lesson replaces the full gradient with a noisy estimate, the stochastic
+setting of real training.
 
 <Footnotes>
   <FNItem n="1">**Nesterov, Y.** (2018). *Lectures on Convex Optimization* (2nd ed.), §2.1. Springer. Smoothness, strong convexity, and the linear rate for gradient descent.</FNItem>

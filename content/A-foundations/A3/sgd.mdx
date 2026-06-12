@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: sgd
 order: 6
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Replace the full gradient with a stochastic estimate and understand the noise versus step-size tradeoff."
 prerequisites: ["gradient-descent"]
 ---
@@ -126,8 +126,108 @@ print("decaying eta0=0.05  :", round(sgd(0.05, decay=True), 6))
 ```
 
 A smaller constant step and a larger batch both lower the noise floor, and the
-decaying schedule drives suboptimality further down. The next lesson speeds up the
-deterministic part with momentum.
+decaying schedule drives suboptimality further down.
+
+## Exercises
+
+**Exercise 1.** A constant-step SGD run with step $\eta$ settles at a noise floor of
+height $\frac{\eta L \sigma^2}{2\mu}$. If halving the step is observed to halve the floor,
+explain why, and predict the floor after dividing the step by $10$ relative to the
+original.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The floor formula $\frac{\eta L \sigma^2}{2\mu}$ is linear in $\eta$: the
+factors $L$, $\sigma^2$, and $\mu$ are properties of the problem, fixed across runs, so
+only $\eta$ varies.
+
+**Step 2.** Halving $\eta$ multiplies the whole expression by $\tfrac12$, which halves
+the floor. That linear dependence is exactly the observation.
+
+**Step 3.** Dividing the step by $10$ multiplies the floor by $\tfrac{1}{10}$, so the new
+floor is one tenth of the original. The cost is a slower approach: the contraction factor
+$(1 - \eta\mu)$ moves closer to $1$, so reaching the lower floor takes more steps.
+
+</details>
+
+**Exercise 2.** Show that the minibatch gradient is unbiased and that a batch of size $B$
+drawn with replacement has variance $\sigma^2 / B$. Let
+$g_B = \frac{1}{B}\sum_{j=1}^B \nabla f_{i_j}(x)$ with the $i_j$ independent and uniform.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each draw is unbiased:
+$\mathbb{E}[\nabla f_{i_j}(x)] = \frac{1}{n}\sum_i \nabla f_i(x) = \nabla f(x)$. By
+linearity of expectation, $\mathbb{E}[g_B] = \frac{1}{B}\sum_{j=1}^B \nabla f(x) =
+\nabla f(x)$, so the batch estimate is unbiased.
+
+**Step 2.** Write the error of one draw as $e_j = \nabla f_{i_j}(x) - \nabla f(x)$, with
+$\mathbb{E}[e_j] = 0$ and $\mathbb{E}\lVert e_j\rVert^2 = \sigma^2$. The batch error is
+$g_B - \nabla f(x) = \frac{1}{B}\sum_j e_j$.
+
+**Step 3.** The draws are independent, so cross terms vanish in expectation,
+$\mathbb{E}[e_j^\top e_k] = 0$ for $j \ne k$:
+
+$$
+\mathbb{E}\Big\lVert \tfrac{1}{B}\textstyle\sum_j e_j \Big\rVert^2
+= \frac{1}{B^2}\sum_{j=1}^B \mathbb{E}\lVert e_j\rVert^2 = \frac{1}{B^2}\cdot B\sigma^2 = \frac{\sigma^2}{B}.
+$$
+
+The variance drops as $1/B$: a batch of $32$ cuts gradient noise by a factor of $32$.
+
+</details>
+
+**Exercise 3 (code).** Estimate the noise floor empirically. Run constant-step SGD on a
+least-squares finite sum, and verify that halving the step size roughly halves the
+measured suboptimality floor, matching the linear $\eta$ dependence of Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 2000, 10
+A = rng.normal(size=(n, d))
+x_true = rng.normal(size=d)
+b = A @ x_true + 0.1 * rng.normal(size=n)
+x_star = np.linalg.lstsq(A, b, rcond=None)[0]
+
+def full_loss(x):
+    return 0.5 * np.mean((A @ x - b)**2)
+
+def floor(eta, steps=40_000, tail=5_000):
+    # average suboptimality over the last `tail` steps = noise-floor estimate
+    x = np.zeros(d)
+    acc = 0.0
+    for t in range(steps):
+        i = rng.integers(0, n)
+        g = A[i] * (A[i] @ x - b[i])
+        x = x - eta * g
+        if t >= steps - tail:
+            acc += full_loss(x) - full_loss(x_star)
+    return acc / tail
+
+f1 = floor(0.02)
+f2 = floor(0.01)                                 # half the step
+ratio = f2 / f1
+print("floor(eta=0.02):", round(f1, 6))
+print("floor(eta=0.01):", round(f2, 6))
+print("ratio:", round(ratio, 3))
+
+assert 0.35 < ratio < 0.75                       # near 0.5, the linear prediction
+```
+
+The measured floor at half the step is roughly half the original, the linear $\eta$
+scaling predicted by the recursion's fixed point. Sampling noise keeps the ratio near but
+not exactly $0.5$.
+
+</details>
+
+The next lesson speeds up the deterministic part with momentum.
 
 <Footnotes>
   <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*, ch. 8. MIT Press. Minibatch stochastic gradient estimates and their unbiasedness.</FNItem>

@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: expectation
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define expectation, prove linearity, and compute E[g(X)] without first finding the distribution of g(X)."
 prerequisites: ["random-variables"]
 ---
@@ -111,7 +111,87 @@ print("E[heads]:", total.mean(), "  n*q:", n * q)
 ```
 
 The die mean lands on 3.5, LOTUS gives the right second moment, linearity holds even
-for the perfectly dependent pair, and the indicator sum averages to $nq$. That
+for the perfectly dependent pair, and the indicator sum averages to $nq$.
+
+## Exercises
+
+**Exercise 1.** A fair six-sided die is rolled once. Use LOTUS to compute
+$\mathbb{E}[X^2]$ directly, without finding the distribution of $X^2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** LOTUS weights $g(x) = x^2$ by the PMF of $X$, which is $p_X(x) = 1/6$
+for each $x \in \{1, \dots, 6\}$:
+
+$$
+\mathbb{E}[X^2] = \sum_{x=1}^{6} x^2 \cdot \tfrac{1}{6} = \tfrac{1}{6}\left(1 + 4 + 9 + 16 + 25 + 36\right).
+$$
+
+**Step 2.** Sum the squares and divide:
+
+$$
+\mathbb{E}[X^2] = \tfrac{91}{6} \approx 15.1667.
+$$
+
+Computing the distribution of $X^2$ (values $1, 4, 9, 16, 25, 36$, each with
+probability $1/6$) gives the same sum; LOTUS skips that bookkeeping.
+
+</details>
+
+**Exercise 2.** Draw a card position uniformly: a hat holds $n$ cards numbered
+$1$ to $n$, you draw all $n$ in random order. Let $X$ be the number of cards that
+land in their own position (a "fixed point"). Use indicator variables and
+linearity to show $\mathbb{E}[X] = 1$ for every $n$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Define indicators. Let $X_i = 1$ if card $i$ lands in position $i$, and
+$0$ otherwise. Then $X = \sum_{i=1}^n X_i$.
+
+**Step 2.** Each card is equally likely to land in any of the $n$ positions, so
+$P(X_i = 1) = 1/n$, giving $\mathbb{E}[X_i] = 1/n$.
+
+**Step 3.** Apply linearity (the $X_i$ are dependent, but linearity needs no
+independence):
+
+$$
+\mathbb{E}[X] = \sum_{i=1}^n \mathbb{E}[X_i] = n \cdot \tfrac{1}{n} = 1.
+$$
+
+On average exactly one card matches its position, regardless of $n$. The
+dependence among the indicators never enters the mean.
+
+</details>
+
+**Exercise 3 (code).** Verify Exercise 2 by simulation: for several values of $n$,
+shuffle $1, \dots, n$ many times and confirm the average number of fixed points is
+close to 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+trials = 500_000
+
+for n in [3, 10, 52]:
+    perms = rng.permuted(np.broadcast_to(np.arange(n), (trials, n)), axis=1)
+    fixed = (perms == np.arange(n)).sum(axis=1)
+    mean_fixed = fixed.mean()
+    print(f"n={n:3d}  E[fixed points] = {mean_fixed:.4f}  (exact 1.0)")
+    assert np.isclose(mean_fixed, 1.0, atol=0.02)
+```
+
+The average number of fixed points stays near 1 for every $n$, matching the
+indicator-plus-linearity result.
+
+</details>
+
+That
 second moment is the raw material for the next lesson, which measures spread:
 variance.
 

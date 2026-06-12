@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: vector-spaces
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Define a vector space from its axioms, see that the only property we ever actually use is closure under linear combination, and learn the one-line test that decides whether a subset is a subspace."
 prerequisites: []
 ---
@@ -139,6 +139,93 @@ Every point built as a linear combination of $b_1, b_2$ stays on the plane. That
 is the subspace test confirmed: closed under addition and scaling. A point off
 the plane (say $b_1 + (0,0,1)$) would give a nonzero dot product, landing outside
 $W$.
+
+## Exercises
+
+**Exercise 1.** Decide whether $W = \{(x, y, z) \in \mathbb{R}^3 : x + y + z = 0\}$
+is a subspace of $\mathbb{R}^3$, using only the two-condition subspace test.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Check nonempty: $(0, 0, 0)$ satisfies $0 + 0 + 0 = 0$, so $0 \in W$
+and $W$ is nonempty.
+
+**Step 2.** Closure under addition. Take $u = (u_1, u_2, u_3)$ and
+$v = (v_1, v_2, v_3)$ in $W$, so $u_1 + u_2 + u_3 = 0$ and $v_1 + v_2 + v_3 = 0$.
+Their sum has coordinate total $(u_1 + v_1) + (u_2 + v_2) + (u_3 + v_3) =
+(u_1 + u_2 + u_3) + (v_1 + v_2 + v_3) = 0 + 0 = 0$, so $u + v \in W$.
+
+**Step 3.** Closure under scalar multiplication. For $\alpha \in \mathbb{R}$ and
+$v \in W$, the total is $\alpha v_1 + \alpha v_2 + \alpha v_3 = \alpha(v_1 + v_2 +
+v_3) = \alpha \cdot 0 = 0$, so $\alpha v \in W$.
+
+Both conditions hold on a nonempty set, so $W$ is a subspace. It is the plane
+through the origin with normal $(1, 1, 1)$.
+
+</details>
+
+**Exercise 2.** Give a subset of $\mathbb{R}^2$ that is closed under scalar
+multiplication but not under addition, proving it fails exactly one condition.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take $W = \{(x, y) : xy = 0\}$, the union of the two coordinate axes.
+
+**Step 2.** Closure under scalar multiplication holds: if $xy = 0$ then
+$(\alpha x)(\alpha y) = \alpha^2 (xy) = 0$, so $\alpha v \in W$ for every scalar
+$\alpha$.
+
+**Step 3.** Closure under addition fails. The point $(1, 0)$ lies on the
+$x$-axis and $(0, 1)$ lies on the $y$-axis, so both are in $W$. Their sum
+$(1, 1)$ has product $1 \cdot 1 = 1 \neq 0$, so $(1, 1) \notin W$.
+
+A single counterexample to addition is enough; $W$ is not a subspace even though
+it passes the scalar-multiplication condition and contains $0$.
+
+</details>
+
+**Exercise 3 (code).** The subspace test predicts that any linear combination of
+points in $W = \{x : Ax = 0\}$ (the solution set of a homogeneous system) is
+again in $W$. Verify this numerically for a random $3 \times 5$ matrix $A$: build
+two solutions, take a random linear combination, and assert it still solves
+$Ax = 0$.
+
+<details>
+<summary>Solution</summary>
+
+The null space of $A$ is a subspace, so closure must hold to machine precision.
+Two null-space vectors come from the right singular vectors of the smallest
+singular values (here the last two columns of $V$, since a $3 \times 5$ matrix
+has nullity at least $2$).
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+A = rng.normal(size=(3, 5))
+
+# Right singular vectors for the (near-)zero singular values span the null space.
+_, _, Vt = np.linalg.svd(A)
+x1 = Vt[-1]            # A @ x1 ~ 0
+x2 = Vt[-2]            # A @ x2 ~ 0
+
+# A random linear combination of two null-space vectors:
+a, b = rng.normal(size=2)
+w = a * x1 + b * x2
+
+assert np.allclose(A @ x1, 0, atol=1e-12)
+assert np.allclose(A @ x2, 0, atol=1e-12)
+assert np.allclose(A @ w, 0, atol=1e-12)   # closure under linear combination
+print("max |A @ w| =", np.max(np.abs(A @ w)))
+```
+
+The combination $w = a x_1 + b x_2$ satisfies $Aw = a(Ax_1) + b(Ax_2) = 0$ by
+linearity of $A$, which is the subspace test at work: the solution set of a
+homogeneous system is closed under linear combination.
+
+</details>
 
 With the container defined, the next lesson asks the sharper question: how many
 vectors do we actually need to *generate* a space, and when is a set of them

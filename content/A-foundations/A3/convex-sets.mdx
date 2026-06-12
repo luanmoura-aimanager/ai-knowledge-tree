@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: convex-sets
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Define convex sets, recognize them, and use the separating-hyperplane idea."
 prerequisites: []
 ---
@@ -102,8 +102,99 @@ print("polyhedron convex:", is_convex_region(in_poly, box))
 ```
 
 The midpoint test confirms the ball and polyhedron are convex and flags the ring as
-non-convex. With convex feasible regions defined, the next lesson puts a convex
-function on top of them.
+non-convex.
+
+## Exercises
+
+**Exercise 1.** Show directly from the definition that the half-space
+$H = \{x : a^\top x \le b\}$ is convex, for any nonzero $a$ and scalar $b$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take any $x, y \in H$, so $a^\top x \le b$ and $a^\top y \le b$. Pick
+$\theta \in [0, 1]$ and form the convex combination $z = \theta x + (1-\theta) y$.
+
+**Step 2.** Apply $a^\top$ and use linearity:
+
+$$
+a^\top z = \theta\, a^\top x + (1-\theta)\, a^\top y.
+$$
+
+**Step 3.** Both $\theta \ge 0$ and $1-\theta \ge 0$, so each term is bounded by the
+same coefficient times $b$:
+
+$$
+a^\top z \le \theta b + (1-\theta) b = b.
+$$
+
+So $z \in H$, and the segment stays inside. The half-space is convex.
+
+</details>
+
+**Exercise 2.** Prove the intersection rule: if $C_1$ and $C_2$ are convex, then
+$C_1 \cap C_2$ is convex. Then explain in one sentence why this makes the
+polyhedron $\{x : Ax \le b\}$ convex.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take $x, y \in C_1 \cap C_2$, so $x$ and $y$ lie in both sets. Pick
+$\theta \in [0,1]$ and let $z = \theta x + (1-\theta) y$.
+
+**Step 2.** Since $x, y \in C_1$ and $C_1$ is convex, $z \in C_1$. The identical
+argument with $C_2$ gives $z \in C_2$.
+
+**Step 3.** A point in both sets is in the intersection, so $z \in C_1 \cap C_2$.
+The segment stays inside, so the intersection is convex.
+
+The polyhedron is the intersection of the half-spaces $\{x : a_i^\top x \le b_i\}$,
+one per row of $A$; each is convex by Exercise 1, so their intersection is convex.
+
+</details>
+
+**Exercise 3 (code).** A convex set contains every convex combination of its points,
+not only midpoints. For the polyhedron with rows $(1,0), (0,1), (-1,-1)$ and
+$b = (1, 1, 1)$, sample triples of interior points and random barycentric weights
+$\theta_1, \theta_2, \theta_3 \ge 0$ summing to one, and check the weighted
+combination stays inside.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+A = np.array([[1, 0], [0, 1], [-1, -1]])
+b = np.array([1.0, 1.0, 1.0])
+inside = lambda X: np.all(X @ A.T <= b + 1e-12, axis=1)
+
+# Draw points in the box, keep those inside the polyhedron.
+box = rng.uniform(-2, 2, size=(300_000, 2))
+pts = box[inside(box)]
+P, Q, R = pts[0::3], pts[1::3], pts[2::3]
+m = min(len(P), len(Q), len(R))
+P, Q, R = P[:m], Q[:m], R[:m]
+
+# Random convex weights on the simplex via the sort trick.
+u = np.sort(rng.random((m, 2)), axis=1)
+t1 = u[:, 0]
+t2 = u[:, 1] - u[:, 0]
+t3 = 1.0 - u[:, 1]
+comb = t1[:, None] * P + t2[:, None] * Q + t3[:, None] * R
+
+assert np.all(inside(comb))
+print("all", m, "three-point convex combinations stayed inside")
+```
+
+Every weighted combination of three interior points lands inside, confirming the
+definition extends from segments to arbitrary convex combinations.
+
+</details>
+
+With convex feasible regions defined, the next lesson puts a convex function on top
+of them.
 
 <Footnotes>
   <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §2.1-2.3. Cambridge University Press. Convex sets and the operations that preserve convexity.</FNItem>

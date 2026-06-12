@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: greedy
 order: 9
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Use greedy choices where they are optimal, and prove it with an exchange argument."
 prerequisites: ["dynamic-programming"]
 ---
@@ -129,8 +129,102 @@ print("DP optimum:        ", dp_knapsack(items, budget))     # 60
 ```
 
 Activity selection's greedy yields a maximal non-overlapping schedule, while the
-knapsack greedy is provably wrong on the example, fixed by DP. The next lesson
-introduces graphs and the two traversals every graph algorithm builds on.
+knapsack greedy is provably wrong on the example, fixed by DP.
+
+## Exercises
+
+**Exercise 1.** Run the earliest-finish-time greedy on the activities
+$(1,3), (2,5), (4,7), (1,8), (5,9), (8,10)$ given as (start, finish). Show the
+chosen set and its size.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sort by finish time:
+$(1,3), (2,5), (4,7), (1,8), (5,9), (8,10)$. It is already sorted.
+
+**Step 2.** Take $(1,3)$; last finish $= 3$. Next activity starting at or after 3:
+$(4,7)$ qualifies (skip $(2,5)$, starts at 2 < 3). Take $(4,7)$; last finish $= 7$.
+
+**Step 3.** Skip $(1,8)$ (starts at 1) and $(5,9)$ (starts at 5 < 7). Take
+$(8,10)$ (starts at $8 \ge 7$); last finish $= 10$.
+
+Chosen set: $(1,3), (4,7), (8,10)$, of size 3. No non-overlapping schedule is
+larger, since these three already tile the time line tightly.
+
+</details>
+
+**Exercise 2.** Construct a coin-change instance where the greedy "take the largest
+coin that fits" fails to use the fewest coins, and show the optimal count. Then
+state the property a coin system needs for greedy to be correct.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Use denominations $\{1, 3, 4\}$ and target amount 6. Greedy takes the
+largest coin $\le 6$, which is 4, leaving 2; then 1 and 1. That is three coins:
+$4 + 1 + 1$.
+
+**Step 2.** The optimum is two coins: $3 + 3 = 6$. Greedy's lock-in on the 4 forced
+an extra coin, so it is not optimal here.
+
+**Step 3.** Greedy coin change is optimal only for *canonical* coin systems (such
+as $\{1, 5, 10, 25\}$), where for every amount the greedy choice is contained in
+some optimal solution, the same exchange-argument condition the lesson states. The
+system $\{1, 3, 4\}$ is not canonical, so greedy can fail and DP is needed.
+
+</details>
+
+**Exercise 3 (code).** Verify the lesson's claim that fractional knapsack *is*
+solved by the value-per-weight greedy. Implement fractional knapsack (items may be
+split) and compare against the 0/1 DP optimum on weights $[1, 5, 5]$, values
+$[10, 30, 30]$, budget 10: the fractional optimum should be at least the 0/1
+optimum of 60.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+weights = [1, 5, 5]
+values  = [10, 30, 30]
+budget  = 10
+
+def fractional(weights, values, budget):
+    order = sorted(range(len(weights)),
+                   key=lambda k: values[k] / weights[k], reverse=True)
+    total, cap = 0.0, budget
+    for k in order:
+        take = min(weights[k], cap)        # take whole item or the remaining cap
+        total += values[k] * take / weights[k]
+        cap -= take
+        if cap == 0:
+            break
+    return total
+
+def dp_01(weights, values, budget):
+    K = np.zeros(budget + 1, dtype=int)
+    for w, v in zip(weights, values):
+        for c in range(budget, w - 1, -1):
+            K[c] = max(K[c], K[c - w] + v)
+    return int(K[budget])
+
+frac = fractional(weights, values, budget)
+opt01 = dp_01(weights, values, budget)
+assert frac >= opt01                       # fractional relaxation is an upper bound
+print("fractional:", frac, " 0/1 DP optimum:", opt01)
+```
+
+The fractional greedy fills the budget with the best value-per-weight items (here
+reaching value 64 by taking the weight-1 item, all of one weight-5 item, and
+four-fifths of the other), which upper-bounds the 0/1 optimum of 60, confirming the
+relaxation is solved correctly by greedy while the integral version is not.
+
+</details>
+
+The next lesson introduces graphs and the two traversals every graph algorithm
+builds on.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Greedy algorithms and the greedy-choice property (Ch. 16).</FNItem>

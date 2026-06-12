@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: floating-point
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Understand IEEE-754 floating point, machine epsilon, and where rounding error comes from."
 prerequisites: []
 ---
@@ -105,7 +105,80 @@ print("(a+b)+c:", (a + b) + c, "  a+(b+c):", a + (b + c))
 
 Machine epsilon defines the relative precision floor, the spacing doubles every power
 of two, overflow and underflow happen at predictable thresholds, and addition is not
-even associative. With this representation in hand, the next lesson asks: when does
+even associative.
+
+## Exercises
+
+**Exercise 1.** Decimal $0.1$ has no finite binary expansion, so it is stored as the
+nearest float64. Using the relative-error bound $\frac{|\text{fl}(x) - x|}{|x|} \le \frac{\varepsilon_{\text{machine}}}{2}$
+with $\varepsilon_{\text{machine}} \approx 2.22 \times 10^{-16}$, bound the absolute
+error of $\text{fl}(0.1)$, and explain why $0.1 + 0.2$ is not exactly $0.3$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The relative error bound gives an absolute error
+$|\text{fl}(0.1) - 0.1| \le \frac{\varepsilon_{\text{machine}}}{2} \cdot 0.1 \approx 1.11 \times 10^{-17}$.
+So $0.1$ is stored with an error of order $10^{-17}$, not zero.
+
+**Step 2.** The same holds for $0.2$ and $0.3$: each is rounded to a nearby float.
+The stored values of $\text{fl}(0.1)$ and $\text{fl}(0.2)$ are each slightly off, and
+their sum is rounded again. There is no reason the rounded sum lands on the float
+nearest to $0.3$, and it does not: $0.1 + 0.2$ evaluates to
+$0.30000000000000004$, which differs from $\text{fl}(0.3) = 0.3$ in the last bit.
+Each operand carries its own rounding error and the addition rounds the result a
+third time, so the three errors do not cancel.
+
+</details>
+
+**Exercise 2.** Show that $2^{52} + 1$ is representable in float64 but $2^{53} + 1$ is
+not, and that $2^{53} + 1$ rounds to $2^{53}$. Use that the gap between consecutive
+floats in $[2^k, 2^{k+1})$ is $2^{k - p}$ with $p = 52$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At magnitude $2^{52}$, the exponent is $k = 52$, so the spacing to the
+next float is $2^{k - p} = 2^{52 - 52} = 2^0 = 1$. Consecutive integers near $2^{52}$
+are exactly representable, so $2^{52} + 1$ lands on a float.
+
+**Step 2.** At magnitude $2^{53}$, the exponent is $k = 53$, so the spacing is
+$2^{53 - 52} = 2^1 = 2$. The representable floats near $2^{53}$ are $2^{53}$ and
+$2^{53} + 2$; the odd integer $2^{53} + 1$ sits halfway between them.
+
+**Step 3.** Round-to-nearest with the ties-to-even rule picks the even neighbor.
+$2^{53}$ has its last mantissa bit zero (even), $2^{53} + 2$ does not at that scale,
+so $2^{53} + 1$ rounds down to $2^{53}$. The integer $+1$ is lost: float64 stops
+representing every integer exactly past $2^{53}$.
+
+</details>
+
+**Exercise 3 (code).** Floating-point addition is not associative. Construct three
+float64 values $a, b, c$ for which $(a + b) + c \neq a + (b + c)$, and confirm the two
+groupings differ by exactly $1$. Explain the mechanism in one sentence.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+a, b, c = 1e16, -1e16, 1.0
+left  = (a + b) + c     # (0.0) + 1.0 = 1.0
+right = a + (b + c)     # 1e16 + (-1e16 + 1.0); the +1 is below the gap at 1e16
+assert left == 1.0
+assert right == 0.0
+assert left - right == 1.0
+print("(a+b)+c =", left, "  a+(b+c) =", right)
+```
+
+In `a + (b + c)`, the inner sum $-10^{16} + 1$ rounds back to $-10^{16}$ because the
+spacing of floats near $10^{16}$ exceeds $1$, so the $+1$ is swallowed before $a$
+cancels $b$; grouping the cancellation first preserves it.
+
+</details>
+
+With this representation in hand, the next lesson asks: when does
 rounding error matter, and when does it explode?
 
 <Footnotes>

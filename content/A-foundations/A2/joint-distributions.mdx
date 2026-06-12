@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: joint-distributions
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Work with joint distributions, marginalize, condition, and define independence."
 prerequisites: ["random-variables"]
 ---
@@ -151,7 +151,107 @@ print("P(Y|X=0):", joint[0] / joint[0].sum())
 The covariance is positive for the shared-component pair, the variance-of-sum
 decomposition holds, the independent pair has near-zero covariance, the
 function-dependent pair $(X, X^2)$ also has near-zero covariance despite being
-fully dependent, and summing a joint table recovers the marginal. The next lesson turns the conditioning formula
+fully dependent, and summing a joint table recovers the marginal.
+
+## Exercises
+
+**Exercise 1.** The joint PMF of $(X, Y)$ is given by the table below, with $X$ the
+row index and $Y$ the column index.
+
+| $p(x, y)$ | $Y = 0$ | $Y = 1$ |
+|---|---|---|
+| $X = 0$ | $0.1$ | $0.2$ |
+| $X = 1$ | $0.3$ | $0.4$ |
+
+Compute the marginal $p_X$, the conditional $p_{Y \mid X}(y \mid 1)$, and decide
+whether $X$ and $Y$ are independent.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Marginalize over $Y$ by summing each row:
+$p_X(0) = 0.1 + 0.2 = 0.3$ and $p_X(1) = 0.3 + 0.4 = 0.7$.
+
+**Step 2.** Condition on $X = 1$ by rescaling that row so it sums to 1:
+
+$$
+p_{Y \mid X}(0 \mid 1) = \frac{0.3}{0.7} = \frac{3}{7}, \qquad
+p_{Y \mid X}(1 \mid 1) = \frac{0.4}{0.7} = \frac{4}{7}.
+$$
+
+**Step 3.** Test independence against the product of marginals. The $Y$ marginal is
+$p_Y(0) = 0.1 + 0.3 = 0.4$, $p_Y(1) = 0.6$. Then
+$p_X(0)\,p_Y(0) = 0.3 \cdot 0.4 = 0.12 \neq 0.1 = p(0, 0)$, so the joint does not
+factor: $X$ and $Y$ are dependent.
+
+</details>
+
+**Exercise 2.** Let $X$ and $Y$ be independent with $\operatorname{Var}(X) = 4$ and
+$\operatorname{Var}(Y) = 9$. Compute $\operatorname{Var}(2X - Y)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Scaling a variable by a constant scales its variance by the square:
+$\operatorname{Var}(2X) = 2^2 \operatorname{Var}(X) = 4 \cdot 4 = 16$, and
+$\operatorname{Var}(-Y) = (-1)^2 \operatorname{Var}(Y) = 9$.
+
+**Step 2.** Apply the variance-of-sum identity with the covariance term:
+
+$$
+\operatorname{Var}(2X - Y) = \operatorname{Var}(2X) + \operatorname{Var}(-Y) + 2\operatorname{Cov}(2X, -Y).
+$$
+
+**Step 3.** Independence forces $\operatorname{Cov}(2X, -Y) = 0$, so the cross term
+drops and $\operatorname{Var}(2X - Y) = 16 + 9 = 25$.
+
+</details>
+
+**Exercise 3 (code).** Build a $3 \times 3$ joint table by normalizing a random
+nonnegative matrix. Then verify on samples drawn from it that the empirical
+conditional $p(Y \mid X = 0)$ matches the table's conditional, and that
+$\mathbb{E}[XY] - \mathbb{E}[X]\mathbb{E}[Y]$ recovers the covariance computed
+directly from the table.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+vals = np.array([0, 1, 2], dtype=float)
+
+raw = rng.random((3, 3))
+joint = raw / raw.sum()                       # P(X=i, Y=j), sums to 1
+
+# Table conditional P(Y | X=0)
+cond_table = joint[0] / joint[0].sum()
+
+# Sample (X, Y) pairs from the flattened joint
+flat = joint.ravel()
+idx = rng.choice(9, size=2_000_000, p=flat)
+Xs, Ys = idx // 3, idx % 3
+cond_emp = np.array([np.mean(Ys[Xs == 0] == j) for j in range(3)])
+assert np.allclose(cond_table, cond_emp, atol=2e-3)
+
+# Covariance from the table vs E[XY] - E[X]E[Y]
+EX = (joint.sum(axis=1) * vals).sum()
+EY = (joint.sum(axis=0) * vals).sum()
+EXY = sum(joint[i, j] * vals[i] * vals[j] for i in range(3) for j in range(3))
+cov_table = EXY - EX * EY
+cov_emp = np.mean(vals[Xs] * vals[Ys]) - vals[Xs].mean() * vals[Ys].mean()
+assert np.isclose(cov_table, cov_emp, atol=5e-3)
+print("cond match:", np.round(cond_table, 4))
+print("cov table:", round(cov_table, 4), " sampled:", round(cov_emp, 4))
+```
+
+The sampled conditional matches the table row, and the two covariance routes agree,
+confirming both the conditioning formula and the $\mathbb{E}[XY] - \mu_X \mu_Y$ form.
+
+</details>
+
+The next lesson turns the conditioning formula
 around into Bayes' rule.
 
 <Footnotes>

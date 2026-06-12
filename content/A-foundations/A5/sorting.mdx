@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: sorting
 order: 6
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Derive merge sort and quicksort, and prove the comparison-sort lower bound."
 prerequisites: ["complexity-analysis"]
 ---
@@ -123,6 +123,92 @@ print(f"log2(n!) for n=500 ~ {math.lgamma(501)/math.log(2):.0f} comparisons (n l
 
 Both algorithms reproduce the library sort, merge sort preserves the relative order
 of equal keys, and the decision-tree bound predicts the $n \log n$ comparison count.
+
+## Exercises
+
+**Exercise 1.** Trace the merge step on the two sorted halves $[1, 4, 7]$ and
+$[2, 3, 8]$. Show the output after each comparison, and count the comparisons
+performed.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Merge keeps a pointer in each half and copies the smaller front
+element each time. Start with pointers at $1$ and $2$.
+
+- Compare $1$ and $2$: copy $1$. Output $[1]$.
+- Compare $4$ and $2$: copy $2$. Output $[1, 2]$.
+- Compare $4$ and $3$: copy $3$. Output $[1, 2, 3]$.
+- Compare $4$ and $8$: copy $4$. Output $[1, 2, 3, 4]$.
+- Compare $7$ and $8$: copy $7$. Output $[1, 2, 3, 4, 7]$.
+- The left half is exhausted; copy the rest of the right half, $8$. Output
+  $[1, 2, 3, 4, 7, 8]$.
+
+**Step 2.** Five comparisons were made before one half emptied. In general,
+merging halves of total length $n$ costs at most $n - 1$ comparisons, here
+$6 - 1 = 5$, matching the count.
+
+</details>
+
+**Exercise 2.** The comparison lower bound uses $\log_2(n!) = \Theta(n \log n)$.
+Prove the upper half of that bound, $\log_2(n!) \le n \log_2 n$, directly from the
+definition of $n!$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $n!$ as a product and bound each factor: every term in
+$n! = 1 \cdot 2 \cdots n$ is at most $n$, and there are $n$ of them, so
+
+$$
+n! = \prod_{k=1}^{n} k \le \prod_{k=1}^{n} n = n^n.
+$$
+
+**Step 2.** Take $\log_2$ of both sides. The logarithm is increasing, so the
+inequality is preserved:
+
+$$
+\log_2(n!) \le \log_2(n^n) = n \log_2 n.
+$$
+
+This gives the $O(n \log n)$ side. A matching lower bound (keeping only the top
+half of the factors, each at least $n/2$) yields $\log_2(n!) \ge \tfrac{n}{2}\log_2\tfrac{n}{2} = \Omega(n \log n)$, so $\log_2(n!) = \Theta(n \log n)$.
+
+</details>
+
+**Exercise 3 (code).** Counting sort beats the $n \log n$ bound on integers in a
+small range by reading values instead of comparing them. Implement it for
+nonnegative integers in $[0, K)$ in $O(n + K)$ time, and assert it matches the
+library sort on random data.
+
+<details>
+<summary>Solution</summary>
+
+The lower bound applies only to comparison sorts; counting sort sidesteps it by
+using each value as an array index, so its cost is linear in the input size plus
+the range $K$.
+
+```python
+import random
+
+def counting_sort(a, K):
+    counts = [0] * K
+    for x in a:               # tally each value: O(n)
+        counts[x] += 1
+    out = []
+    for v in range(K):        # emit values in order: O(K + n)
+        out.extend([v] * counts[v])
+    return out
+
+rng = random.Random(0)
+K = 100
+data = [rng.randrange(K) for _ in range(2000)]
+assert counting_sort(data, K) == sorted(data)
+print("counting sort matches sorted()")
+```
+
+</details>
+
 The next lesson abstracts the divide-and-conquer pattern itself and the master
 theorem for its recurrences.
 

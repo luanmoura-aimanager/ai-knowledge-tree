@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: trees-bst
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Use a BST for ordered operations and see why balancing keeps them logarithmic."
 prerequisites: ["complexity-analysis"]
 ---
@@ -137,8 +137,102 @@ print("successor of 500 in random tree:", successor(root_rand, 500))
 ```
 
 The randomly built BST has height close to $\log_2 n$, while the sorted-insertion
-tree degenerates into a chain of height $n$. The next lesson moves from ordered
-structures to a partially ordered one optimized for fast extremes: the heap.
+tree degenerates into a chain of height $n$.
+
+## Exercises
+
+**Exercise 1.** Insert the keys `5, 3, 8, 1, 4, 7, 9` in that order into an empty
+BST. Draw the resulting tree, give its height, and list the in-order traversal.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each key descends by comparison from the root and attaches at the
+first empty slot. `5` is the root. `3` is less than 5, so it goes left. `8` is
+greater, so it goes right. `1` is less than 5 then less than 3, so it is 3's left
+child. `4` is less than 5 then greater than 3, so it is 3's right child. `7` is
+greater than 5 then less than 8, so it is 8's left child. `9` is greater than 5
+then greater than 8, so it is 8's right child.
+
+```
+        5
+      /   \
+     3     8
+    / \   / \
+   1   4 7   9
+```
+
+**Step 2.** The height (counting edges on the longest root-to-leaf path, or nodes
+minus one level) is 2: the root at level 0, then 3 and 8, then the four leaves.
+Counting levels of nodes, the tree has 3 levels.
+
+**Step 3.** In-order traversal visits left subtree, node, right subtree, yielding
+keys in sorted order: `1, 3, 4, 5, 7, 8, 9`.
+
+</details>
+
+**Exercise 2.** Prove that an in-order traversal of any BST visits the keys in
+strictly increasing order.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Argue by structural induction on the tree. Base case: an empty tree
+emits the empty sequence, which is trivially sorted.
+
+**Step 2.** Inductive step: take a node with key $x$, left subtree $L$, and right
+subtree $R$. By the inductive hypothesis, in-order traversal of $L$ emits its keys
+in increasing order, and likewise for $R$. In-order on the whole tree emits
+(traversal of $L$), then $x$, then (traversal of $R$).
+
+**Step 3.** The BST property says every key in $L$ is strictly less than $x$ and
+every key in $R$ is strictly greater than $x$. So the concatenation places all of
+$L$'s keys (sorted, all $< x$) before $x$, and all of $R$'s keys (sorted, all
+$> x$) after $x$. The result is sorted across the boundaries as well as within
+each piece, completing the induction.
+
+</details>
+
+**Exercise 3 (code).** Without modifying the tree, write a function that checks
+whether a binary tree satisfies the BST property, by passing down the allowed open
+interval $(\text{lo}, \text{hi})$ for each node's key. Assert it accepts a valid
+tree and rejects one with a single misplaced key.
+
+<details>
+<summary>Solution</summary>
+
+A node-by-node check of "left child smaller, right child larger" is not enough: a
+key can be larger than its parent yet violate a grandparent's bound. Carrying the
+allowed interval down the recursion catches exactly those cases.
+
+```python
+class N:
+    __slots__ = ("key", "left", "right")
+    def __init__(self, key, left=None, right=None):
+        self.key = key; self.left = left; self.right = right
+
+def is_bst(node, lo=float("-inf"), hi=float("inf")):
+    if node is None:
+        return True
+    if not (lo < node.key < hi):           # key must lie in the open interval
+        return False
+    return (is_bst(node.left, lo, node.key) and
+            is_bst(node.right, node.key, hi))
+
+valid = N(5, N(3, N(1), N(4)), N(8, N(7), N(9)))
+# 6 sits below 8 (its parent) but is wrongly in the left subtree of root 5,
+# so it must be < 5; the interval check rejects it.
+invalid = N(5, N(3, N(1), N(6)), N(8))
+
+assert is_bst(valid) is True
+assert is_bst(invalid) is False
+print(is_bst(valid), is_bst(invalid))
+```
+
+</details>
+
+The next lesson moves from ordered structures to a partially ordered one optimized
+for fast extremes: the heap.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Binary search trees and red-black trees (Ch. 12, 13).</FNItem>

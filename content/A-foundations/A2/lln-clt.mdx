@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: lln-clt
 order: 11
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "State and use the LLN and CLT to describe the behavior of sample averages."
 prerequisites: ["inequalities"]
 ---
@@ -104,7 +104,92 @@ print("frac within +/-1.96:", round(np.mean(np.abs(standardized) < 1.96), 4))
 ```
 
 The running die average settles onto 3.5, and the standardized means of a skewed
-exponential become a unit normal with ~95% of mass inside $\pm1.96$. With sampling
+exponential become a unit normal with ~95% of mass inside $\pm1.96$.
+
+## Exercises
+
+**Exercise 1.** A fair die has mean $\mu = 3.5$ and variance $\sigma^2 = 35/12 \approx 2.9167$.
+For $n = 100$ rolls, use Chebyshev's inequality (as in the LLN proof) to bound the
+probability that the sample mean deviates from $3.5$ by at least $0.5$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The sample mean $\bar X_{100}$ has mean $3.5$ and variance
+$\sigma^2/n = 2.9167/100 = 0.029167$.
+
+**Step 2.** Chebyshev applied to $\bar X_{100}$ with tolerance $\varepsilon = 0.5$:
+
+$$
+P(|\bar X_{100} - 3.5| \ge 0.5) \le \frac{\operatorname{Var}(\bar X_{100})}{\varepsilon^2}
+= \frac{0.029167}{0.25} = 0.11\overline{6}.
+$$
+
+So the probability is at most about $0.117$. This is a loose worst-case bound; the
+CLT-based normal approximation would give a far smaller actual probability, but
+Chebyshev needs only the variance.
+
+</details>
+
+**Exercise 2.** The CLT says $\bar X_n \approx \mathcal{N}(\mu, \sigma^2/n)$. Using
+the standard normal fact $P(|Z| \le 1.96) \approx 0.95$, derive the width of a 95%
+confidence interval for $\mu$ and show how it shrinks with $n$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Standardize: $Z = (\bar X_n - \mu)/(\sigma/\sqrt n)$ is approximately
+$\mathcal{N}(0, 1)$, so $P(|Z| \le 1.96) \approx 0.95$.
+
+**Step 2.** Unfold the inequality $|\bar X_n - \mu| \le 1.96\,\sigma/\sqrt n$, which
+holds with probability about $0.95$. The interval is
+$\bar X_n \pm 1.96\,\sigma/\sqrt n$, of full width
+$2 \cdot 1.96\,\sigma/\sqrt n = 3.92\,\sigma/\sqrt n$.
+
+**Step 3.** The width scales as $1/\sqrt n$: to halve it requires four times the
+data. Quadrupling $n$ from $100$ to $400$ shrinks the width from $0.392\,\sigma$ to
+$0.196\,\sigma$.
+
+</details>
+
+**Exercise 3 (code).** Take the most skewed start possible, a Bernoulli($0.1$)
+variable. Verify the LLN (running mean converges to $0.1$) and the CLT (standardized
+sample means over $n = 500$ are approximately standard normal, with about 95% of mass
+within $\pm 1.96$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(11)
+
+p = 0.1
+mu, sigma = p, np.sqrt(p * (1 - p))    # Bernoulli mean and std
+
+# LLN: running mean of Bernoulli(0.1) converges to 0.1
+draws = (rng.random(200_000) < p).astype(float)
+running = np.cumsum(draws) / np.arange(1, len(draws) + 1)
+assert abs(running[-1] - p) < 0.01
+
+# CLT: standardized means over n=500 are ~ N(0,1)
+n, trials = 500, 200_000
+samples = (rng.random((trials, n)) < p).astype(float)
+means = samples.mean(axis=1)
+z = (means - mu) / (sigma / np.sqrt(n))
+frac = np.mean(np.abs(z) < 1.96)
+assert abs(z.mean()) < 0.02 and abs(z.std() - 1.0) < 0.02
+assert abs(frac - 0.95) < 0.01
+print("running mean:", round(running[-1], 4), " frac within 1.96:", round(frac, 4))
+```
+
+Even from a sharply skewed Bernoulli, the running mean lands on $0.1$ and the
+standardized means form a unit normal with about 95% of mass inside $\pm 1.96$.
+
+</details>
+
+With sampling
 behavior pinned down, the next lesson uses it in reverse: estimating a distribution's
 parameters from data by maximum likelihood.
 

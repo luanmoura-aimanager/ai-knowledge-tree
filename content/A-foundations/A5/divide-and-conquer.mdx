@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: divide-and-conquer
 order: 7
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Solve divide-and-conquer recurrences with the master theorem."
 prerequisites: ["sorting"]
 ---
@@ -150,8 +150,98 @@ print("karatsuba matches *:", karatsuba(a, b) == a * b)
 ```
 
 The merge-sort time ratios approach 2 as predicted by case 2 of the master theorem,
-and Karatsuba matches Python's built-in big-integer multiplication. The next lesson
-moves to a different combinatorial pattern: dynamic programming.
+and Karatsuba matches Python's built-in big-integer multiplication.
+
+## Exercises
+
+**Exercise 1.** Solve $T(n) = 4\,T(n/2) + n$ with the master theorem. Identify
+$a$, $b$, $f(n)$, the branching exponent $\log_b a$, the case, and the closed form.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read off the recurrence: $a = 4$ subproblems, each of size $n/b$ with
+$b = 2$, and combine cost $f(n) = n$.
+
+**Step 2.** Compute the branching exponent: $\log_b a = \log_2 4 = 2$, so the leaf
+count grows like $n^2$.
+
+**Step 3.** Compare $f(n) = n = n^1$ to $n^{\log_b a} = n^2$. Since
+$n^1 = O(n^{2 - \varepsilon})$ for any $\varepsilon \le 1$, the leaves dominate:
+this is case 1.
+
+**Step 4.** Case 1 gives $T(n) = \Theta(n^{\log_b a}) = \Theta(n^2)$.
+
+</details>
+
+**Exercise 2.** Derive the cost of $T(n) = 2\,T(n/2) + n$ (merge sort) directly by
+summing the recursion tree, without quoting the master theorem, and confirm it
+equals $\Theta(n \log n)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At depth $k$ there are $2^k$ nodes, each of size $n/2^k$, each costing
+$f(n/2^k) = n/2^k$. The total work at level $k$ is $2^k \cdot (n/2^k) = n$,
+independent of $k$.
+
+**Step 2.** The tree has depth $\log_2 n$ (halving from $n$ down to size 1), so
+there are $\log_2 n + 1$ levels, each contributing $n$:
+
+$$
+T(n) = \sum_{k=0}^{\log_2 n} n = n\,(\log_2 n + 1).
+$$
+
+**Step 3.** Dropping the constant and lower-order term, $T(n) = \Theta(n \log n)$.
+Every level doing equal work is the signature of case 2.
+
+</details>
+
+**Exercise 3 (code).** Empirically estimate the branching exponent of Karatsuba.
+Count the number of recursive base-case multiplications Karatsuba performs on two
+$n$-bit integers for $n = 2^k$, and check the count grows like $3^{k}$ (the
+$\log_2 3$ exponent in disguise, since $3^k = (2^k)^{\log_2 3} = n^{\log_2 3}$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+calls = 0
+def karatsuba(x, y, base_bits):
+    global calls
+    if x.bit_length() <= base_bits or y.bit_length() <= base_bits:
+        calls += 1
+        return x * y
+    half = max(x.bit_length(), y.bit_length()) // 2
+    hx, lx = x >> half, x & ((1 << half) - 1)
+    hy, ly = y >> half, y & ((1 << half) - 1)
+    z2 = karatsuba(hx, hy, base_bits)
+    z0 = karatsuba(lx, ly, base_bits)
+    z1 = karatsuba(hx + lx, hy + ly, base_bits) - z2 - z0
+    return (z2 << (2 * half)) + (z1 << half) + z0
+
+counts = []
+for k in range(2, 8):                       # n = 2^k bits, split down to 1-bit base
+    calls = 0
+    x = (1 << (2**k)) - 1                    # all-ones n-bit number
+    karatsuba(x, x, 1)
+    counts.append(calls)
+
+ratios = [counts[i] / counts[i-1] for i in range(1, len(counts))]
+# Each doubling of n triples the base-case count: three subproblems per level.
+assert all(2.6 <= r <= 3.4 for r in ratios)
+print("base-case counts:", counts)
+print("successive ratios:", [round(r, 2) for r in ratios])
+```
+
+Each doubling of the bit length roughly triples the number of base multiplies, the
+three-way branching that produces the $n^{\log_2 3}$ runtime rather than $n^2$.
+
+</details>
+
+The next lesson moves to a different combinatorial pattern: dynamic programming.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. The divide-and-conquer paradigm (Ch. 4).</FNItem>

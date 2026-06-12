@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: variance-moments
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define variance and higher moments, and use the MGF to recover them."
 prerequisites: ["expectation"]
 ---
@@ -135,8 +135,106 @@ print("M''(0) ~ E[X^2]:", m2, "  variance:", m2 - m1**2)
 ```
 
 The two variance formulas agree, the sampled MGF matches its closed form, and
-numerical derivatives of the MGF recover the first two moments. With spread defined
-for one variable, the next lesson handles several at once: joint distributions.
+numerical derivatives of the MGF recover the first two moments.
+
+## Exercises
+
+**Exercise 1.** A fair die shows $X \in \{1, 2, 3, 4, 5, 6\}$ each with probability
+$1/6$. Compute $\operatorname{Var}(X)$ using the computational formula
+$\mathbb{E}[X^2] - \mu^2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The mean is $\mu = \frac{1 + 2 + 3 + 4 + 5 + 6}{6} = \frac{21}{6} = 3.5$.
+
+**Step 2.** The second moment is
+
+$$
+\mathbb{E}[X^2] = \frac{1 + 4 + 9 + 16 + 25 + 36}{6} = \frac{91}{6} \approx 15.1667.
+$$
+
+**Step 3.** Subtract the squared mean:
+
+$$
+\operatorname{Var}(X) = \frac{91}{6} - 3.5^2 = 15.1667 - 12.25 = 2.9167 = \frac{35}{12}.
+$$
+
+The standard deviation is $\sqrt{35/12} \approx 1.708$, a spread of under two faces
+around the center $3.5$.
+
+</details>
+
+**Exercise 2.** The MGF of a Poisson($\lambda$) variable is
+$M_X(t) = e^{\lambda(e^t - 1)}$. Use it to recover $\mathbb{E}[X]$ and
+$\operatorname{Var}(X)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate once. With $g(t) = \lambda(e^t - 1)$ and $g'(t) = \lambda e^t$,
+
+$$
+M_X'(t) = \lambda e^t\, e^{\lambda(e^t - 1)}.
+$$
+
+At $t = 0$: $M_X'(0) = \lambda \cdot 1 \cdot e^0 = \lambda$, so $\mathbb{E}[X] = \lambda$.
+
+**Step 2.** Differentiate again, using the product rule on $\lambda e^t$ and $M_X(t)$:
+
+$$
+M_X''(t) = \lambda e^t\, e^{g(t)} + \lambda e^t \cdot \lambda e^t\, e^{g(t)} = \big(\lambda e^t + \lambda^2 e^{2t}\big)e^{g(t)}.
+$$
+
+At $t = 0$: $M_X''(0) = \lambda + \lambda^2 = \mathbb{E}[X^2]$.
+
+**Step 3.** Combine:
+
+$$
+\operatorname{Var}(X) = M_X''(0) - M_X'(0)^2 = (\lambda + \lambda^2) - \lambda^2 = \lambda.
+$$
+
+For a Poisson, mean and variance both equal $\lambda$.
+
+</details>
+
+**Exercise 3 (code).** Confirm the MGF product rule for sums of independent
+variables: draw independent Poisson($\lambda_1$) and Poisson($\lambda_2$) samples
+and check that the empirical MGF of $X + Y$ matches $M_X(t)\,M_Y(t)$ at a chosen
+$t$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(8)
+N = 2_000_000
+lam1, lam2 = 2.0, 3.0
+X = rng.poisson(lam1, N)
+Y = rng.poisson(lam2, N)
+
+t = 0.3
+mgf_sum = np.mean(np.exp(t * (X + Y)))             # empirical M_{X+Y}(t)
+mgf_product = np.mean(np.exp(t * X)) * np.mean(np.exp(t * Y))
+
+# Closed form: each Poisson MGF is exp(lam (e^t - 1))
+closed = np.exp(lam1 * (np.exp(t) - 1)) * np.exp(lam2 * (np.exp(t) - 1))
+
+assert np.isclose(mgf_sum, mgf_product, rtol=2e-3)
+print("M_{X+Y}(t):", round(mgf_sum, 4),
+      " M_X(t) M_Y(t):", round(mgf_product, 4),
+      " closed:", round(closed, 4))
+```
+
+The MGF of the sum matches the product of the individual MGFs, the independence
+identity that makes summing Poissons reduce to adding their rates.
+
+</details>
+
+With spread defined for one variable, the next lesson handles several at once: joint
+distributions.
 
 <Footnotes>
   <FNItem n="1">**Wasserman, L.** (2004). *All of Statistics.* Springer. Ch. 3-4, variance, moments, and moment generating functions. [doi:10.1007/978-0-387-21736-9](https://doi.org/10.1007/978-0-387-21736-9)</FNItem>

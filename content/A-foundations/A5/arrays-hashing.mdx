@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: arrays-hashing
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Understand amortized O(1) append and average O(1) hashing, along with their failure modes."
 prerequisites: ["complexity-analysis"]
 ---
@@ -140,8 +140,100 @@ print("lookup is now O(n) instead of O(1)")
 
 The chained hash map keeps buckets small on average, the load-factor threshold
 triggers resizing, and the deliberately bad hash collapses every key into one bucket,
-showing how a poor hash destroys the constant-time guarantee. The next lesson covers
-the linear structures: linked lists, stacks, and queues.
+showing how a poor hash destroys the constant-time guarantee.
+
+## Exercises
+
+**Exercise 1.** A hash map uses chaining with $m = 4$ buckets and the hash
+$h(k) = k$, so a key $k$ lands in bucket $k \bmod 4$. Insert the keys
+$3, 7, 10, 11, 14$ in that order. Show the contents of each bucket, the load
+factor, and the worst-case lookup cost (longest chain).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute each bucket index $k \bmod 4$: $3 \to 3$, $7 \to 3$,
+$10 \to 2$, $11 \to 3$, $14 \to 2$.
+
+**Step 2.** Drop the keys into their buckets, appending in insertion order:
+
+- bucket 0: empty
+- bucket 1: empty
+- bucket 2: $[10, 14]$
+- bucket 3: $[3, 7, 11]$
+
+**Step 3.** The load factor is $\alpha = n/m = 5/4 = 1.25$. The longest chain is
+bucket 3 with 3 entries, so a worst-case lookup scans 3 items: $O(\text{length of
+the longest chain})$ here equals 3 comparisons.
+
+</details>
+
+**Exercise 2.** A program overrides `__hash__` to always return 0 while keeping a
+correct `__eq__`. Argue that lookups stay correct but the time per operation
+degrades to $O(n)$, and state which hash-map invariant is and is not violated.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The required invariant is that equal objects hash to the same value.
+A constant hash satisfies it trivially: if two objects are equal they both hash
+to 0. So lookups remain correct, since every key that could match is in the one
+bucket being searched.
+
+**Step 2.** The performance assumption (keys spread roughly uniformly over
+buckets) is destroyed. With $h \equiv 0$, all $n$ keys land in bucket 0, forming
+one chain of length $n$. A lookup must scan that whole chain, so each `get` and
+`set` is $O(n)$.
+
+**Step 3.** Resizing does not help: doubling $m$ and rehashing still sends every
+key to bucket $0 \bmod m = 0$. The structure has collapsed to a linked list with
+hash-map overhead. Correctness invariant holds; the uniform-spread assumption,
+which the $O(1)$ bound rests on, does not.
+
+</details>
+
+**Exercise 3 (code).** Implement open-addressing with linear probing in a fixed
+array of capacity $m = 8$ (no resizing). Insert keys $0, 8, 16$, which all hash
+to slot $0 \bmod 8$, and confirm they occupy slots $0, 1, 2$ by probing forward.
+Then verify a lookup finds each key.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+m = 8
+EMPTY = -1
+slots = np.full(m, EMPTY)
+
+def insert(key):
+    i = key % m
+    while slots[i] != EMPTY:        # linear probe to the next free slot
+        i = (i + 1) % m
+    slots[i] = key
+    return i
+
+def find(key):
+    i = key % m
+    while slots[i] != EMPTY:
+        if slots[i] == key:
+            return i
+        i = (i + 1) % m
+    return -1
+
+placed = [insert(k) for k in (0, 8, 16)]
+assert placed == [0, 1, 2]                     # all collided at 0, probed forward
+assert [find(k) for k in (0, 8, 16)] == [0, 1, 2]
+print("slots:", slots.tolist())
+```
+
+The three colliding keys cascade into the next free slots $0, 1, 2$, and each
+later lookup re-walks the same probe sequence to land on its key.
+
+</details>
+
+The next lesson covers the linear structures: linked lists, stacks, and queues.
 
 <Footnotes>
   <FNItem n="1">**Sedgewick, R., & Wayne, K.** (2011). *Algorithms* (4th ed.). Addison-Wesley. Resizing arrays and hash tables (§1.3, §3.4).</FNItem>

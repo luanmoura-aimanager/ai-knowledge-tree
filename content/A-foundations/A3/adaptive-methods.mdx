@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: adaptive-methods
 order: 8
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Build per-coordinate adaptive step sizes and assemble the Adam update."
 prerequisites: ["sgd", "momentum"]
 ---
@@ -113,6 +113,93 @@ print("plain GD final f:", f"{plain_gd():.3e}")   # crawls on the flat coordinat
 
 Adam drives every coordinate down despite the 1000x curvature spread, while plain
 gradient descent, capped by the steepest coordinate, barely moves the flattest one.
+
+## Exercises
+
+**Exercise 1.** Adam runs with $\beta_1 = 0.9$ and $\beta_2 = 0.999$. Compute the
+bias-correction factors $1 - \beta_1^t$ and $1 - \beta_2^t$ at $t = 1$ and at
+$t = 10$, and explain why the second-moment correction matters for longer than the
+first.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $t = 1$: $1 - \beta_1^1 = 1 - 0.9 = 0.1$ and
+$1 - \beta_2^1 = 1 - 0.999 = 0.001$. The raw moments $m_1, v_1$ are only $0.1$ and
+$0.001$ of the gradient and its square, so without correction the first step would
+be tiny and badly scaled.
+
+**Step 2.** At $t = 10$: $\beta_1^{10} = 0.9^{10} \approx 0.3487$, so
+$1 - \beta_1^{10} \approx 0.6513$. And $\beta_2^{10} = 0.999^{10} \approx 0.9900$,
+so $1 - \beta_2^{10} \approx 0.0100$.
+
+**Step 3.** The first-moment factor has climbed from $0.1$ to $0.65$ in ten steps:
+the correction is nearly done. The second-moment factor is still only $0.01$,
+because $\beta_2 = 0.999$ decays far more slowly. The second moment stays biased
+toward zero for hundreds of steps, which is why dividing by $1 - \beta_2^t$ matters
+over a much longer horizon than dividing by $1 - \beta_1^t$.
+
+</details>
+
+**Exercise 2.** Consider one coordinate where the gradient is the constant $g$ at
+every step. Show that AdaGrad's effective step size $\eta / (\sqrt{G_t} + \epsilon)$
+decays like $1/\sqrt{t}$, while RMSProp's reaches a finite steady value. Ignore
+$\epsilon$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (AdaGrad).** With $g_k = g$ for all $k$, the accumulator is
+$G_t = \sum_{k=1}^t g^2 = t\,g^2$. The effective step is
+
+$$
+\frac{\eta}{\sqrt{G_t}} = \frac{\eta}{\sqrt{t}\,\lvert g\rvert},
+$$
+
+which decays as $1/\sqrt{t}$ and goes to zero, the stalling flaw of AdaGrad.
+
+**Step 2 (RMSProp).** The moving average obeys
+$S_t = \rho S_{t-1} + (1-\rho)g^2$. With constant $g^2$ this is a fixed-point
+iteration whose limit $S_\infty$ solves $S_\infty = \rho S_\infty + (1-\rho)g^2$,
+giving $S_\infty = g^2$.
+
+**Step 3.** The steady effective step is therefore
+$\eta / \sqrt{S_\infty} = \eta / \lvert g\rvert$, a finite constant. Replacing the
+growing sum with a decaying average is exactly what stops the step from collapsing.
+
+</details>
+
+**Exercise 3 (code).** Implement RMSProp and confirm Step 2 of Exercise 2
+numerically: with a constant gradient $g = 2$ and $\rho = 0.9$, the running average
+$S_t$ converges to $g^2 = 4$ and the effective step converges to $\eta / |g|$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+g = 2.0
+rho = 0.9
+eta = 0.1
+eps = 1e-8
+
+S = 0.0
+for _ in range(500):
+    S = rho * S + (1 - rho) * g**2     # constant gradient each step
+
+eff_step = eta / (np.sqrt(S) + eps)
+
+assert np.isclose(S, g**2, atol=1e-6)             # S_inf = g^2 = 4
+assert np.isclose(eff_step, eta / abs(g), atol=1e-6)
+print("S_inf:", round(S, 6), " effective step:", round(eff_step, 6))
+```
+
+The average settles at $4 = g^2$ and the effective step at
+$0.1 / 2 = 0.05$, matching the fixed point derived by hand.
+
+</details>
+
 The next lesson turns from unconstrained methods to optimization under constraints.
 
 <Footnotes>

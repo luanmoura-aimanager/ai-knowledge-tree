@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: gradient-descent
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Derive gradient descent from a local model and analyze its descent guarantee."
 prerequisites: ["optimization-landscape"]
 ---
@@ -126,8 +126,99 @@ print("eta>2/L diverges:", not np.all(np.isfinite(x)) or np.linalg.norm(x) > 1e6
 ```
 
 Gradient descent at $\eta = 1/L$ converges to the exact minimizer with a monotone
-decrease, and pushing past $2/L$ diverges, matching the descent lemma. The next
-lesson quantifies how fast convergence is, using smoothness and strong convexity.
+decrease, and pushing past $2/L$ diverges, matching the descent lemma.
+
+## Exercises
+
+**Exercise 1.** Derive the gradient-descent update by minimizing the local model
+$\hat f(x) = f(x_t) + \nabla f(x_t)^\top (x - x_t) + \tfrac{1}{2\eta}\lVert x - x_t\rVert^2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the gradient of $\hat f$ in $x$. The constant and the linear term
+contribute $\nabla f(x_t)$; the penalty $\tfrac{1}{2\eta}\lVert x - x_t\rVert^2$
+contributes $\tfrac{1}{\eta}(x - x_t)$:
+
+$$
+\nabla \hat f(x) = \nabla f(x_t) + \tfrac{1}{\eta}(x - x_t).
+$$
+
+**Step 2.** Set it to zero and solve for $x$:
+
+$$
+\tfrac{1}{\eta}(x - x_t) = -\nabla f(x_t) \implies x = x_t - \eta\, \nabla f(x_t).
+$$
+
+**Step 3.** The model $\hat f$ is convex (its Hessian is $\tfrac{1}{\eta} I \succ 0$),
+so this stationary point is the global minimizer. It is the gradient step.
+
+</details>
+
+**Exercise 2.** Starting from the descent lemma
+$f(y) \le f(x) - \eta(1 - \tfrac{L\eta}{2})\lVert\nabla f(x)\rVert^2$, find the step
+size $\eta$ that maximizes the guaranteed per-step decrease, and state that decrease.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The guaranteed decrease is $\eta(1 - \tfrac{L\eta}{2})\lVert\nabla f(x)\rVert^2$.
+Holding the gradient fixed, maximize the scalar coefficient
+$q(\eta) = \eta - \tfrac{L}{2}\eta^2$ over $\eta > 0$.
+
+**Step 2.** Differentiate and set to zero: $q'(\eta) = 1 - L\eta = 0$, so
+$\eta^\star = 1/L$. Since $q''(\eta) = -L < 0$, this is a maximum.
+
+**Step 3.** Evaluate the bracket at $\eta^\star = 1/L$: $1 - \tfrac{L}{2}\cdot\tfrac1L = \tfrac12$,
+so the coefficient is $\tfrac{1}{L}\cdot\tfrac12 = \tfrac{1}{2L}$. The largest
+guaranteed decrease is
+
+$$
+f(y) \le f(x) - \tfrac{1}{2L}\lVert\nabla f(x)\rVert^2.
+$$
+
+</details>
+
+**Exercise 3 (code).** For the quadratic $f(x) = \tfrac12 x^\top A x - b^\top x$ with
+$A$ having rows $(3,1)$ and $(1,2)$ and $b = (1, -1)$, scan step sizes across the
+safe range and verify empirically that the descent lemma bracket
+$1 - L\eta/2$ predicts whether $f$ keeps decreasing: descent for $\eta < 2/L$,
+divergence past it.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+A = np.array([[3.0, 1.0], [1.0, 2.0]])
+b = np.array([1.0, -1.0])
+f = lambda x: 0.5 * x @ A @ x - b @ x
+grad = lambda x: A @ x - b
+L = np.linalg.eigvalsh(A).max()
+
+def converges(eta, steps=400):
+    x = np.array([5.0, 5.0])
+    for _ in range(steps):
+        x = x - eta * grad(x)
+    return np.all(np.isfinite(x)) and np.linalg.norm(x) < 1e6
+
+# Bracket positive (eta < 2/L) predicts descent; negative predicts blow-up.
+for eta in [0.05, 1.0 / L, 0.50, 2.5 / L]:
+    bracket = 1 - L * eta / 2
+    assert converges(eta) == (bracket > 0)
+    print(f"eta={eta:.3f}  bracket={bracket:+.3f}  converges={converges(eta)}")
+
+print("2/L threshold =", round(2 / L, 4))
+```
+
+The bracket sign matches convergence at every tested step size: positive bracket
+gives a decreasing, convergent run, and the negative bracket past $2/L$ diverges.
+
+</details>
+
+The next lesson quantifies how fast convergence is, using smoothness and strong
+convexity.
 
 <Footnotes>
   <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §2.2 and ch. 3. Springer. Steepest descent and the line-search framework ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>

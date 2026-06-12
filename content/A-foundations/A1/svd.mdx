@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: svd
 order: 12
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Construct the SVD of any matrix from the spectral theorem applied to AᵀA, and read it as rotate–scale–rotate."
 prerequisites: ["spectral-theorem"]
 ---
@@ -116,7 +116,96 @@ print("U Sigma V^T @ v:", np.round(step3, 10))   # same
 ```
 
 The reconstruction error is near machine epsilon; both $U$ and $V^\top$ pass the
-orthogonality check. With the SVD in hand, the next lesson uses it to find the
+orthogonality check.
+
+## Exercises
+
+**Exercise 1.** Compute the singular values of $A = \begin{bmatrix} 2 & 0 \\ 0 &
+3 \\ 0 & 0 \end{bmatrix}$ by hand, using $A^\top A$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form $A^\top A$, a $2 \times 2$ matrix:
+
+$$
+A^\top A = \begin{bmatrix} 2 & 0 & 0 \\ 0 & 3 & 0 \end{bmatrix}
+\begin{bmatrix} 2 & 0 \\ 0 & 3 \\ 0 & 0 \end{bmatrix}
+= \begin{bmatrix} 4 & 0 \\ 0 & 9 \end{bmatrix}.
+$$
+
+**Step 2.** This is already diagonal, so its eigenvalues are $\lambda_1 = 9$ and
+$\lambda_2 = 4$ (ordered largest first).
+
+**Step 3.** The singular values are the square roots:
+$\sigma_1 = \sqrt 9 = 3$ and $\sigma_2 = \sqrt 4 = 2$. The third row of $A$
+contributes nothing, which is why $\Sigma$ has a zero row in
+$A = U\Sigma V^\top$.
+
+</details>
+
+**Exercise 2.** Show that the nonzero singular values of $A$ equal those of
+$A^\top$, so $\operatorname{rank}(A) = \operatorname{rank}(A^\top)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the SVD $A = U\Sigma V^\top$ with $U, V$ orthogonal. Transpose
+both sides: $A^\top = (U\Sigma V^\top)^\top = V \Sigma^\top U^\top$.
+
+**Step 2.** This is a valid SVD of $A^\top$: $V$ and $U^\top$ are orthogonal, and
+$\Sigma^\top$ is the (rectangular) diagonal matrix carrying the same diagonal
+entries $\sigma_i$ as $\Sigma$, only reshaped. So $A^\top$ has the identical set
+of singular values.
+
+**Step 3.** The rank equals the count of nonzero singular values (the number of
+$u_i$ spanning the column space in the lesson). Since $A$ and $A^\top$ share that
+count, $\operatorname{rank}(A) = \operatorname{rank}(A^\top)$, which is the
+row-rank-equals-column-rank fact.
+
+</details>
+
+**Exercise 3 (code).** For a random $4 \times 3$ matrix, verify that the left
+singular vectors $u_i = \tfrac{1}{\sigma_i} A v_i$ from the construction match
+the columns of $U$ that `np.linalg.svd` returns (up to sign), and that
+$\lVert A v_i \rVert = \sigma_i$.
+
+<details>
+<summary>Solution</summary>
+
+The construction defines $u_i = A v_i / \sigma_i$, so $A v_i = \sigma_i u_i$ and
+$\lVert A v_i \rVert = \sigma_i \lVert u_i \rVert = \sigma_i$. Each column of $U$
+must match the constructed $u_i$ up to an overall sign (an SVD is unique only up
+to sign on paired singular vectors).
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+A = rng.normal(size=(4, 3))
+
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+V = Vt.T
+
+for i, sigma in enumerate(s):
+    Av = A @ V[:, i]
+    u_constructed = Av / sigma
+    # ||A v_i|| == sigma_i
+    assert np.isclose(np.linalg.norm(Av), sigma)
+    # u_constructed equals column i of U up to a sign flip
+    assert np.allclose(u_constructed, U[:, i]) or \
+           np.allclose(u_constructed, -U[:, i])
+
+print("singular values:", np.round(s, 6))
+```
+
+Each $\lVert A v_i \rVert$ reproduces $\sigma_i$, and the constructed left
+singular vectors agree with `svd`'s $U$ up to sign, confirming the Step 2
+construction $u_i = A v_i / \sigma_i$.
+
+</details>
+
+With the SVD in hand, the next lesson uses it to find the
 best rank-$k$ approximation to $A$ and to define PCA.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: bayes-rule
 order: 6
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Derive Bayes' rule and use it to invert conditional probabilities."
 prerequisites: ["joint-distributions"]
 ---
@@ -122,7 +122,108 @@ print("posterior prob from odds:", round(post_odds / (1 + post_odds), 4))
 ```
 
 The simulation, the direct Bayes computation, and the odds form all agree on the
-counterintuitive ~2%. Adding a prior to the likelihood is the bridge to the next
+counterintuitive ~2%.
+
+## Exercises
+
+**Exercise 1.** A box has two coins: a fair coin ($P(\text{head}) = 0.5$) and a
+biased coin ($P(\text{head}) = 0.9$). You pick one at random and flip it once,
+getting heads. Compute the posterior probability that you picked the biased coin.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set the hypotheses and prior. Let $B$ = "biased coin" and
+$F$ = "fair coin", each chosen with prior $P(B) = P(F) = 0.5$. The data is
+$D = \text{heads}$ with likelihoods $P(D \mid B) = 0.9$ and $P(D \mid F) = 0.5$.
+
+**Step 2.** Assemble the evidence by the law of total probability:
+
+$$
+P(D) = P(D \mid B)P(B) + P(D \mid F)P(F) = 0.9 \cdot 0.5 + 0.5 \cdot 0.5 = 0.7.
+$$
+
+**Step 3.** Apply Bayes' rule:
+
+$$
+P(B \mid D) = \frac{P(D \mid B)P(B)}{P(D)} = \frac{0.9 \cdot 0.5}{0.7} = \frac{0.45}{0.7} \approx 0.6429.
+$$
+
+One head nudges belief in the biased coin from 0.5 up to about 0.64, not all the
+way: a single head is only mild evidence.
+
+</details>
+
+**Exercise 2.** Continue Exercise 1: you flip the same coin a second time and get
+heads again. Using the posterior after one flip as the new prior, compute the
+posterior after two heads. Verify it matches computing from the two-head
+likelihoods directly.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Update sequentially. The posterior from Exercise 1 becomes the prior:
+$P(B) = 0.6429$, $P(F) = 0.3571$. A second head has the same likelihoods,
+$P(D \mid B) = 0.9$, $P(D \mid F) = 0.5$.
+
+$$
+P(B \mid DD) = \frac{0.9 \cdot 0.6429}{0.9 \cdot 0.6429 + 0.5 \cdot 0.3571} = \frac{0.5786}{0.5786 + 0.1786} \approx 0.7642.
+$$
+
+**Step 2.** Compute from scratch with the two-flip likelihood
+$P(\text{HH} \mid B) = 0.9^2 = 0.81$ and $P(\text{HH} \mid F) = 0.5^2 = 0.25$,
+starting from the original prior $0.5$:
+
+$$
+P(B \mid \text{HH}) = \frac{0.81 \cdot 0.5}{0.81 \cdot 0.5 + 0.25 \cdot 0.5} = \frac{0.81}{0.81 + 0.25} = \frac{0.81}{1.06} \approx 0.7642.
+$$
+
+The two agree. Bayesian updating is associative: feeding evidence one piece at a
+time, reusing each posterior as the next prior, lands on the same belief as
+conditioning on all the evidence at once.
+
+</details>
+
+**Exercise 3 (code).** A spam filter sees the word "free". Spam has prior
+$P(\text{spam}) = 0.4$; "free" appears in 30% of spam and 2% of ham. Simulate
+emails and confirm the empirical $P(\text{spam} \mid \text{free})$ matches Bayes'
+rule.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N = 5_000_000
+
+spam = rng.random(N) < 0.4
+has_free = np.where(
+    spam,
+    rng.random(N) < 0.30,     # P(free | spam)
+    rng.random(N) < 0.02,     # P(free | ham)
+)
+
+p_sim = spam[has_free].mean()
+
+# Bayes' rule closed form
+num = 0.30 * 0.4
+den = 0.30 * 0.4 + 0.02 * 0.6
+p_bayes = num / den
+
+print("P(spam | free) simulated:", round(p_sim, 4))
+print("P(spam | free) Bayes:    ", round(p_bayes, 4))
+assert np.isclose(p_sim, p_bayes, atol=1e-3)
+```
+
+The closed form is $0.12 / (0.12 + 0.012) \approx 0.9091$, and the simulation
+lands on the same value: seeing "free" raises the spam probability from the 0.4
+prior to about 0.91.
+
+</details>
+
+Adding a prior to the likelihood is the bridge to the next
 lesson's distributions, which supply the likelihoods this rule consumes.
 
 <Footnotes>

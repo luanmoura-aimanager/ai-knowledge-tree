@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: conditioning-stability
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Distinguish the conditioning of a problem from the stability of an algorithm, and bound error with the condition number."
 prerequisites: ["floating-point", "A1/svd"]
 ---
@@ -117,7 +117,102 @@ print("QR-route error: ", np.linalg.norm(x_qr - truth))
 ```
 
 The relative error grows with the condition number as predicted, and the normal-
-equations route loses precision the QR route preserves. The next lesson zooms in on
+equations route loses precision the QR route preserves.
+
+## Exercises
+
+**Exercise 1.** A matrix $A$ has $\sigma_{\max} = 10$ and $\sigma_{\min} = 10^{-5}$.
+Compute $\kappa_2(A)$, and state how many correct digits a backward-stable solver of
+$Ax = b$ returns when the input is given to double precision
+($\varepsilon_{\text{machine}} \approx 2.2 \times 10^{-16}$).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The 2-norm condition number is the ratio of extreme singular values:
+
+$$
+\kappa_2(A) = \frac{\sigma_{\max}}{\sigma_{\min}} = \frac{10}{10^{-5}} = 10^{6}.
+$$
+
+**Step 2.** A backward-stable solver achieves the forward-error bound
+$\frac{\lVert \hat x - x\rVert}{\lVert x\rVert} \lesssim \kappa_2(A) \cdot \varepsilon_{\text{machine}} \approx 10^{6} \cdot 2.2 \times 10^{-16} = 2.2 \times 10^{-10}$.
+
+**Step 3.** A relative error near $10^{-10}$ leaves about $10$ correct digits. Of the
+$16$ digits double precision supplies, the condition number $10^6$ consumes $6$,
+matching the rule that each factor of $10$ in $\kappa$ costs one digit.
+
+</details>
+
+**Exercise 2.** Show that for the normal equations $A^\top A x = A^\top b$, the
+condition number satisfies $\kappa_2(A^\top A) = \kappa_2(A)^2$. Use the SVD
+$A = U \Sigma V^\top$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $A = U \Sigma V^\top$ with $U, V$ orthogonal and $\Sigma$ diagonal
+holding the singular values $\sigma_i$. Then
+
+$$
+A^\top A = V \Sigma^\top U^\top U \Sigma V^\top = V \Sigma^2 V^\top,
+$$
+
+using $U^\top U = I$. This is the eigendecomposition of $A^\top A$, so its singular
+values are the diagonal entries $\sigma_i^2$.
+
+**Step 2.** The extreme singular values of $A^\top A$ are therefore
+$\sigma_{\max}^2$ and $\sigma_{\min}^2$, giving
+
+$$
+\kappa_2(A^\top A) = \frac{\sigma_{\max}^2}{\sigma_{\min}^2} = \left(\frac{\sigma_{\max}}{\sigma_{\min}}\right)^2 = \kappa_2(A)^2.
+$$
+
+**Step 3.** Forming $A^\top A$ squares the conditioning, so a problem with
+$\kappa(A) = 10^6$ becomes $\kappa(A^\top A) = 10^{12}$: the normal equations can
+lose twice as many digits as a route that keeps $\kappa(A)$, even though both solve
+the same least-squares problem.
+
+</details>
+
+**Exercise 3 (code).** Build a matrix with controlled $\kappa_2 = 10^8$ via its SVD,
+solve $Ax = b$ for a known $x$, and confirm the relative error stays under the bound
+$\kappa_2 \cdot \varepsilon_{\text{machine}}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+eps = np.finfo(float).eps
+n, kappa = 40, 1e8
+
+# Controlled condition number: singular values geomspaced from 1 to 1/kappa.
+U = np.linalg.qr(rng.normal(size=(n, n)))[0]
+V = np.linalg.qr(rng.normal(size=(n, n)))[0]
+s = np.geomspace(1.0, 1.0 / kappa, n)
+A = U @ np.diag(s) @ V.T
+
+assert np.isclose(np.linalg.cond(A), kappa, rtol=1e-3)
+
+x_true = rng.normal(size=n)
+b = A @ x_true
+x_hat = np.linalg.solve(A, b)
+rel_err = np.linalg.norm(x_hat - x_true) / np.linalg.norm(x_true)
+
+assert rel_err <= kappa * eps          # forward-error bound holds
+print("rel error:", rel_err, "  bound kappa*eps:", kappa * eps)
+```
+
+The relative error lands below $\kappa_2 \cdot \varepsilon_{\text{machine}} \approx 2.2 \times 10^{-8}$:
+the backward-stable `solve` is as accurate as the conditioning of the problem allows,
+no better and no worse.
+
+</details>
+
+The next lesson zooms in on
 the most common source of stability loss: subtracting near-equal numbers.
 
 <Footnotes>

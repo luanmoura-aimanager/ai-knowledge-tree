@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: low-rank-pca
 order: 13
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Prove the truncated SVD is the best low-rank approximation, and identify PCA as the SVD of the centered data matrix."
 prerequisites: ["svd"]
 ---
@@ -126,6 +126,101 @@ print("expected (s[0]^2 / (n-1)):", s[0]**2 / (n - 1))
 
 The first three components capture most of the variance; the rank-3 approximation
 has low relative error; and the PCA score variance matches the expected formula.
+
+## Exercises
+
+**Exercise 1.** A matrix has singular values $\sigma = (4, 3, 2, 1)$. Compute the
+best rank-2 Frobenius approximation error and the fraction of variance explained by
+the first two components.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By Eckart–Young, the rank-2 error in Frobenius norm uses the discarded
+singular values $\sigma_3, \sigma_4$:
+
+$$
+\lVert A - A_2\rVert_F = \sqrt{\sigma_3^2 + \sigma_4^2} = \sqrt{4 + 1} = \sqrt{5} \approx 2.236.
+$$
+
+**Step 2.** The fraction of variance explained is the kept energy over the total
+energy, with energy measured as squared singular values:
+
+$$
+\frac{\sigma_1^2 + \sigma_2^2}{\sigma_1^2 + \sigma_2^2 + \sigma_3^2 + \sigma_4^2}
+= \frac{16 + 9}{16 + 9 + 4 + 1} = \frac{25}{30} \approx 0.833.
+$$
+
+The first two components hold about 83 percent of the variance, and the leftover
+error is the root-sum-square of the two smallest singular values.
+
+</details>
+
+**Exercise 2.** Prove that the rank-$k$ truncated SVD error in Frobenius norm is
+exactly $\sqrt{\sum_{i>k}\sigma_i^2}$. Use the unitary invariance of the Frobenius
+norm.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the error matrix using the SVD. With $A = \sum_i \sigma_i u_i v_i^\top$
+and $A_k = \sum_{i\le k}\sigma_i u_i v_i^\top$, the difference keeps only the tail:
+
+$$
+A - A_k = \sum_{i > k} \sigma_i u_i v_i^\top = U \Sigma_{>k} V^\top,
+$$
+
+where $\Sigma_{>k}$ zeroes the first $k$ singular values.
+
+**Step 2.** The Frobenius norm is unitarily invariant: $\lVert U M V^\top\rVert_F = \lVert M\rVert_F$
+for orthogonal $U, V$, because $\lVert M\rVert_F^2 = \operatorname{tr}(M^\top M)$
+and the trace is unchanged by conjugation with orthogonal matrices. So
+
+$$
+\lVert A - A_k\rVert_F = \lVert \Sigma_{>k}\rVert_F = \sqrt{\sum_{i>k}\sigma_i^2}.
+$$
+
+The error is read off directly from the discarded singular values, with no cross
+terms surviving.
+
+</details>
+
+**Exercise 3 (code).** Generate data along two orthogonal directions with
+variances 9 and 1 plus small noise. Confirm that PCA recovers the two principal
+directions (up to sign) and that the first principal variance is near 9.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+n = 4000
+d1 = np.array([1.0, 0.0])           # true principal directions
+d2 = np.array([0.0, 1.0])
+s1 = rng.normal(scale=3.0, size=n)  # variance 9 along d1
+s2 = rng.normal(scale=1.0, size=n)  # variance 1 along d2
+X = np.outer(s1, d1) + np.outer(s2, d2) + 0.01 * rng.normal(size=(n, 2))
+
+Xc = X - X.mean(axis=0)
+U, sv, Vt = np.linalg.svd(Xc, full_matrices=False)
+
+# First principal variance = sigma_1^2 / (n - 1) should be ~ 9.
+var1 = sv[0]**2 / (n - 1)
+assert abs(var1 - 9.0) < 0.5
+
+# First principal direction aligns with d1 (sign is arbitrary).
+assert abs(abs(Vt[0] @ d1) - 1.0) < 1e-2
+print("first principal variance:", round(float(var1), 3))
+```
+
+The largest singular value reproduces the dominant variance of 9, and its right
+singular vector lines up with the direction that variance lives along, which is
+what PCA is built to find.
+
+</details>
+
 With the best low-rank approximation understood, the next lesson looks at the
 factorizations that solve linear systems efficiently without forming inverses.
 

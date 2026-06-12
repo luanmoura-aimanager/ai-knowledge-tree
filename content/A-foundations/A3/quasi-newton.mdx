@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: quasi-newton
 order: 13
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Approximate the Hessian from gradient differences with the BFGS update and its limited-memory form."
 prerequisites: ["newton-method"]
 ---
@@ -116,8 +116,113 @@ print("gradient norm:", f"{np.linalg.norm(g):.2e}")
 
 BFGS reaches the minimizer of an ill-conditioned ($\kappa = 50$) quadratic in a few
 dozen steps using only gradients, with the inverse-Hessian estimate built from the
-secant pairs. The next lesson handles objectives that are not smooth, with proximal
-methods.
+secant pairs.
+
+## Exercises
+
+**Exercise 1.** On a quadratic $f(x) = \tfrac12 x^\top H x - b^\top x$, take one step
+$s_t = x_{t+1} - x_t$ and form $y_t = \nabla f(x_{t+1}) - \nabla f(x_t)$. Show by hand
+that the secant condition $H s_t = y_t$ holds exactly, so the true Hessian satisfies the
+constraint BFGS imposes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For this quadratic the gradient is $\nabla f(x) = H x - b$, an affine map.
+
+**Step 2.** Compute the gradient difference directly:
+
+$$
+y_t = \nabla f(x_{t+1}) - \nabla f(x_t) = (H x_{t+1} - b) - (H x_t - b) = H(x_{t+1} - x_t).
+$$
+
+**Step 3.** The constant $b$ cancels, leaving $y_t = H s_t$. So the exact Hessian
+satisfies the secant condition for every step. BFGS asks its approximation $B_{t+1}$ to
+match this one observed pairing; on a quadratic, after enough independent directions the
+approximation pins down $H$ on the whole space.
+
+</details>
+
+**Exercise 2.** The curvature condition $y_t^\top s_t > 0$ guarantees BFGS keeps its
+inverse-Hessian estimate positive definite. Show that for a strictly convex quadratic
+with Hessian $H \succ 0$, the curvature condition holds for any nonzero step $s_t$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** On the quadratic, $y_t = H s_t$ from Exercise 1, so
+
+$$
+y_t^\top s_t = (H s_t)^\top s_t = s_t^\top H s_t.
+$$
+
+**Step 2.** Because $H$ is positive definite, $s_t^\top H s_t > 0$ for every nonzero
+$s_t$, by the definition of positive definiteness.
+
+**Step 3.** Therefore $y_t^\top s_t > 0$ whenever the step is nonzero, so $\rho_t =
+1/(y_t^\top s_t)$ is well defined and positive, and the rank-two BFGS update preserves
+positive definiteness. On nonquadratic functions a line search (Wolfe conditions)
+enforces the same inequality.
+
+</details>
+
+**Exercise 3 (code).** Implement the L-BFGS two-loop recursion that computes the product
+$H_t \nabla f$ from the last $m$ stored pairs $(s_k, y_k)$, without ever forming a matrix.
+Verify it against the dense BFGS inverse-Hessian on the same pairs by checking the two
+search directions agree.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, m = 12, 5
+
+# Build m secant pairs from a fixed SPD Hessian so curvature condition holds.
+M = rng.normal(size=(n, n)); H_true = M @ M.T + n * np.eye(n)
+S = rng.normal(size=(m, n))
+Y = S @ H_true                                  # y_k = H s_k (rows)
+
+# Dense BFGS inverse-Hessian built from the same pairs (gamma * I start).
+gamma = (S[-1] @ Y[-1]) / (Y[-1] @ Y[-1])
+Hdense = gamma * np.eye(n)
+for k in range(m):
+    s, y = S[k], Y[k]
+    rho = 1.0 / (y @ s)
+    I = np.eye(n)
+    Hdense = (I - rho * np.outer(s, y)) @ Hdense @ (I - rho * np.outer(y, s)) + rho * np.outer(s, s)
+
+g = rng.normal(size=n)
+dense_dir = Hdense @ g
+
+# Two-loop recursion: same H0 = gamma * I, same pairs, applied implicitly.
+def two_loop(g, S, Y, gamma):
+    q = g.copy()
+    alpha = np.zeros(m)
+    rho = np.array([1.0 / (Y[k] @ S[k]) for k in range(m)])
+    for k in reversed(range(m)):                # backward pass
+        alpha[k] = rho[k] * (S[k] @ q)
+        q = q - alpha[k] * Y[k]
+    r = gamma * q                               # H0 * q
+    for k in range(m):                          # forward pass
+        beta = rho[k] * (Y[k] @ r)
+        r = r + (alpha[k] - beta) * S[k]
+    return r
+
+loop_dir = two_loop(g, S, Y, gamma)
+
+assert np.allclose(loop_dir, dense_dir, atol=1e-8)
+print("max abs difference:", float(np.max(np.abs(loop_dir - dense_dir))))
+```
+
+The two-loop recursion reproduces the dense BFGS product to machine precision while
+touching only $O(mn)$ work, which is what lets L-BFGS scale to large $n$.
+
+</details>
+
+The next lesson handles objectives that are not smooth, with proximal methods.
 
 <Footnotes>
   <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §6.1. Springer. The secant condition and the BFGS inverse-Hessian update ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>

@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: optimization-landscape
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Formalize an optimization problem and characterize minima through the gradient and the Hessian."
 prerequisites: ["A1/matrix-calculus"]
 ---
@@ -112,8 +112,96 @@ print("analytic grad:", grad(x), " finite-diff:", np.round(fd, 6))
 
 The bowl's Hessian is positive definite (a minimum), the saddle's is indefinite, the
 negative gradient is a descent direction, and finite differences confirm the analytic
-gradient. The next lesson defines the geometric property, convexity, that makes a
-stationary point a global minimum.
+gradient.
+
+## Exercises
+
+**Exercise 1.** For $f(x, y) = x^2 + 3y^2$, find every stationary point by hand, then
+classify it using the Hessian. Confirm it is a strict local minimum.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set the gradient to zero. With
+$\nabla f = (2x,\, 6y)^\top$, the only solution of $2x = 0$ and $6y = 0$ is the origin
+$(0, 0)$. There is exactly one stationary point.
+
+**Step 2.** Form the Hessian, which is constant here:
+
+$$
+\nabla^2 f = \begin{pmatrix} 2 & 0 \\ 0 & 6 \end{pmatrix}.
+$$
+
+**Step 3.** A diagonal matrix has its diagonal entries as eigenvalues, so the
+eigenvalues are $2$ and $6$, both positive. The Hessian is positive definite, so the
+origin is a strict local minimum. Since $f$ is a sum of squares, it is in fact the
+global minimum, with $f(0,0) = 0$.
+
+</details>
+
+**Exercise 2.** The first-order condition $\nabla f(x^\star) = 0$ is necessary but not
+sufficient. Show that $f(x, y) = x^2 - y^2$ has a stationary point at the origin that is
+neither a minimum nor a maximum, and identify the directions of increase and decrease.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute $\nabla f = (2x,\, -2y)^\top$. It vanishes only at $(0, 0)$, so the
+origin is the unique stationary point.
+
+**Step 2.** The Hessian is $\nabla^2 f = \left(\begin{smallmatrix} 2 & 0 \\ 0 & -2 \end{smallmatrix}\right)$,
+with eigenvalues $+2$ and $-2$. Mixed signs make it indefinite, so the origin is a
+saddle, not an extremum.
+
+**Step 3.** Read the directions off the quadratic form. Along the $x$-axis ($y = 0$),
+$f = x^2 > 0$ for $x \ne 0$: the function increases. Along the $y$-axis ($x = 0$),
+$f = -y^2 < 0$ for $y \ne 0$: it decreases. The origin is a minimum along $x$ and a
+maximum along $y$, the defining shape of a saddle.
+
+</details>
+
+**Exercise 3 (code).** Pick a random symmetric $5 \times 5$ matrix as a Hessian and the
+quadratic $f(d) = \tfrac12 d^\top H d$. Verify numerically that $d = -\nabla f(x)$ is a
+descent direction at a nonzero $x$ whenever the directional derivative
+$\nabla f(x)^\top d$ is negative, and that this holds at every nonzero point.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+M = rng.normal(size=(5, 5))
+H = M + M.T                                  # symmetric Hessian (any signature)
+
+# f(x) = 0.5 x^T H x, grad = H x (H symmetric)
+grad = lambda x: H @ x
+
+# At many random nonzero points, -grad is a descent direction unless grad == 0.
+ratios = []
+for _ in range(1000):
+    x = rng.normal(size=5)
+    g = grad(x)
+    d = -g
+    dd = g @ d                               # directional derivative along -grad
+    ratios.append(dd / (g @ g))              # equals -1 whenever grad != 0
+    assert dd <= 0                           # never an ascent direction
+
+# -grad gives directional derivative -||grad||^2 <= 0, strictly < 0 when grad != 0.
+ratios = np.array(ratios)
+assert np.allclose(ratios, -1.0)
+print("directional derivative ratio (all):", round(ratios.max(), 6))
+```
+
+The directional derivative along $-\nabla f$ equals $-\lVert \nabla f\rVert^2$, which is
+negative at every point where the gradient is nonzero. Steepest descent is always a
+valid descent direction away from stationary points.
+
+</details>
+
+The next lesson defines the geometric property, convexity, that makes a stationary point
+a global minimum.
 
 <Footnotes>
   <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.), §2.1. Springer. First- and second-order optimality conditions for unconstrained problems ([doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)).</FNItem>

@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: kkt
 order: 11
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "State the KKT conditions and use them to solve inequality-constrained problems."
 prerequisites: ["duality"]
 ---
@@ -94,8 +94,99 @@ print("\ninactive constraint: x*=0, lam=0, slackness:",
 ```
 
 All four KKT conditions hold at the certified optimum, and the inactive-constraint
-case shows complementary slackness with a zero multiplier. The next lesson returns to
-unconstrained methods but uses curvature: Newton's method.
+case shows complementary slackness with a zero multiplier.
+
+## Exercises
+
+**Exercise 1.** Solve $\min_x \tfrac12\lVert x\rVert^2$ subject to $a^\top x \ge 1$
+with $a = (3, 4)$ by hand, using the KKT conditions. Report $x^\star$, $\lambda^\star$,
+and $f(x^\star)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $g(x) = 1 - a^\top x \le 0$. Stationarity of
+$\mathcal{L} = \tfrac12\lVert x\rVert^2 + \lambda(1 - a^\top x)$ gives
+$x - \lambda a = 0$, so $x = \lambda a$.
+
+**Step 2.** Guess the constraint is active, $a^\top x = 1$. Substituting
+$x = \lambda a$ gives $\lambda \lVert a\rVert^2 = 1$, so
+$\lambda^\star = 1/\lVert a\rVert^2$. With $\lVert a\rVert^2 = 9 + 16 = 25$,
+$\lambda^\star = 1/25 = 0.04 \ge 0$, so dual feasibility holds.
+
+**Step 3.** Then $x^\star = \lambda^\star a = (3/25, 4/25) = (0.12, 0.16)$.
+Complementary slackness holds since $g(x^\star) = 0$, and primal feasibility holds
+($a^\top x^\star = 1$). All four conditions check out.
+
+**Step 4.** The objective value is
+
+$$
+f(x^\star) = \tfrac12 \lVert x^\star\rVert^2 = \tfrac{1}{2\lVert a\rVert^2} = \tfrac{1}{50} = 0.02.
+$$
+
+</details>
+
+**Exercise 2.** Using complementary slackness, prove that if the constraint
+$g(x) \le 0$ is strictly slack at the optimum ($g(x^\star) < 0$), then its
+multiplier must be zero, and conversely a nonzero multiplier forces the constraint
+active.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Complementary slackness states $\lambda^\star g(x^\star) = 0$. This is a
+product of two numbers equal to zero, so at least one factor is zero.
+
+**Step 2.** Suppose $g(x^\star) < 0$ (strictly slack). Then $g(x^\star) \neq 0$, so
+the product can be zero only if $\lambda^\star = 0$. A constraint that does not bind
+exerts no force.
+
+**Step 3.** Conversely, suppose $\lambda^\star > 0$. Then $\lambda^\star \neq 0$, so
+the product forces $g(x^\star) = 0$: the constraint is active. A constraint that
+pushes must sit on its boundary. The two cases are the active set and the inactive
+set, with no point both slack and forceful.
+
+</details>
+
+**Exercise 3 (code).** A box-constrained least squares: minimize
+$f(x) = \tfrac12\lVert x - c\rVert^2$ subject to $x \le u$ componentwise, with
+$c = (2, -1, 3)$ and $u = (1, 1, 1)$. The KKT-optimal solution clips each coordinate
+at its upper bound, $x^\star_i = \min(c_i, u_i)$. Verify the four KKT conditions hold
+at this clipped point.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+c = np.array([2.0, -1.0, 3.0])
+u = np.array([1.0, 1.0, 1.0])
+
+# Constraints g_i(x) = x_i - u_i <= 0. Gradient of f is x - c.
+# KKT solution clips at the bound where c_i > u_i.
+x = np.minimum(c, u)
+lam = np.maximum(c - u, 0.0)     # multiplier active where the bound binds
+
+g = x - u
+stationarity = np.allclose((x - c) + lam, 0)   # grad f + sum lam_i grad g_i = 0
+primal_feasible = np.all(g <= 1e-12)
+dual_feasible = np.all(lam >= 0)
+slackness = np.allclose(lam * g, 0)
+
+assert stationarity and primal_feasible and dual_feasible and slackness
+print("x* =", x, " lambda =", lam)
+print("all four KKT conditions hold:",
+      stationarity and primal_feasible and dual_feasible and slackness)
+```
+
+Each coordinate either sits below its bound with a zero multiplier or clips to the
+bound with a positive multiplier; complementary slackness holds coordinatewise,
+certifying the clipped point as the global optimum.
+
+</details>
+
+The next lesson returns to unconstrained methods but uses curvature: Newton's method.
 
 <Footnotes>
   <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §5.5. Cambridge University Press. The KKT conditions and complementary slackness.</FNItem>

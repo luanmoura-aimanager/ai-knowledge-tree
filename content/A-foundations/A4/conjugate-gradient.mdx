@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: conjugate-gradient
 order: 6
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Solve symmetric positive-definite systems with conjugate gradient and understand its Krylov structure."
 prerequisites: ["iterative-methods", "A1/quadratic-forms"]
 ---
@@ -120,7 +120,120 @@ print(f"finite-termination bound: <= n = {n}")
 ```
 
 CG reaches the solution in fewer iterations than the dimension when the spectrum is
-favorable, with residual decaying geometrically. The next lesson generalizes Krylov
+favorable, with residual decaying geometrically.
+
+## Exercises
+
+**Exercise 1.** For the SPD system with
+$A = \left(\begin{smallmatrix} 4 & 1 \\ 1 & 3 \end{smallmatrix}\right)$,
+$b = (1, 2)^\top$, and $x_0 = 0$, compute the first CG step length $\alpha_0$ and the
+iterate $x_1$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $x_0 = 0$, the initial residual is $r_0 = b - A x_0 = b = (1, 2)^\top$,
+and the first direction is $p_0 = r_0 = (1, 2)^\top$.
+
+**Step 2.** The step length is $\alpha_0 = \dfrac{r_0^\top r_0}{p_0^\top A p_0}$. The
+numerator is $r_0^\top r_0 = 1^2 + 2^2 = 5$. For the denominator,
+
+$$
+A p_0 = \begin{pmatrix} 4 & 1 \\ 1 & 3 \end{pmatrix}\begin{pmatrix} 1 \\ 2 \end{pmatrix} = \begin{pmatrix} 6 \\ 7 \end{pmatrix}, \qquad p_0^\top A p_0 = 1 \cdot 6 + 2 \cdot 7 = 20.
+$$
+
+So $\alpha_0 = 5/20 = 1/4$.
+
+**Step 3.** The new iterate is
+
+$$
+x_1 = x_0 + \alpha_0 p_0 = \tfrac14 (1, 2)^\top = (0.25, 0.5)^\top.
+$$
+
+This is the exact minimizer of $\phi$ along the line $x_0 + t p_0$.
+
+</details>
+
+**Exercise 2.** With condition number $\kappa = 4$, evaluate the CG error-reduction
+factor $\frac{\sqrt\kappa - 1}{\sqrt\kappa + 1}$ per step, and find how many steps drive
+the $A$-norm error below $10^{-6}$ of its start (ignore the leading factor of $2$).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $\kappa = 4$, $\sqrt\kappa = 2$, so the per-step factor is
+
+$$
+\frac{\sqrt\kappa - 1}{\sqrt\kappa + 1} = \frac{2 - 1}{2 + 1} = \frac{1}{3}.
+$$
+
+**Step 2.** The error bound shrinks like $(1/3)^k$. Requiring $(1/3)^k \le 10^{-6}$
+and taking logs:
+
+$$
+k \ge \frac{\log 10^{-6}}{\log (1/3)} = \frac{-6 \log 10}{-\log 3} \approx \frac{-13.816}{-1.0986} \approx 12.6.
+$$
+
+**Step 3.** The smallest integer is $k = 13$. A well-conditioned spectrum
+($\kappa = 4$) gives a $\sqrt\kappa$-rate of $1/3$ per step, so a handful of
+iterations suffices, far below the dimension $n$.
+
+</details>
+
+**Exercise 3 (code).** Implement CG for a random SPD system and verify two
+properties: the residuals $r_k$ are mutually orthogonal, and the solution matches a
+direct solve.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 40
+# Well-conditioned SPD matrix: eigenvalues spread evenly in [1, 10].
+Q = np.linalg.qr(rng.normal(size=(n, n)))[0]
+A = Q @ np.diag(np.linspace(1.0, 10.0, n)) @ Q.T
+b = rng.normal(size=n)
+
+x = np.zeros(n)
+r = b - A @ x
+p = r.copy()
+rs_old = r @ r
+residual_vecs = [r.copy()]
+for _ in range(n):
+    Ap = A @ p
+    alpha = rs_old / (p @ Ap)
+    x = x + alpha * p
+    r = r - alpha * Ap
+    rs_new = r @ r
+    residual_vecs.append(r.copy())
+    if rs_new < 1e-20:
+        break
+    p = r + (rs_new / rs_old) * p
+    rs_old = rs_new
+
+# Residuals are mutually orthogonal (a defining CG property). Check the early
+# iterates, before the residuals shrink to the rounding floor.
+R = np.array(residual_vecs[:10])
+R = R / np.linalg.norm(R, axis=1, keepdims=True)     # unit-normalize each
+G = R @ R.T
+off_diag = G - np.diag(np.diag(G))
+assert np.max(np.abs(off_diag)) < 1e-8
+
+x_true = np.linalg.solve(A, b)
+assert np.linalg.norm(x - x_true) < 1e-6
+print("max off-diagonal residual inner product:", np.max(np.abs(off_diag)))
+```
+
+The off-diagonal Gram entries are negligible, confirming the residuals form an
+orthogonal set, which is the discrete reason CG never needs to revisit a direction
+and terminates in at most $n$ steps.
+
+</details>
+
+The next lesson generalizes Krylov
 solvers to nonsymmetric systems with GMRES.
 
 <Footnotes>
