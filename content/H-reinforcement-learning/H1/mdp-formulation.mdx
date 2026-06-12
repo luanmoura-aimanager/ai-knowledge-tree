@@ -4,7 +4,7 @@ pillar: H
 subId: H1
 lessonId: mdp-formulation
 order: 1
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Define an MDP by its states, actions, transitions, and rewards; write the discounted return and the state- and action-value functions of a policy."
 prerequisites: ["A2/expectation", "A2/markov-chains"]
 ---
@@ -176,6 +176,84 @@ print("max abs error:", round(np.max(np.abs(V_true - V_mc)), 3))
 The Monte Carlo averages of the discounted return land on the analytic $V^\pi$
 within sampling error, which is exactly the claim $V^\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s]$:
 the value function *is* the expected return.
+
+## Exercises
+
+**Exercise 1.** An agent with discount $\gamma = 0.5$ receives the alternating
+reward stream $r_1 = 4,\ r_2 = 0,\ r_3 = 4,\ r_4 = 0, \dots$ (a $4$ on every
+odd-indexed reward, forever). Compute the return $G_0$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the return and drop the zero terms. With $r_{2j+1} = 4$ and
+$r_{2j+2} = 0$, only the even powers of $\gamma$ survive:
+
+$$
+G_0 = \sum_{k=0}^{\infty} \gamma^k r_{k+1} = 4\big(\gamma^0 + \gamma^2 + \gamma^4 + \dots\big) = 4 \sum_{j=0}^{\infty} (\gamma^2)^j.
+$$
+
+**Step 2.** Sum the geometric series with ratio $\gamma^2 = 0.25$:
+
+$$
+G_0 = \frac{4}{1 - \gamma^2} = \frac{4}{1 - 0.25} = \frac{4}{0.75} = \tfrac{16}{3} \approx 5.333.
+$$
+
+The bound check holds: with $r_{\max} = 4$, the return cannot exceed
+$r_{\max}/(1-\gamma) = 4/0.5 = 8$, and $5.333$ sits below it.
+
+</details>
+
+**Exercise 2.** A state $s$ has two available actions under a stochastic policy,
+$\pi(a_1 \mid s) = 0.7$ and $\pi(a_2 \mid s) = 0.3$, with action-values
+$Q^\pi(s, a_1) = 10$ and $Q^\pi(s, a_2) = 2$. Compute $V^\pi(s)$, and explain why
+$V^\pi(s)$ can never exceed $\max_a Q^\pi(s,a)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the identity $V^\pi(s) = \sum_a \pi(a\mid s)\, Q^\pi(s,a)$:
+
+$$
+V^\pi(s) = 0.7 \cdot 10 + 0.3 \cdot 2 = 7 + 0.6 = 7.6.
+$$
+
+**Step 2.** $V^\pi(s)$ is a convex combination (a probability-weighted average) of
+the $Q^\pi(s,a)$ values, and an average of numbers is at most their maximum. Here
+$7.6 \le 10 = \max_a Q^\pi(s,a)$. Equality holds only when the policy puts all its
+mass on a maximal action, which is what a greedy policy does.
+
+</details>
+
+**Exercise 3 (code).** The effective horizon is the discounted weight
+$\sum_{k=0}^{\infty}\gamma^k = 1/(1-\gamma)$. Pick $\gamma = 0.9$ and
+$r_{\max} = 10$. Compute the smallest number of steps $N$ such that truncating the
+return there leaves a tail smaller than $10^{-3}$, then verify the truncated
+geometric weight sum is within $10^{-3}$ of the closed-form horizon.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+gamma, rmax, tol = 0.9, 10.0, 1e-3
+H_eff = 1.0 / (1.0 - gamma)                       # closed-form horizon = 10
+
+# Tail past step N is bounded by rmax * gamma**N / (1 - gamma); solve < tol.
+N = int(np.ceil(np.log(tol * (1 - gamma) / rmax) / np.log(gamma)))
+tail = rmax * gamma**N / (1 - gamma)
+assert tail < tol
+
+trunc = np.sum(gamma ** np.arange(N))            # truncated weight sum
+assert np.isclose(trunc, H_eff, atol=1e-3)
+print("N:", N, " horizon:", round(trunc, 4), "of", round(H_eff, 4))
+```
+
+The truncated weight sum reaches $10$ once $N$ passes about a hundred steps, the
+point where the geometric tail drops below the tolerance.
+
+</details>
 
 The recursion $G_t = r_{t+1} + \gamma G_{t+1}$ used above to define the return is
 about to become the recursion that the value functions themselves obey, the

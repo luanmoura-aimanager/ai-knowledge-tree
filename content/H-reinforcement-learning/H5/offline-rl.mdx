@@ -4,7 +4,7 @@ pillar: H
 subId: H5
 lessonId: offline-rl
 order: 3
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Explain why standard Q-learning fails on a fixed dataset, then control the distribution shift with conservative Q-learning (CQL) and implicit Q-learning (IQL)."
 prerequisites: ["H2/ddpg-td3-sac"]
 ---
@@ -108,6 +108,103 @@ The naive policy walks straight off the cliff, choosing an unseen action whose v
 it had no right to trust, while CQL's conservatism keeps it on the best supported
 action. That is the entire offline-RL problem in miniature: out-of-distribution
 overestimation, controlled by staying near the data.
+
+## Exercises
+
+**Exercise 1.** The CQL penalty is
+$\alpha\big(\mathbb{E}_{s \sim \mathcal{D},\, a \sim \mu}[Q(s,a)] - \mathbb{E}_{(s,a) \sim \mathcal{D}}[Q(s,a)]\big)$.
+Take a single state with three actions whose current $Q$ values are
+$Q = (1, 2, 5)$, where actions $0$ and $1$ appear in the dataset (each with empirical
+weight $1/2$) and action $2$ is unseen. Let $\mu$ be uniform over the three actions
+and $\alpha = 1$. Compute the penalty, and say which action's value it pushes down
+hardest.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The first term averages $Q$ over $\mu$, uniform on all three actions:
+
+$$
+\mathbb{E}_{a \sim \mu}[Q] = \tfrac13(1 + 2 + 5) = \tfrac{8}{3} \approx 2.667.
+$$
+
+**Step 2.** The second term averages $Q$ over the dataset distribution, which puts
+weight $1/2$ on actions $0$ and $1$ and zero on the unseen action $2$:
+
+$$
+\mathbb{E}_{\mathcal{D}}[Q] = \tfrac12 \cdot 1 + \tfrac12 \cdot 2 = 1.5.
+$$
+
+**Step 3.** The penalty is $\alpha(2.667 - 1.5) = 1.167$. Minimizing it lowers the
+first expectation, and since $\mu$ is uniform while the dataset term holds the in-data
+actions up, the net downward pressure falls hardest on the high, **unsupported**
+value $Q(s, 2) = 5$: the action with the largest gap between its $\mu$-weight and its
+(zero) data weight, which is exactly the OOD overestimate the $\max$ would have
+chased.
+
+</details>
+
+**Exercise 2.** CQL is said to produce a **lower bound** on the true value, while IQL
+**avoids querying OOD actions entirely**. Contrast the two mechanisms: what does each
+do with the Bellman target's $\max_{a'} Q(s', a')$, and why does that make the greedy
+policy safe in each case?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** CQL keeps the standard Bellman target, including the
+$\max_{a'} Q(s', a')$ over all actions, but adds the penalty that deflates $Q$ on
+out-of-data actions and inflates it on in-data ones. The learned $Q$ is driven below
+the true value (a lower bound), so when the greedy policy takes the $\max$ it cannot
+be lured by an inflated OOD value: any unsupported action has been pushed down.
+
+**Step 2.** IQL never evaluates $Q$ on actions outside the data. It replaces
+$\max_{a'} Q(s', a')$ with an expectile-regressed value $V(s')$ that approximates the
+best **in-support** action's value using only $(s, a, r, s')$ tuples present in the
+dataset. The backup therefore never proposes a new action, so the OOD extrapolation
+problem never arises to be corrected.
+
+**Step 3.** CQL controls the overestimate by penalizing it after the fact (a lower
+bound); IQL sidesteps it by construction (never querying off the data). Both yield a
+greedy or advantage-weighted policy that stays on supported actions, but one fixes the
+target and the other re-defines it.
+
+</details>
+
+**Exercise 3 (code).** Show the root cause of OOD overestimation as a maximization
+bias. All $K = 10$ actions have true value $0$. In-data actions $0\text{-}4$ are
+well estimated (low-variance), unseen actions $5\text{-}9$ carry a noisy optimistic
+extrapolation. Verify that the $\max$ over **all** actions is biased well above $0$
+while the $\max$ over **in-data** actions is near $0$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+K, in_data, trials = 10, np.arange(5), 4000
+max_all, max_indata = [], []
+for _ in range(trials):
+    Q = np.zeros(K)                                   # every action's TRUE value is 0
+    Q[in_data] = rng.normal(0, 1 / np.sqrt(2000), size=5)   # well-estimated, near 0
+    Q[5:] = rng.normal(0, 1.0, size=5)                      # noisy OOD extrapolation
+    max_all.append(Q.max())
+    max_indata.append(Q[in_data].max())
+
+mean_all, mean_in = np.mean(max_all), np.mean(max_indata)
+assert mean_all > 0.5          # max over unseen-included Q is inflated upward
+assert abs(mean_in) < 0.05     # max over supported actions stays near the truth
+print("E[max all]:", round(mean_all, 4), " E[max in-data]:", round(mean_in, 4))
+```
+
+Taking the $\max$ over actions that include high-variance OOD estimates systematically
+selects the upward noise, so the target is inflated above the true value of $0$;
+restricting the $\max$ to supported actions removes the bias, which is why staying near
+the data (CQL's penalty, IQL's in-support backup) is the entire fix.
+
+</details>
 
 Single-agent offline RL still assumes one decision-maker. The next lesson adds
 others: multi-agent RL, where the environment itself contains adapting agents.

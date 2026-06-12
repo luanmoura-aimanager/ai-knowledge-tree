@@ -4,7 +4,7 @@ pillar: H
 subId: H3
 lessonId: world-models-dreamer
 order: 4
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Train a latent dynamics model from pixels and learn a policy entirely inside its imagined rollouts, backpropagating returns through the model (Dreamer)."
 prerequisites: ["dyna-q", "D4/vae"]
 ---
@@ -121,6 +121,141 @@ print("K learned in imagination:", round(K, 3), " analytic optimum:", round(K_st
 The hand-derived gradient matches the finite-difference estimate, and the policy
 trained only on imagined rollouts converges to the analytic optimal gain,
 controlling a system it learned about purely by differentiating through a model.
+
+## Exercises
+
+**Exercise 1.** Dreamer optimizes the policy by backpropagating the imagined
+return through the rollout (an analytic policy gradient), whereas REINFORCE uses
+the score-function estimator. For a one-step imagined rollout with latent
+transition $z' = f(z, a)$, reward $\hat{r}(z')$, and a deterministic policy
+$a = \pi_\phi(z)$, write the analytic gradient $\partial \hat{r}(z') /
+\partial \phi$ by the chain rule, and contrast which factors it needs that the
+REINFORCE estimator $\hat{r}\,\nabla_\phi \log \pi_\phi(a \mid z)$ does not.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compose the one-step return:
+$\hat{r}(z') = \hat{r}\big(f(z, \pi_\phi(z))\big)$. Apply the chain rule through
+$z'$, then $a$, then $\phi$:
+
+$$
+\frac{\partial \hat{r}(z')}{\partial \phi}
+= \frac{\partial \hat{r}}{\partial z'}\,
+  \frac{\partial f}{\partial a}\,
+  \frac{\partial \pi_\phi(z)}{\partial \phi}.
+$$
+
+**Step 2.** This needs three Jacobians: the reward head's gradient
+$\partial \hat{r} / \partial z'$, the dynamics' sensitivity to the action
+$\partial f / \partial a$, and the policy's parameter gradient. All three are
+available only because the world model is differentiable; the gradient flows
+*through* the learned dynamics.
+
+**Step 3.** REINFORCE forms $\hat{r}\,\nabla_\phi \log \pi_\phi(a \mid z)$. It
+never differentiates the reward or the dynamics; it treats the return as an
+opaque scalar weight on the score function $\nabla_\phi \log \pi_\phi$. So it
+works even with a non-differentiable environment, but it discards the
+sensitivity information $\partial \hat{r}/\partial z'$ and $\partial f/\partial a$
+that the analytic gradient exploits.
+
+**Step 4.** That discarded information is exactly why the analytic gradient is
+lower variance per sample: each rollout tells the policy not just "this return
+was high" but "the return rises in this direction in parameter space," which is
+the sample-efficiency advantage Dreamer claims.
+
+</details>
+
+**Exercise 2.** Dreamer uses short imagination horizons and a learned critic that
+bootstraps the value beyond the horizon. Explain why backpropagating through a
+*long* rollout of a learned latent model causes gradients to explode, and how the
+critic's bootstrap lets a short rollout still estimate long-horizon return.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Unrolling the latent dynamics $H$ steps composes the per-step
+Jacobian $\partial z_{t+1} / \partial z_t$ that many times. The gradient of the
+return with respect to an early action carries a product of $H$ such Jacobians.
+If their typical spectral norm exceeds one (an unstable or merely
+poorly-conditioned latent system), the product grows geometrically in $H$, the
+same exploding-gradient mechanism as deep recurrent nets.
+
+**Step 2.** Keeping $H$ small bounds the length of that Jacobian product, so the
+gradients stay finite. Gradient clipping and deliberately stable latent dynamics
+add further protection, but the horizon is the primary lever.
+
+**Step 3.** A short rollout alone would ignore all return past step $H$. The
+critic $V_\psi(z_H)$ supplies an estimate of the discounted return *from the
+horizon onward*, so the imagined objective is
+$\sum_{t=0}^{H-1} \gamma^t \hat{r}_t + \gamma^H V_\psi(z_H)$. The bootstrap term
+stands in for the truncated tail.
+
+**Step 4.** This is the TD bootstrap idea moved inside the model: a short
+trajectory plus a learned value at its end estimates long-horizon return without
+unrolling far enough to blow up the gradient.
+
+</details>
+
+**Exercise 3 (code).** For the linear-quadratic model of the worked check
+($x' = Ax + Bu$, reward $-(x^2 + \rho u^2)$, linear policy $u = -Kx$,
+$A = 0.9$, $B = 0.5$, $\rho = 0.1$, $\gamma = 0.95$, horizon $H = 25$), verify
+the analytic policy gradient by finite differences at a second test point
+$K = 1.0$, then run gradient ascent on the imagined return from $K = 0$ and
+assert it reaches the grid-search optimum.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+A, B, rho, gamma, H = 0.9, 0.5, 0.1, 0.95, 25
+
+def rollout(K, x0):
+    x, xs, us, G, disc = x0, [], [], 0.0, 1.0
+    for _ in range(H):
+        u = -K * x
+        G += disc * (-(x**2 + rho * u**2)); xs.append(x); us.append(u)
+        x = A * x + B * u; disc *= gamma
+    return G, xs, us
+
+def dG_dK(K, x0):                                # backprop return through rollout
+    _, xs, us = rollout(K, x0)
+    ax, grad, disc = 0.0, 0.0, gamma**(H - 1)
+    for t in reversed(range(H)):
+        x, u = xs[t], us[t]
+        d_x = disc * (-(2*x) - rho*2*u*(-K))
+        d_K = disc * (-rho*2*u*(-x))
+        new_ax = d_x + ax * (A - B*K)
+        grad += d_K + ax * (-B * x)
+        ax, disc = new_ax, disc / gamma
+    return grad
+
+# finite-difference check of the analytic gradient at K = 1.0
+fd = (rollout(1.0 + 1e-5, 1.0)[0] - rollout(1.0 - 1e-5, 1.0)[0]) / 2e-5
+assert np.isclose(dG_dK(1.0, 1.0), fd, atol=1e-3)
+
+# train K purely on imagined rollouts
+K = 0.0
+for _ in range(3000):
+    g = np.mean([dG_dK(K, x0) for x0 in rng.normal(size=64)])
+    K += 0.02 * g
+
+def J(K): return -(1 + rho*K**2) * sum((gamma * (A - B*K)**2)**t for t in range(H))
+grid = np.linspace(-1, 3, 4001)
+K_star = float(grid[int(np.argmax([J(k) for k in grid]))])
+
+assert abs(K - K_star) < 0.02
+print("analytic grad vs FD at K=1.0:", round(dG_dK(1.0, 1.0), 4), round(fd, 4))
+print("learned K:", round(K, 3), " grid optimum:", round(K_star, 3))
+```
+
+The analytic gradient matches finite differences at the new test point, and
+policy ascent on the imagined return lands on the grid-search optimum, the full
+Dreamer mechanism (differentiate the return through the model) in miniature.
+
+</details>
 
 This closes model-based RL. The next subsection steps back to a problem every
 method so far has assumed away: how an agent should explore, starting from the

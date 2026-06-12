@@ -4,7 +4,7 @@ pillar: H
 subId: H6
 lessonId: rl-as-llm-finetuning
 order: 1
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Cast autoregressive text generation as a token-level MDP, identify the policy, reward, and KL-to-reference penalty, and place the RLHF pipeline in this RL frame."
 prerequisites: ["H2/ppo", "E4/ppo-rlhf"]
 ---
@@ -122,6 +122,105 @@ print("beta=0.05 concentrates on argmax reward:",
 The closed-form policy matches the numerically optimized one, and the temperature
 $\beta$ moves it continuously from "stay at the reference" to "take the highest-reward
 token," which is exactly the knob the KL coefficient turns during RLHF.
+
+## Exercises
+
+**Exercise 1.** At one generation step the policy puts $\pi = (0.9, 0.1)$ on a
+two-token vocabulary while the reference is $\pi_{\text{ref}} = (0.5, 0.5)$, with KL
+coefficient $\beta = 0.2$. Using the per-token reward
+$r_t = r(x,y)[t=T] - \beta \log \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\text{ref}}(a_t \mid s_t)}$,
+compute the KL penalty applied when the policy emits the first token, when it emits
+the second token, and the expected per-step KL penalty under $\pi$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The penalty on a sampled token $a$ is
+$\beta \log \frac{\pi(a)}{\pi_{\text{ref}}(a)}$. For the first token,
+$0.2 \cdot \log \frac{0.9}{0.5} = 0.2 \cdot \log 1.8 = 0.2 \cdot 0.5878 = 0.1176$.
+
+**Step 2.** For the second token,
+$0.2 \cdot \log \frac{0.1}{0.5} = 0.2 \cdot \log 0.2 = 0.2 \cdot (-1.6094) = -0.3219$.
+The penalty is negative here: the policy is emitting a token it has made *rarer*
+than the reference, so the objective rewards that move.
+
+**Step 3.** The expected penalty is $\beta\,\mathrm{KL}(\pi \,\|\, \pi_{\text{ref}})$:
+
+$$
+0.2\left(0.9 \log \tfrac{0.9}{0.5} + 0.1 \log \tfrac{0.1}{0.5}\right)
+= 0.2 \cdot 0.3681 = 0.0736.
+$$
+
+The KL itself is $0.3681$ nats, positive as any KL must be, and the coefficient
+$\beta$ scales it into the reward.
+
+</details>
+
+**Exercise 2.** From the closed-form optimum
+$\pi^*(a) = \frac{1}{Z}\pi_{\text{ref}}(a)\exp(r(a)/\beta)$, derive the two limits
+claimed in the lesson: $\pi^* \to \pi_{\text{ref}}$ as $\beta \to \infty$, and
+$\pi^*$ concentrating on $\arg\max_a r(a)$ as $\beta \to 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** As $\beta \to \infty$, the argument $r(a)/\beta \to 0$ for every $a$, so
+$\exp(r(a)/\beta) \to 1$. Then $\pi^*(a) \propto \pi_{\text{ref}}(a) \cdot 1$, and
+after normalizing $\pi^* = \pi_{\text{ref}}$. Infinite penalty pins the policy to the
+anchor.
+
+**Step 2.** As $\beta \to 0$, write the reward gap to the best action,
+$\Delta(a) = r(a) - \max_{a'} r(a') \le 0$. Then
+
+$$
+\pi^*(a) = \frac{\pi_{\text{ref}}(a)\,e^{\Delta(a)/\beta}}{\sum_{a'} \pi_{\text{ref}}(a')\,e^{\Delta(a')/\beta}}.
+$$
+
+For the maximizing action $\Delta = 0$ so its exponential stays $1$; for any other
+action $\Delta < 0$ and $e^{\Delta/\beta} \to 0$ as $\beta \to 0$. The mass collapses
+onto $\arg\max_a r(a)$ (assuming a unique maximizer with nonzero reference
+probability). Zero penalty is pure reward chasing.
+
+</details>
+
+**Exercise 3 (code).** As $\beta$ sweeps down, the KL-regularized optimum trades
+staying near the reference for chasing reward. For the bandit in the worked block,
+compute the optimal policy's expected reward $\mathbb{E}_{\pi^*}[r]$ and its
+$\mathrm{KL}(\pi^* \,\|\, \pi_{\text{ref}})$ at $\beta \in \{20, 5, 1, 0.25\}$, and
+verify both rise monotonically as $\beta$ falls.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+K = 8
+logits_ref = rng.normal(size=K)
+pi_ref = np.exp(logits_ref); pi_ref /= pi_ref.sum()   # reference next-token dist
+r = rng.normal(size=K) * 2                            # reward-model score per token
+
+def softmax(u): e = np.exp(u - u.max()); return e / e.sum()
+def pi_star(beta): return softmax(np.log(pi_ref) + r / beta)
+def kl(p, q): return float(np.sum(p * (np.log(p) - np.log(q))))
+
+Er, KL = [], []
+for beta in [20.0, 5.0, 1.0, 0.25]:
+    p = pi_star(beta)
+    Er.append(float(p @ r)); KL.append(kl(p, pi_ref))
+    print(f"beta={beta:5}  E[r]={p @ r:7.3f}  KL={kl(p, pi_ref):6.3f}")
+
+assert all(Er[i] < Er[i + 1] for i in range(len(Er) - 1))   # reward rises as beta falls
+assert all(KL[i] < KL[i + 1] for i in range(len(KL) - 1))   # so does drift from reference
+```
+
+Both expected reward and KL climb as $\beta$ shrinks: at $\beta = 20$ the policy sits
+on the reference with near-zero KL, and by $\beta = 0.25$ it has spent almost two
+nats of KL to push the expected reward up. The KL coefficient is the dial between
+trust and reward.
+
+</details>
 
 This frames RLHF where the reward comes from a learned model of human preference. The
 next lesson swaps that learned reward for a programmatic verifier, the setup behind

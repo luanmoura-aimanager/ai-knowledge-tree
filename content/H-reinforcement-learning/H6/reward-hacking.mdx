@@ -4,7 +4,7 @@ pillar: H
 subId: H6
 lessonId: reward-hacking
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Explain why optimizing a proxy reward eventually degrades the true objective (Goodhart), quantify it with reward-model overoptimization scaling, and mitigate it with KL control and reward ensembles."
 prerequisites: ["rl-as-llm-finetuning", "E4/reward-modeling"]
 ---
@@ -98,6 +98,99 @@ print("true reward peaks at n =", res[peak][0], "then declines:", trues[-1] < tr
 The proxy reward climbs without bound as the optimizer searches harder, while the
 true reward turns over at moderate pressure and decays toward chance, the
 overoptimization that KL penalties and reward ensembles exist to hold back.
+
+## Exercises
+
+**Exercise 1.** The gold reward follows $r^*_{\text{gold}}(d) = d\,(\alpha - \beta d)$
+with $d = \sqrt{\mathrm{KL}(\pi \,\|\, \pi_{\text{ref}})}$. Take $\alpha = 2$ and
+$\beta = 0.5$. By hand, find the distance $d^*$ at which the gold reward peaks, the
+KL there, and the gold reward at $d = 4$ (twice the peak distance).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The peak is where the derivative vanishes:
+$\frac{d}{dd}\,[d(\alpha - \beta d)] = \alpha - 2\beta d = 0$, so
+$d^* = \alpha / (2\beta) = 2 / (2 \cdot 0.5) = 2$.
+
+**Step 2.** Since $d = \sqrt{\mathrm{KL}}$, the KL at the peak is
+$\mathrm{KL} = (d^*)^2 = 4$ nats.
+
+**Step 3.** At $d = 4$ the gold reward is
+$4\,(2 - 0.5 \cdot 4) = 4 \cdot 0 = 0$. Twice the peak distance, the curve has
+fallen all the way back to its starting value: every bit of proxy optimization past
+$d^*$ has bought zero net gold reward, the overoptimization made concrete.
+
+</details>
+
+**Exercise 2.** A reward ensemble averages $M$ independently trained reward models,
+each scoring a fixed candidate as $\hat r_m = r^* + \varepsilon_m$ with the errors
+$\varepsilon_m$ independent, mean zero, and variance $\sigma^2$. Show that the
+ensemble's error variance shrinks by a factor $M$, and explain in one line why that
+delays the overoptimization decline.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The ensemble score is the mean
+$\bar r = \frac{1}{M}\sum_{m=1}^M \hat r_m = r^* + \frac{1}{M}\sum_m \varepsilon_m$,
+so its error is $\bar\varepsilon = \frac{1}{M}\sum_m \varepsilon_m$.
+
+**Step 2.** For independent terms, variance of a sum is the sum of variances:
+$\operatorname{Var}\!\big(\sum_m \varepsilon_m\big) = M\sigma^2$. The mean divides by
+$M^2$:
+
+$$
+\operatorname{Var}(\bar\varepsilon) = \frac{1}{M^2}\cdot M\sigma^2 = \frac{\sigma^2}{M}.
+$$
+
+**Step 3.** Overoptimization happens when the optimizer selects candidates whose
+high proxy score is a large positive error rather than true quality. Cutting the
+error variance by $M$ means a candidate needs a far larger genuine $r^*$ to win on
+noise alone, so selection chases real reward longer before error outliers dominate,
+pushing the gold-reward peak further out.
+
+</details>
+
+**Exercise 3 (code).** Confirm the ensemble effect from Exercise 2 in the selection
+setting of the worked block. Fix the optimization pressure at $n = 100$ candidates,
+each with a true reward plus a heavy-tailed reward-model error. Compare the true
+reward of the candidate selected by a **single** reward model against one selected
+by the **mean of a 5-model ensemble**. The ensemble's selected candidate should have
+higher true reward.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+trials = 4000
+n = 100                                   # optimization pressure (candidates searched)
+
+def selected_true(M):                     # select by mean of M reward models
+    out = []
+    for _ in range(trials):
+        t = rng.normal(size=n)                          # true reward of each candidate
+        errs = rng.standard_t(df=2, size=(M, n)) * 1.5  # M independent RM errors
+        proxy = t + errs.mean(axis=0)                   # ensemble proxy score
+        out.append(t[int(np.argmax(proxy))])            # true reward of best-proxy pick
+    return np.mean(out)
+
+single = selected_true(1)
+ensemble = selected_true(5)
+print("true reward, single RM:", round(single, 3))
+print("true reward, 5-RM ensemble:", round(ensemble, 3))
+assert ensemble > single                  # averaging errors -> less hacking, higher true reward
+```
+
+Averaging five reward models shrinks the error variance fivefold, so the selected
+candidate's true reward rises (about $0.28 \to 0.58$ here): the ensemble cannot be
+fooled by one model's idiosyncratic hole, exactly the mechanism that flattens and
+delays the overoptimization decline.
+
+</details>
 
 This closes pillar H. From the Bellman equation through deep, model-based, and
 multi-agent RL to the reinforcement learning that aligns and sharpens language

@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: ddpg-td3-sac
 order: 7
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Extend Q-learning to continuous actions with a deterministic actor (DDPG), correct overestimation with twin critics and target smoothing (TD3), and add entropy regularization for exploration (SAC)."
 prerequisites: ["ppo", "H1/q-learning-sarsa"]
 ---
@@ -112,6 +112,109 @@ print("optimal a*(s):", np.round(0.5 * s_test, 3))
 The actor's slope converges to $0.5$ and its action map lands exactly on
 $a^*(s) = 0.5\,s$, ascending the critic's gradient with no search over actions,
 which is the deterministic policy gradient that DDPG, TD3, and SAC all build on.
+
+## Exercises
+
+**Exercise 1.** For the critic $Q(s, a) = -(a - 0.5\,s)^2$ and linear actor
+$\mu_w(s) = w\,s$, derive the deterministic policy gradient
+$\nabla_w \mathbb{E}_s[Q(s, \mu_w(s))]$ as an expectation over $s$, and show its
+only zero is $w = 0.5$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The deterministic policy gradient is the chain rule through the
+critic: $\nabla_w Q(s, \mu_w(s)) = \nabla_a Q(s, a)\big|_{a = \mu_w(s)} \cdot \nabla_w \mu_w(s)$.
+
+**Step 2.** The pieces are $\nabla_a Q(s, a) = -2(a - 0.5\,s)$ and
+$\nabla_w \mu_w(s) = s$. At $a = w\,s$,
+
+$$
+\nabla_w Q(s, \mu_w(s)) = -2(w\,s - 0.5\,s)\cdot s = -2 s^2 (w - 0.5).
+$$
+
+**Step 3.** Take the expectation over $s$ (with $\mathbb{E}[s^2] > 0$):
+
+$$
+\nabla_w J = -2\,\mathbb{E}[s^2]\,(w - 0.5).
+$$
+
+This is zero only at $w = 0.5$, and the sign of the gradient pushes $w$ toward
+$0.5$ from either side (positive gradient when $w < 0.5$), so $w = 0.5$ is the
+unique stable fixed point, recovering the optimal action map $a^*(s) = 0.5\,s$.
+
+</details>
+
+**Exercise 2.** TD3 uses the minimum of two critics in the target,
+$\min(Q_1, Q_2)$, to fight overestimation. Suppose two independent critics each
+estimate a true value $v$ with unbiased noise: $Q_i = v + \xi_i$ with
+$\xi_i \sim \mathcal{N}(0, \sigma^2)$ independent. Argue why $\mathbb{E}[\min(Q_1, Q_2)] < v$,
+and contrast it with the upward bias of the single-critic max over actions.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each critic is individually unbiased: $\mathbb{E}[Q_i] = v$. But the
+minimum of two random variables is at most either one, and strictly below
+whenever they differ, so $\min(Q_1, Q_2) \le Q_1$ with strict inequality on a
+positive-probability event.
+
+**Step 2.** Taking expectations, $\mathbb{E}[\min(Q_1, Q_2)] < \mathbb{E}[Q_1] = v$
+(for $\sigma > 0$). The min of two unbiased estimates is biased downward, the
+amount growing with the noise $\sigma$.
+
+**Step 3.** This is the mirror image of the maximization bias: taking
+$\max_{a'} Q(s', a')$ over noisy per-action estimates pushes the target *above*
+the true max, because noise that happens to inflate one action is what the max
+selects. TD3 deliberately swaps that harmful upward bias for a mild downward bias,
+which empirically destabilizes far less, since a slightly pessimistic critic does
+not feed a runaway feedback loop into the actor.
+
+</details>
+
+**Exercise 3 (code).** Train the linear deterministic actor $\mu_w(s) = w\,s$ on
+the critic $Q(s,a) = -(a - 0.5\,s)^2$ by ascending the deterministic policy
+gradient, and separately confirm Exercise 2: the min of two unbiased noisy critics
+underestimates a true value of zero, while the max over several actions
+overestimates it.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+# Part A: deterministic policy gradient recovers w = 0.5.
+def dQ_da(s, a):
+    return -2.0 * (a - 0.5 * s)
+w, lr = 0.0, 0.05
+for _ in range(4000):
+    s = rng.normal(size=256)
+    grad = np.mean(dQ_da(s, w * s) * s)        # dQ/da * dmu/dw
+    w += lr * grad
+assert np.isclose(w, 0.5, atol=1e-2)
+
+# Part B: min of two unbiased critics underestimates; max over actions overestimates.
+sigma, trials, K = 1.0, 200_000, 6
+q1 = rng.normal(0.0, sigma, size=trials)        # critic 1, true value 0
+q2 = rng.normal(0.0, sigma, size=trials)        # critic 2, true value 0
+twin_min = np.minimum(q1, q2)
+many = rng.normal(0.0, sigma, size=(trials, K)) # K noisy action values, true 0
+single_max = many.max(axis=1)
+
+assert twin_min.mean() < 0.0                    # twin-min: downward bias
+assert single_max.mean() > 0.0                  # single-max: upward bias
+print("actor slope w:", round(w, 4))
+print("E[min(Q1,Q2)] (TD3, underestimates):", round(twin_min.mean(), 4))
+print("E[max_a Q]   (DQN-style, overestimates):", round(single_max.mean(), 4))
+```
+
+The actor slope lands on $0.5$, and the twin-critic minimum sits below zero while
+the action-max sits above it, the bias swap TD3 makes to keep the critic from
+inflating the actor's target.
+
+</details>
 
 This closes the model-free toolbox: value-based, policy-gradient, and continuous-
 control methods all learn purely from sampled transitions. The next subsection asks

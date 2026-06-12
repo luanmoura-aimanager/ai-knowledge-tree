@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: function-approximation
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Replace a value table with a parametric approximator trained by semi-gradient TD, and understand why function approximation, bootstrapping, and off-policy data together can diverge."
 prerequisites: ["H1/q-learning-sarsa", "A3/sgd"]
 ---
@@ -114,6 +114,101 @@ print("on-policy weight after 200 steps:", round(w, 4), "(stays near 0)")
 Under the full triad the weight blows up to a large number while the true value is
 zero; restoring coverage of every transition collapses it back toward zero. The
 divergence is real and the cause is structural, not a tuning accident.
+
+## Exercises
+
+**Exercise 1.** A linear value function $V_w(s) = w^\top \phi(s)$ has weight
+$w = (0.5, -1.0)$. A transition has features $\phi(S) = (1, 2)$, reward $r = 1$,
+discount $\gamma = 0.9$, and next-state features $\phi(S') = (2, 1)$. Compute the
+TD error $\delta$ and the semi-gradient weight update $\Delta w$ with step size
+$\alpha = 0.1$, by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Predictions. $V_w(S) = 0.5 \cdot 1 + (-1.0) \cdot 2 = -1.5$ and
+$V_w(S') = 0.5 \cdot 2 + (-1.0) \cdot 1 = 0$.
+
+**Step 2.** TD error using the bootstrapped target $r + \gamma V_w(S')$:
+
+$$
+\delta = r + \gamma V_w(S') - V_w(S) = 1 + 0.9 \cdot 0 - (-1.5) = 2.5.
+$$
+
+**Step 3.** The semi-gradient update is $\Delta w = \alpha\, \delta\, \nabla_w V_w(S) = \alpha\, \delta\, \phi(S)$, since $\nabla_w V_w(S) = \phi(S)$ for the linear model:
+
+$$
+\Delta w = 0.1 \cdot 2.5 \cdot (1, 2) = (0.25, 0.5).
+$$
+
+Only $\phi(S)$ enters the gradient; $\phi(S')$ sits inside the target, which the
+semi-gradient holds fixed.
+
+</details>
+
+**Exercise 2.** In the minimal divergence example, the update multiplies the
+scalar weight by $1 + \alpha(2\gamma - 1)$ each step. Find the exact condition on
+$\gamma$ (independent of $\alpha > 0$) under which the off-policy bootstrapped
+update diverges, and state what happens at the boundary.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The iteration is $w \leftarrow w\,(1 + \alpha(2\gamma - 1))$, a
+geometric sequence with ratio $\rho = 1 + \alpha(2\gamma - 1)$. The magnitude
+$|w|$ grows without bound exactly when $\rho > 1$ (with $w \neq 0$).
+
+**Step 2.** $\rho > 1$ means $\alpha(2\gamma - 1) > 0$. Since $\alpha > 0$, this
+holds for every step size precisely when $2\gamma - 1 > 0$, that is
+
+$$
+\gamma > \tfrac12.
+$$
+
+**Step 3.** At the boundary $\gamma = \tfrac12$, the factor is $2\gamma - 1 = 0$,
+so $\rho = 1$ and the weight stays fixed at its initial value (neither grows nor
+shrinks). For $\gamma < \tfrac12$ the ratio is below $1$ and $w$ decays to zero,
+the true value. Since useful discounts sit near $1$, the unstable regime is the
+common one, which is why coverage of every transition matters.
+
+</details>
+
+**Exercise 3 (code).** Sweep the discount $\gamma$ across a grid and run the
+two-state off-policy update for 200 steps from $w_0 = 1$. Confirm numerically
+that the final weight crosses from bounded to exploding exactly at the
+$\gamma = 0.5$ threshold of Exercise 2.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+alpha = 0.1
+phi = np.array([1.0, 2.0])          # features for s1, s2
+
+def final_w(gamma, steps=200):
+    w = 1.0
+    for _ in range(steps):
+        delta = gamma * phi[1] * w - phi[0] * w   # reward 0, bootstrap target
+        w += alpha * delta * phi[0]
+    return w
+
+gammas = np.array([0.30, 0.45, 0.50, 0.55, 0.70, 0.99])
+finals = np.array([final_w(g) for g in gammas])
+
+bounded = np.abs(finals) <= 1.0 + 1e-9    # |w| did not grow past w0 = 1
+assert bool(np.all(bounded[gammas <= 0.5]))     # gamma <= 0.5: stays bounded
+assert bool(np.all(~bounded[gammas > 0.5]))     # gamma  > 0.5: explodes
+print("gamma:", gammas)
+print("final |w| bounded:", bounded)
+```
+
+The weight stays at or below its initial magnitude for $\gamma \le 0.5$ and
+explodes for every $\gamma > 0.5$, the structural threshold the deadly triad
+predicts.
+
+</details>
 
 The next lesson tames exactly this instability for neural networks: deep
 Q-networks add experience replay and a target network, two tricks that

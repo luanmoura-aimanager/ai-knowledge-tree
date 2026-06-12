@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: policy-gradient
 order: 4
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Derive the policy gradient theorem with the log-derivative trick, obtain the REINFORCE estimator, and reduce its variance with a baseline."
 prerequisites: ["H1/mdp-formulation", "A3/sgd"]
 ---
@@ -156,6 +156,116 @@ print("gradient means agree (unbiased):", np.allclose(g_nb.mean(0), g_b.mean(0),
 REINFORCE puts essentially all mass on the best arm, and the baseline lowers the
 gradient's second moment while the two gradient means agree, confirming it reduces
 variance without introducing bias.
+
+## Exercises
+
+**Exercise 1.** A softmax policy over two actions has logits $\theta = (\theta_0, \theta_1)$
+and probabilities $\pi = \mathrm{softmax}(\theta)$. Derive the score
+$\nabla_\theta \log \pi_\theta(a)$ for the sampled action $a$, and show it equals
+$e_a - \pi$, where $e_a$ is the one-hot indicator of $a$. Evaluate it at
+$\theta = (0, 0)$ for $a = 1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the log-probability of action $a$:
+$\log \pi_\theta(a) = \theta_a - \log \sum_k e^{\theta_k}$.
+
+**Step 2.** Differentiate with respect to component $\theta_j$. The first term
+contributes $\mathbb{1}[j = a]$. The second is the log-partition, whose derivative
+is the softmax probability:
+
+$$
+\frac{\partial}{\partial \theta_j} \log \sum_k e^{\theta_k} = \frac{e^{\theta_j}}{\sum_k e^{\theta_k}} = \pi_j.
+$$
+
+**Step 3.** Combining, $\dfrac{\partial \log \pi_\theta(a)}{\partial \theta_j} = \mathbb{1}[j = a] - \pi_j$,
+which stacked over $j$ is the vector $e_a - \pi$.
+
+**Step 4.** At $\theta = (0, 0)$, $\pi = (0.5, 0.5)$, and for $a = 1$ the one-hot
+is $e_1 = (0, 1)$, so the score is $(0, 1) - (0.5, 0.5) = (-0.5, 0.5)$.
+
+This $e_a - \pi$ score is exactly the `np.eye(K)[a] - p` factor in the worked code.
+
+</details>
+
+**Exercise 2.** Show that adding a baseline $b(s)$ that depends on the state but
+not the action leaves the policy gradient unbiased, and explain why a baseline
+that depended on the action $a$ would in general bias it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The extra term added to the estimator is
+$\nabla_\theta \log \pi_\theta(a \mid s)\, b(s)$. Take its expectation over
+$a \sim \pi_\theta(\cdot \mid s)$ at fixed $s$:
+
+$$
+\mathbb{E}_{a}\big[\nabla_\theta \log \pi_\theta(a \mid s)\, b(s)\big] = b(s) \sum_a \pi_\theta(a \mid s)\, \nabla_\theta \log \pi_\theta(a \mid s),
+$$
+
+pulling $b(s)$ out because it does not depend on $a$.
+
+**Step 2.** Use $\pi_\theta \nabla_\theta \log \pi_\theta = \nabla_\theta \pi_\theta$
+and that probabilities sum to one:
+
+$$
+\sum_a \nabla_\theta \pi_\theta(a \mid s) = \nabla_\theta \sum_a \pi_\theta(a \mid s) = \nabla_\theta 1 = 0.
+$$
+
+So the added term has zero expectation and the gradient is unchanged.
+
+**Step 3.** Step 1 required factoring $b(s)$ out of the sum over $a$. A baseline
+$b(s, a)$ that varied with the action cannot be pulled out, so the sum no longer
+collapses to $\nabla_\theta 1 = 0$; the leftover term is generally nonzero and
+shifts the gradient, introducing bias. Only action-independent baselines are safe.
+
+</details>
+
+**Exercise 3 (code).** On the three-armed bandit, confirm two facts at a fixed
+reference policy: the per-sample REINFORCE gradient is unbiased (its mean matches
+the analytic policy gradient $\sum_a \pi(a)(e_a - \pi)\,\mu_a$), and subtracting
+the expected-reward baseline lowers the gradient's variance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(1)
+
+true_means = np.array([0.0, 1.0, 2.0])
+p = np.array([0.2, 0.3, 0.5])               # fixed reference policy
+K = 3
+
+# Analytic policy gradient: E_a[ (e_a - p) * mu_a ].
+scores = np.eye(K) - p                       # row a is the score e_a - p
+analytic = (p[:, None] * scores * true_means[:, None]).sum(0)
+
+b = true_means @ p                           # expected-reward baseline
+N = 300_000
+g_nb = np.zeros((N, K)); g_b = np.zeros((N, K))
+for i in range(N):
+    a = rng.choice(K, p=p)
+    r = true_means[a] + rng.normal()
+    score = np.eye(K)[a] - p
+    g_nb[i] = score * r
+    g_b[i]  = score * (r - b)
+
+assert np.allclose(g_nb.mean(0), analytic, atol=0.02)     # unbiased
+assert np.allclose(g_b.mean(0),  analytic, atol=0.02)     # still unbiased
+var_nb = (g_nb ** 2).sum(1).mean()
+var_b  = (g_b  ** 2).sum(1).mean()
+assert var_b < var_nb                                     # baseline cuts variance
+print("analytic grad:", np.round(analytic, 3))
+print("E||g||^2 no baseline:", round(var_nb, 3), " with:", round(var_b, 3))
+```
+
+The sampled gradient means match the analytic policy gradient with and without the
+baseline, and the second moment drops once the baseline is subtracted, the
+variance reduction the math promised for free.
+
+</details>
 
 The baseline that best reduces variance is the state value $V(s)$, which is not
 known in advance. Learning it with a second network and using it both as the

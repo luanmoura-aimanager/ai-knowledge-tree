@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: ppo
 order: 6
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Motivate the trust-region constraint behind TRPO, derive the PPO clipped surrogate objective, and understand why clipping keeps policy updates conservative."
 prerequisites: ["actor-critic"]
 ---
@@ -115,6 +115,105 @@ The objective has exactly zero slope beyond the clip boundary in the clipped
 direction, and its value at $\rho = 1.2$ and $\rho = 1.8$ is identical, so once an
 update has moved the policy to the edge of the trust region, pushing further buys
 nothing. That flat region is how PPO keeps each step proximal.
+
+## Exercises
+
+**Exercise 1.** With clip parameter $\epsilon = 0.2$, evaluate the clipped
+objective $L^{\text{CLIP}}$ at ratio $\rho = 1.5$ for a positive advantage
+$\hat{A} = +2$ and at $\rho = 0.5$ for a negative advantage $\hat{A} = -2$. In
+each case state whether the unclipped or clipped branch is selected by the $\min$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The clip range is $[1 - 0.2, 1 + 0.2] = [0.8, 1.2]$. The objective is
+$\min(\rho \hat{A},\, \mathrm{clip}(\rho, 0.8, 1.2)\,\hat{A})$.
+
+**Step 2.** Positive advantage, $\rho = 1.5$, $\hat{A} = +2$. Unclipped:
+$1.5 \cdot 2 = 3$. Clipped: $\mathrm{clip}(1.5, 0.8, 1.2) = 1.2$, giving
+$1.2 \cdot 2 = 2.4$. The $\min$ takes $2.4$, the clipped branch. The ratio has
+exceeded $1 + \epsilon$ in the rewarded direction, so the cap engages and the
+gradient with respect to $\rho$ is zero.
+
+**Step 3.** Negative advantage, $\rho = 0.5$, $\hat{A} = -2$. Unclipped:
+$0.5 \cdot (-2) = -1$. Clipped: $\mathrm{clip}(0.5, 0.8, 1.2) = 0.8$, giving
+$0.8 \cdot (-2) = -1.6$. The $\min$ takes $-1.6$, the clipped branch. Pushing the
+ratio below $1 - \epsilon$ for a bad action stops being rewarded past the boundary.
+
+In both cases the $\min$ selected the smaller (clipped) value, which is what
+removes the incentive to move further once outside the trust region.
+
+</details>
+
+**Exercise 2.** Show that the gradient of the importance-sampling surrogate
+$L^{\text{IS}}(\theta) = \mathbb{E}_t[\rho_t(\theta)\hat{A}_t]$ at
+$\theta = \theta_{\text{old}}$ equals the standard policy gradient
+$\mathbb{E}_t[\nabla_\theta \log \pi_\theta(a_t \mid s_t)\,\hat{A}_t]$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate the ratio. Since
+$\rho_t(\theta) = \pi_\theta(a_t \mid s_t) / \pi_{\theta_{\text{old}}}(a_t \mid s_t)$
+and the denominator is constant in $\theta$,
+
+$$
+\nabla_\theta \rho_t(\theta) = \frac{\nabla_\theta \pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}.
+$$
+
+**Step 2.** Evaluate at $\theta = \theta_{\text{old}}$, where the two policies
+coincide so $\pi_{\theta_{\text{old}}}(a_t \mid s_t) = \pi_\theta(a_t \mid s_t)$:
+
+$$
+\nabla_\theta \rho_t \big|_{\theta_{\text{old}}} = \frac{\nabla_\theta \pi_\theta(a_t \mid s_t)}{\pi_\theta(a_t \mid s_t)} = \nabla_\theta \log \pi_\theta(a_t \mid s_t),
+$$
+
+using the log-derivative identity $\nabla \log \pi = \nabla \pi / \pi$.
+
+**Step 3.** Therefore
+$\nabla_\theta L^{\text{IS}} \big|_{\theta_{\text{old}}} = \mathbb{E}_t[\nabla_\theta \log \pi_\theta(a_t \mid s_t)\,\hat{A}_t]$,
+the policy gradient. PPO's surrogate has the right gradient at the starting point;
+the clip only modifies behavior once $\rho$ moves away from $1$.
+
+</details>
+
+**Exercise 3 (code).** Implement $L^{\text{CLIP}}$ and verify the trust-region
+property numerically: for $\hat{A} > 0$ the objective is non-decreasing in $\rho$
+and flat above $1 + \epsilon$, and for $\hat{A} < 0$ it is non-increasing and flat
+below $1 - \epsilon$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+eps = 0.2
+def L_clip(ratio, A):
+    return np.minimum(ratio * A, np.clip(ratio, 1 - eps, 1 + eps) * A)
+
+ratios = np.linspace(0.0, 2.0, 4001)
+Lpos = L_clip(ratios, +1.0)
+Lneg = L_clip(ratios, -1.0)
+
+# Positive advantage: non-decreasing everywhere, zero slope above 1+eps.
+slope_pos = np.gradient(Lpos, ratios)
+assert np.all(slope_pos >= -1e-9)                       # non-decreasing
+assert np.allclose(slope_pos[ratios > 1 + eps + 1e-3], 0.0, atol=1e-6)
+
+# Negative advantage: non-increasing everywhere, zero slope below 1-eps.
+slope_neg = np.gradient(Lneg, ratios)
+assert np.all(slope_neg <= 1e-9)                        # non-increasing
+assert np.allclose(slope_neg[ratios < 1 - eps - 1e-3], 0.0, atol=1e-6)
+print("A>0 max slope above clip:", round(float(np.max(np.abs(slope_pos[ratios > 1.2 + 1e-3]))), 8))
+print("A<0 max slope below clip:", round(float(np.max(np.abs(slope_neg[ratios < 0.8 - 1e-3]))), 8))
+```
+
+The objective moves monotonically in the rewarded direction and goes exactly flat
+once the ratio leaves $[1 - \epsilon, 1 + \epsilon]$ on the clipped side, the flat
+shoulder that caps each PPO step.
+
+</details>
 
 PPO handles discrete and continuous actions through a stochastic policy. When the
 optimal policy is deterministic and actions are continuous, a different family is

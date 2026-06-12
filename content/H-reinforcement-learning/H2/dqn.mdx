@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: dqn
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Stabilize Q-learning with a neural network using experience replay and a slowly-updated target network, and state the DQN loss and training loop."
 prerequisites: ["function-approximation", "D1/backprop"]
 ---
@@ -138,6 +138,110 @@ right at every position and reaches the goal in the optimal number of steps. The
 only change to make this a true DQN is to replace the linear $W$ with a network
 and the manual update with a backprop step; replay and the target network stay
 exactly as written.
+
+## Exercises
+
+**Exercise 1.** A transition is $(s, a, r, s')$ with $r = 2$, $\gamma = 0.9$, and
+$s'$ non-terminal. The target network gives action values
+$Q_{w^-}(s', \cdot) = (1.0, 4.0, 3.0)$ over three actions, and the online network
+predicts $Q_w(s, a) = 2.5$. Compute the DQN target $y$ and the squared TD loss
+for this transition by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The DQN target maxes the target network's values at $s'$:
+$\max_{a'} Q_{w^-}(s', a') = \max(1.0, 4.0, 3.0) = 4.0$.
+
+**Step 2.** Form the bootstrapped target:
+
+$$
+y = r + \gamma \max_{a'} Q_{w^-}(s', a') = 2 + 0.9 \cdot 4.0 = 5.6.
+$$
+
+**Step 3.** The per-transition loss is the squared TD error against the online
+prediction:
+
+$$
+(y - Q_w(s, a))^2 = (5.6 - 2.5)^2 = 3.1^2 = 9.61.
+$$
+
+The gradient flows through $Q_w(s, a)$ only; $y$ is held fixed because it uses
+the frozen weights $w^-$.
+
+</details>
+
+**Exercise 2.** Experience replay reuses each stored transition many times.
+Suppose the buffer holds $B$ transitions, each minibatch draws $m$ of them
+uniformly with replacement, and one gradient step is taken per environment step.
+On average, how many times is a given transition sampled while it remains in the
+buffer for $B$ further steps? Explain why this is the data-efficiency gain over
+the naive one-update-per-transition agent.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In a single minibatch of $m$ draws with replacement from $B$
+transitions, the probability a specific transition is picked at least once is
+small, but the expected count is what matters: each of the $m$ draws hits the
+transition with probability $1/B$, so the expected count per minibatch is
+$m \cdot (1/B) = m/B$.
+
+**Step 2.** One minibatch is drawn per environment step, and the transition stays
+in the buffer for about $B$ steps before the sliding window evicts it. Summing the
+per-step expectation over those $B$ steps:
+
+$$
+\mathbb{E}[\text{times sampled}] \approx B \cdot \frac{m}{B} = m.
+$$
+
+**Step 3.** The naive agent uses each transition in exactly one update then
+discards it; replay uses it about $m$ times. The same collected experience yields
+roughly $m$ times as many gradient updates, which is the data-efficiency gain
+(separate from the decorrelation benefit of sampling a random batch rather than a
+correlated consecutive run).
+
+</details>
+
+**Exercise 3 (code).** Show the stabilizing effect of the target network on a 1D
+bootstrap toy. A self-referential target $y = 1.2\,w$ has gain above one, the
+regime where chasing it tick for tick blows up. Compare regressing $w$ toward the
+target recomputed against the live $w$ every step (moving target) versus a target
+frozen for $C = 20$ steps, and confirm the moving version diverges while the
+frozen version stays bounded.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+alpha, c, C = 0.5, 1.2, 20      # target y = c*w with gain c > 1
+
+def run(frozen):
+    w, w_targ = 1.0, 1.0
+    for t in range(200):
+        if frozen and t % C == 0:
+            w_targ = w                          # refresh the frozen target
+        target = c * (w_targ if frozen else w)
+        w += alpha * (target - w)
+    return w
+
+w_moving = run(frozen=False)
+w_frozen = run(frozen=True)
+
+assert abs(w_moving) > 1e6                       # moving target diverges
+assert abs(w_frozen) < 1e3                       # frozen target stays bounded
+print("moving-target w:", f"{w_moving:.3e}")
+print("frozen-target w:", round(w_frozen, 4))
+```
+
+When the prediction and target share the same live weight, each step amplifies the
+last and the weight explodes; freezing the target for $C$ steps turns each window
+into a bounded regression toward a stationary label, which is exactly how DQN's
+target network keeps the bootstrap from chasing its own prediction.
+
+</details>
 
 DQN learns good policies but systematically overestimates action values, and its
 single value head wastes effort in states where the action barely matters. The

@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: dqn-improvements
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Fix Q-learning's maximization bias with Double DQN, separate state value from advantage with the dueling architecture, and weight replay by TD error, the pieces that compose Rainbow."
 prerequisites: ["dqn"]
 ---
@@ -106,6 +106,109 @@ print("double-estimator mean (unbiased):", round(np.mean(double), 3))
 The single estimator reports a clearly positive value where the truth is zero,
 while the double estimator sits at zero, the exact overestimation that Double DQN
 removes by decoupling action selection from action evaluation.
+
+## Exercises
+
+**Exercise 1.** At a next state $s'$ the online network predicts
+$Q_w(s', \cdot) = (1.0, 3.0, 2.5)$ over three actions and the target network
+predicts $Q_{w^-}(s', \cdot) = (2.0, 1.5, 2.2)$. With $r = 1$ and $\gamma = 0.9$,
+compute the plain DQN target and the Double DQN target, and explain which network
+plays which role in each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Plain DQN: the target network both selects and evaluates, so it takes
+its own max, $\max_{a'} Q_{w^-}(s', a') = \max(2.0, 1.5, 2.2) = 2.2$. The target
+is $y = 1 + 0.9 \cdot 2.2 = 2.98$.
+
+**Step 2.** Double DQN: the online network $w$ selects the maximizing action,
+$\arg\max_{a'} Q_w(s', a') = \arg\max(1.0, 3.0, 2.5) = $ action $1$ (the middle
+one). The target network $w^-$ evaluates that chosen action: $Q_{w^-}(s', 1) = 1.5$.
+
+**Step 3.** The Double DQN target is
+
+$$
+y = r + \gamma\, Q_{w^-}(s', \arg\max_{a'} Q_w(s', a')) = 1 + 0.9 \cdot 1.5 = 2.35.
+$$
+
+The Double target ($2.35$) is below the plain target ($2.98$): decoupling the
+selecting network from the evaluating network prevents the same noisy estimate
+from being both chosen and trusted, which is what removes the upward bias.
+
+</details>
+
+**Exercise 2.** In the dueling architecture, $Q(s,a) = V(s) + \big(A(s,a) - \tfrac{1}{|\mathcal{A}|}\sum_{a'} A(s,a')\big)$.
+Take $V(s) = 5$ and raw advantages $A(s, \cdot) = (2, -1, 0)$. Compute all three
+$Q(s, a)$ values. Then add a constant $c = 4$ to every raw advantage and recompute,
+showing $Q$ is unchanged, the constant ambiguity that the mean subtraction kills.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Mean advantage: $\bar{A} = \tfrac13(2 + (-1) + 0) = \tfrac13$.
+Centered advantages: $A - \bar{A} = (2 - \tfrac13,\, -1 - \tfrac13,\, 0 - \tfrac13) = (\tfrac53,\, -\tfrac43,\, -\tfrac13)$.
+
+**Step 2.** Add $V = 5$ to each centered advantage:
+
+$$
+Q(s, \cdot) = (5 + \tfrac53,\; 5 - \tfrac43,\; 5 - \tfrac13) = (\tfrac{20}{3},\, \tfrac{11}{3},\, \tfrac{14}{3}) \approx (6.667,\, 3.667,\, 4.667).
+$$
+
+**Step 3.** Shift every raw advantage by $c = 4$: $A' = (6, 3, 4)$. Its mean is
+$\bar{A'} = \tfrac{13}{3} = \bar{A} + 4$, so the centering subtracts the added
+constant right back out:
+
+$$
+A' - \bar{A'} = (6 - \tfrac{13}{3},\, 3 - \tfrac{13}{3},\, 4 - \tfrac{13}{3}) = (\tfrac53,\, -\tfrac43,\, -\tfrac13),
+$$
+
+identical to Step 1. With $V$ unchanged, $Q = (\tfrac{20}{3}, \tfrac{11}{3}, \tfrac{14}{3})$
+is unchanged. A constant added to the advantage stream cancels in $A - \bar{A}$,
+so the mean subtraction removes the ambiguity and pins $V$ and $A$ uniquely.
+
+</details>
+
+**Exercise 3 (code).** Prioritized replay samples transition $i$ with probability
+$P(i) \propto p_i^\alpha$ and corrects the bias with weight
+$w_i = (N\,P(i))^{-\beta}$. Verify the correction is unbiased: estimate
+$\mathbb{E}_{\text{uniform}}[\delta]$ (the quantity uniform replay targets) by
+drawing from the prioritized distribution and reweighting by $w_i$, and confirm it
+matches the plain uniform average.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+N = 1000
+deltas = rng.normal(size=N)                 # per-transition TD errors
+prio = np.abs(deltas) + 1e-3                 # priorities p_i = |delta| + eps
+alpha, beta = 0.6, 1.0
+
+P = prio ** alpha
+P = P / P.sum()                              # sampling distribution P(i)
+w = (N * P) ** (-beta)                       # importance-sampling weights
+
+uniform_mean = deltas.mean()                 # what uniform replay targets
+
+m = 400_000
+idx = rng.choice(N, size=m, p=P)             # prioritized sampling
+# Reweighted estimate: average of w_i * delta_i over draws, divided by E[w].
+weighted_est = np.mean(w[idx] * deltas[idx]) / np.mean(w[idx])
+
+assert np.isclose(weighted_est, uniform_mean, atol=2e-2)
+print("uniform mean delta:        ", round(uniform_mean, 4))
+print("IS-reweighted from prio:   ", round(weighted_est, 4))
+```
+
+The importance-sampling weights pull the prioritized-sample estimate back onto the
+uniform expectation, so prioritized replay reorders which transitions get gradient
+steps without changing the expectation those steps estimate.
+
+</details>
 
 These value-based methods learn $Q$ then act greedily, which struggles with
 continuous actions (the $\max_a$ becomes an optimization) and stochastic optimal
