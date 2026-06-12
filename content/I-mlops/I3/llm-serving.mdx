@@ -126,22 +126,22 @@ GPU memory is free for the cache, how many such full-length sequences fit at onc
 **Step 1.** KV bytes per token is $2 L d s$ (the factor $2$ for keys and values):
 
 $$
-2 \cdot 40 \cdot 5120 \cdot 2 = 1\,638\,400 \text{ bytes} = 1.6 \text{ MB per token}.
+2 \cdot 40 \cdot 5120 \cdot 2 = 819\,200 \text{ bytes} = 0.8 \text{ MB per token}.
 $$
 
 **Step 2.** A request of $n = 4096$ tokens costs $4096$ times that:
 
 $$
-1\,638\,400 \cdot 4096 \approx 6.71 \times 10^9 \text{ bytes} \approx 6.71 \text{ GB}.
+819\,200 \cdot 4096 \approx 3.36 \times 10^9 \text{ bytes} \approx 3.36 \text{ GB}.
 $$
 
 **Step 3.** Divide the free memory by the per-sequence cost and floor:
 
 $$
-\left\lfloor \frac{32 \times 10^9}{6.71 \times 10^9} \right\rfloor = \lfloor 4.77 \rfloor = 4 \text{ sequences}.
+\left\lfloor \frac{32 \times 10^9}{3.36 \times 10^9} \right\rfloor = \lfloor 9.53 \rfloor = 9 \text{ sequences}.
 $$
 
-Memory, not compute, caps this model at $4$ concurrent full-length requests.
+Memory, not compute, caps this model at $9$ concurrent full-length requests.
 
 </details>
 
