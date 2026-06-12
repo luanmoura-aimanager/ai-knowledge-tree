@@ -4,7 +4,7 @@ pillar: K
 subId: K1
 lessonId: slowly-changing-dimensions
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Track how a dimension's attributes change over time with Type 1 (overwrite), Type 2 (new versioned row), and Type 3 (prior-value column), and reconstruct the state as of any past date."
 prerequisites: ["dimensional-modeling"]
 ---
@@ -115,7 +115,120 @@ print("as-of lookups resolve to the correct version:", True)
 ```
 
 Every past date lands inside exactly one version's interval and returns the value
-that was live then, while the current flag and a present-day lookup agree. The next
+that was live then, while the current flag and a present-day lookup agree.
+
+## Exercises
+
+**Exercise 1.** A customer dimension currently holds one row:
+`(cust_key=7, region="West", effective_from=2022-01-01, effective_to=9999-12-31,
+is_current=true)`. On 2023-03-01 the customer moves to "East". Write the rows the
+dimension holds after applying (a) a Type 1 update and (b) a Type 2 update, and
+state what each layout can and cannot answer afterward.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Type 1 overwrites in place, keeping one row:
+
+```text
+(cust_key=7, region="East", effective_from=2022-01-01, effective_to=9999-12-31, is_current=true)
+```
+
+History is gone: every fact, including 2022 sales, now joins to "East". The layout
+can answer "current region" but not "what was the region in 2022".
+
+**Step 2.** Type 2 closes the old version and inserts a new one, giving two rows:
+
+```text
+(cust_key=7, region="West", effective_from=2022-01-01, effective_to=2023-03-01, is_current=false)
+(cust_key=7, region="East", effective_from=2023-03-01, effective_to=9999-12-31, is_current=true)
+```
+
+The old row's `effective_to` is set to the change date and its `is_current` flag is
+cleared. This layout answers both "current region" (the `is_current` row) and "what
+was the region on any past date" (the version whose half-open interval contains it).
+
+</details>
+
+**Exercise 2.** Given a Type 2 history for one key with versions
+$[2020\text{-}01\text{-}01, 2021\text{-}06\text{-}01)$ = "A",
+$[2021\text{-}06\text{-}01, 2023\text{-}02\text{-}01)$ = "B", and
+$[2023\text{-}02\text{-}01, 9999\text{-}12\text{-}31)$ = "C", resolve the as-of
+value for the dates 2021-06-01 and 2020-12-31 by hand, and explain why the right
+endpoint is open.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The as-of rule selects the single version with
+$\text{effective\_from} \le d < \text{effective\_to}$.
+
+**Step 2.** For $d = $ 2021-06-01: version "A" needs $d <$ 2021-06-01, which fails
+at equality; version "B" needs $2021\text{-}06\text{-}01 \le d <$ 2023-02-01, which
+holds. The answer is "B".
+
+**Step 3.** For $d = $ 2020-12-31: version "A" needs
+$2020\text{-}01\text{-}01 \le d <$ 2021-06-01, which holds. The answer is "A".
+
+**Step 4.** The right endpoint is open so that a date exactly on a change boundary
+belongs to one version only, the new one. If both endpoints were closed, 2021-06-01
+would satisfy both "A" (ends 2021-06-01) and "B" (starts 2021-06-01), making the
+lookup ambiguous. Half-open intervals tile the timeline with no overlap and no gap.
+
+</details>
+
+**Exercise 3 (code).** Implement a Type 2 `apply_change` that, given an existing
+single-version history and a change `(new_value, change_date)`, returns the updated
+two-version arrays: close the old version at the change date and append the new
+version with a far-future `effective_to`. Then verify the as-of lookup returns the
+old value strictly before the change, and the new value on and after it.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+FAR = np.datetime64("9999-12-31")
+
+def apply_change(value, eff_from, eff_to, new_value, change_date):
+    # Close the current (last) version at change_date, append the new version.
+    cd = np.datetime64(change_date)
+    eff_to = eff_to.copy()
+    eff_to[-1] = cd                                   # old version now ends here
+    value   = np.append(value, new_value)
+    eff_from = np.append(eff_from, cd)
+    eff_to   = np.append(eff_to, FAR)
+    return value, eff_from, eff_to
+
+def as_of(date, value, eff_from, eff_to):
+    d = np.datetime64(date)
+    mask = (eff_from <= d) & (d < eff_to)
+    return value[np.flatnonzero(mask)[0]]
+
+# Start: one version "West" live from 2022-01-01.
+value    = np.array(["West"])
+eff_from = np.array(["2022-01-01"], dtype="datetime64[D]")
+eff_to   = np.array([FAR])
+
+value, eff_from, eff_to = apply_change(value, eff_from, eff_to, "East", "2023-03-01")
+
+assert value.tolist() == ["West", "East"]
+assert eff_to[0] == np.datetime64("2023-03-01")       # old version closed
+assert eff_to[1] == FAR                               # new version is live
+assert as_of("2022-08-01", value, eff_from, eff_to) == "West"   # before change
+assert as_of("2023-02-28", value, eff_from, eff_to) == "West"   # day before
+assert as_of("2023-03-01", value, eff_from, eff_to) == "East"   # on change (right-open)
+assert as_of("2024-01-01", value, eff_from, eff_to) == "East"   # after change
+print("versions:", value.tolist())
+```
+
+The change splits one version into two adjoining half-open intervals; the boundary
+date 2023-03-01 resolves to the new "East" version, confirming the right-open rule.
+
+</details>
+
+The next
 lesson steps back to weigh this kind of careful, normalized history-keeping against
 the flat, redundant tables analytics often prefers, in
 [normalization vs denormalization](K1/normalization-tradeoffs).

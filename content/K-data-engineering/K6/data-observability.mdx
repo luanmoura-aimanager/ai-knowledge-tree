@@ -4,7 +4,7 @@ pillar: K
 subId: K6
 lessonId: data-observability
 order: 4
-estimatedMinutes: 23
+estimatedMinutes: 33
 goal: "Monitor the operational health of a pipeline, freshness, row volume, and null rates, and flag a broken upstream feed with a robust z-score before it reaches a dashboard."
 prerequisites: ["data-quality-dimensions"]
 ---
@@ -126,7 +126,110 @@ assert flagged.sum() == 1 and flagged[21]
 
 The broken day's robust z-score lands near $-29$, far past the $3.5$ alert line,
 while the worst normal day sits under $3$; the median-and-MAD baseline stayed
-honest because the drop never entered its own reference. The final lesson closes
+honest because the drop never entered its own reference.
+
+## Exercises
+
+**Exercise 1.** A freshness series records the lag in minutes since each hourly
+refresh: the baseline is tight around 5 minutes, and one run lags 95 minutes
+because the feed stalled. By hand, argue why the *ordinary* z-score is a poor
+detector here and why the robust z-score is not, without computing exact values.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The ordinary z-score uses the sample mean $\mu$ and standard deviation
+$\sigma$ computed over *all* points, including the 95-minute lag. The single large
+value drags $\mu$ upward away from 5 and inflates $\sigma$, because a squared
+deviation of roughly $(95 - \mu)^2$ dominates the variance sum.
+
+**Step 2.** With $\sigma$ inflated, the numerator $x - \mu$ for the anomaly is
+divided by a large denominator, so its z-score is pulled toward a modest value. The
+point poisons the very statistics meant to expose it, which can leave it under the
+threshold.
+
+**Step 3.** The robust z-score uses the median and the median absolute deviation.
+The median of the lags is still near 5 because one extreme value cannot move a
+median past the bulk of the data, and the MAD stays small because it is itself a
+median of absolute deviations. The anomaly's numerator $x - \tilde{x} \approx 90$
+is divided by a small scaled MAD, so its robust z-score is large and clears the
+threshold. The baseline statistics never absorbed the outlier.
+
+</details>
+
+**Exercise 2.** Show that the robust z-score is invariant to the unit of the
+metric: if every value $x_i$ is multiplied by a positive constant $a$ (say minutes
+to seconds), the robust z-score of each point is unchanged.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under the scaling $x_i \mapsto a x_i$, the median scales the same way:
+$\tilde{x} \mapsto a\tilde{x}$, since the median is order-preserving and $a > 0$
+preserves order.
+
+**Step 2.** The MAD scales by $a$ as well:
+$\operatorname{median}_i |a x_i - a\tilde{x}| = a \operatorname{median}_i |x_i - \tilde{x}| = a\,\text{MAD}$,
+pulling the positive factor $a$ out of the absolute value.
+
+**Step 3.** Substitute into the robust z-score:
+
+$$
+0.6745 \cdot \frac{a x - a\tilde{x}}{a\,\text{MAD}}
+= 0.6745 \cdot \frac{a(x - \tilde{x})}{a\,\text{MAD}}
+= 0.6745 \cdot \frac{x - \tilde{x}}{\text{MAD}}.
+$$
+
+The factor $a$ cancels, so the robust z-score is unchanged. The same alert
+threshold works whether the metric is in minutes or seconds.
+
+</details>
+
+**Exercise 3 (code).** A distribution signal: track a column's null rate over 40
+runs. The baseline hovers near 2% nulls, but on one run a broken join pushes it to
+38%. Compute the robust z-score for every run and confirm the broken run is the
+only one flagged at $|z| > 3.5$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n = 40
+null_rate = 0.02 + rng.normal(0, 0.004, n)   # ~2% nulls, small jitter
+null_rate = np.clip(null_rate, 0.0, 1.0)
+broken = 17
+null_rate[broken] = 0.38                       # a broken join: nulls explode
+
+median = np.median(null_rate)
+mad = np.median(np.abs(null_rate - median))
+robust_z = 0.6745 * (null_rate - median) / mad
+thr = 3.5
+flagged = np.abs(robust_z) > thr
+
+print(f"median null rate = {median:.4f}")
+print(f"robust z @ broken = {robust_z[broken]:.2f}")
+normal = np.ones(n, dtype=bool); normal[broken] = False
+print(f"max |z| normal    = {np.max(np.abs(robust_z[normal])):.2f}")
+print(f"flagged runs      = {np.where(flagged)[0].tolist()}")
+
+# the injected anomaly clears the threshold
+assert np.abs(robust_z[broken]) > thr
+# every normal run stays under it
+assert np.all(np.abs(robust_z[normal]) < thr)
+# exactly the broken run is flagged
+assert flagged.sum() == 1 and flagged[broken]
+```
+
+The broken run's robust z-score is an order of magnitude past the $3.5$ line while
+every normal run stays well under it, so the median-and-MAD baseline flags the
+distribution break and nothing else.
+
+</details>
+
+The final lesson closes
 the discipline by protecting the data the pipeline carries, classifying and
 masking sensitive fields and meeting compliance regimes, in
 [governance](K6/governance-pii).

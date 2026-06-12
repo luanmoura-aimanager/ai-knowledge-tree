@@ -4,7 +4,7 @@ pillar: K
 subId: K3
 lessonId: distributed-joins
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Choose between a shuffle join and a broadcast join by comparing the bytes each moves across the network, and see why broadcasting a small table avoids the shuffle entirely."
 prerequisites: ["spark-dataframes"]
 ---
@@ -115,7 +115,91 @@ print("ok: broadcast below the crossover, shuffle above it")
 ```
 
 The crossover here is $1000 / 7 \approx 143$ MB: a small table under that broadcasts, one
-over it shuffles. This whole analysis assumes keys spread evenly across workers; when one
+over it shuffles.
+
+## Exercises
+
+**Exercise 1.** A cluster has $W = 10$ workers, a large fact table of $L = 2000$ MB, and a
+dimension table of $S = 150$ MB. Compute the network bytes for a shuffle join and a
+broadcast join, decide which the planner should pick, and find the crossover size at which
+the two strategies tie.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Shuffle moves both tables once: $N_{\text{shuffle}} = L + S = 2000 + 150 = 2150$
+MB.
+
+**Step 2.** Broadcast ships one copy of the small table to each worker:
+$N_{\text{broadcast}} = W \cdot S = 10 \cdot 150 = 1500$ MB.
+
+**Step 3.** Since $1500 < 2150$, broadcast moves fewer bytes, so the planner picks the
+broadcast join.
+
+**Step 4.** The strategies tie at $W \cdot S = L + S$, which solves to $S = L / (W - 1) =
+2000 / 9 \approx 222$ MB. The dimension table at $150$ MB sits below this crossover, which
+confirms broadcast wins.
+
+</details>
+
+**Exercise 2.** The broadcast cost $W \cdot S$ grows with the worker count while the
+shuffle cost $L + S$ does not. Hold $L = 1000$ MB and $S = 100$ MB fixed and find the
+largest worker count $W$ for which broadcast still beats shuffle. Explain why adding
+workers eventually flips the decision.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Broadcast wins while $W \cdot S < L + S$. Substituting the sizes:
+$100 W < 1000 + 100 = 1100$.
+
+**Step 2.** Divide by $100$: $W < 11$. The largest integer satisfying this is $W = 10$, so
+broadcast wins up to ten workers and shuffle wins at eleven or more.
+
+**Step 3.** Broadcasting replicates the small table once per worker, so its cost is linear
+in $W$, while the shuffle moves each table exactly once regardless of $W$. As workers are
+added the replicated copies accumulate until they exceed the one-time shuffle of both
+tables, which is why the decision flips at large $W$.
+
+</details>
+
+**Exercise 3 (code).** Sweep the small-table size from $10$ MB to $400$ MB with $L = 1000$
+MB and $W = 8$ workers. For each size compute both network costs, pick the cheaper, and
+confirm empirically that the strategy switches from broadcast to shuffle exactly at the
+crossover $S = L / (W - 1)$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+L, W = 1000.0, 8
+sizes = np.arange(10.0, 401.0, 10.0)
+
+def pick(small):
+    shuffle = L + small
+    broadcast = W * small
+    return "broadcast" if broadcast < shuffle else "shuffle"
+
+choices = np.array([pick(s) for s in sizes])
+crossover = L / (W - 1)                       # 1000 / 7 ≈ 142.857 MB
+
+# Broadcast must win strictly below the crossover, shuffle at or above it.
+below = sizes < crossover
+assert all(choices[below] == "broadcast")
+assert all(choices[~below] == "shuffle")
+print(f"crossover = {crossover:.1f} MB")
+print("last broadcast size:", sizes[below].max(), "first shuffle size:", sizes[~below].min())
+print("ok: decision switches at the predicted crossover")
+```
+
+The last size that broadcasts is $140$ MB and the first that shuffles is $150$ MB, which
+straddle the $142.86$ MB crossover, matching $S = L / (W - 1)$.
+
+</details>
+
+This whole analysis assumes keys spread evenly across workers; when one
 key dominates, the shuffle join's even-split assumption breaks and a single worker is
 swamped, which is the [skew problem](data-skew) the next lesson quantifies.
 

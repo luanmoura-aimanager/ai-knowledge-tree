@@ -4,7 +4,7 @@ pillar: K
 subId: K6
 lessonId: data-quality-dimensions
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Make data quality measurable along completeness, validity, uniqueness, and consistency, and turn each into an automated check with a pass rate you can alert on."
 prerequisites: ["K5/transformation-as-code"]
 ---
@@ -142,7 +142,115 @@ assert passed is False
 
 The four rates land on $1 - m/N$, $(N-k)/N$, and $(N-d)/N$ to the digit, which is
 why a quality report is auditable: each number is a defect count divided by a row
-count, nothing hidden. The next lesson moves from "is today's data clean" to "did
+count, nothing hidden.
+
+## Exercises
+
+**Exercise 1.** A column has $N = 200$ rows. Of these, 30 are null. Of the 170
+present values, 8 fall outside the allowed range. Compute the completeness rate and
+the validity rate by hand, and explain why the validity denominator is 170 and not
+200.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Completeness is the non-null fraction:
+$c = (N - m)/N = (200 - 30)/200 = 170/200 = 0.85$.
+
+**Step 2.** Validity is scored only on present values: of the $N - m = 170$
+present values, $k = 8$ violate the range, so $v = (170 - 8)/170 = 162/170 \approx 0.953$.
+
+**Step 3.** A null is an *absence*, already penalized by completeness. Counting it
+again as a validity failure would double-count the same defect, and a null has no
+value to test against the range rule. So validity divides by the 170 present
+values, not the full 200. The two dimensions measure disjoint kinds of defect:
+missing versus wrong.
+
+</details>
+
+**Exercise 2.** A primary-key uniqueness check uses threshold $\tau = 1.0$. A
+table of $N = 500$ rows has $u = 497$ distinct key values. Compute the uniqueness
+rate, state the verdict, and explain why $\tau = 1.0$ is the natural threshold for
+a primary key while a completeness check on an optional field might use
+$\tau = 0.95$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The uniqueness rate is $q = u/N = 497/500 = 0.994$. The duplicate
+count is $N - u = 3$.
+
+**Step 2.** The verdict is $\text{pass} \iff q \ge \tau$. Here
+$0.994 \ge 1.0$ is false, so the check **fails**.
+
+**Step 3.** A primary key must identify a row uniquely; a single duplicate already
+breaks that guarantee and corrupts any join on the key, so any defect is
+intolerable and $\tau = 1.0$. An optional-but-expected field tolerates a small
+fraction of missing values without breaking downstream use, so its threshold is set
+below 1 (e.g. 0.95) to alert only when nulls become unusually common rather than on
+every absent value. The threshold encodes how costly a defect in that dimension is.
+
+</details>
+
+**Exercise 3 (code).** Build a 500-row table as numpy arrays. Inject exactly 50
+nulls into one column, exactly 20 out-of-range values into a second, and exactly 7
+duplicate keys into a third. Compute completeness, validity, and uniqueness, and
+assert each rate matches its injected defect rate exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+N = 500
+
+# completeness: inject exactly m nulls
+m = 50
+amount = rng.normal(50.0, 10.0, size=N)
+amount[rng.choice(N, size=m, replace=False)] = np.nan
+
+# validity: exactly k out-of-range (negative) prices
+k = 20
+price = rng.uniform(1.0, 99.0, size=N)
+price[rng.choice(N, size=k, replace=False)] = -1.0
+
+# uniqueness: exactly d duplicate keys (reuse the first d ids in the last d rows)
+d = 7
+key = np.arange(N)
+key[-d:] = key[:d]
+
+def completeness(col):
+    return np.mean(~np.isnan(col))
+
+def validity(col, lo, hi):
+    present = col[~np.isnan(col)]
+    return np.mean((present >= lo) & (present <= hi))
+
+def uniqueness(col):
+    return np.unique(col).size / col.size
+
+c = completeness(amount)
+v = validity(price, 0.0, 100.0)
+q = uniqueness(key)
+
+print(f"completeness = {c:.3f}  (expect {1 - m/N:.3f})")
+print(f"validity     = {v:.3f}  (expect {(N - k)/N:.3f})")
+print(f"uniqueness   = {q:.3f}  (expect {(N - d)/N:.3f})")
+
+assert np.isclose(c, 1 - m / N)
+assert np.isclose(v, (N - k) / N)
+assert np.isclose(q, (N - d) / N)
+```
+
+Each rate is a defect count divided by the row count, so completeness recovers
+$1 - 50/500 = 0.90$, validity recovers $480/500 = 0.96$, and uniqueness recovers
+$493/500 = 0.986$, matching the injected defects to the digit.
+
+</details>
+
+The next lesson moves from "is today's data clean" to "did
 the *shape* of the data change", where a producer alters the
 [schema](K6/schema-evolution-contracts) out from under its consumers.
 

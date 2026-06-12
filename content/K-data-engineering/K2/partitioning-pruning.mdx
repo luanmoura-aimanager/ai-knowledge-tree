@@ -4,7 +4,7 @@ pillar: K
 subId: K2
 lessonId: partitioning-pruning
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Lay data out in directories keyed by a column and compute how a predicate prunes the files an engine must open, plus why over-partitioning into tiny files destroys the gain."
 prerequisites: ["parquet-internals"]
 ---
@@ -134,7 +134,124 @@ print("pruning helps, but over-partitioning hurts:", True)
 
 Pruning gives a large speedup over a full scan, yet the total cost bottoms out at
 an interior partition count and climbs again as files shrink toward the
-per-file overhead, the small-file problem made quantitative. Partitioning gets a
+per-file overhead, the small-file problem made quantitative.
+
+## Exercises
+
+**Exercise 1.** A sales table is partitioned by day over one year, $P = 365$
+partitions of equal size. A dashboard query filters to a single 30-day month.
+Compute the selectivity $s$, the number of partitions touched
+$P_{\text{touched}}$, the number pruned, and the speedup factor over a full scan.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Selectivity is the fraction of the key range asked for:
+$s = 30/365 \approx 0.0822$.
+
+**Step 2.** Partitions touched: $P_{\text{touched}} = \lceil s P \rceil =
+\lceil 0.0822 \cdot 365 \rceil = \lceil 30 \rceil = 30$ (the 30 daily partitions in
+the window). Pruned: $365 - 30 = 335$.
+
+**Step 3.** With equal-size partitions, data scanned is the touched fraction
+$30/365$ of the table, so the speedup over a full scan is
+
+$$
+\frac{1}{s} = \frac{365}{30} \approx 12.2\times .
+$$
+
+The query reads about 8.2% of the data and skips the other 335 partitions
+entirely, never opening their files.
+
+</details>
+
+**Exercise 2.** Starting from $B(P) \approx s N \beta + s P \omega$ with the
+discrete data term restored as $B_{\text{data}}(P) = \frac{N}{P}\lceil sP\rceil\beta$,
+explain qualitatively why the total cost is U-shaped in $P$, and identify which
+term dominates at small $P$ and which at large $P$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Large-$P$ behavior. When $P$ is large, $\lceil sP \rceil \approx sP$,
+so the data term flattens to $\frac{N}{P}\cdot sP\cdot\beta = sN\beta$, a constant,
+while the overhead $sP\omega$ grows linearly in $P$. The rising overhead dominates;
+splitting further only adds per-file cost for no data saving.
+
+**Step 2.** Small-$P$ behavior. When partitions are few and coarse, the ceiling
+$\lceil sP \rceil$ rounds a fractional $sP$ up to at least 1, so the query drags in
+a whole large partition it mostly discards. As $P$ grows from small values, finer
+partitions let the query prune more of that wasted partition, so the data term
+*falls*. Here the falling data term dominates.
+
+**Step 3.** A term that falls at small $P$ and a term that rises at large $P$ sum
+to a U-shape with an interior minimum. The optimum sits where the marginal data
+saved by one more split equals the marginal $\omega$ overhead it adds; partition to
+that point, not past it.
+
+</details>
+
+**Exercise 3.** Two layouts hold the same 6,000,000-row table. Layout A uses 12
+monthly partitions; layout B uses 8,760 hourly partitions. The per-file overhead is
+$\omega = 3 \times 10^6$ bytes-equivalent, rows are 64 bytes, and a query has
+selectivity $s = 0.05$. Without running code, argue which layout a selective query
+prefers and why hourly partitioning can lose despite pruning more finely.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Overhead grows with files touched. Layout B touches
+$\lceil 0.05 \cdot 8760 \rceil = 438$ files, each costing $\omega = 3\times10^6$, so
+its overhead is $438 \cdot 3\times10^6 \approx 1.31\times10^9$ bytes-equivalent.
+Layout A touches $\lceil 0.05 \cdot 12 \rceil = 1$ file, overhead $3\times10^6$.
+
+**Step 2.** Data scanned is roughly the same selective fraction for both once
+partitions are fine enough to prune ($sN\beta \approx 0.05 \cdot 6{,}000{,}000
+\cdot 64 \approx 1.9\times10^7$ bytes), small next to layout B's overhead.
+
+**Step 3.** Layout B's per-file overhead ($\approx 1.3\times10^9$) dwarfs the data
+it saves, so its total cost far exceeds layout A's. Hourly partitioning slices past
+the sweet spot: the data term has already flattened, and every extra file only adds
+$\omega$. The finer layout prunes a higher *fraction* of partitions but opens so
+many tiny files that the fixed overhead dominates. This is the small-file problem.
+
+</details>
+
+**Exercise 4 (code).** For a table partitioned by day over a year ($P = 365$), take
+a query that selects a contiguous 30-day window. Compute selectivity, partitions
+touched, partitions pruned, the fraction of data scanned, and the saving factor;
+assert the data fraction equals the selectivity and the saving equals $1/s$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+P = 365                      # one partition per day
+window = 30                  # query selects a 30-day window
+selectivity = window / P
+touched = int(np.ceil(selectivity * P))
+pruned = P - touched
+frac_scanned = touched / P
+saving = P / touched
+
+assert touched == 30
+assert pruned == 335
+assert np.isclose(frac_scanned, selectivity)   # equal-size partitions
+assert np.isclose(saving, 1 / selectivity)
+print(f"selectivity = {selectivity:.4f}")
+print(f"touched = {touched}, pruned = {pruned}")
+print(f"fraction scanned = {frac_scanned:.4f}, saving = {saving:.1f}x")
+```
+
+Selectivity is $30/365 \approx 0.0822$, the query touches 30 partitions and prunes
+335, scans that same 8.22% fraction of the data, and so runs about $12.2\times$
+cheaper than a full scan.
+
+</details>
+
+Partitioning gets a
 pile of Parquet files to the right granularity; the
 [next lesson](table-formats-lakehouse) adds the metadata layer that turns that
 pile into a transactional table.

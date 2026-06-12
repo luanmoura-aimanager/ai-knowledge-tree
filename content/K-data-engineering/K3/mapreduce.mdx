@@ -4,7 +4,7 @@ pillar: K
 subId: K3
 lessonId: mapreduce
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Express a distributed aggregation as map, shuffle, and reduce, and see why the all-to-all shuffle in the middle is the step that dominates the cost of a big job."
 prerequisites: ["K1/oltp-vs-olap"]
 ---
@@ -139,7 +139,112 @@ print("ok: distributed count matches, shuffle moved", shuffle_volume, "records")
 ```
 
 The shuffle moved one record per word occurrence here precisely because no combiner ran;
-a combiner would have collapsed repeated words per document first. This map-shuffle-reduce
+a combiner would have collapsed repeated words per document first.
+
+## Exercises
+
+**Exercise 1.** A mapper processes the document `the cat the dog the cat`. List the
+intermediate $(\text{word}, 1)$ pairs the map emits with no combiner, then the pairs it
+would ship with a combiner that pre-aggregates locally. State the shuffle volume (number of
+records shipped) in each case.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With no combiner the map emits one pair per word occurrence, in order:
+$(\text{the}, 1), (\text{cat}, 1), (\text{the}, 1), (\text{dog}, 1), (\text{the}, 1),
+(\text{cat}, 1)$. That is $6$ records, the document length.
+
+**Step 2.** A combiner sums the $1$s per distinct word on the mapper before shipping. The
+counts are `the` $= 3$, `cat` $= 2$, `dog` $= 1$, so it ships
+$(\text{the}, 3), (\text{cat}, 2), (\text{dog}, 1)$, one record per distinct word.
+
+**Step 3.** Shuffle volume is $6$ records without the combiner and $3$ records with it: one
+per occurrence versus one per distinct word per mapper.
+
+</details>
+
+**Exercise 2.** With $R = 3$ reducers and the partition rule
+$\text{partition}(k) = \operatorname{hash}(k) \bmod R$, suppose three distinct keys hash to
+the raw values $\operatorname{hash} = 17, 18, 24$. Show which reducer each key lands on, and
+argue why every mapper must agree on these assignments for the reduce to be correct.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply $\bmod 3$ to each hash: $17 \bmod 3 = 2$, $18 \bmod 3 = 0$, and
+$24 \bmod 3 = 0$. So the first key goes to reducer $2$, and the other two both go to
+reducer $0$.
+
+**Step 2.** The partition function is deterministic: the same key produces the same hash on
+every mapper, so all mappers route a given key to the identical reducer.
+
+**Step 3.** Correctness of reduce needs every value for a key to arrive at one machine,
+since the reduce function consumes the full value list $[v_1, v_2, \dots]$ for $k$ at once.
+If two mappers disagreed on the target reducer, a key's values would split across machines
+and each reducer would compute a partial, wrong result.
+
+</details>
+
+**Exercise 3 (code).** Implement word count with a combiner: pre-aggregate each document on
+its mapper, then hash-partition and reduce. Confirm the final counts match a direct count
+and that the combiner strictly reduces the shuffle volume versus the no-combiner version.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import zlib
+from collections import Counter
+
+docs = [
+    "the cat the dog the cat",
+    "the dog the dog",
+    "cat cat the",
+]
+R = 3
+
+def partition_of(key):
+    return zlib.crc32(key.encode()) % R
+
+# No combiner: emit one (word, 1) per occurrence.
+mapped_plain = [(w, 1) for doc in docs for w in doc.split()]
+shuffle_plain = len(mapped_plain)
+
+# Combiner: pre-aggregate per document into (word, local_count).
+mapped_combined = []
+for doc in docs:
+    for w, c in Counter(doc.split()).items():
+        mapped_combined.append((w, c))
+shuffle_combined = len(mapped_combined)
+
+# Shuffle the combined pairs and reduce by summing per key.
+partitions = {p: [] for p in range(R)}
+for word, c in mapped_combined:
+    partitions[partition_of(word)].append((word, c))
+
+reduced = {}
+for p in range(R):
+    for word, c in partitions[p]:
+        reduced[word] = reduced.get(word, 0) + c
+
+direct = dict(Counter(w for doc in docs for w in doc.split()))
+
+print("reduced:", dict(sorted(reduced.items())))
+print("shuffle no-combiner:", shuffle_plain, " with combiner:", shuffle_combined)
+
+assert reduced == direct                       # combiner keeps the result exact
+assert shuffle_combined < shuffle_plain         # and strictly cuts shuffle volume
+print("ok: counts exact, shuffle cut from", shuffle_plain, "to", shuffle_combined)
+```
+
+The combiner collapses repeated words inside each document, so it ships one record per
+distinct word per mapper instead of one per occurrence, and because the count sum is
+associative the reduced totals are identical to the direct count.
+
+</details>
+
+This map-shuffle-reduce
 skeleton is exactly what [Spark's DataFrame engine](spark-dataframes) compiles down to,
 hiding the boilerplate while keeping the same shuffle boundary at its core.
 

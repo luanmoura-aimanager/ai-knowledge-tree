@@ -4,7 +4,7 @@ pillar: K
 subId: K4
 lessonId: change-data-capture
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Stream a database's row-level changes off its write-ahead log instead of polling, and use the transactional outbox to publish events without dual-write inconsistency."
 prerequisites: ["delivery-semantics"]
 codeExempt: true
@@ -116,6 +116,101 @@ delivery, made safe by the [idempotent consumer](K4/delivery-semantics) from the
 lesson, which dedups on the event id the outbox row carries. The two patterns
 compose: the outbox guarantees *no event is lost or invented*, idempotency guarantees
 *no duplicate is double-counted*.
+
+## Exercises
+
+**Exercise 1.** A team uses query-based polling with `SELECT * FROM orders WHERE
+updated_at > :last_seen`, running every 30 seconds. Between two polls, a single
+order row is updated three times (PENDING, then PAID, then REFUNDED) and a
+*different* order row is created and then deleted. List exactly which change
+events the downstream consumer observes, and which it misses, and name the
+property of polling each miss illustrates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The thrice-updated row. Polling photographs current state at the poll
+boundary, so it returns the row once with its final value, REFUNDED. The consumer
+sees a single change, REFUNDED, and never learns the row passed through PENDING or
+PAID. This is the *missed intermediate states* leak: only the last value between
+two polls survives.
+
+**Step 2.** The created-then-deleted row. By the time the poll runs, the row no
+longer exists, so the `SELECT` cannot return it. The consumer never learns the row
+was created and never learns it was deleted, observing nothing at all for it. The
+deletion specifically illustrates the *misses deletes* leak (a `DELETE` removes the
+row a `SELECT` would have to return), compounded here by the create also being
+collapsed away.
+
+**Step 3.** Net result: of the four real mutations (three updates plus a
+create/delete pair, five if you count the create separately), the consumer
+observes exactly one event, REFUNDED. Log-based CDC reads each mutation as its own
+WAL entry, so it would have emitted all of them in commit order, including both
+deletes.
+
+</details>
+
+**Exercise 2.** A developer proposes to fix the dual-write problem by adding
+retries: after `db.save(order)` commits, retry `broker.publish(event)` until it is
+acknowledged. Explain why this still does not give the same guarantee as the
+transactional outbox, and characterize precisely what failure mode survives.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Retries address only one direction of failure. If the publish fails
+transiently, retrying eventually succeeds, so no event is lost in that case. That
+removes the "committed but never published" loss when the *broker* is the thing
+that is flaky.
+
+**Step 2.** But the application process itself can die between the database commit
+and the publish, before any retry loop runs (a crash, an OOM kill, a deploy). The
+order is committed, no event was published, and the in-memory retry state is gone
+with the process. On restart there is no record that a publish is owed, so the
+event is permanently lost. Retries cannot cover a failure of the very process that
+holds the retry logic.
+
+**Step 3.** Conversely, if the developer publishes first and retries the database
+write, a process death after a successful publish announces an order that the
+database never committed: an invented event. Either ordering leaves one
+unrecoverable divergence because the two writes are in separate systems with no
+shared transaction.
+
+**Step 4.** The outbox removes this by making the event-record write part of the
+*same* database transaction as the business update, so a crash cannot land one
+without the other. The publish then becomes an independent, durable, retryable
+relay reading committed outbox rows, which is exactly the case retries *do* handle
+well.
+
+</details>
+
+**Exercise 3.** The outbox relay delivers at-least-once: it publishes an outbox
+row and may crash before marking it sent, republishing on restart. Suppose instead
+the relay marks a row sent *first*, then publishes. Contrast the failure mode of
+this ordering with the original, say which delivery guarantee each gives, and
+state which one the idempotent consumer from the previous lesson makes safe.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Original ordering (publish, then mark sent). If the relay crashes
+after publishing but before marking the row sent, the row still looks unsent on
+restart, so the relay republishes it. The event reaches the broker one or more
+times: this is **at-least-once** delivery, whose failure mode is duplicates.
+
+**Step 2.** Reversed ordering (mark sent, then publish). If the relay crashes after
+marking the row sent but before publishing, the row now looks sent and is never
+retried, so the event is never published. The event reaches the broker zero or one
+times: this is **at-most-once** delivery, whose failure mode is loss.
+
+**Step 3.** Which is safe to combine. Duplicates are recoverable: the idempotent
+consumer dedups on the event id the outbox row carries, so re-applying a duplicate
+is a no-op and at-least-once becomes effectively-once. Loss is not recoverable
+downstream, because a consumer cannot dedup an event it never receives. So the
+original publish-then-mark ordering (at-least-once) is the correct one, and the
+idempotent consumer is what makes its duplicates harmless.
+
+</details>
 
 With ingestion covered end to end, from the [log](K4/log-and-kafka) through windows,
 watermarks, delivery, and CDC, the data is landing in the warehouse. The next

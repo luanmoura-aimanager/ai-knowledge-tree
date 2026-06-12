@@ -9,14 +9,20 @@ campaign + remark-gfm both shipped).
 
 ## Backlog
 
-- **Exercises campaign** (in progress, started 2026-06-11). Every lesson gets an
-  `## Exercises` section: at least 3 exercises (theory and code) with hidden
-  `<details>` solutions, per the new STYLE.md §6.7. Infrastructure (STYLE §6.7,
-  `.mdx-body details` CSS, `render-check.mjs --exercises` gate, exemplar
-  `A2/entropy.mdx`) shipped first; then one PR per pillar retrofits all 458
-  lessons. Pillar status: A ☑ B ☑ C ☑ D ☑ E ☑ F ☑ G ☑ H ☑ I ☑ J ☑ K ☐.
+_Empty._ Three efforts shipped:
 
-Two efforts shipped on 2026-06-11:
+- **Exercises campaign** (PRs #85–#95, merged, 2026-06-11/12). Every lesson now
+  ends with an `## Exercises` section: at least 3 difficulty-laddered exercises
+  (theory and runnable numpy code, or theory-only for `codeExempt` lessons) with
+  hidden `<details>` solutions, per the new binding **STYLE.md §6.7**.
+  Infrastructure shipped first (PR #85: §6.7, `.mdx-body details` CSS,
+  `render-check.mjs --exercises` gate, exemplar `A2/entropy.mdx`); then one PR
+  per pillar A→K retrofitted all 458 lessons. Pillar status: all complete
+  (A☑ B☑ C☑ D☑ E☑ F☑ G☑ H☑ I☑ J☑ K☑). Every code solution was executed under
+  python3; every pillar passed `render-check.mjs --exercises` and a subagent
+  review before merge.
+
+Two earlier efforts shipped on 2026-06-11:
 
 - **Intuition-examples campaign** (PRs #73–82, merged). The scan flagged 145
   lessons; 84 gained verified concrete examples (magnitude scale / contrasting

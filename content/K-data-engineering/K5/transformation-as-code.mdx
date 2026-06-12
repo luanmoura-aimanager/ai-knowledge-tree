@@ -4,7 +4,7 @@ pillar: K
 subId: K5
 lessonId: transformation-as-code
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define warehouse transformations as version-controlled, dependency-linked models (the dbt mental model) so a transformation layer becomes a testable DAG with lineage instead of ad hoc SQL."
 prerequisites: ["etl-vs-elt"]
 codeExempt: true
@@ -81,7 +81,78 @@ software-engineering posture data engineering increasingly adopts<FN n="2" />:
   for any table a dashboard breaks on, the exact chain of models back to raw.
 
 The result is that a transformation layer stops being a fragile sequence of scripts
-and becomes a tested, version-controlled DAG with end-to-end lineage. This is the
+and becomes a tested, version-controlled DAG with end-to-end lineage.
+
+## Exercises
+
+**Exercise 1.** A model is "a `SELECT` plus a materialization". Explain what the
+author writes versus what the framework generates, and give one situation where you
+would choose to materialize a model as a `view` rather than as a `table`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The author writes only the `SELECT` statement that defines the derived
+relation, plus a one-word instruction naming the materialization (`table` or `view`).
+
+**Step 2.** The framework wraps that `SELECT`: for a `table` it emits
+`CREATE TABLE AS SELECT ...`, for a `view` it emits `CREATE VIEW AS SELECT ...`, and
+it manages the resulting object in the warehouse. One file maps to one model maps to
+one output relation.
+
+**Step 3.** Choose `view` when the model is cheap to recompute and you want it always
+fresh on read with no storage cost, for example a thin staging projection over raw
+that is queried rarely. A `table` is preferable when the `SELECT` is expensive and
+read often, so the cost is paid once at build time rather than on every read.
+
+</details>
+
+**Exercise 2.** A model declares a **reference** to another model instead of
+hard-coding a table name. From that single declaration, two distinct capabilities
+follow. Name both, and explain how each is computed from the set of references.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The set of all references over all models is a directed acyclic graph,
+where an edge from `B` to `A` means `A` references (reads) `B`.
+
+**Step 2.** Ordering. A reference is a dependency edge: the referenced model must be
+built first. A topological sort of the reference DAG yields a valid build order, so
+nobody hand-orders the scripts. The order is derived from the references.
+
+**Step 3.** Lineage. The same edges read in the other direction answer "what depends
+on this model?". Taking a node's descendants gives every downstream model, the
+blast-radius you need before changing a column.
+
+</details>
+
+**Exercise 3.** A dbt test is "an assertion expressed as a query that should return
+zero rows". Write, in plain English, the query condition for a uniqueness test on
+`fct_revenue.order_id` and for a referential-integrity test that every
+`fct_revenue.customer_id` exists in `dim_customer`. State the pass condition for each
+and why zero rows is the natural convention.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Uniqueness on `order_id`: the test query groups `fct_revenue` by
+`order_id` and returns each group whose count is greater than one (a duplicated key).
+It passes when that query returns zero rows, meaning no key repeats.
+
+**Step 2.** Referential integrity: the test query returns the `fct_revenue` rows whose
+`customer_id` has no matching row in `dim_customer` (a left anti-join, or `customer_id`
+not in the set of `dim_customer` keys). It passes when that query returns zero rows,
+meaning every fact key resolves to a dimension.
+
+**Step 3.** Zero rows is the natural convention because the query is written to surface
+violations only: any returned row is a counterexample to the assertion, so an empty
+result is exactly "no violations found". The framework runs the query after the build
+and treats a non-empty result as a failure.
+
+</details>
+
+This is the
 general mental model for any warehouse; [dbt for AI data](J5/dbt-transformations)
 applies the same models, refs, and tests to the feature and training tables an ML
 system consumes. The next lesson sharpens one detail of how these models run, by

@@ -4,7 +4,7 @@ pillar: K
 subId: K2
 lessonId: parquet-internals
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Read the Parquet file layout, row groups split into per-column chunks with min/max statistics, and see how those statistics let an engine skip whole row groups without decoding them."
 prerequisites: ["compression-encoding"]
 codeExempt: true
@@ -87,7 +87,90 @@ graph LR
 
 The same `min`/`max`/`null_count` stats also answer some aggregates outright
 (`MAX(amount)` over a sorted column needs only the footer), and `null_count` lets
-`IS NOT NULL` filters skip all-null chunks. Skipping at the row-group level is
+`IS NOT NULL` filters skip all-null chunks.
+
+## Exercises
+
+**Exercise 1.** A query filters `WHERE amount BETWEEN 100 AND 200`. For each of
+these four row groups, decide from the footer stats whether the engine can skip it
+or must read its pages: (a) `min = 5, max = 80`; (b) `min = 150, max = 900`;
+(c) `min = 300, max = 350`; (d) `min = 50, max = 120`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** State the skip test for a range predicate. A row group can match only
+if its interval `[min, max]` overlaps the query interval `[100, 200]`. The group
+is skippable when the two intervals are disjoint: when `max < 100` or `min > 200`.
+
+**Step 2.** Apply it to each group.
+
+- (a) `max = 80 < 100`: disjoint below the query, **skip**.
+- (b) `min = 150` lies inside `[100, 200]`: the intervals overlap, **read**.
+- (c) `min = 300 > 200`: disjoint above the query, **skip**.
+- (d) `max = 120` falls inside `[100, 200]`: overlap, **read**.
+
+**Step 3.** Groups (a) and (c) are pruned; (b) and (d) are read. The test only
+skips provably non-matching groups, so a value in `[100, 200]` is never lost. Note
+the test cannot tell whether (b) or (d) actually *contains* a matching row; it only
+rules groups out, never in.
+
+</details>
+
+**Exercise 2.** A table has 1,000 row groups. Column `region` is the sort key, so
+its per-group `[min, max]` ranges are tight and non-overlapping. A filter
+`region = 'EU'` matches a contiguous band of 40 row groups. How many groups does
+pruning skip? Now suppose instead the table is sorted by `ts`, leaving `region`
+randomly shuffled so every group spans the full alphabet of regions. How many can
+be skipped then, and what does the contrast show?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sorted on `region`: the 40 matching groups form one contiguous band,
+and every other group has a `[min, max]` interval that excludes `'EU'`. The engine
+reads 40 and skips the remaining $1000 - 40 = 960$ row groups.
+
+**Step 2.** Shuffled `region`: each group's values are spread across the whole
+alphabet, so every group's `[min, max]` straddles `'EU'`. No interval is disjoint
+from the filter, so the engine can skip **zero** groups and reads all 1,000.
+
+**Step 3.** The stats are identical machinery in both cases; only the physical
+clustering changed. Pruning power is a property of how the data is laid out, not of
+the file format. A column you filter on heavily should be the sort/cluster key, or
+its min/max stats are dead weight.
+
+</details>
+
+**Exercise 3.** Storing the footer at the *end* of the file forces a reader to do
+two round trips to begin reading data (one to fetch the footer, one for the
+targeted chunks). A colleague proposes putting the footer at the *start* instead,
+to save a round trip. Explain what the writer would lose, and why the end-of-file
+choice is the right trade-off for an immutable analytics format.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify what the footer must contain: the byte offset and statistics
+of every row group and column chunk. Those offsets and stats are not known until
+all the data has been written, because each chunk's size and min/max depend on the
+values streamed into it.
+
+**Step 2.** A footer at the start would force the writer to either buffer the
+entire file in memory (to learn all offsets before emitting the header) or seek
+backward and patch the header after the fact. The first caps file size by memory;
+the second rules out write-once streaming to append-only object storage, where you
+cannot edit bytes already written.
+
+**Step 3.** Putting the footer last lets the writer stream row groups out as they
+fill and append the metadata once at the end, a single forward pass that suits
+object storage. The cost is one extra read seek per query, cheap and amortized
+across the many chunks a query then reads. For a write-once, read-many analytics
+format the end-of-file footer is the correct trade.
+
+</details>
+
+Skipping at the row-group level is
 coarse pruning *inside* a file; the [next lesson](partitioning-pruning) does the
 same trick one level up, pruning whole files via the directory layout, and shows
 why slicing too finely backfires.

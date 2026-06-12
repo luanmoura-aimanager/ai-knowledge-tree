@@ -4,7 +4,7 @@ pillar: K
 subId: K4
 lessonId: log-and-kafka
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Model a stream as an append-only partitioned log with per-consumer offsets, and see how partitioning by key gives ordered, replayable, horizontally scalable ingestion."
 prerequisites: ["K1/oltp-vs-olap"]
 codeExempt: true
@@ -108,6 +108,97 @@ graph LR
 The producers route by key into partitions; each partition is an ordered offset
 sequence; each consumer group tracks its own offset per partition and so reads the
 same data independently and at its own pace.
+
+## Exercises
+
+**Exercise 1.** A topic `payments` has $P = 4$ partitions. A producer writes records
+keyed by `account_id`, using $\operatorname{partition} = \operatorname{hash}(\text{key})
+\bmod P$ with a hash function that, for these four accounts, yields
+$\operatorname{hash}(7) = 31$, $\operatorname{hash}(11) = 18$,
+$\operatorname{hash}(15) = 40$, $\operatorname{hash}(99) = 26$. Compute each
+account's partition. Then state which of these two orderings the log guarantees and
+which it does not: (a) all events for account 7 in commit order; (b) the global
+order of an account-7 event versus an account-15 event.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply $\bmod 4$ to each hash. $31 \bmod 4 = 3$, $18 \bmod 4 = 2$,
+$40 \bmod 4 = 0$, $26 \bmod 4 = 2$. So account 7 maps to partition 3, account 11 to
+partition 2, account 15 to partition 0, and account 99 to partition 2.
+
+**Step 2.** Ordering (a) is guaranteed. All events for account 7 share the key 7,
+hence the same partition (3), hence one offset sequence, which is totally ordered.
+Per-key order holds.
+
+**Step 3.** Ordering (b) is not guaranteed. Account 7 lands in partition 3 and
+account 15 in partition 0, two independent logs on possibly different brokers with
+no shared clock. Their relative order is arbitrary. The log keeps per-key order and
+gives up global order, which is exactly the trade that lets throughput scale with
+$P$.
+
+**Step 4.** Note accounts 11 and 99 collide into partition 2. They are still
+mutually ordered within that partition's offset sequence, even though they are
+unrelated keys; collisions cost interleaving, not correctness.
+
+</details>
+
+**Exercise 2.** Two consumer groups read `payments`: a `fraud` group with committed
+offset 1200 on a partition, and an `analytics` group replaying the same partition
+from offset 0. The partition's tip (latest offset) is 1500. Explain why each group
+can sit at a different offset without interfering, and compute each group's lag.
+Then say what a queue (where a read consumes the record) could not do here.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The broker is stateless about reader position: it stores the immutable
+records, and each consumer group stores its *own* committed offset per partition.
+Reading does not mutate or remove a record, so the fraud group at 1200 and the
+analytics group at 0 are independent cursors over the same shared, read-only log.
+Neither advances the other.
+
+**Step 2.** Lag is the distance from a group's committed offset to the tip.
+Fraud lag $= 1500 - 1200 = 300$ records behind. Analytics lag $= 1500 - 0 = 1500$
+records behind (it is replaying the full history).
+
+**Step 3.** A queue cannot do this. In a queue a `pop` consumes (removes) the
+record, so the first reader to take a record prevents any other reader from seeing
+it. Two independent full readings of the same history, one live at the tip and one
+replaying from the start, are only possible because the log is replayable: position
+is the reader's, not the data's.
+
+</details>
+
+**Exercise 3.** A team needs strict per-customer ordering of events and currently
+keys records by `customer_id` into a topic with $P = 8$ partitions. Traffic grows
+and they want more parallelism, so an engineer proposes switching the producer to a
+*random* key per record to spread load evenly across partitions. Explain the
+ordering consequence of this change and propose a key choice that scales throughput
+without breaking the requirement.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** What random keying buys. Random keys hash uniformly across all 8
+partitions, so load is maximally spread and throughput is as high as $P$ partitions
+allow. That is the upside the engineer is chasing.
+
+**Step 2.** What it breaks. Ordering is guaranteed only *within* a partition. With
+random keys, two events for the same customer can hash to different partitions, on
+different brokers with no shared clock, so their relative order is lost. The strict
+per-customer ordering requirement is violated. The key is not a load knob, it is the
+declaration of what must stay ordered.
+
+**Step 3.** The fix. Keep keying by `customer_id`. Per-customer order is preserved
+because all of a customer's events share a key and therefore a partition, while
+*different* customers still spread across the 8 partitions and parallelize. To scale
+further, raise the partition count $P$ (more partitions, still keyed by customer):
+more customers fan out across more brokers, throughput rises, and each customer's
+stream stays totally ordered. Order is preserved exactly where it is needed and
+relaxed exactly where relaxing it buys scale.
+
+</details>
 
 This append-only, partitioned, offset-addressed log is the substrate every later
 lesson assumes. The next lesson takes the unbounded stream it delivers and asks the

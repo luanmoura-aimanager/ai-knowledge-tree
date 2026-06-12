@@ -4,7 +4,7 @@ pillar: K
 subId: K4
 lessonId: watermarks-late-data
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Separate event time from processing time, track progress with a watermark that bounds how late data can be, and reason about the completeness-versus-latency tradeoff it sets."
 prerequisites: ["windowing"]
 ---
@@ -120,7 +120,118 @@ print("dropped counts by L:", counts, "-> monotonically non-increasing")
 
 With $L = 0$ the watermark hugs the front of the stream and many out-of-order events
 are dropped; raising $L$ widens the grace period and the dropped count falls to a
-handful and then to zero. Even at-least-counted events can still arrive twice, which
+handful and then to zero.
+
+## Exercises
+
+**Exercise 1.** Events arrive in processing-time order with event times (in
+minutes) $12, 18, 15, 25, 22, 30$. The allowed lateness is $L = 4$. Using
+$W = \max t_e \text{ seen so far} - L$, compute the watermark just before each
+arrival and decide whether each event is late (an event is late when
+$t_e < W$ at the moment it arrives). Which window does the late event belong to,
+and was that window already fired? Use tumbling windows of width 10 starting at 0.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Track the running max of event times in arrival order and subtract
+$L = 4$ to get the watermark at each arrival, then compare the arriving $t_e$ to it.
+
+| arrival | $t_e$ | running max before | $W = \max - 4$ | late? ($t_e < W$) |
+|---|---|---|---|---|
+| 1 | 12 | $-\infty$ | $-\infty$ | no |
+| 2 | 18 | 12 | 8 | no |
+| 3 | 15 | 18 | 14 | no ($15 \ge 14$) |
+| 4 | 25 | 18 | 14 | no |
+| 5 | 22 | 25 | 21 | no ($22 \ge 21$) |
+| 6 | 30 | 25 | 21 | no |
+
+**Step 2.** With $L = 4$, no event is late: every arriving event time stays at or
+above the watermark. The closest call is event 3 ($t_e = 15$ against $W = 14$) and
+event 5 ($t_e = 22$ against $W = 21$), both on time by a margin of 1.
+
+**Step 3.** Tighten to see the boundary. With $L = 2$, before arrival 3 the
+watermark is $18 - 2 = 16$, and $t_e = 15 < 16$, so event 3 would be late. It
+belongs to the tumbling window $[10, 20)$ (since $\lfloor 15 / 10 \rfloor = 1$). At
+that point the watermark 16 has not yet reached the window end 20, so the window had
+*not* fired and the event would still make it in; it is only "late" relative to the
+watermark heuristic. This shows the count of late events depends on $L$, the point
+the next exercise pins numerically.
+
+</details>
+
+**Exercise 2.** Prove that the number of dropped-late events is monotonically
+non-increasing in the allowed lateness $L$: for $L_1 \le L_2$, raising $L$ from
+$L_1$ to $L_2$ can never increase the count of dropped events. Argue per event.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Fix one event with event time $t_e$ arriving at some processing time,
+when the running max of seen event times is $M$. The watermark at that instant is
+$W(L) = M - L$. The event is dropped as late exactly when $t_e < W(L)$, i.e.
+$t_e < M - L$.
+
+**Step 2.** Compare the two latenesses on this single event. With $L_1 \le L_2$ we
+have $M - L_2 \le M - L_1$, so $W(L_2) \le W(L_1)$: the larger $L$ produces a lower
+(further-back) watermark at the same instant. If the event is not dropped under
+$L_1$ (meaning $t_e \ge M - L_1$), it is also not dropped under the lower bar
+$M - L_2$, since $t_e \ge M - L_1 \ge M - L_2$.
+
+**Step 3.** So no event that survived at $L_1$ becomes dropped at $L_2 \ge L_1$.
+The dropped set under $L_2$ is a subset of the dropped set under $L_1$ (the running
+max $M$ at each arrival depends only on arrival order, not on $L$). Hence the dropped
+count is non-increasing in $L$. This is the completeness-versus-latency trade: a
+larger $L$ can only rescue stragglers, never create new late events, at the cost of
+delaying every window's firing by up to $L$.
+
+</details>
+
+**Exercise 3 (code).** Build a stream of 60 events with random processing delays
+and a few heavy stragglers. Replay them in arrival order, advance the watermark as
+$\max t_e \text{ seen} - L$, and count dropped-late events for a sweep of $L$
+values. Verify numerically that the dropped count is monotonically non-increasing
+in $L$ and that $L = 0$ drops strictly more than a large $L$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n = 60
+event_time = np.sort(rng.uniform(0, 30, n))      # when each event happened
+delay = rng.exponential(1.0, n)                  # network / processing delay
+delay[[9, 23, 41, 55]] += 7.0                    # heavy stragglers
+proc_time = event_time + delay                   # when it arrived
+
+order = np.argsort(proc_time)                     # replay in arrival order
+et = event_time[order]
+running_max = np.maximum.accumulate(et)           # max event time seen so far
+
+def dropped_late(L):
+    watermark = running_max - L                   # watermark just before each arrival
+    return int(np.sum(et < watermark))            # arrivals older than the watermark
+
+Ls = [0.0, 0.5, 1.0, 2.0, 4.0, 8.0]
+counts = [dropped_late(L) for L in Ls]
+for L, c in zip(Ls, counts):
+    print(f"L = {L:>4}  ->  dropped late = {c}")
+
+# Completeness vs latency: raising L can only drop fewer (never more).
+assert all(counts[i] >= counts[i + 1] for i in range(len(counts) - 1))
+# A zero grace period drops strictly more than a generous one.
+assert dropped_late(0.0) > dropped_late(8.0)
+```
+
+The dropped count falls as $L$ rises and never climbs, confirming the per-event
+monotonicity argument: a wider grace period rescues stragglers and drops a subset of
+what a tighter one drops.
+
+</details>
+
+Even at-least-counted events can still arrive twice, which
 raises the orthogonal question of how many times each event is *delivered* in the
 first place. That is [delivery semantics](K4/delivery-semantics).
 

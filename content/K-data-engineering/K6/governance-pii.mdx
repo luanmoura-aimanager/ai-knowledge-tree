@@ -4,7 +4,7 @@ pillar: K
 subId: K6
 lessonId: governance-pii
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Classify and protect sensitive data with masking, tokenization, and role-based access, and meet regimes like GDPR (purpose limitation, the right to deletion) with an auditable trail."
 prerequisites: ["data-lineage"]
 codeExempt: true
@@ -98,6 +98,87 @@ Lineage is the thread that ties governance together: it propagates classificatio
 from source to dashboard and it scopes a deletion request to the exact set of
 downstream records, so the [traversal](A5/graph-traversal) machinery does double
 duty as a compliance tool.
+
+## Exercises
+
+**Exercise 1.** A `customers` table has columns `name`, `email`, `signup_date`,
+`internal_segment`, and `national_id`. Assign each column one of the four
+classification levels (public, internal, PII, sensitive) and justify the two that
+are most consequential to get right.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the definitions column by column. `name` identifies a person, so
+PII. `email` identifies a person (and is a contact handle), so PII. `signup_date`
+on its own does not identify anyone, but it is a business attribute not meant for
+outsiders, so internal. `internal_segment` is a derived business label, internal.
+`national_id` is a government identifier, the canonical sensitive class.
+
+**Step 2.** The two most consequential are `national_id` and `email`.
+Mismatched-low on `national_id` (treating it as merely internal) skips the
+stricter legal handling sensitive data requires and is the costliest error.
+`email` matters because it is both a direct identifier and the field most likely
+to be joined or exported, so under-classifying it leaks identities through
+analytics tables.
+
+The final assignment: `name` = PII, `email` = PII, `signup_date` = internal,
+`internal_segment` = internal, `national_id` = sensitive.
+
+</details>
+
+**Exercise 2.** An analytics team needs to count distinct customers per region and
+join orders to customers, but must never see raw email addresses. Compare masking
+and tokenization for this requirement and explain why one of them fails the join
+requirement.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Masking replaces part or all of a value with a placeholder for
+display, e.g. `j•••@example.com`. Two different raw emails can mask to the same
+placeholder, and the masked form is not a stable key, so a join on the masked
+column either collides distinct people or fails to match the same person across
+tables. Masking therefore breaks the distinct-count and the join.
+
+**Step 2.** Tokenization replaces each raw email with a stable surrogate token
+through a reversible mapping held in a guarded vault. The same email always maps to
+the same token, and different emails map to different tokens, so the token is a
+valid join key and a valid distinct-count key. The token carries no personal
+information on its own, so the analytics team meets both requirements without ever
+seeing a raw email.
+
+**Step 3.** Tokenization is the correct choice. Masking is for display to a human
+reader; tokenization preserves referential structure for analytics, which is what
+the join and distinct-count need.
+
+</details>
+
+**Exercise 3.** A data subject exercises their GDPR right to deletion. Explain why
+satisfying this request is a lineage traversal, which direction it traverses, and
+what would go wrong if the organization relied on memory instead of recorded
+lineage.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The right to erasure requires removing *every* copy of that person's
+data. Their data starts in source records and flows through staging into marts and
+downstream tables. Finding every copy means enumerating everything derived from the
+source records, which is a downstream (forward) traversal of the lineage graph from
+the source nodes holding that person's rows.
+
+**Step 2.** It traverses *downstream*: from the source records, follow edges
+forward to collect every dataset that carries data derived from those records. That
+reachable set is exactly the set of places a deletion must reach.
+
+**Step 3.** Without recorded lineage, the organization would hunt manually through
+every table, with no guarantee of completeness. A single missed downstream copy
+means the person's data persists somewhere, which is both a failed erasure and a
+compliance violation. Recorded lineage makes the deletion scope a tractable graph
+query instead of an error-prone manual search.
+
+</details>
 
 This closes pillar K. The Data Engineer path threads the whole discipline, from
 [data modeling](K1/relational-model) through transformation and orchestration to

@@ -4,7 +4,7 @@ pillar: K
 subId: K5
 lessonId: orchestrators-compared
 order: 5
-estimatedMinutes: 19
+estimatedMinutes: 29
 goal: "Compare task-centric orchestration (Airflow: run these steps in order) with asset-centric orchestration (Dagster: produce these tables), and see what each makes easy or hard."
 prerequisites: ["scheduling-backfills"]
 codeExempt: true
@@ -91,6 +91,82 @@ data-level observability.
 
 Neither is strictly better: a pipeline that is mostly arbitrary operations leans
 task-centric, and one that is mostly producing analytical tables leans asset-centric.
+
+## Exercises
+
+**Exercise 1.** A dashboard shows that the `mart_exec_summary` table is stale. Explain
+what a task-centric orchestrator can and cannot tell you about why, and contrast that
+with what an asset-centric orchestrator reports. Tie the difference to what each system
+treats as its unit of reasoning.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The task-centric orchestrator reasons about tasks, which are black boxes
+known only as "ran" or "failed". It can tell you which tasks ran and in what order, and
+whether any failed or were skipped. It cannot say which table is out of date or why,
+because what a task reads or writes is opaque to it. Lineage over the data lives only in
+your head or a separate catalog.
+
+**Step 2.** The asset-centric orchestrator reasons about assets, the tables themselves.
+Because it knows each asset and its upstream edges, it can report per-asset facts:
+`mart_exec_summary` last materialized at a given time, with a row count, and whether its
+upstream assets are fresher than it (so it is stale relative to them).
+
+**Step 3.** The difference is the unit of reasoning. Task-centric tracks operations, so
+its answers are about execution. Asset-centric tracks data objects, so its answers are
+about freshness and lineage of the data itself.
+
+</details>
+
+**Exercise 2.** Asset-centric orchestration "gets several things for free" from
+knowing the asset graph. Pick **partial refresh** and explain why it is natural in the
+asset-centric model but requires manual care in the task-centric model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In the asset-centric model, to fix one asset you materialize that asset and
+its descendants, leaving untouched assets alone. The system can do this precisely
+because it knows exactly which assets each run produces and how they depend on one
+another, so the descendant set is derived from the declared graph.
+
+**Step 2.** In the task-centric model the orchestrator knows only task edges, not the
+data each task produces. To refresh "just the affected tables" you must yourself work
+out which tasks rebuild those tables and their downstream tables, then rerun exactly
+that chosen set of tasks. The mapping from "this table changed" to "these tasks" is not
+in the system; it is on the author.
+
+**Step 3.** So partial refresh is a built-in graph operation for asset-centric and a
+manual task-selection exercise for task-centric.
+
+</details>
+
+**Exercise 3.** You are choosing an orchestration style for two pipelines. Pipeline A
+runs a nightly sequence of heterogeneous operations: call a vendor API, move a file by
+SFTP, trigger a stored procedure, send a Slack message. Pipeline B builds twenty
+analytical tables from raw through staging to marts. Recommend a style for each and
+justify it from the trade the two models make.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The core trade: task-centric is maximally general about what runs and gives
+explicit control over order, at the price of being blind to the data tasks move.
+Asset-centric trades some generality (everything is framed as producing an asset) for
+native lineage, surgical partial refresh, and data-level observability.
+
+**Step 2.** Pipeline A is mostly arbitrary operations, several of which (an API call, an
+SFTP move, a Slack message) produce no data asset to reason about. The generality and
+explicit ordering of the task-centric model fit it, and the asset framing would be
+awkward. Recommend task-centric.
+
+**Step 3.** Pipeline B is a data-producing transformation graph: twenty tables with
+clear upstream and downstream relationships. The asset-centric model gives lineage,
+partial refresh, and per-table observability for free here. Recommend asset-centric.
+
+</details>
+
 With orchestration covered, the pipeline can reliably build its tables; the
 [next subsection](K6/data-quality-dimensions) turns to whether the tables those runs
 produce are actually *correct*, making data quality measurable and enforceable.

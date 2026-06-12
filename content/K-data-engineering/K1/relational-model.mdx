@@ -4,7 +4,7 @@ pillar: K
 subId: K1
 lessonId: relational-model
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Model data as relations with keys and functional dependencies, and normalize to 3NF/BCNF to remove the update, insertion, and deletion anomalies that redundancy causes."
 prerequisites: []
 codeExempt: true
@@ -110,6 +110,99 @@ graph TD
   C -->|"cust_id FK"| OR
   OR -->|"order_id FK"| OL
 ```
+
+## Exercises
+
+**Exercise 1.** A table records course enrollments with attributes
+`(student_id, student_email, course_id, course_title, grade)`, keyed by
+`(student_id, course_id)`. List the functional dependencies that hold, then name
+each anomaly the table suffers with a concrete instance.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Besides the key dependency
+$(\text{student\_id}, \text{course\_id}) \to \text{grade}$, two non-key
+dependencies hold: $\text{student\_id} \to \text{student\_email}$ (one email per
+student) and $\text{course\_id} \to \text{course\_title}$ (one title per course).
+Both left sides are proper parts of the composite key, so each is a partial
+dependency.
+
+**Step 2.** Update anomaly: a student changes email. The email repeats on every
+enrollment row for that student, so a correct update must touch them all; miss one
+and the table asserts two emails for one student.
+
+**Step 3.** Insertion anomaly: a new course with no enrollments yet cannot be
+recorded, because `course_title` exists only as a column of an enrollment row, and
+there is no row without a `(student_id, course_id)` key.
+
+**Step 4.** Deletion anomaly: deleting a student's last enrollment erases their
+email, and deleting a course's last enrollment erases its title, since those facts
+live only on enrollment rows.
+
+</details>
+
+**Exercise 2.** Take the enrollment table of Exercise 1 and decompose it to BCNF.
+Give the resulting relations with their keys and foreign keys, and verify that
+every nontrivial functional dependency in each relation has a superkey on its left.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each non-key determinant becomes its own relation keyed by that
+determinant:
+
+```text
+Students(student_id PK, student_email)
+Courses(course_id PK, course_title)
+Enrollments(student_id FK, course_id FK, grade)   PK = (student_id, course_id)
+```
+
+**Step 2.** Check `Students`: the only nontrivial FD is
+$\text{student\_id} \to \text{student\_email}$, and `student_id` is the key, hence
+a superkey. BCNF holds.
+
+**Step 3.** Check `Courses`: the only nontrivial FD is
+$\text{course\_id} \to \text{course\_title}$, and `course_id` is the key. BCNF holds.
+
+**Step 4.** Check `Enrollments`: the only nontrivial FD is
+$(\text{student\_id}, \text{course\_id}) \to \text{grade}$, whose left side is the
+key. No partial dependency survives, because `student_email` and `course_title`
+have moved out. Every determinant is a superkey, so the schema is in BCNF.
+
+</details>
+
+**Exercise 3.** A schema designer claims that because every BCNF relation is also
+in 3NF, the two forms are interchangeable and BCNF is always achievable by lossless
+decomposition without losing dependencies. State precisely where 3NF and BCNF
+differ, and give a small relation that is in 3NF but not BCNF.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** BCNF demands that for *every* nontrivial FD $X \to Y$, $X$ is a
+superkey. 3NF relaxes this in one case: it tolerates a non-superkey determinant
+$X \to A$ when $A$ is a *prime* attribute (part of some candidate key). So 3NF is
+strictly weaker, and a relation can satisfy 3NF while violating BCNF.
+
+**Step 2.** Consider $\text{Teaches}(\text{student}, \text{subject}, \text{teacher})$
+with the rules: each teacher teaches exactly one subject
+($\text{teacher} \to \text{subject}$), and each student-subject pair is taught by
+one teacher ($(\text{student}, \text{subject}) \to \text{teacher}$). The candidate
+keys are $(\text{student}, \text{subject})$ and $(\text{student}, \text{teacher})$.
+
+**Step 3.** This is in 3NF: in $\text{teacher} \to \text{subject}$, the determined
+attribute `subject` is prime (it belongs to candidate key
+$(\text{student}, \text{subject})$), which 3NF permits. But `teacher` alone is not
+a superkey, so $\text{teacher} \to \text{subject}$ violates BCNF.
+
+**Step 4.** The designer's claim overreaches: decomposing to BCNF here would split
+out $\text{teacher} \to \text{subject}$, and the dependency
+$(\text{student}, \text{subject}) \to \text{teacher}$ can no longer be enforced
+within a single relation. BCNF is not always achievable while preserving all
+dependencies; 3NF is. The two are not interchangeable.
+
+</details>
 
 With `cust_city` living once in `Customers`, a move is a single-row update, a
 new customer can be inserted before any order exists, and deleting an order

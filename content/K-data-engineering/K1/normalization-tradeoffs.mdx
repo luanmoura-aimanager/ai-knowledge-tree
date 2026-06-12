@@ -4,7 +4,7 @@ pillar: K
 subId: K1
 lessonId: normalization-tradeoffs
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Weigh the storage and update cost of denormalization against the join cost it removes, and decide when a wide pre-joined table beats a normalized star for read-heavy analytics."
 prerequisites: ["dimensional-modeling"]
 ---
@@ -110,7 +110,115 @@ The denormalized layout costs $130{,}000$ against $280{,}000$ when $90\%$ of
 operations are reads, and $370{,}000$ against $120{,}000$ when only $10\%$ are,
 with the two meeting exactly at $f = 0.6$. The lesson generalizes: an analytical
 warehouse, almost all reads, leans toward wide denormalized tables, while an
-operational store leans toward the normalized form. How those wide tables are
+operational store leans toward the normalized form.
+
+## Exercises
+
+**Exercise 1.** A normalized schema stores customer city once in a `Customers`
+table and references it from a million-row `Orders` table by foreign key. A
+denormalized schema copies `city` onto every order row. (a) A customer with 50
+orders moves city. How many row writes does each layout need to stay consistent?
+(b) A report joins orders to cities; explain why the normalized read touches more
+rows than the denormalized one. Tie each answer to a named anomaly.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Normalized write: the city is stored once, so a move is a single-row
+update in `Customers`, one write. Denormalized write: the city repeats on all 50
+order rows, so the change fans out to 50 writes. This is the update anomaly turned
+into a performance cost, one logical change becoming many physical writes.
+
+**Step 2.** Normalized read: reconstructing order-with-city joins `Orders` to
+`Customers`, so the engine scans and matches keys across both tables, touching the
+joined rows plus the `Customers` rows it probes, more rows than the answer alone.
+Denormalized read: `city` already sits on the order row, so a read is a single scan
+of `Orders` with no join.
+
+**Step 3.** The trade is exactly the two anomalies in cost form: normalization
+avoids the update anomaly (one fact, one place) at the price of join cost on every
+read; denormalization removes the join (no read-time reassembly) at the price of
+fan-out writes that reintroduce the update anomaly as repeated work.
+
+</details>
+
+**Exercise 2.** Using the cost model $R_{\text{norm}}=3$, $R_{\text{denorm}}=1$,
+$W_{\text{norm}}=1$, $W_{\text{denorm}}=4$, compute by hand the crossover read
+fraction $f^\ast$ from the closed form, then verify both layouts cost the same
+there. Show every substitution.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute into the closed form:
+
+$$
+f^\ast = \frac{W_{\text{norm}} - W_{\text{denorm}}}
+              {(R_{\text{denorm}} - R_{\text{norm}}) - (W_{\text{denorm}} - W_{\text{norm}})}
+       = \frac{1 - 4}{(1 - 3) - (4 - 1)}
+       = \frac{-3}{-2 - 3}
+       = \frac{-3}{-5} = 0.6.
+$$
+
+**Step 2.** Evaluate each layout's per-operation cost at $f = 0.6$ (so reads
+$= 0.6$, writes $= 0.4$):
+
+$$
+\text{cost}_{\text{norm}} = 0.6 \cdot 3 + 0.4 \cdot 1 = 1.8 + 0.4 = 2.2,
+$$
+$$
+\text{cost}_{\text{denorm}} = 0.6 \cdot 1 + 0.4 \cdot 4 = 0.6 + 1.6 = 2.2.
+$$
+
+**Step 3.** Both equal $2.2$ rows touched per operation, so the layouts are tied at
+$f^\ast = 0.6$. For $f > 0.6$ the denormalized line, with the smaller read
+coefficient, dips below; for $f < 0.6$ the normalized line wins.
+
+</details>
+
+**Exercise 3 (code).** Generalize the model. Sweep the read fraction $f$ over
+$[0, 1]$, and verify three facts numerically: the closed-form $f^\ast$ matches the
+$f$ where the two cost curves cross to within the grid resolution, the denormalized
+layout is cheaper for all $f > f^\ast$, and the normalized layout is cheaper for
+all $f < f^\ast$. Use $R_{\text{norm}}=3$, $R_{\text{denorm}}=1$,
+$W_{\text{norm}}=1$, $W_{\text{denorm}}=4$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+R_norm, R_denorm = 3.0, 1.0
+W_norm, W_denorm = 1.0, 4.0
+
+f = np.linspace(0.0, 1.0, 100_001)            # read fraction grid
+norm   = f * R_norm   + (1 - f) * W_norm
+denorm = f * R_denorm + (1 - f) * W_denorm
+
+# Closed-form crossover.
+cross = (W_norm - W_denorm) / ((R_denorm - R_norm) - (W_denorm - W_norm))
+
+# Grid point where the sign of (norm - denorm) flips.
+diff = norm - denorm
+flip = f[np.argmin(np.abs(diff))]
+assert np.isclose(cross, 0.6)
+assert abs(flip - cross) <= (f[1] - f[0])     # crossing matches closed form
+
+# Above the crossover denorm wins; below it norm wins.
+above = f > cross + 1e-6
+below = f < cross - 1e-6
+assert np.all(denorm[above] < norm[above])
+assert np.all(norm[below] < denorm[below])
+print("crossover:", round(cross, 4), " grid crossing:", round(float(flip), 4))
+```
+
+The grid crossing lands on $f^\ast = 0.6$, and the cost ordering flips cleanly
+across it: denormalization is cheaper above, normalization below.
+
+</details>
+
+How those wide tables are
 physically laid out on disk to make the scan cheap is the subject of the next
 subsection, starting with [row vs columnar](K2/row-vs-columnar) storage.
 

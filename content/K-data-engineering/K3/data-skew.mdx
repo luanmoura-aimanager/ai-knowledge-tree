@@ -4,7 +4,7 @@ pillar: K
 subId: K3
 lessonId: data-skew
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Quantify how a skewed key distribution overloads one reducer, making job time track the largest partition rather than the average, and fix it with salting."
 prerequisites: ["distributed-joins"]
 ---
@@ -108,6 +108,107 @@ twice as long as a balanced one would; salting brings the peak down toward the m
 simulation is an idealization, it spreads the hot key's excess evenly across every
 reducer, where real salting splits that key into $m$ explicit sub-keys; both share the
 same point, that breaking up the one heavy key is what removes the straggler.
+
+## Exercises
+
+**Exercise 1.** A shuffle sends four reducers loads of $10$, $14$, $90$, and $6$ records.
+Compute the mean load and the straggler ratio $\max_j L_j / \bar L$. By the rule that job
+time tracks the maximum, how many times longer does this phase run than a perfectly
+balanced one with the same total work?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sum the loads: $10 + 14 + 90 + 6 = 120$ records over $R = 4$ reducers, so the
+mean is $\bar L = 120 / 4 = 30$ records.
+
+**Step 2.** The maximum is $\max_j L_j = 90$, so the straggler ratio is
+$90 / 30 = 3$.
+
+**Step 3.** A balanced phase finishes when each reducer clears its fair share $\bar L = 30$;
+the skewed phase finishes only when the hot reducer clears $90$. Since time tracks the
+maximum, the skewed phase runs $90 / 30 = 3\times$ longer than the balanced one, even
+though the total work is identical.
+
+</details>
+
+**Exercise 2.** A single key owns a fraction $f$ of all rows and is salted into $m$
+synthetic sub-keys that hash to distinct reducers. Assuming the rest of the load is
+negligible, write the hot reducer's share of total rows before and after salting, and find
+the smallest $m$ that brings the hot reducer's share at or below the balanced share $1/R$
+on $R$ reducers when $f = 0.4$ and $R = 8$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Before salting, every row with the hot key lands on one reducer, so its share
+is $f$. After salting into $m$ buckets that scatter to distinct reducers, that key's load
+splits $m$ ways, giving a per-bucket share of $f / m$.
+
+**Step 2.** The balanced (fair) share is $1/R$. Require $f / m \le 1/R$, which rearranges
+to $m \ge f R$.
+
+**Step 3.** Substitute $f = 0.4$ and $R = 8$: $m \ge 0.4 \cdot 8 = 3.2$. Since $m$ is an
+integer, the smallest salt count is $m = 4$. With four sub-keys the hot key's share drops
+to $0.4 / 4 = 0.1 = 1/10$, which is below the fair $1/8 = 0.125$.
+
+</details>
+
+**Exercise 3 (code).** Build a power-law key set, hash-partition it onto $R = 16$ reducers,
+and measure the straggler ratio. Then salt only the single hottest key into $m = 8$
+sub-keys, re-partition, and confirm the maximum load strictly drops while the total work is
+unchanged.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+R, n_keys, m = 16, 300, 8
+counts = (rng.pareto(1.1, n_keys) + 1) * 10        # heavy-tailed per-key row counts
+assign = rng.integers(0, R, n_keys)                # hash(key) % R for each key
+
+def loads_from(assign, counts):
+    load = np.zeros(R)
+    for k in range(len(counts)):
+        load[assign[k]] += counts[k]
+    return load
+
+load = loads_from(assign, counts)
+max_before, mean_load = load.max(), load.mean()
+
+# Salt the hottest key: split its rows into m equal pieces sent to m distinct reducers.
+hot = int(np.argmax(counts))                        # the single heaviest key
+salted_assign = assign.copy().tolist()
+salted_counts = counts.copy().tolist()
+salted_assign[hot] = int(rng.integers(0, R))        # one piece keeps a reducer
+salted_counts[hot] = counts[hot] / m
+targets = rng.choice(R, size=m - 1, replace=False)  # m-1 more distinct reducers
+for t in targets:
+    salted_assign.append(int(t))
+    salted_counts.append(counts[hot] / m)
+
+salted_assign = np.array(salted_assign)
+salted_counts = np.array(salted_counts)
+load_after = loads_from(salted_assign, salted_counts)
+max_after = load_after.max()
+
+print(f"max before={max_before:.0f}  mean={mean_load:.0f}  ratio={max_before/mean_load:.2f}x")
+print(f"max after salting={max_after:.0f}")
+
+assert max_after < max_before                        # salting lowered the straggler
+assert np.isclose(load.sum(), load_after.sum())      # total work is unchanged
+print("ok: straggler cut, total work preserved")
+```
+
+The hottest key carried far more than its fair share, so splitting it eight ways pulls the
+peak load down while the salted partials still sum to the same total, exactly the
+associativity that makes the second re-combine pass exact.
+
+</details>
+
 Skew is the last of the runtime costs; the [next lesson](query-execution-pushdown) turns
 to how the query planner avoids reading data it does not need in the first place.
 

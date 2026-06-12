@@ -4,7 +4,7 @@ pillar: K
 subId: K1
 lessonId: oltp-vs-olap
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Separate transactional (many small writes, point lookups) from analytical (few large scans, aggregations) workloads, and see why one storage layout cannot serve both well."
 prerequisites: ["relational-model"]
 codeExempt: true
@@ -81,6 +81,83 @@ graph LR
   W --> D["dashboards"]
   W --> M["ML training tables"]
 ```
+
+## Exercises
+
+**Exercise 1.** Classify each of the following as predominantly OLTP or OLAP, and
+justify each from its access pattern (rows touched, write rate, columns read):
+(a) a payment service inserting one charge per checkout; (b) a nightly job
+computing average order value per region for the last 90 days; (c) a mobile app
+reading a single user's profile by id on app launch; (d) a data-science query
+selecting two columns over the full event table to build a training set.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) OLTP. Inserting one charge per checkout is a small write touching
+a few rows at a high rate, the point-operation pattern of a system of record.
+
+**Step 2.** (b) OLAP. Averaging order value over 90 days scans millions of rows to
+return one aggregate, runs a handful of times, and reads few columns of most rows.
+
+**Step 3.** (c) OLTP. Reading one profile by id is a point lookup, a few columns
+of one row fetched by key, latency-sensitive and high-frequency.
+
+**Step 4.** (d) OLAP. Selecting two columns over the full event table is a
+large-scan, few-columns-of-most-rows access, the column-store-favoring pattern
+that defines analytical work.
+
+</details>
+
+**Exercise 2.** A row store places all columns of a row contiguously on disk. For
+a query computing `SUM(amount)` over a table of 100 million rows where each row is
+200 bytes and the `amount` column is 8 bytes, estimate how many bytes a row store
+must read versus the minimum a column store would read. Use the result to explain
+why one physical layout cannot serve both workloads.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A row store must drag whole rows through memory to reach one column:
+$100{,}000{,}000 \times 200 = 2 \times 10^{10}$ bytes, 20 GB, even though the query
+needs only `amount`.
+
+**Step 2.** A column store keeps `amount` contiguous, so the scan reads only that
+column: $100{,}000{,}000 \times 8 = 8 \times 10^{8}$ bytes, 0.8 GB, a 25x reduction.
+
+**Step 3.** The row store wins the OLTP case (one seek fetches a whole order for a
+point operation) and loses the OLAP case (it reads 25x the needed bytes). Bytes can
+be contiguous by row or by column, not both at once, so a single layout cannot be
+optimal for point operations and column scans simultaneously. That is why the two
+workloads are split across separate systems with separate storage layouts.
+
+</details>
+
+**Exercise 3.** A startup runs all reporting directly against its live OLTP
+checkout database to avoid building an ETL pipeline. Describe two concrete problems
+this causes as traffic grows, and explain how the separate-systems architecture in
+the diagram resolves each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Resource contention. A heavy reporting scan over millions of rows holds
+locks and consumes I/O and memory that checkout transactions need, so a dashboard
+refresh can slow or stall live payments. Separating the systems moves scans to a
+warehouse, so reporting never competes with checkout traffic for the same resources.
+
+**Step 2.** Layout mismatch. The OLTP database is normalized and row-stored for
+fast small writes, which is the wrong shape for large aggregations: every analytical
+query pays join and full-row-scan costs the layout was not built for. The ETL or ELT
+pipeline reshapes the data into a denormalized, scan-tuned warehouse, so analysts
+query a layout built for their workload.
+
+**Step 3.** The cost is freshness: the warehouse lags the operational store by the
+pipeline's load interval. For most reporting that staleness is acceptable, and it
+buys both isolation and a layout matched to the workload, which is why production
+architectures pay it.
+
+</details>
 
 The warehouse on the right is not normalized like the operational stores on the
 left; it is deliberately reshaped for aggregation. The next lesson gives that

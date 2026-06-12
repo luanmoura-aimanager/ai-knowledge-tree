@@ -4,7 +4,7 @@ pillar: K
 subId: K3
 lessonId: query-execution-pushdown
 order: 5
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Trace how a query planner pushes filters and column projections down to the scan and processes data in vectorized batches, cutting the rows and bytes that reach the CPU."
 prerequisites: ["K2/partitioning-pruning", "distributed-joins"]
 ---
@@ -126,7 +126,96 @@ print("ok: pushdown + projection strictly cut the bytes and rows read")
 ```
 
 The pushed plan reads 0.75% of the naive bytes here, the product of keeping 15% of columns
-and 5% of rows. This closes batch processing: data is partitioned, joined, and scanned
+and 5% of rows.
+
+## Exercises
+
+**Exercise 1.** A table has $C = 25$ equal-width columns and $N$ rows. A query references
+$c = 5$ columns and its `WHERE` clause has selectivity $\sigma = 0.02$. Compute the
+fraction of the naive bytes the CPU processes after projection and predicate pushdown, and
+attribute the reduction to each mechanism.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Projection reads $c / C = 5 / 25 = 0.2$ of the columns, so projection alone cuts
+the bytes to $20\%$ of the naive scan.
+
+**Step 2.** Predicate pushdown keeps a fraction $\sigma = 0.02$ of the rows, in the best
+case where the surviving rows cluster into a few skippable row groups.
+
+**Step 3.** Stacked, the bytes processed are $\sigma \cdot (c / C) = 0.02 \cdot 0.2 = 0.004$
+of the naive bytes, that is $0.4\%$. The factor of $5$ from projection and the factor of
+$50$ from the predicate multiply to a combined $250\times$ reduction.
+
+</details>
+
+**Exercise 2.** A Parquet file has four row groups whose `c`-column min/max ranges are
+$[0, 50]$, $[40, 90]$, $[80, 130]$, and $[120, 200]$. For the predicate `c > 100`, state
+which row groups min/max skipping can prune without decoding, and explain why a group whose
+range straddles $100$ cannot be skipped.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A row group is skippable only if no value in it can satisfy `c > 100`, that is
+when its $\max(c) \le 100$. Check each: $[0,50]$ has $\max = 50 \le 100$, prunable;
+$[40,90]$ has $\max = 90 \le 100$, prunable.
+
+**Step 2.** The group $[80, 130]$ has $\max = 130 > 100$ but $\min = 80 \le 100$, so its
+range straddles the threshold; some rows may match and some may not, and the stats alone
+cannot tell which, so it must be read. The group $[120, 200]$ has $\min = 120 > 100$, so
+every row matches and it must be read in full.
+
+**Step 3.** Min/max skipping is all-or-nothing per group: it prunes only when the entire
+range falls on one side of the predicate. The first two groups are skipped; the last two are
+read.
+
+</details>
+
+**Exercise 3 (code).** Simulate $N$ rows assigned to row groups, each group tagged with the
+min/max of a filter column. For the predicate `c > threshold`, count rows read by a naive
+full scan versus a min/max-skipping scan, and confirm skipping reads strictly fewer rows
+while never dropping a row that actually matches.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, group_size = 100_000, 1000
+c = np.sort(rng.integers(0, 200, N))           # clustered on the filter column
+threshold = 150
+
+groups = c.reshape(-1, group_size)             # contiguous row groups
+gmax = groups.max(axis=1)                       # min/max stats per row group
+
+# Naive: read every row, then filter.
+rows_naive = N
+matches_naive = int((c > threshold).sum())
+
+# Min/max skipping: read a group only if it can contain a match (gmax > threshold).
+read_mask = gmax > threshold
+rows_skipping = int(read_mask.sum()) * group_size
+matches_skipping = int((groups[read_mask] > threshold).sum())
+
+print(f"rows read  naive={rows_naive}  skipping={rows_skipping}")
+print(f"matches    naive={matches_naive}  skipping={matches_skipping}")
+
+assert rows_skipping < rows_naive              # skipping reads strictly fewer rows
+assert matches_skipping == matches_naive       # but loses no matching row
+print("ok: fewer rows scanned, every match preserved")
+```
+
+Groups whose maximum falls at or below the threshold cannot contain a match and are pruned
+unread, so the scan touches fewer rows while still finding every row that satisfies the
+predicate.
+
+</details>
+
+This closes batch processing: data is partitioned, joined, and scanned
 with the minimum I/O. The [next subsection](K4/log-and-kafka) drops the assumption that
 the data sits still and turns to streaming, where records arrive continuously as an
 append-only log.
