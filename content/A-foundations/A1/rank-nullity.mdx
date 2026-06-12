@@ -194,7 +194,8 @@ null_vec = Vt[-1]
 assert np.allclose(A @ null_vec, 0, atol=1e-12)
 
 # Row space is orthogonal to the null space: every row . null_vec == 0.
-assert np.allclose(A @ null_vec, A.dot(null_vec))   # rows dotted with null_vec
+for row in A:
+    assert abs(row @ null_vec) < 1e-10
 print("rank:", r, "nullity:", n - r, "max |row . null|:",
       np.max(np.abs(A @ null_vec)))
 ```
