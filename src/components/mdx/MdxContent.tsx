@@ -1,5 +1,6 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkMath from "remark-math";
+import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import rehypeUnwrapImages from "rehype-unwrap-images";
 import type { MDXComponents } from "mdx/types";
@@ -46,7 +47,11 @@ export function MdxContent({ source }: { source: string }) {
         components={components}
         options={{
           mdxOptions: {
-            remarkPlugins: [remarkMath],
+            // GFM enables pipe tables in lesson prose. `singleTilde: false`
+            // keeps `~` from being parsed as strikethrough, which would clash
+            // with math/text; remarkMath still owns `$...$` and `$$...$$`, so
+            // pipes inside math (|x|, P(A|B), determinants) are untouched.
+            remarkPlugins: [[remarkGfm, { singleTilde: false }], remarkMath],
             rehypePlugins: [rehypeKatex, rehypeUnwrapImages],
           },
         }}
