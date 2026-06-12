@@ -1,0 +1,278 @@
+---
+title: "The derivative as a limit"
+pillar: L
+subId: L2
+lessonId: derivative-definition
+order: 1
+estimatedMinutes: 33
+goal: "Define the derivative as the limit of difference quotients, compute one from the definition, and read it as tangent slope and instantaneous rate of change."
+prerequisites: ["L1/limit-laws"]
+---
+
+"How fast is this changing right now?" A car's speedometer answers it for
+position, a training curve's slope answers it for loss, and both answers are
+the same mathematical object. Average rates over an interval are easy
+(distance over time); the problem is the *instantaneous* rate, where the
+interval shrinks to a point and the ratio becomes $0/0$. The limit machinery
+from L1 was built for exactly this moment.
+
+## From secant to tangent
+
+Fix a function $f$ and a point $a$. Over the interval from $a$ to $a + h$, the
+**average rate of change** is the **difference quotient**
+
+$$
+\frac{f(a + h) - f(a)}{h},
+$$
+
+geometrically the slope of the **secant line** through the two points
+$(a, f(a))$ and $(a+h, f(a+h))$. Shrinking $h$ slides the second point toward
+the first; if the secant slopes settle, their limit is the slope of the
+**tangent line**, the line the graph hugs at $(a, f(a))$.
+
+The **derivative of $f$ at $a$** is that limit, when it exists<FN n="1" />:
+
+$$
+f'(a) = \lim_{h \to 0} \frac{f(a + h) - f(a)}{h} .
+$$
+
+When the limit exists, $f$ is **differentiable at $a$**. Treating the
+basepoint as variable produces a new function $f'$, the derivative of $f$,
+also written $\frac{df}{dx}$ (Leibniz) or $\dot f$ (Newton, for time
+derivatives).
+
+![Secant lines through (1, 1) on the parabola for h = 2, 1, 0.5, 0.1: the slopes 4, 3, 2.5, 2.1 march down onto the tangent slope 2 as the second point slides in.](/figures/L2/derivative-definition.svg)
+
+## A computation from the definition
+
+Claim: for $f(x) = x^2$, $f'(a) = 2a$ at every $a$.
+
+**Step 1.** Expand the difference quotient:
+
+$$
+\frac{(a+h)^2 - a^2}{h} = \frac{a^2 + 2ah + h^2 - a^2}{h} = \frac{2ah + h^2}{h}.
+$$
+
+**Step 2.** For $h \neq 0$ (which is all the limit looks at), cancel:
+
+$$
+\frac{2ah + h^2}{h} = 2a + h .
+$$
+
+The indeterminate $0/0$ was a disguise; underneath sits a polynomial in $h$.
+
+**Step 3.** Apply the limit laws: $\lim_{h \to 0} (2a + h) = 2a$. So
+$f'(a) = 2a$.
+
+The result reads correctly in every interpretation. At $a = 1$ the parabola
+climbs with slope $2$ (the figure's tangent); at $a = 0$ it is momentarily
+flat; at $a = -3$ it falls with slope $-6$, twice as steep as at
+$a = -1.5$.
+
+The same three steps give a second example worth keeping:
+$f(x) = 1/x$ has
+
+$$
+\frac{1}{h}\left(\frac{1}{a+h} - \frac{1}{a}\right)
+= \frac{1}{h} \cdot \frac{a - (a+h)}{a(a+h)}
+= \frac{-1}{a(a+h)} \longrightarrow -\frac{1}{a^2},
+$$
+
+so $(1/x)' = -1/x^2$: always negative ($1/x$ falls everywhere on each branch),
+and steepest near $0$ where the graph dives.
+
+## Units and readings
+
+The derivative is a ratio of small changes, so its units are output units per
+input unit, and each pairing has a name you already know:
+
+- position (m) by time (s): $f'$ is **velocity**, m/s;
+- velocity by time: **acceleration**, m/s$^2$;
+- loss by a model weight: the **gradient component** $\partial \ell / \partial w$
+  that training reads to decide which way to nudge $w$ (the multivariable
+  version arrives in L4);
+- cost (\$) by quantity: **marginal cost**, the price of one more unit.
+
+In every case $f'(a) \gt 0$ means increasing at $a$, $f'(a) \lt 0$ decreasing,
+and the magnitude is the exchange rate between input and output changes. That
+exchange-rate reading, output change $\approx f'(a) \times$ input change, is
+the linearization idea this discipline closes with.
+
+## Differentiable implies continuous, not conversely
+
+Differentiability is a stronger demand than continuity.
+
+**Claim.** If $f'(a)$ exists then $f$ is continuous at $a$.
+
+**Step 1.** Write the change in $f$ as the quotient times $h$: for $h \ne 0$,
+
+$$
+f(a+h) - f(a) = \frac{f(a+h) - f(a)}{h} \cdot h .
+$$
+
+**Step 2.** Take $h \to 0$ with the product law: the quotient tends to the
+finite number $f'(a)$ and the factor $h$ tends to $0$, so the product tends to
+$f'(a) \cdot 0 = 0$. Hence $f(a + h) \to f(a)$: continuity.
+
+The converse fails, and the standard counterexample is the most-used
+activation function's silhouette. $f(x) = \lvert x \rvert$ is continuous
+everywhere, but at $0$ the difference quotient is
+
+$$
+\frac{\lvert h \rvert}{h} =
+\begin{cases} +1 & h \gt 0 \\ -1 & h \lt 0 , \end{cases}
+$$
+
+with disagreeing one-sided limits: no derivative. The graph has a **corner**,
+two slopes meeting at a point with no single tangent. This is the confusion
+to keep straight: **continuous does not imply differentiable.** Corners
+($\lvert x \rvert$), cusps, and vertical tangents ($x^{1/3}$ at $0$, where the
+quotient blows up) all break differentiability while continuity survives. The
+ReLU activation $\max(0, x)$ has this corner at the origin, which is why
+frameworks must pick a convention for its "derivative" at $0$<FN n="2" />.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Forward difference quotients for f(x) = x^2 at a = 1.5: error shrinks like h
+f = lambda x: x**2
+a = 1.5
+exact = 2 * a
+h = 10.0 ** -np.arange(1, 9)
+fwd = (f(a + h) - f(a)) / h
+print("forward errors :", np.abs(fwd - exact)[:5])
+assert np.allclose(np.abs(fwd - exact), h, rtol=1e-4)   # error = h exactly here
+
+# Central differences cancel the symmetric error term: error ~ h^2
+g = np.sin
+exact_g = np.cos(a)
+ctr = (g(a + h) - g(a - h)) / (2 * h)
+fwd_g = (g(a + h) - g(a)) / h
+print("sin fwd error  :", np.abs(fwd_g - exact_g)[:4])
+print("sin ctr error  :", np.abs(ctr - exact_g)[:4])
+assert np.abs(ctr - exact_g)[3] < np.abs(fwd_g - exact_g)[3] * 1e-2
+
+# |x| at 0: the two one-sided quotients refuse to agree
+hq = 1e-9
+right = (abs(0 + hq) - 0) / hq
+left = (abs(0 - hq) - 0) / (-hq)
+print("one-sided quotients at 0:", right, left)
+assert right == 1.0 and left == -1.0
+```
+
+The forward error tracks $h$ to four digits (for $x^2$ the quotient is
+$2a + h$, so the error is $h$ itself), central differences gain two orders of
+accuracy per decade as the $h^2$ scaling predicts, and the absolute value's
+one-sided quotients sit at $\pm 1$ no matter how small $h$ gets.
+
+## Exercises
+
+**Exercise 1.** Compute $f'(a)$ from the limit definition for
+$f(x) = x^3$. Use the expansion $(a+h)^3 = a^3 + 3a^2 h + 3 a h^2 + h^3$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Difference quotient, expanded:
+
+$$
+\frac{(a+h)^3 - a^3}{h}
+= \frac{3a^2 h + 3 a h^2 + h^3}{h}.
+$$
+
+**Step 2.** Cancel one $h$ (valid since the limit excludes $h = 0$):
+
+$$
+3a^2 + 3ah + h^2 .
+$$
+
+**Step 3.** Limit laws as $h \to 0$: the last two terms vanish, leaving
+
+$$
+f'(a) = 3a^2 .
+$$
+
+Consistent with $x^2 \mapsto 2x$: the pattern $x^n \mapsto n x^{n-1}$ is
+emerging, and the next lesson proves it in general.
+
+</details>
+
+**Exercise 2.** Compute the derivative of $f(x) = \sqrt{x}$ at $a \gt 0$ from
+the definition, using the conjugate trick from L1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The quotient $\dfrac{\sqrt{a+h} - \sqrt{a}}{h}$ is $0/0$; multiply
+by the conjugate over itself:
+
+$$
+\frac{\sqrt{a+h} - \sqrt{a}}{h} \cdot \frac{\sqrt{a+h} + \sqrt{a}}{\sqrt{a+h} + \sqrt{a}}
+= \frac{(a + h) - a}{h \left( \sqrt{a+h} + \sqrt{a} \right)} .
+$$
+
+**Step 2.** The numerator collapses to $h$; cancel it:
+
+$$
+\frac{1}{\sqrt{a+h} + \sqrt{a}} .
+$$
+
+**Step 3.** As $h \to 0$, continuity of the square root gives
+$\sqrt{a + h} \to \sqrt{a}$, so
+
+$$
+f'(a) = \frac{1}{2\sqrt{a}} .
+$$
+
+At $a = 4$ the slope is $1/4$, matching the tangent line used in the
+linearization figure later in this discipline. As $a \to 0^+$ the slope blows
+up: the square root leaves the origin vertically.
+
+</details>
+
+**Exercise 3 (code).** The derivative of $f(x) = e^x$ at $0$ is the limit of
+$(e^h - 1)/h$. Estimate it with forward differences for
+$h = 10^{-1}, \dots, 10^{-8}$, then demonstrate the floating-point cliff: for
+$h = 10^{-12}$ the naive quotient loses most of its digits, while the
+function `np.expm1` (which computes $e^h - 1$ without cancellation) does not.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+h = 10.0 ** -np.arange(1, 9)
+naive = (np.exp(h) - 1) / h
+print("estimates:", naive[:4], "-> limit 1")
+assert abs(naive[-1] - 1.0) < 1e-7
+
+# The cliff: at h = 1e-12, e^h - 1 ~ 1e-12 sits 12 digits below 1,
+# so forming it by subtraction keeps only ~4 correct digits
+hq = 1e-12
+bad = (np.exp(hq) - 1) / hq
+good = np.expm1(hq) / hq
+print("naive:", bad, " expm1:", good)
+assert abs(good - 1.0) < 1e-12          # stable route keeps full precision
+assert abs(bad - 1.0) > 1e-5            # naive route has visibly decayed
+```
+
+The limit is $1$ (that constant being $1$ is what makes $e$ the natural base,
+formalized next lesson). The naive quotient first improves as $h$ shrinks,
+then collapses: subtracting two nearly equal numbers cancels their shared
+digits. Numerical differentiation always negotiates this tradeoff, which is
+A4's catastrophic-cancellation story starting here.
+
+</details>
+
+Computing limits for every new function would never end; the next lesson
+derives the power, product, and quotient rules once, after which
+differentiation becomes calculation instead of limit-taking.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 2.7-2.8, derivatives and rates of change.</FNItem>
+  <FNItem n="2">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 6.3 on ReLU and its non-differentiable point. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+  <FNItem n="3">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 9, the derivative defined with full care.</FNItem>
+</Footnotes>

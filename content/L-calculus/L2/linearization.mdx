@@ -1,0 +1,266 @@
+---
+title: "Linearization and differentials"
+pillar: L
+subId: L2
+lessonId: linearization
+order: 6
+estimatedMinutes: 32
+goal: "Replace a function near a point by its tangent line, bound the error of the approximation with the mean value theorem, and see why locally linear is the idea the rest of calculus scales up."
+prerequisites: ["chain-rule", "mvt-lhopital"]
+---
+
+Every lesson in this discipline has circled one idea from a different angle:
+near a point, a differentiable function is as good as a straight line. This
+lesson makes that the headline. **Linearization** swaps a function for its
+tangent line, the simplest model that gets both the value and the rate right,
+and the mean value theorem from last lesson finally says *how wrong* the swap
+can be. Gradient descent will be derived in L6 by doing exactly this swap on a
+loss surface and trusting it one small step at a time.
+
+## The linearization
+
+The **linearization** of $f$ at $a$ (also: the tangent-line approximation, or
+first-order approximation) is
+
+$$
+L(x) = f(a) + f'(a)\,(x - a) .
+$$
+
+It is the unique line through $(a, f(a))$ with slope $f'(a)$: it matches $f$'s
+value and first derivative at $a$, and nothing else about $f$. The claim is
+that for $x$ near $a$,
+
+$$
+f(x) \approx f(a) + f'(a)(x - a) .
+$$
+
+**Worked example: $\sqrt{4.1}$ without a calculator.** Take
+$f(x) = \sqrt{x}$, $a = 4$, where everything is known: $f(4) = 2$,
+$f'(x) = \frac{1}{2\sqrt{x}}$ so $f'(4) = \tfrac14$.
+
+$$
+L(x) = 2 + \tfrac14 (x - 4)
+\quad \Longrightarrow \quad
+\sqrt{4.1} \approx 2 + \tfrac14 (0.1) = 2.025 .
+$$
+
+The true value is $2.02485\dots$: off by $1.5 \times 10^{-4}$, four correct
+digits from one multiplication. The same line gives $\sqrt{4.4} \approx 2.1$
+(true $2.0976$, error $2.4 \times 10^{-3}$) and $\sqrt{6} \approx 2.5$ (true
+$2.449$, error $5.1 \times 10^{-2}$). Step $4\times$ farther, error roughly
+$16\times$ worse: the error is scaling like the *square* of the distance,
+and the next section proves that.
+
+![The square root and its tangent line at x = 4. The shaded gap is the linearization error: invisible near the touch point, growing quadratically away from it, with the annotated errors quadrupling per doubling of distance.](/figures/L2/linearization.svg)
+
+## Bounding the error
+
+Define the error $E(x) = f(x) - L(x)$. How big can it be on an interval
+around $a$?
+
+**Step 1.** $E(a) = 0$ and $E'(x) = f'(x) - f'(a)$, so $E'(a) = 0$ too: the
+error starts at zero with zero slope. Whatever grows it must come from the
+*second* derivative, the rate at which $f'$ itself drifts away from
+$f'(a)$.
+
+**Step 2.** Apply the MVT to $E$ on $[a, x]$: there is a $c_1$ between them
+with
+
+$$
+E(x) = E'(c_1)(x - a) = \left[ f'(c_1) - f'(a) \right] (x - a) .
+$$
+
+**Step 3.** Apply the MVT again, now to $f'$ on $[a, c_1]$: there is a $c_2$
+with $f'(c_1) - f'(a) = f''(c_2)(c_1 - a)$. Substitute, and bound
+$\lvert c_1 - a \rvert \le \lvert x - a \rvert$:
+
+$$
+\lvert E(x) \rvert \le M \,(x - a)^2,
+\qquad \text{where } M = \max_{t \text{ between } a, x} \lvert f''(t) \rvert .
+$$
+
+(The sharp constant is $M/2$, delivered by Taylor's theorem in L3; this
+two-MVT version is off by at most the factor 2 and needs no new machinery.)
+
+The shape of the bound is the takeaway: **error $\le$ curvature budget
+$\times$ step squared.** Halve the step, quarter the error. The quantity
+$f''$, the derivative of the derivative, measures how fast the slope turns,
+i.e. how non-line-like $f$ is; where $f'' = 0$ identically ($f$ already a
+line) the tangent is exact at any distance. For $\sqrt{x}$ near 4,
+$f''(x) = -\frac{1}{4} x^{-3/2}$ gives $M \approx 0.031$, so the predicted
+ceiling for $\sqrt{4.4}$ is $0.031 \times 0.16 \approx 5 \times 10^{-3}$,
+and the observed $2.4 \times 10^{-3}$ sits comfortably under it.
+
+## Differentials
+
+Classical notation packages linearization as **differentials**: write
+$dy = f'(x)\,dx$, where $dx$ is a chosen input change and $dy$ is the
+*predicted* output change along the tangent. Against the true change
+$\Delta y = f(x + dx) - f(x)$, the bound above reads
+$\Delta y = dy + O(dx^2)$.
+
+The differential's value is bookkeeping in applied problems. A sphere's
+volume is $V = \tfrac43 \pi r^3$, so $dV = 4\pi r^2 \, dr$: a thin shell's
+volume is surface area times thickness. Measuring $r = 10$ cm with error
+$dr = 0.1$ cm propagates to
+$dV = 4\pi \cdot 100 \cdot 0.1 \approx 126$ cm$^3$ of volume uncertainty
+(against $V \approx 4189$ cm$^3$, a 3% relative error: triple the 1%
+input error, because the *relative* differential of $r^3$ is
+$3\,dr/r$). This is first-order error propagation, the same rule lab
+courses state and the same Jacobian-vector product autodiff systems compute,
+one dimension at a time<FN n="1" />.
+
+## Where this goes
+
+The pillar now forks off this lesson in three directions, so the idea is
+worth one paragraph of foreshadowing. **Newton's method** (A3/A4) solves
+$f(x) = 0$ by linearizing at a guess and jumping to the line's root:
+$x_{n+1} = x_n - f(x_n)/f'(x_n)$. **Taylor polynomials** (L3) refuse to stop
+at the linear term and append $(x-a)^2$, $(x-a)^3, \dots$ corrections,
+turning the error bound above into an exact series. **The gradient step**
+(L6) linearizes a multivariable loss, $\ell(w + s) \approx \ell(w) +
+\nabla \ell(w)^{\!\top} s$, and moves against the gradient because that is
+the steepest descent direction *of the linear model*; the step size exists
+precisely to stay inside the region where the model is trustworthy, the
+region this lesson's error bound delimits. One idea, three franchises.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Linearization of sqrt at a = 4
+f, df = np.sqrt, lambda x: 0.5 / np.sqrt(x)
+a = 4.0
+L = lambda x: f(a) + df(a) * (x - a)
+
+for x in [4.1, 4.4, 6.0]:
+    err = abs(f(x) - L(x))
+    print(f"sqrt({x}): true {f(x):.5f}, linear {L(x):.5f}, error {err:.2e}")
+
+# Quadratic error scaling: halving the step quarters the error
+steps = np.array([0.8, 0.4, 0.2, 0.1, 0.05])
+errs = np.abs(f(a + steps) - L(a + steps))
+ratios = errs[:-1] / errs[1:]
+print("error ratios per halving:", ratios.round(3))
+assert np.all(np.abs(ratios - 4.0) < 0.35)        # ~4x per halving
+
+# MVT error ceiling: |E| <= max|f''| * (x-a)^2 on [4, 4.8]
+M = np.abs(-0.25 * 4.0 ** -1.5)                   # |f''| is largest at t = 4
+x = np.linspace(4.0, 4.8, 1000)
+assert np.all(np.abs(f(x) - L(x)) <= M * (x - a) ** 2 + 1e-15)
+
+# Differential of the sphere volume: dV = 4 pi r^2 dr
+r, dr = 10.0, 0.1
+V = lambda r: 4 / 3 * np.pi * r**3
+dV = 4 * np.pi * r**2 * dr
+true_change = V(r + dr) - V(r)
+print(f"dV = {dV:.2f}, true change = {true_change:.2f}")
+assert abs(dV - true_change) / true_change < 0.01
+```
+
+The errors quadruple per halved step, every point on the interval respects
+the MVT ceiling, and the shell differential predicts the sphere's true volume
+change to within 1%, the leftover being the promised second-order term.
+
+## Exercises
+
+**Exercise 1.** Linearize $f(x) = \sin x$ at $a = 0$ and use it to estimate
+$\sin(0.1)$ and $\sin(0.5)$. Compare with the true values
+($0.0998334$ and $0.4794255$) and explain the error gap using the
+$(x-a)^2$ scaling. (The bound here is loose; the next discipline's cubic
+term explains the rest.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $f(0) = 0$ and $f'(x) = \cos x$, so $f'(0) = 1$ and
+
+$$
+L(x) = 0 + 1 \cdot x = x .
+$$
+
+The small-angle approximation $\sin x \approx x$ is a linearization.
+
+**Step 2.** Estimates: $\sin(0.1) \approx 0.1$ (true $0.0998334$, error
+$1.7 \times 10^{-4}$); $\sin(0.5) \approx 0.5$ (true $0.4794255$, error
+$2.1 \times 10^{-2}$).
+
+**Step 3.** The step grew by $5\times$, so quadratic scaling predicts error
+growth of about $25\times$; the observed ratio is
+$0.0206 / 0.000167 \approx 123$, larger than $25$. The quadratic bound is an
+upper-bound *shape*, not an equality, and for $\sin$ at $0$ the quadratic
+coefficient $f''(0)/2 = 0$ vanishes, making the true error cubic
+($\approx x^3/6$: $1.67 \times 10^{-4}$ and $2.08 \times 10^{-2}$, matching
+both errors to three digits). Taylor's theorem in L3 turns this observation
+into a formula.
+
+</details>
+
+**Exercise 2.** A cube's side is measured as $s = 20$ cm with uncertainty
+$ds = 0.2$ cm (1%). Use differentials to estimate the resulting uncertainty
+in (a) the surface area $A = 6s^2$ and (b) the volume $V = s^3$, in absolute
+and relative terms.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** $dA = 12 s \, ds = 12 \cdot 20 \cdot 0.2 = 48$ cm$^2$, against
+$A = 2400$ cm$^2$: relative error $48/2400 = 2\%$.
+
+**(b)** $dV = 3 s^2 \, ds = 3 \cdot 400 \cdot 0.2 = 240$ cm$^3$, against
+$V = 8000$ cm$^3$: relative error $240/8000 = 3\%$.
+
+**The pattern.** Relative errors multiply by the exponent: $A \propto s^2$
+doubles the 1% to 2%, $V \propto s^3$ triples it to 3%. In logarithmic form,
+$d(\ln V) = 3 \, d(\ln s)$, the logarithmic derivative from the implicit
+differentiation lesson doing error-propagation work.
+
+</details>
+
+**Exercise 3 (code).** Newton's method is linearization used aggressively:
+to solve $x^2 = 2$, linearize $f(x) = x^2 - 2$ at the current guess and jump
+to the line's root, $x_{n+1} = x_n - f(x_n)/f'(x_n)$. Starting from
+$x_0 = 2$, run five iterations, print the error each time, and verify the
+number of correct digits roughly doubles per step (quadratic convergence).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda x: x**2 - 2
+df = lambda x: 2 * x
+
+x = 2.0
+errs = []
+for n in range(5):
+    x = x - f(x) / df(x)              # jump to the tangent line's root
+    err = abs(x - np.sqrt(2))
+    errs.append(err)
+    print(f"step {n+1}: x = {x:.15f}, error = {err:.2e}")
+
+# Quadratic convergence: error_{n+1} ~ C * error_n^2 while above round-off
+e = np.array(errs[:3])
+assert e[1] < e[0] ** 2 and e[2] < 10 * e[1] ** 2
+assert errs[-1] < 1e-15
+```
+
+The errors run $0.0\overline{4} \to 2\times10^{-3} \to 4\times10^{-6} \to
+10^{-12} \to$ machine zero: squaring each step, so the digit count doubles.
+Each iteration trusts the tangent line completely, and the quadratic error
+bound is why that trust compounds so fast near the root.
+
+</details>
+
+The tangent line matches value and slope and stops there; the next
+discipline begins by asking what integration accumulates, and its Taylor
+lessons extend this line to polynomials that match as many derivatives as
+patience allows.
+
+<Footnotes>
+  <FNItem n="1">**Baydin, A. G., Pearlmutter, B. A., Radul, A. A., & Siskind, J. M.** (2018). "Automatic differentiation in machine learning: a survey". *JMLR*, 18(153), 1-43. Linearization as the semantic core of forward-mode autodiff. [arXiv:1502.05767](https://arxiv.org/abs/1502.05767)</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 3.10, linear approximations and differentials.</FNItem>
+  <FNItem n="3">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 19 frames Taylor's theorem as iterated linearization with controlled error.</FNItem>
+</Footnotes>

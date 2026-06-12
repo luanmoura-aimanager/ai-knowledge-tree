@@ -1,0 +1,317 @@
+---
+title: "Power, product, and quotient rules"
+pillar: L
+subId: L2
+lessonId: differentiation-rules
+order: 2
+estimatedMinutes: 34
+goal: "Derive the power, product, and quotient rules from the limit definition and differentiate any rational combination of the elementary functions."
+prerequisites: ["derivative-definition"]
+---
+
+Computing $f'$ from the limit definition is honest work, but doing it for
+$f(x) = (3x^4 - 2x)(x^2 + 1)/(x^3 + 5)$ would be a career. The rules in this
+lesson are limit theorems proved once; afterward, differentiation of any
+algebraic combination is mechanical. Each proof is short, and each leaves a
+fingerprint worth remembering.
+
+## Linearity and the power rule
+
+Limits respect sums and constant multiples (L1), and the difference quotient
+of $c f + g$ splits accordingly, so
+
+$$
+(c f + g)' = c f' + g' .
+$$
+
+Differentiation is a **linear** operation, the same structural property
+matrix multiplication has, which is no coincidence: L4 reframes the
+derivative as a linear map.
+
+**Power rule.** For every positive integer $n$,
+
+$$
+(x^n)' = n \, x^{n-1} .
+$$
+
+**Step 1.** The binomial theorem expands the shifted power:
+
+$$
+(x + h)^n = x^n + n x^{n-1} h + \binom{n}{2} x^{n-2} h^2 + \dots + h^n .
+$$
+
+**Step 2.** Subtract $x^n$ and divide by $h$; every surviving term still
+carries at least one factor of $h$ except the first:
+
+$$
+\frac{(x+h)^n - x^n}{h} = n x^{n-1} + \underbrace{\binom{n}{2} x^{n-2} h + \dots + h^{n-1}}_{\to \, 0} .
+$$
+
+**Step 3.** The limit laws kill everything carrying an $h$, leaving
+$n x^{n-1}$.
+
+With linearity this differentiates every polynomial on sight:
+$(5x^3 - 2x + 7)' = 15x^2 - 2$. The rule extends to all real exponents
+(negative via the quotient rule below, fractional via implicit
+differentiation next lesson): $(x^{-1})' = -x^{-2}$ recovers the $1/x$
+computation from last lesson, and $(x^{1/2})' = \tfrac12 x^{-1/2}$ recovers
+the square root.
+
+## The product rule
+
+Products do *not* differentiate term by term, and the failure is worth
+witnessing before the fix: $(x \cdot x)' = (x^2)' = 2x$, but
+$x' \cdot x' = 1 \cdot 1 = 1$. Wrong, and not even the right shape.
+
+**Product rule.** If $f$ and $g$ are differentiable,
+
+$$
+(fg)' = f' g + f g' .
+$$
+
+**Step 1.** Set up the quotient and add-subtract the mixed term
+$f(x+h)\,g(x)$, the standard trick for splitting a product's change into two
+single-factor changes:
+
+$$
+\frac{f(x+h)g(x+h) - f(x)g(x)}{h}
+= \frac{f(x+h)g(x+h) - f(x+h)g(x)}{h} + \frac{f(x+h)g(x) - f(x)g(x)}{h}.
+$$
+
+**Step 2.** Factor each piece:
+
+$$
+= f(x+h)\,\frac{g(x+h) - g(x)}{h} + g(x)\,\frac{f(x+h) - f(x)}{h} .
+$$
+
+**Step 3.** Take $h \to 0$: differentiability of $f$ implies its continuity
+(last lesson), so $f(x + h) \to f(x)$, and the two quotients tend to $g'(x)$
+and $f'(x)$. The product and sum laws assemble the limit:
+$f g' + g f' .$
+
+The structure says something true about change itself: when two quantities
+grow together, the total growth is each one's growth *holding the other
+fixed*, summed. A rectangle with sides $f$ and $g$ gains area through two
+strips, $f' g$ from one side and $f g'$ from the other; the corner sliver is
+second-order and dies in the limit.
+
+## The quotient rule
+
+**Quotient rule.** Where $g \ne 0$,
+
+$$
+\left( \frac{f}{g} \right)' = \frac{f' g - f g'}{g^2} .
+$$
+
+The fast derivation: write $q = f/g$, so $f = qg$. The product rule gives
+$f' = q'g + qg'$; solve for $q'$:
+
+$$
+q' = \frac{f' - q g'}{g} = \frac{f' - (f/g) g'}{g} = \frac{f' g - f g'}{g^2}.
+$$
+
+The minus sign and the order of the numerator matter (swap them and every
+sign flips); the denominator's square does not care about order. Sanity check
+on a known answer: $f = 1$, $g = x$ gives
+$(1/x)' = (0 \cdot x - 1 \cdot 1)/x^2 = -1/x^2$, matching the from-scratch
+computation in the previous lesson.
+
+## The elementary derivatives
+
+The rules need raw materials. Two limits from L1 supply the trig derivatives,
+and one definition supplies the exponential.
+
+**Sine and cosine.** The angle-addition formula splits the quotient:
+
+$$
+\frac{\sin(x+h) - \sin x}{h}
+= \sin x \cdot \frac{\cos h - 1}{h} + \cos x \cdot \frac{\sin h}{h} .
+$$
+
+From L1, $\frac{\sin h}{h} \to 1$, and $\frac{\cos h - 1}{h} \to 0$ (multiply
+by the conjugate: $\frac{\cos h - 1}{h} = \frac{-\sin^2 h}{h(\cos h + 1)} =
+-\frac{\sin h}{h} \cdot \frac{\sin h}{\cos h + 1} \to 1 \cdot \frac{0}{2} =
+0$). So
+
+$$
+(\sin x)' = \cos x, \qquad (\cos x)' = -\sin x,
+$$
+
+the second by the same argument. Differentiating four times cycles back:
+$\sin \to \cos \to -\sin \to -\cos \to \sin$.
+
+**The exponential.** For any base $b \gt 0$,
+
+$$
+\frac{b^{x+h} - b^x}{h} = b^x \cdot \frac{b^h - 1}{h},
+$$
+
+so every exponential's derivative is proportional to itself, with constant
+$\lim_{h \to 0} (b^h - 1)/h$. The base for which that constant is $1$ is
+**defined** to be $e$ (consistent with the sequence definition in L1, though
+proving so takes work<FN n="1" />), giving the cleanest derivative in
+calculus:
+
+$$
+(e^x)' = e^x .
+$$
+
+Self-reproduction under differentiation is why $e^x$ shows up wherever a
+quantity's growth rate is proportional to its size: compound interest,
+population models, and the exponential moving averages inside Adam. For other
+bases, $b^x = e^{x \ln b}$ gives $(b^x)' = b^x \ln b$ once the chain rule
+lands next lesson.
+
+![A cubic and its derivative, stacked. Where the derivative is positive (shaded green) the cubic rises; where negative (shaded red) it falls; the derivative's zero crossings at x = -1 and x = 1 are the cubic's flat points.](/figures/L2/differentiation-rules.svg)
+
+A worked combination, every rule at once. Differentiate
+$F(x) = \dfrac{x^2 \sin x}{x + 2}$.
+
+**Step 1 (product, for the numerator).** $u = x^2 \sin x$ has
+$u' = 2x \sin x + x^2 \cos x$.
+
+**Step 2 (quotient).** With $v = x + 2$, $v' = 1$:
+
+$$
+F' = \frac{u' v - u v'}{v^2}
+= \frac{(2x \sin x + x^2 \cos x)(x + 2) - x^2 \sin x}{(x+2)^2} .
+$$
+
+No limits taken; the theorems already paid that cost.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+x = np.linspace(0.5, 3.0, 7)
+h = 1e-6
+num = lambda fn: (fn(x + h) - fn(x - h)) / (2 * h)   # central difference
+
+# Power rule on x^5
+assert np.allclose(num(lambda t: t**5), 5 * x**4, rtol=1e-7)
+
+# Product rule on x^2 * sin(x)
+lhs = num(lambda t: t**2 * np.sin(t))
+rhs = 2 * x * np.sin(x) + x**2 * np.cos(x)
+assert np.allclose(lhs, rhs, rtol=1e-7)
+
+# Quotient rule on sin(x) / (x + 2)
+lhs = num(lambda t: np.sin(t) / (t + 2))
+rhs = (np.cos(x) * (x + 2) - np.sin(x)) / (x + 2) ** 2
+assert np.allclose(lhs, rhs, rtol=1e-6)
+
+# Term-by-term differentiation of a product is wrong
+wrong = num(lambda t: t) * num(lambda t: t)          # would claim (x*x)' = 1
+right = num(lambda t: t * t)                          # = 2x
+print("naive (f'g'):", wrong[:3], " true (fg)':", right[:3])
+assert not np.allclose(wrong, right)
+
+# e^x reproduces itself; 2^x picks up ln(2)
+assert np.allclose(num(np.exp), np.exp(x), rtol=1e-7)
+assert np.allclose(num(lambda t: 2.0**t), 2.0**x * np.log(2), rtol=1e-7)
+```
+
+Every rule matches its central-difference estimate to seven digits, the
+term-by-term "product rule" is visibly wrong, and the exponential checks
+confirm $e$ is the base whose proportionality constant is $1$.
+
+## Exercises
+
+**Exercise 1.** Differentiate $f(x) = \dfrac{3x^2 - 1}{x^2 + 1}$ and simplify.
+Where is $f'(x) = 0$, and what does the sign of $f'$ say on either side?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Quotient rule with $u = 3x^2 - 1$, $v = x^2 + 1$, $u' = 6x$,
+$v' = 2x$:
+
+$$
+f'(x) = \frac{6x (x^2 + 1) - (3x^2 - 1)(2x)}{(x^2+1)^2} .
+$$
+
+**Step 2.** Expand the numerator:
+$6x^3 + 6x - 6x^3 + 2x = 8x$, so
+
+$$
+f'(x) = \frac{8x}{(x^2 + 1)^2} .
+$$
+
+**Step 3.** The denominator is always positive, so $f'$ has the sign of $x$:
+zero only at $x = 0$, negative for $x \lt 0$, positive for $x \gt 0$. The
+function falls, bottoms out at $f(0) = -1$, then rises (toward its horizontal
+asymptote $3$, by the leading-term limit from L1).
+
+</details>
+
+**Exercise 2.** Using $(\sin x)' = \cos x$, $(\cos x)' = -\sin x$, and the
+quotient rule, derive the derivative of $\tan x = \dfrac{\sin x}{\cos x}$ in
+the form $\sec^2 x = 1/\cos^2 x$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Quotient rule with $u = \sin x$, $v = \cos x$:
+
+$$
+(\tan x)' = \frac{\cos x \cdot \cos x - \sin x \cdot (-\sin x)}{\cos^2 x}
+= \frac{\cos^2 x + \sin^2 x}{\cos^2 x} .
+$$
+
+**Step 2.** The numerator is the Pythagorean identity, equal to $1$:
+
+$$
+(\tan x)' = \frac{1}{\cos^2 x} = \sec^2 x .
+$$
+
+Since $\sec^2 x \ge 1 \gt 0$ everywhere it is defined, $\tan$ is increasing on
+each of its branches, and its slope at $0$ is exactly $1$ (consistent with
+$\tan x \approx x$ for small angles).
+
+</details>
+
+**Exercise 3 (code).** For $f(x) = x^3 - 3x$ (the figure's cubic), verify
+numerically on a fine grid that $f$ is increasing wherever $f'(x) \gt 0$ and
+decreasing wherever $f'(x) \lt 0$, and locate the two flat points from the
+sign changes of $f'$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+x = np.linspace(-2.4, 2.4, 100_001)
+f = x**3 - 3 * x
+df = 3 * x**2 - 3                       # the rule-based derivative
+
+# Where f' > 0, consecutive samples of f must increase (and vice versa)
+rising = df[:-1] > 0.01                 # margin avoids the flat points
+falling = df[:-1] < -0.01
+steps = np.diff(f)
+assert np.all(steps[rising] > 0)
+assert np.all(steps[falling] < 0)
+
+# Flat points: sign changes of f'
+flips = np.where(np.sign(df[:-1]) != np.sign(df[1:]))[0]
+print("f' changes sign near x =", x[flips])
+assert np.allclose(np.abs(x[flips]), 1.0, atol=1e-3)   # x = -1 and x = +1
+```
+
+The sampled function rises and falls in lockstep with the derivative's sign,
+and the sign flips land at $x = \pm 1$, where $3x^2 - 3 = 0$. The full
+derivative-sign-to-monotonicity theorem is proved in the MVT lesson; this is
+its numerical preview.
+
+</details>
+
+The toolkit still cannot touch $\sin(x^2)$ or $e^{-x^2/2}$, compositions
+rather than products; the next lesson derives the chain rule, the one rule
+backpropagation runs on.
+
+<Footnotes>
+  <FNItem n="1">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 10 derives the differentiation rules; Ch. 18 treats the exponential rigorously.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 3.1-3.3, differentiation rules and trig derivatives.</FNItem>
+  <FNItem n="3">**Apostol, T. M.** (1967). *Calculus, Vol. 1* (2nd ed.). Wiley. Ch. 4, the algebra of derivatives with complete proofs.</FNItem>
+</Footnotes>
