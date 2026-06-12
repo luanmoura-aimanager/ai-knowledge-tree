@@ -6,6 +6,7 @@ import * as runtime from "react/jsx-runtime";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import remarkMath from "remark-math";
+import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 
 const file = process.argv[2];
@@ -23,7 +24,8 @@ const components = {
 try {
   const { default: MDXContent } = await evaluate(src, {
     ...runtime,
-    remarkPlugins: [remarkMath],
+    // Keep in sync with src/components/mdx/MdxContent.tsx.
+    remarkPlugins: [[remarkGfm, { singleTilde: false }], remarkMath],
     rehypePlugins: [rehypeKatex],
   });
   const html = renderToStaticMarkup(
@@ -33,7 +35,14 @@ try {
     console.error(`RENDER ERROR (katex-error) in ${file}`);
     process.exit(1);
   }
-  console.log(`OK ${file} (${html.length} chars rendered)`);
+  // A literal "|---" surviving into rendered HTML means a GFM table was NOT
+  // parsed (raw pipe text leaked through). Flag it.
+  if (/\|\s*-{3,}/.test(html)) {
+    console.error(`RAW PIPE TABLE (not parsed as <table>) in ${file}`);
+    process.exit(1);
+  }
+  const tbl = html.includes("<table") ? " [has <table>]" : "";
+  console.log(`OK ${file} (${html.length} chars rendered)${tbl}`);
 } catch (e) {
   console.error(`FAILED ${file}: ${e.message}`);
   process.exit(1);
