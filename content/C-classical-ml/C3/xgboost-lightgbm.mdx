@@ -41,6 +41,22 @@ log-loss the local curvature $h_i = p_i(1 - p_i)$ adjusts the step, and the
 $+\lambda$ shrinks leaf weights of small or noisy leaves. Second-order
 information makes training converge in fewer rounds.
 
+What does that curvature actually weight? $h_i = p_i(1-p_i)$ is largest where
+the model is unsure and smallest where it is confident:
+
+- An **uncertain** example at $p_i = 0.5$ contributes $h_i = 0.25$, the
+  maximum.
+- A **fairly confident** one at $p_i = 0.9$ contributes $h_i = 0.09$.
+- A **near-certain** one at $p_i = 0.99$ contributes $h_i = 0.0099$, about
+  $25\times$ less than the uncertain example.
+
+Since $h_i$ sits in the denominator of $f^\star = -G/(H + \lambda)$, a leaf
+full of near-certain examples (tiny $H$) takes a *larger* step per unit
+gradient, while a leaf of uncertain examples (large $H$) is held back. This
+is the same $h$ the code below computes as `p_t * (1 - p_t)`: first-order
+boosting treats every example's curvature as $1$ and misses this; Newton
+boosting reads it off the second derivative.
+
 ## Regularized split criterion
 
 XGBoost adds an $L_2$ penalty on leaf weights and a per-leaf cost $\gamma$.

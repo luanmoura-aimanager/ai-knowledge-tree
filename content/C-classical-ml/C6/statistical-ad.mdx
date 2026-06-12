@@ -54,6 +54,17 @@ $$
 The 0.6745 makes the modified Z-score consistent with the standard
 $\mathcal{N}(0, 1)$ for normal data. Threshold at $|z^{\text{mod}}| > 3.5$.
 
+These two scores are routinely conflated, but they diverge whenever outliers are
+present, because they estimate scale differently. On the closing block's 200
+clean draws plus three planted outliers at $6, -7, 8$, the three big values
+inflate the standard deviation to $s = 1.28$, while the MAD-implied scale
+$\text{MAD}/0.6745 = 0.997$ stays near the true $1$. The point $x = 6$ then reads
+as $z = 4.64$ under the contaminated $s$ but $z^{\text{mod}} = 5.97$ under the
+robust scale: the outlier looks $1.3\times$ less extreme to the plain Z-score
+because it has corrupted its own yardstick. With enough large outliers this gap
+pushes a true anomaly back under the threshold (the masking effect); the robust
+estimator does not move, so it keeps flagging it.
+
 ## Generalized ESD (Rosner's test)
 
 Iterative procedure that explicitly tests for up to $k$ outliers in a normal

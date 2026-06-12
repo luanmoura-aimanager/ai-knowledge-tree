@@ -28,7 +28,21 @@ $$
 
 The dot product captures matched preferences: if user and item embeddings
 align in the same direction in the latent space, the predicted rating is
-high.
+high. Take a 2-factor space where factor 1 is "action" and factor 2 is
+"romance", and a user who loves action and dislikes romance,
+$\mathbf{u}_u = (1.5, -1.0)$. The same user, scored against three items that
+differ only in where they sit in that space:
+
+- **An action film** $\mathbf{v} = (1.2, -0.8)$, pointing the same way as the
+  user: $\hat R = 1.5(1.2) + (-1.0)(-0.8) = 2.6$. Strong recommendation.
+- **A neutral item** $\mathbf{v} = (0.8, 1.2)$, orthogonal to the user:
+  $\hat R = 1.5(0.8) + (-1.0)(1.2) = 0.0$. The two factors cancel; no signal.
+- **A romance film** $\mathbf{v} = (-0.6, 1.0)$, pointing the opposite way:
+  $\hat R = 1.5(-0.6) + (-1.0)(1.0) = -1.9$. Pushed to the bottom.
+
+The user vector is fixed across all three; only the alignment of the item
+vector moves the score from $+2.6$ to $-1.9$, which is the whole content of the
+dot-product model.
 
 For most production systems, add per-user and per-item bias terms (plus a
 global mean) to absorb constant offsets:

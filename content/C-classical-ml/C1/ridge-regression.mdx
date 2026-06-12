@@ -70,6 +70,19 @@ $\sigma_j^2/(\sigma_j^2 + \lambda) \approx 0$. Ridge does not zero out
 coefficients; it bends the OLS solution back toward the origin proportionally
 to how poorly each direction was determined.
 
+Fix $\lambda = 1$ and read the factor across a range of singular values to feel
+the asymmetry:
+
+- $\sigma_j = 10$ (a well-determined direction): factor $100/101 \approx 0.99$,
+  almost untouched.
+- $\sigma_j = 1$ (singular value equal to $\sqrt{\lambda}$): factor
+  $1/2 = 0.5$, the crossover where the coefficient is halved.
+- $\sigma_j = 0.1$ (a nearly collinear direction): factor
+  $0.01/1.01 \approx 0.0099$, kept down to about $1\%$ of its OLS value.
+
+The penalty barely sees the strong directions and almost erases the weak ones,
+which is the point: the weak directions are where OLS blows up.
+
 ## Ridge as MAP estimation
 
 Place a Gaussian prior $\beta \sim \mathcal{N}(0, \tau^2 I)$ and combine with
