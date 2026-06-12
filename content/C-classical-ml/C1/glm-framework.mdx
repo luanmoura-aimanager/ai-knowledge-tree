@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: glm-framework
 order: 9
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Wrap linear regression, logistic regression, and Poisson regression into one exponential-family framework with link functions."
 prerequisites: ["softmax-regression", "A2/exponential-family"]
 ---
@@ -148,7 +148,95 @@ print("Poisson/log beta:      ", np.round(b_pois, 3), " (vs true", beta_pois_tru
 ```
 
 A single IRLS routine, parameterized by link and variance function, recovers
-linear, logistic, and Poisson regression. The next lesson zeroes in on the
+linear, logistic, and Poisson regression.
+
+## Exercises
+
+**Exercise 1.** Derive the canonical link for the Bernoulli distribution from the
+exponential-family form. Write $\text{Bernoulli}(\mu)$ as $\exp(\theta y - b(\theta))$
+with natural parameter $\theta$, read off $\theta$ as a function of $\mu$, and
+confirm the canonical link $g(\mu) = \theta$ is the logit.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Bernoulli pmf is $p(y) = \mu^y (1 - \mu)^{1-y}$ for
+$y \in \{0, 1\}$. Take logs and exponentiate:
+
+$$
+p(y) = \exp\!\big(y\log\mu + (1 - y)\log(1 - \mu)\big) = \exp\!\Big(y\log\tfrac{\mu}{1 - \mu} + \log(1 - \mu)\Big).
+$$
+
+**Step 2.** Matching to $\exp(\theta y - b(\theta))$, the natural parameter is the
+coefficient of $y$: $\theta = \log\frac{\mu}{1 - \mu}$, and $b(\theta) = -\log(1 - \mu) = \log(1 + e^\theta)$.
+
+**Step 3.** The canonical link sets $g(\mu) = \theta = \log\frac{\mu}{1 - \mu}$,
+the logit. Inverting, $\mu = \frac{1}{1 + e^{-\theta}}$ is the sigmoid, matching the
+catalog row for logistic regression.
+
+</details>
+
+**Exercise 2.** For a canonical-link GLM the score is
+$\nabla\ell = X^\top(\mathbf{y} - \boldsymbol\mu)$. Show that at the MLE the
+residual vector $\mathbf{y} - \hat{\boldsymbol\mu}$ is orthogonal to every column
+of $X$, and explain why this generalizes the OLS normal equations.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The MLE $\hat\beta$ is a stationary point of the log-likelihood, so
+$\nabla\ell(\hat\beta) = 0$. With the canonical-link gradient this reads
+$X^\top(\mathbf{y} - \hat{\boldsymbol\mu}) = 0$, where $\hat{\boldsymbol\mu} = g^{-1}(X\hat\beta)$.
+
+**Step 2.** Each component $X_j^\top(\mathbf{y} - \hat{\boldsymbol\mu}) = 0$ says
+the residual is orthogonal to column $j$. The residual lies in the orthogonal
+complement of the column space of $X$.
+
+**Step 3.** For the Gaussian/identity GLM, $\hat{\boldsymbol\mu} = X\hat\beta$, so
+the condition becomes $X^\top(\mathbf{y} - X\hat\beta) = 0$, the OLS normal
+equations. The canonical-link GLM keeps the same residual-orthogonality structure,
+with $\hat{\boldsymbol\mu}$ a nonlinear function of $X\hat\beta$ instead of a linear
+one.
+
+</details>
+
+**Exercise 3 (code).** Fit a Poisson/log GLM by Newton's method (which equals IRLS
+for the canonical link) and verify the orthogonality condition from Exercise 2:
+$X^\top(\mathbf{y} - \hat{\boldsymbol\mu}) \approx 0$ at the fitted optimum.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 600, 3
+X = np.column_stack([np.ones(n), rng.normal(size=(n, d - 1))])
+beta_true = np.array([0.3, 0.5, -0.4])
+y = rng.poisson(np.exp(X @ beta_true)).astype(float)
+
+beta = np.zeros(d)
+for _ in range(50):
+    mu = np.exp(X @ beta)                    # inverse log link
+    g = X.T @ (y - mu)                       # canonical-link score
+    H = X.T @ (mu[:, None] * X)              # -Hessian = X^T diag(mu) X
+    beta = beta + np.linalg.solve(H, g)      # Newton step
+
+mu = np.exp(X @ beta)
+score = X.T @ (y - mu)
+assert np.max(np.abs(score)) < 1e-6          # residuals orthogonal to every column
+print("max |X^T(y - mu)| at MLE =", float(np.max(np.abs(score))))
+print("beta:", np.round(beta, 3), " true:", beta_true)
+```
+
+The fitted residuals are orthogonal to every column to machine precision, the
+GLM generalization of the OLS normal equations, and the recovered coefficients sit
+near the truth.
+
+</details>
+
+The next lesson zeroes in on the
 last two GLMs from the table: Poisson for counts and Gamma for durations.
 
 <Footnotes>

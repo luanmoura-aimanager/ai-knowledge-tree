@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: ridge-regression
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Add an L2 penalty, derive the closed-form solution, and see why ridge shrinks small singular directions the most."
 prerequisites: ["linear-regression-ols", "bias-variance"]
 ---
@@ -166,8 +166,112 @@ print("best lambda:", round(best, 3))
 
 The coefficient norm shrinks as $\lambda$ grows, train MSE grows (fitting less),
 the SVD shrinkage formula matches the direct solve to machine precision, and
-cross-validation picks a finite $\lambda$ where bias and variance balance. The
-next lesson swaps the L2 penalty for L1 and gets sparsity instead of shrinkage.
+cross-validation picks a finite $\lambda$ where bias and variance balance.
+
+## Exercises
+
+**Exercise 1.** For a single direction with singular value $\sigma = 2$ and
+penalty $\lambda = 4$, compute the ridge shrinkage factor
+$\sigma^2/(\sigma^2 + \lambda)$ and state by what fraction the OLS coefficient in
+that direction is reduced.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The shrinkage factor multiplies the OLS coefficient in that
+direction. With $\sigma = 2$, $\sigma^2 = 4$, and $\lambda = 4$,
+
+$$
+\frac{\sigma^2}{\sigma^2 + \lambda} = \frac{4}{4 + 4} = \frac{4}{8} = 0.5.
+$$
+
+**Step 2.** A factor of $0.5$ means the ridge coefficient in that direction is
+half the OLS value, a reduction of $50\%$. This is the crossover case $\sigma^2 =
+\lambda$ (equivalently $\sigma = \sqrt{\lambda}$): directions with larger
+$\sigma$ are shrunk less, smaller $\sigma$ more.
+
+</details>
+
+**Exercise 2.** Derive the ridge closed form $\hat\beta_\lambda = (X^\top X +
+\lambda I)^{-1} X^\top \mathbf{y}$ by setting the gradient of the penalized
+objective to zero, and explain why $X^\top X + \lambda I$ is always invertible
+for $\lambda > 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the objective $J(\beta) = \lVert \mathbf{y} - X\beta\rVert^2 +
+\lambda\lVert\beta\rVert^2$. Its gradient is the OLS gradient plus the penalty
+gradient:
+
+$$
+\nabla_\beta J = -2 X^\top(\mathbf{y} - X\beta) + 2\lambda\beta.
+$$
+
+**Step 2.** Set the gradient to zero and divide by 2:
+
+$$
+-X^\top \mathbf{y} + X^\top X\beta + \lambda\beta = 0
+\implies (X^\top X + \lambda I)\beta = X^\top \mathbf{y}.
+$$
+
+Solving for $\beta$ gives $\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top
+\mathbf{y}$.
+
+**Step 3.** $X^\top X$ is symmetric positive semidefinite, so its eigenvalues
+$\nu_j \ge 0$. Adding $\lambda I$ shifts every eigenvalue to $\nu_j + \lambda$.
+For $\lambda > 0$ each $\nu_j + \lambda > 0$, so the matrix has no zero
+eigenvalue and is invertible, even when $X$ is rank-deficient and $X^\top X$
+alone is singular.
+
+</details>
+
+**Exercise 3 (code).** Verify the MAP equivalence numerically: ridge with
+penalty $\lambda$ equals the maximum-a-posteriori estimate under a Gaussian
+prior $\beta \sim \mathcal{N}(0, \tau^2 I)$ and Gaussian likelihood with noise
+variance $\sigma^2$, where $\lambda = \sigma^2/\tau^2$. Compute the ridge
+solution for a chosen $(\sigma^2, \tau^2)$ and confirm it matches the direct
+ridge solve with that $\lambda$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 40, 8
+X = rng.normal(size=(n, d))
+beta_true = rng.normal(size=d)
+sigma2 = 0.25                                  # likelihood noise variance
+y = X @ beta_true + np.sqrt(sigma2) * rng.normal(size=n)
+
+tau2 = 2.0                                      # prior variance on beta
+lam = sigma2 / tau2                             # the MAP <-> ridge bridge
+
+# Ridge solve with lambda = sigma^2 / tau^2.
+beta_ridge = np.linalg.solve(X.T @ X + lam * np.eye(d), X.T @ y)
+
+# MAP: minimize (1/sigma^2)||y - Xb||^2 + (1/tau^2)||b||^2. Multiplying the
+# normal equations through by sigma^2 gives exactly the ridge system above.
+A = (X.T @ X) / sigma2 + np.eye(d) / tau2
+b = (X.T @ y) / sigma2
+beta_map = np.linalg.solve(A, b)
+
+print("lambda = sigma^2 / tau^2 =", round(lam, 4))
+assert np.allclose(beta_ridge, beta_map)
+print("ridge == MAP:", np.allclose(beta_ridge, beta_map))
+```
+
+The MAP estimate under the Gaussian prior and the ridge solution with $\lambda =
+\sigma^2/\tau^2$ coincide to machine precision: regularization strength is the
+ratio of noise variance to prior variance, so a tighter prior (small $\tau^2$)
+means a larger $\lambda$.
+
+</details>
+
+The next lesson swaps the L2 penalty for L1 and gets sparsity instead of
+shrinkage.
 
 <Footnotes>
   <FNItem n="1">**Hoerl, A. E., & Kennard, R. W.** (1970). "Ridge regression: biased estimation for nonorthogonal problems". *Technometrics*, 12(1), 55-67. [doi:10.1080/00401706.1970.10488634](https://doi.org/10.1080/00401706.1970.10488634)</FNItem>

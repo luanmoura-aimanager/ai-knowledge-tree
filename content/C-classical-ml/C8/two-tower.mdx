@@ -4,7 +4,7 @@ pillar: C
 subId: C8
 lessonId: two-tower
 order: 5
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Embed users and items with neural nets and score with a dot product, the basis of modern retrieval."
 prerequisites: ["matrix-factorization"]
 ---
@@ -179,8 +179,111 @@ for u in range(n_users):
 print(f"recall@10 over users: mean={np.mean(recall):.3f}, std={np.std(recall):.3f}")
 ```
 
-The learned two-tower model recovers most true positives in the top-10. The
-next lesson takes the user tower further by consuming sequences instead of
+The learned two-tower model recovers most true positives in the top-10.
+
+## Exercises
+
+**Exercise 1.** A query batch has one user embedding $\mathbf{u} = (1, 2)$ and
+three candidate item embeddings: the positive $\mathbf{v}^+ = (1, 1)$ and two
+in-batch negatives $\mathbf{v}_1 = (2, 0)$, $\mathbf{v}_2 = (0, -1)$. Compute the
+in-batch softmax cross-entropy loss
+$L = -\log \frac{\exp(\mathbf{u}^\top \mathbf{v}^+)}{\sum_j \exp(\mathbf{u}^\top \mathbf{v}_j)}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Score each candidate by the dot product:
+$\mathbf{u}^\top \mathbf{v}^+ = 1\cdot1 + 2\cdot1 = 3$,
+$\mathbf{u}^\top \mathbf{v}_1 = 1\cdot2 + 2\cdot0 = 2$,
+$\mathbf{u}^\top \mathbf{v}_2 = 1\cdot0 + 2\cdot(-1) = -2$.
+
+**Step 2.** Exponentiate: $e^{3} \approx 20.086$, $e^{2} \approx 7.389$,
+$e^{-2} \approx 0.135$. The denominator is
+$20.086 + 7.389 + 0.135 = 27.610$.
+
+**Step 3.** The softmax probability of the positive is
+$20.086 / 27.610 \approx 0.7275$, so
+
+$$
+L = -\log(0.7275) \approx 0.318.
+$$
+
+The positive outscores both negatives, so the probability mass on it is high and
+the loss is small.
+
+</details>
+
+**Exercise 2.** A catalog has $M = 10^6$ items. A cross-feature model needs one
+forward pass per (user, item) pair; a two-tower model runs the user tower once
+and then searches an HNSW index whose work scales like $\log_2 M$ distance
+comparisons. Compare the per-query work of the two designs, and explain why the
+dot-product score is the load-bearing assumption.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cross-feature model evaluates the network once per candidate, so
+a single query costs $M = 10^6$ forward passes; the score of a (user, item) pair
+cannot be reused because the network mixes both inputs.
+
+**Step 2.** The two-tower model computes the user embedding with one forward
+pass, then traverses the index. With $\log_2 10^6 \approx 20$, the HNSW search
+reaches the top matches in on the order of a few hundred distance comparisons,
+each a cheap $k$-dimensional dot product, not a full network evaluation. Even
+brute-force scoring against precomputed item vectors is $M$ cheap dot products
+rather than $M$ forward passes.
+
+**Step 3.** The index only works because the score factorizes as
+$\mathbf{u}^\top \mathbf{v}$: item embeddings can be precomputed independently of
+the query, and dot-product (or cosine) is exactly the geometry ANN structures
+index. An arbitrary cross-feature score has no such structure, so it cannot be
+precomputed or indexed, which is why the dot-product form is non-negotiable for
+retrieval.
+
+</details>
+
+**Exercise 3 (code).** Implement in-batch softmax retrieval scoring: given a
+batch of user embeddings and item embeddings where item $j$ is the true positive
+for user $j$, compute the in-batch cross-entropy loss, then verify that
+sharpening the embeddings (scaling them up) lowers the loss when the positives
+are already the top match.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+B, k = 12, 16
+# Near-orthogonal users (mostly along distinct axes), item j a noisy copy of user j
+U = np.eye(B, k) + 0.1 * rng.normal(size=(B, k))
+V = U + 0.05 * rng.normal(size=(B, k))
+
+def in_batch_loss(U, V):
+    logits = U @ V.T                                 # (B, B): row u, col item
+    logits -= logits.max(axis=1, keepdims=True)
+    logp = logits - np.log(np.exp(logits).sum(axis=1, keepdims=True))
+    return -np.mean(np.diag(logp))                   # positives on the diagonal
+
+# Confirm the diagonal is already the argmax (positives are top match)
+assert np.all(np.argmax(U @ V.T, axis=1) == np.arange(B))
+
+loss_base = in_batch_loss(U, V)
+loss_sharp = in_batch_loss(2.0 * U, 2.0 * V)         # scale up -> sharper softmax
+
+assert loss_sharp < loss_base
+print(f"loss: base {loss_base:.4f} -> sharpened {loss_sharp:.4f}")
+```
+
+When the positive is already the highest-scoring candidate, scaling the
+embeddings sharpens the softmax onto it and drives the in-batch loss down, which
+is the pressure training puts on the towers.
+
+</details>
+
+The next lesson takes the user tower further by consuming sequences instead of
 static features.
 
 <Footnotes>

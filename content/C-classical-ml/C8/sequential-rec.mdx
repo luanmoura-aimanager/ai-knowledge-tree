@@ -4,7 +4,7 @@ pillar: C
 subId: C8
 lessonId: sequential-rec
 order: 6
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Model user histories as sequences (SASRec, BERT4Rec) and predict the next item."
 prerequisites: ["two-tower"]
 ---
@@ -168,9 +168,111 @@ print(f"hit@5 on next-item prediction: {hits / total:.3f}  (random would be 5/{n
 
 The simple sequence-based predictor beats random by a clear margin and
 illustrates the pattern: encode the history into a single vector, score
-candidates by dot product, train against sampled negatives. This closes the
-C8 recommendation track; the next subsection covers the data-structure side:
-approximate nearest neighbor search that makes all of this serve at scale.
+candidates by dot product, train against sampled negatives.
+
+## Exercises
+
+**Exercise 1.** A causal (SASRec-style) decoder processes a length-$T$ sequence
+and produces a next-item prediction at every position. State how many supervised
+next-item training targets a single length-$T$ sequence yields, and contrast
+this with a model that predicts only the final item. Why does the causal
+objective make a sequence model more sample-efficient than one trained on the
+last position alone?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A causal decoder predicts $i_{t+1}$ from the prefix $i_1, \dots, i_t$
+for each position $t = 1, \dots, T-1$. That is $T - 1$ supervised
+(prefix, target) pairs from one sequence.
+
+**Step 2.** A model trained only on the final item uses a single target per
+sequence: predict $i_T$ from $i_1, \dots, i_{T-1}$.
+
+**Step 3.** The causal objective extracts $T - 1$ gradient signals from each
+user history instead of one, so every interaction is both an input and, at the
+next step, a label. The causal mask is what makes this safe: predicting
+$i_{t+1}$ sees only items at or before $t$, so no target leaks into its own
+input. This dense supervision is why next-item language-model-style training is
+more sample-efficient than last-item-only training on the same data.
+
+</details>
+
+**Exercise 2.** Sequential models must use time-respecting splits. Consider a
+user history $(i_1, \dots, i_{10})$ in chronological order. Describe a correct
+train/test split and a leaky random split, and explain concretely what
+information the leaky split lets the model use that it would not have at serving
+time.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A correct (time-respecting) split trains on the prefix
+$(i_1, \dots, i_9)$ and tests on predicting $i_{10}$ from that prefix, or more
+generally trains on the past and evaluates on strictly later interactions.
+
+**Step 2.** A leaky random split shuffles the ten interactions and holds out a
+random subset, for example testing on $i_4$ while training includes $i_5$
+through $i_{10}$.
+
+**Step 3.** Under the leaky split the model trains on items that occur after the
+test target in real time. Predicting $i_4$ while having learned from $i_7$ uses
+future information the live system cannot have: at serving time only the items up
+to the current moment exist. The leaked future inflates offline metrics and the
+gap collapses in production, which is why evaluation must train on the past and
+test on the future.
+
+</details>
+
+**Exercise 3 (code).** Build short user histories with autoregressive structure
+(the next item is the catalog item most aligned with the mean of the recent
+window). Encode each history as the mean of its recent item embeddings, score
+all items by dot product, and verify that hit@5 with the true embeddings beats a
+random baseline by a clear margin.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n_items, k, n_users, T = 60, 8, 200, 12
+emb = rng.normal(size=(n_items, k))
+
+def gen_history(T):
+    s = [int(rng.integers(0, n_items))]
+    for _ in range(T):
+        ctx = emb[s[-5:]].mean(axis=0)
+        logits = emb @ ctx + 0.3 * rng.normal(size=n_items)
+        s.append(int(np.argmax(logits)))
+    return s
+
+histories = [gen_history(T) for _ in range(n_users)]
+
+hits = 0
+for seq in histories:
+    history, true_next = seq[-6:-1], seq[-1]
+    ctx = emb[history].mean(axis=0)
+    top5 = np.argsort(-(emb @ ctx))[:5]
+    hits += int(true_next in top5)
+
+hit5 = hits / n_users
+random_baseline = 5 / n_items
+assert hit5 > 5 * random_baseline
+print(f"hit@5: {hit5:.3f}  random: {random_baseline:.3f}")
+```
+
+Encoding the recent window as a mean embedding and scoring by dot product recovers
+the true next item far above chance, which is the retrieval pattern every
+sequence model specializes.
+
+</details>
+
+This closes the C8 recommendation track; the next subsection covers the
+data-structure side: approximate nearest neighbor search that makes all of this
+serve at scale.
 
 <Footnotes>
   <FNItem n="1">**Kang, W.-C., & McAuley, J.** (2018). "Self-attentive sequential recommendation". *ICDM*. [arXiv:1808.09781](https://arxiv.org/abs/1808.09781). SASRec: a causal Transformer for next-item prediction.</FNItem>

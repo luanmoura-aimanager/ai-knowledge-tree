@@ -4,7 +4,7 @@ pillar: C
 subId: C8
 lessonId: nmf
 order: 4
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Restrict factors to be nonnegative and get parts-based representations of users and items."
 prerequisites: ["matrix-factorization"]
 ---
@@ -136,8 +136,99 @@ print(f"\ntopic recovery correlations: {[round(c, 2) for c in corrs]}")
 ```
 
 NMF recovers nonnegative factors with sparse entries, and the recovered
-topic vectors correlate strongly with the true ones. The next lesson moves
-to neural-net factor models: two-tower retrieval.
+topic vectors correlate strongly with the true ones.
+
+## Exercises
+
+**Exercise 1.** Take $W = \begin{bmatrix} 2 & 0 \\ 1 & 1 \end{bmatrix}$ and
+$H = \begin{bmatrix} 1 & 3 \\ 2 & 0 \end{bmatrix}$. Compute the reconstruction
+$WH$ and confirm by inspection that every entry is nonnegative without any
+cancellation. State why this is forced rather than coincidental.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Multiply row by column:
+
+$$
+WH = \begin{bmatrix} 2\cdot 1 + 0\cdot 2 & 2\cdot 3 + 0\cdot 0 \\ 1\cdot 1 + 1\cdot 2 & 1\cdot 3 + 1\cdot 0 \end{bmatrix} = \begin{bmatrix} 2 & 6 \\ 3 & 3 \end{bmatrix}.
+$$
+
+**Step 2.** Every entry is a sum of products of nonnegative numbers. A product
+of two nonnegatives is nonnegative, and a sum of nonnegatives is nonnegative, so
+no entry can come out below zero. This is the structural fact behind the
+parts-based interpretation: factors can only add evidence, never subtract it, so
+a row of $W$ reads as a recipe of how much of each part (row of $H$) to mix in.
+
+</details>
+
+**Exercise 2.** Show that the multiplicative update
+$H_{kj} \leftarrow H_{kj}\,\frac{(W^\top X)_{kj}}{(W^\top W H)_{kj}}$ leaves
+$H_{kj}$ unchanged exactly when the gradient of $\lVert X - WH\rVert_F^2$ with
+respect to $H_{kj}$ is zero, and explain why the update can never turn a positive
+$H_{kj}$ negative.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The gradient of $\lVert X - WH\rVert_F^2$ with respect to $H$ is
+$\nabla_H = 2(W^\top W H - W^\top X)$. A stationary point has
+$(W^\top W H)_{kj} = (W^\top X)_{kj}$ for the relevant entry.
+
+**Step 2.** At such a point the ratio
+$\frac{(W^\top X)_{kj}}{(W^\top W H)_{kj}} = 1$, so the multiplicative update
+maps $H_{kj} \mapsto H_{kj} \cdot 1 = H_{kj}$: it is a fixed point precisely when
+the gradient vanishes.
+
+**Step 3.** $X$, $W$, and $H$ are nonnegative, so both $(W^\top X)_{kj}$ and
+$(W^\top W H)_{kj}$ are nonnegative, and the denominator is strictly positive
+whenever the iterate is interior. The multiplier is therefore a nonnegative
+number, and multiplying a positive $H_{kj}$ by a nonnegative factor keeps it
+nonnegative. Nonnegativity is preserved at every step without any clipping.
+
+</details>
+
+**Exercise 3 (code).** Implement the Lee-Seung multiplicative updates from
+scratch on a nonnegative matrix and verify two facts: the Frobenius
+reconstruction error is monotonically non-increasing across iterations, and both
+factors stay nonnegative throughout.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n, d, k = 30, 20, 4
+W_true = rng.exponential(size=(n, k))
+H_true = rng.exponential(size=(k, d))
+X = W_true @ H_true                                  # nonnegative target
+
+W = rng.uniform(0.5, 1.0, size=(n, k))
+H = rng.uniform(0.5, 1.0, size=(k, d))
+eps = 1e-9
+
+errors = []
+for _ in range(150):
+    H *= (W.T @ X) / (W.T @ W @ H + eps)
+    W *= (X @ H.T) / (W @ H @ H.T + eps)
+    errors.append(np.linalg.norm(X - W @ H))
+    assert (W >= 0).all() and (H >= 0).all()
+
+errors = np.array(errors)
+# Allow tiny float wobble from the eps stabilizer
+assert np.all(np.diff(errors) <= 1e-6)
+print(f"error start {errors[0]:.3f} -> end {errors[-1]:.4f}, monotone: True")
+```
+
+The reconstruction error decreases step after step and both factors remain
+nonnegative, which are the two guarantees the multiplicative update provides.
+
+</details>
+
+The next lesson moves to neural-net factor models: two-tower retrieval.
 
 <Footnotes>
   <FNItem n="1">**Lee, D. D., & Seung, H. S.** (1999). "Learning the parts of objects by non-negative matrix factorization". *Nature*, 401, 788-791. [doi:10.1038/44565](https://doi.org/10.1038/44565). The parts-based interpretation and the multiplicative update rules.</FNItem>

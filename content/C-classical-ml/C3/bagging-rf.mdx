@@ -4,7 +4,7 @@ pillar: C
 subId: C3
 lessonId: bagging-rf
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Average bootstrap replicas to reduce variance, and decorrelate trees with random feature subsets."
 prerequisites: ["tree-pruning", "C1/bias-variance"]
 ---
@@ -183,7 +183,152 @@ print(f"single tree test acc: {single_acc:.3f}  (forest reduces variance over th
 ```
 
 The random forest beats the single tree on the noisy test set, and the OOB
-accuracy tracks the held-out test accuracy. The next lesson opens the black
+accuracy tracks the held-out test accuracy.
+
+## Exercises
+
+**Exercise 1.** Using the variance bound $\rho\sigma^2 + \frac{1-\rho}{B}\sigma^2$
+for the average of $B$ trees, take $\sigma^2 = 1$. Compute the limiting variance
+as $B \to \infty$ for $\rho = 0.6$ (plain bagged trees) and $\rho = 0.1$
+(decorrelated forest trees), and the variance at $B = 50$ for each. Explain what
+the two numbers say about why random forests help.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** As $B \to \infty$ the second term vanishes, leaving the floor
+$\rho\sigma^2 = \rho$. So the limit is $0.6$ for bagging and $0.1$ for the forest.
+
+**Step 2.** At $B = 50$ add the finite-$B$ term $\frac{1-\rho}{B}$:
+
+$$
+\rho = 0.6:\quad 0.6 + \tfrac{0.4}{50} = 0.6 + 0.008 = 0.608,
+$$
+$$
+\rho = 0.1:\quad 0.1 + \tfrac{0.9}{50} = 0.1 + 0.018 = 0.118.
+$$
+
+**Step 3.** Even with 50 trees the variance is dominated by the floor $\rho$, not
+the averaging term. Adding more trees drives the $\frac{1-\rho}{B}$ term toward 0
+but cannot cross the floor, so lowering $\rho$ (the random-feature twist) is the
+only way to push the limiting variance from $0.6$ down to $0.1$. More trees alone
+cannot.
+
+</details>
+
+**Exercise 2.** The lesson states a bootstrap sample of size $n$ contains about
+63% unique examples. Derive the $1 - 1/e$ limit, and explain why the remaining
+fraction is the out-of-bag set used for free error estimation.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A fixed example is missed by one draw with probability $1 - 1/n$.
+Draws are independent with replacement, so it is missed by all $n$ draws with
+probability $(1 - 1/n)^n$.
+
+**Step 2.** Take the limit using $\lim_{n\to\infty}(1 - 1/n)^n = e^{-1}$:
+
+$$
+P(\text{example never drawn}) \to e^{-1} \approx 0.368.
+$$
+
+So the expected fraction of examples that do appear is
+$1 - e^{-1} \approx 0.632$, the 63% unique figure.
+
+**Step 3.** The roughly 37% of examples a given tree never saw are out-of-bag for
+that tree. Predicting each example using only the trees that excluded it gives a
+held-out estimate at no extra cost, because each tree's training set already
+left those examples aside.
+
+</details>
+
+**Exercise 3 (code).** Demonstrate decorrelation directly: fit two ensembles on
+the same data, one choosing the best split among all features ($m = d$, plain
+bagging) and one among a random subset ($m = 2$). Estimate the average pairwise
+correlation of tree predictions in each, and confirm the random-subset forest is
+less correlated.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Reuse the lesson's tree builder. Collect each tree's prediction
+vector on a held-out set, stack them, and average the off-diagonal entries of the
+prediction correlation matrix.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 400, 6
+X = rng.normal(size=(n, d))
+y = ((X[:, 0] + X[:, 1] > 0) ^ (X[:, 2] > 0)).astype(int)
+
+def gini(labels):
+    if len(labels) == 0: return 0.0
+    p = np.bincount(labels, minlength=2) / len(labels)
+    return 1 - np.sum(p**2)
+
+class Node:
+    def __init__(self): self.leaf = self.feature = self.threshold = self.left = self.right = None
+
+def split(X, y, m, rng):
+    n, d = X.shape
+    feats = rng.choice(d, size=min(m, d), replace=False)
+    best = (None, None, -1); parent = gini(y)
+    for j in feats:
+        for t in np.unique(X[:, j]):
+            mm = X[:, j] <= t
+            if mm.sum() == 0 or (~mm).sum() == 0: continue
+            gain = parent - (mm.sum()/n)*gini(y[mm]) - ((~mm).sum()/n)*gini(y[~mm])
+            if gain > best[2]: best = (j, t, gain)
+    return best
+
+def build(X, y, m, rng, max_depth=6):
+    node = Node()
+    if max_depth == 0 or len(y) < 2 or gini(y) == 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    j, t, gain = split(X, y, m, rng)
+    if j is None or gain <= 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    mm = X[:, j] <= t; node.feature, node.threshold = j, t
+    node.left = build(X[mm], y[mm], m, rng, max_depth - 1)
+    node.right = build(X[~mm], y[~mm], m, rng, max_depth - 1)
+    return node
+
+def predict(node, x):
+    while node.leaf is None:
+        node = node.left if x[node.feature] <= node.threshold else node.right
+    return node.leaf
+
+Xtr, ytr, Xte = X[:300], y[:300], X[300:]
+
+def mean_pairwise_corr(m, B=25):
+    preds = []
+    for _ in range(B):
+        s = rng.integers(0, len(ytr), len(ytr))
+        tree = build(Xtr[s], ytr[s], m=m, rng=rng)
+        preds.append([predict(tree, x) for x in Xte])
+    P = np.array(preds, float)
+    P = P[P.std(axis=1) > 0]                 # drop constant-prediction trees
+    C = np.corrcoef(P)
+    off = C[np.triu_indices_from(C, k=1)]
+    return np.nanmean(off)
+
+corr_full = mean_pairwise_corr(m=6)          # plain bagging, all features
+corr_sub = mean_pairwise_corr(m=2)           # random subset
+assert corr_sub < corr_full                  # random subsets decorrelate trees
+print(f"mean tree correlation: m=d {corr_full:.3f}, m=2 {corr_sub:.3f}")
+```
+
+**Step 2.** The random-subset ensemble shows lower mean pairwise correlation than
+the all-feature ensemble. That is exactly the $\rho$ in the variance bound: a
+smaller $\rho$ lowers the floor $\rho\sigma^2$ that no amount of averaging can
+beat, which is why the forest generalizes better than plain bagging.
+
+</details>
+
+The next lesson opens the black
 box: how to read feature importance from a forest.
 
 <Footnotes>

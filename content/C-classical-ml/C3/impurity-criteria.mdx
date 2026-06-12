@@ -4,7 +4,7 @@ pillar: C
 subId: C3
 lessonId: impurity-criteria
 order: 2
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Choose splits with Gini, entropy, or MSE; understand information gain and overfitting on noisy data."
 prerequisites: ["decision-trees", "A2/entropy"]
 ---
@@ -137,7 +137,110 @@ print(f"\nregression MSE parent: {parent_var:.3f}, after split: {weighted_child:
 
 The two classification criteria behave as advertised; the perfect split
 recovers a full bit of information while the uninformative one yields zero;
-and the regression split halves the variance on a symmetric distribution. The
+and the regression split halves the variance on a symmetric distribution.
+
+## Exercises
+
+**Exercise 1.** A node holds 80 examples: 60 of class A and 20 of class B. A
+split sends 40 examples (30 A, 10 B) left and 40 examples (30 A, 10 B) right.
+Compute the parent Gini, both child Ginis, and the Gini gain. Explain the result.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Parent proportions $p_A = 60/80 = 0.75$, $p_B = 0.25$:
+
+$$
+\text{Gini}(S) = 1 - (0.75^2 + 0.25^2) = 1 - (0.5625 + 0.0625) = 0.375.
+$$
+
+**Step 2.** Each child has the same 30:10 mix, so $p_A = 0.75$, $p_B = 0.25$ in
+both, giving $\text{Gini}(S_L) = \text{Gini}(S_R) = 0.375$ identical to the
+parent.
+
+**Step 3.** The weighted reduction is
+
+$$
+\Delta = 0.375 - \tfrac{40}{80}\cdot 0.375 - \tfrac{40}{80}\cdot 0.375 = 0.375 - 0.375 = 0.
+$$
+
+The split preserves the class proportions in both children, so it carries no
+information and the gain is zero. A useful split must change the mix.
+
+</details>
+
+**Exercise 2.** Show that for a binary node with class proportions $p$ and
+$1 - p$, the Gini impurity equals $2p(1 - p)$. Then verify it peaks at $p = 0.5$
+by setting the derivative to zero.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute the two proportions into the Gini definition:
+
+$$
+\text{Gini} = 1 - \left(p^2 + (1-p)^2\right).
+$$
+
+**Step 2.** Expand $(1-p)^2 = 1 - 2p + p^2$ and collect terms:
+
+$$
+1 - \left(p^2 + 1 - 2p + p^2\right) = 1 - 1 + 2p - 2p^2 = 2p - 2p^2 = 2p(1-p).
+$$
+
+**Step 3.** Differentiate $g(p) = 2p - 2p^2$: $g'(p) = 2 - 4p$. Setting
+$g'(p) = 0$ gives $p = 0.5$, and $g''(p) = -4 < 0$ confirms a maximum. At
+$p = 0.5$, $\text{Gini} = 2(0.5)(0.5) = 0.5 = 1 - 1/K$ for $K = 2$, matching the
+uniform-distribution bound.
+
+</details>
+
+**Exercise 3 (code).** The lesson claims a split that isolates a single point
+gives high child purity but little gain, because its weight in the sum is tiny.
+Verify this: on a 200-point node with a 50/50 class mix, compare the Gini gain of
+a balanced perfect split against a split that peels off one point.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Build a node with a feature that perfectly separates the two classes
+(a balanced split) and a second scenario where the threshold isolates one
+example. Compute the weighted Gini gain for each.
+
+```python
+import numpy as np
+
+def gini(labels):
+    if len(labels) == 0: return 0.0
+    p = np.bincount(labels, minlength=2) / len(labels)
+    return 1 - np.sum(p**2)
+
+def gain(y, mask):
+    n = len(y)
+    return gini(y) - (mask.sum()/n)*gini(y[mask]) - ((~mask).sum()/n)*gini(y[~mask])
+
+y = np.concatenate([np.zeros(100), np.ones(100)]).astype(int)
+
+balanced = np.arange(200) < 100              # left = all class 0, right = all class 1
+peel_one = np.arange(200) < 1                # left = one class-0 point only
+
+g_balanced = gain(y, balanced)
+g_peel = gain(y, peel_one)
+
+assert np.isclose(g_balanced, 0.5)           # perfect split recovers full Gini 0.5
+assert g_peel < 0.01                         # isolating one point barely helps
+print(f"balanced perfect split gain: {g_balanced:.4f}")
+print(f"peel-one-point gain:         {g_peel:.4f}")
+```
+
+**Step 2.** The balanced split recovers the full parent Gini of 0.5, while
+peeling one point yields a gain near 0.0025. The pure singleton child has Gini 0,
+but its weight $1/200$ in the sum makes its contribution negligible, so the
+weighted criterion discounts tiny-child splits as the lesson states.
+
+</details>
+
+The
 next lesson controls the resulting tree size so it generalizes instead of
 memorizing.
 

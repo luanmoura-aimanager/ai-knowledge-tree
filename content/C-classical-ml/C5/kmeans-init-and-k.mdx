@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: kmeans-init-and-k
 order: 2
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Use k-means++ for a smarter initialization and pick k with the elbow method or silhouette score."
 prerequisites: ["kmeans"]
 ---
@@ -165,7 +165,102 @@ for k in [2, 3, 4, 5]:
 
 k-means++ gives lower mean inertia with much less variance across trials,
 the elbow at $k = 3$ is visible, and the silhouette score peaks at the true
-$k$. The next lesson swaps cluster means for actual data points to handle
+$k$.
+
+## Exercises
+
+**Exercise 1.** A dataset has three already-chosen centers and four candidate
+points with nearest-center distances $D = (1, 2, 3, 4)$. Compute the k-means++
+probability of selecting each candidate as the next center.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** k-means++ weights each candidate by its squared distance,
+$D(x_i)^2$. The squared distances are $1, 4, 9, 16$.
+
+**Step 2.** Normalize by the sum $1 + 4 + 9 + 16 = 30$:
+
+$$
+\Pr = \left(\tfrac{1}{30},\ \tfrac{4}{30},\ \tfrac{9}{30},\ \tfrac{16}{30}\right)
+   \approx (0.033,\ 0.133,\ 0.300,\ 0.533).
+$$
+
+The farthest point (distance 4) is selected with probability $0.533$, over
+sixteen times the chance of the nearest point, which is how $D^2$ seeding pulls
+new centers toward poorly served regions.
+
+</details>
+
+**Exercise 2.** A point sits at the boundary between two clusters with
+$a_i = b_i = 3$. Compute its silhouette $s_i$ and explain what value of
+$s_i$ would instead signal the point is misassigned.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the definition $s_i = (b_i - a_i)/\max(a_i, b_i)$. With
+$a_i = b_i = 3$:
+
+$$
+s_i = \frac{3 - 3}{\max(3, 3)} = \frac{0}{3} = 0.
+$$
+
+**Step 2.** A silhouette of $0$ marks a borderline point, equally close to its
+own cluster and the nearest other one. A misassigned point has
+$b_i$ less than $a_i$ (the nearest other cluster is closer than its own), giving
+a negative numerator and so $s_i$ less than $0$. Reassigning such a point to its
+nearest cluster would raise its silhouette.
+
+</details>
+
+**Exercise 3 (code).** Run a $k$ sweep from 1 to 6 on three blobs, taking the
+best inertia over several restarts at each $k$. Verify that inertia is
+monotonically non-increasing in $k$ and that the drop into $k = 3$ is far larger
+than the drops past it, the kink the elbow method reads off.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+centers_true = [[2.0, 0.0], [-2.0, 0.0], [0.0, 2.0]]
+X = np.vstack([rng.normal(loc=c, scale=0.5, size=(150, 2)) for c in centers_true])
+
+def kmeans(X, k, max_iter=100, rng=rng):
+    mu = X[rng.choice(len(X), size=k, replace=False)]
+    for _ in range(max_iter):
+        d2 = ((X[:, None] - mu[None, :])**2).sum(axis=2)
+        z = d2.argmin(axis=1)
+        mu_new = np.array([X[z == j].mean(axis=0) if (z == j).sum() else mu[j]
+                           for j in range(k)])
+        if np.allclose(mu, mu_new):
+            break
+        mu = mu_new
+    return np.sum((X - mu[z])**2)
+
+def best_inertia(X, k, restarts=10):
+    return min(kmeans(X, k, rng=np.random.default_rng(s)) for s in range(restarts))
+
+ks = range(1, 7)
+inertias = np.array([best_inertia(X, k) for k in ks])
+drops = -np.diff(inertias)                          # inertia reduction per step
+
+assert np.all(drops >= -1e-6)                       # non-increasing in k
+assert drops[1] > 5 * drops[3]                      # (k=2->3) >> (k=4->5): the elbow
+print("inertias:", inertias.round(1))
+print("per-step drops:", drops.round(1))
+```
+
+Inertia falls as $k$ grows, and the reduction collapses once $k$ passes three:
+the drop into three clusters dwarfs every later drop, the bend the elbow method
+reads off.
+
+</details>
+
+The next lesson swaps cluster means for actual data points to handle
 non-Euclidean metrics: k-medoids.
 
 <Footnotes>

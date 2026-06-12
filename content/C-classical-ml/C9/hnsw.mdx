@@ -4,7 +4,7 @@ pillar: C
 subId: C9
 lessonId: hnsw
 order: 4
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Build a hierarchical small-world graph that supports logarithmic-time greedy search."
 prerequisites: ["ann-problem"]
 ---
@@ -204,7 +204,126 @@ print(f"avg nodes visited per query: {np.mean(visits):.0f} / {len(X)} "
 The single-layer small-world graph reaches ~88% recall@10 while visiting
 roughly 16% of the database, sub-linear in n. HNSW's layered structure
 adds logarithmic-time top-down navigation that pushes this further at
-scale. The next lesson surveys the production vector databases that wrap
+scale.
+
+## Exercises
+
+**Exercise 1.** HNSW assigns each node a level $\ell$ drawn so that the
+probability of reaching at least layer $j$ is $1/M^{j}$ for $M = 16$. With
+$n = 10^9$ nodes at layer $0$, how many nodes are expected at layers $1$, $2$,
+and $3$, and roughly how many layers does the index have?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A node reaches layer $j$ with probability $1/M^{j}$, so the expected
+count at layer $j$ is $n / M^{j}$. With $M = 16$:
+
+$$
+n_1 = \frac{10^9}{16} \approx 6.25 \times 10^7, \quad
+n_2 = \frac{10^9}{256} \approx 3.9 \times 10^6, \quad
+n_3 = \frac{10^9}{4096} \approx 2.4 \times 10^5.
+$$
+
+**Step 2.** The top layer is the largest $j$ with at least about one node, so
+$M^{j} \lesssim n$, giving $j \lesssim \log_M n = \log_{16} 10^9 = 9 \ln 10 /
+\ln 16 \approx 7.5$.
+
+**Step 3.** The index has roughly $8$ layers. Each upper layer is $M$ times
+sparser, so the greedy descent from the top reaches the query's region in
+$O(\log_M n)$ hops, which is the source of HNSW's logarithmic search cost.
+
+</details>
+
+**Exercise 2.** An HNSW index over $n = 2 \times 10^8$ vectors of dimension
+$d = 256$ (float32) uses $M = 32$. Estimate the memory for the raw vectors and
+for the graph edges (store each edge as a 4-byte node id, about $2M$ edges per
+node across layers), and say which dominates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Raw vectors cost $n \cdot d \cdot 4 = 2 \times 10^8 \cdot 256 \cdot 4
+= 2.048 \times 10^{11}$ bytes, about $205$ GB.
+
+**Step 2.** Edges cost $n \cdot 2M \cdot 4 = 2 \times 10^8 \cdot 64 \cdot 4 =
+5.12 \times 10^{10}$ bytes, about $51$ GB.
+
+**Step 3.** The raw vectors dominate at roughly $205$ GB versus $51$ GB of
+edges, a total near $256$ GB. The vectors are the bigger cost, which is why
+HNSW combined with PQ (quantizing the vectors while keeping the graph) is the
+standard way to fit large graph indices in memory.
+
+</details>
+
+**Exercise 3 (code).** Take the toy single-layer small-world graph and sweep the
+beam width `ef` over $\{10, 50, 200\}$. Confirm that a larger beam does not lower
+recall@10 and that it visits more nodes, the recall-for-work trade `ef` controls.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d, M = 3000, 32, 16
+X = rng.normal(size=(n, d))
+queries = rng.normal(size=(40, d))
+
+def build_graph(X, M):                       # connect each node to its M nearest
+    edges = [[] for _ in range(len(X))]
+    for i in range(len(X)):
+        d2 = ((X - X[i]) ** 2).sum(1); d2[i] = np.inf
+        edges[i] = np.argsort(d2)[:M].tolist()
+    return edges
+
+edges = build_graph(X, M)
+
+def greedy(query, ef, k=10, n_starts=5, rng=rng):
+    starts = rng.choice(n, size=n_starts, replace=False)
+    visited = set(int(s) for s in starts)
+    best = sorted((np.sum((X[s] - query) ** 2), int(s)) for s in starts)
+    frontier = list(best)
+    while frontier:
+        frontier.sort()
+        dc, node = frontier.pop(0)
+        if len(best) >= ef and dc > best[-1][0]:
+            break
+        for nb in edges[node]:
+            if nb in visited:
+                continue
+            visited.add(nb)
+            d2 = np.sum((X[nb] - query) ** 2)
+            if len(best) < ef or d2 < best[-1][0]:
+                best.append((d2, nb)); best.sort(); best = best[:ef]
+                frontier.append((d2, nb))
+    return [i for _, i in best[:k]], len(visited)
+
+def true_knn(q, k=10):
+    return set(np.argsort(((X - q) ** 2).sum(1))[:k].tolist())
+
+prev = None
+for ef in [10, 50, 200]:
+    recs, vis = [], []
+    for q in queries:
+        nn, v = greedy(q, ef)
+        recs.append(len(set(nn) & true_knn(q)) / 10); vis.append(v)
+    mr = float(np.mean(recs))
+    print(f"ef={ef}: recall@10={mr:.3f}  visited={np.mean(vis):.0f}/{n}")
+    if prev is not None:
+        assert mr >= prev - 1e-9              # larger beam never hurts recall
+    prev = mr
+```
+
+Recall@10 climbs from about $0.62$ at `ef` $= 10$ to about $0.98$ at `ef` $=
+200$, while nodes visited rise from roughly $160$ to roughly $1{,}080$ of
+$3{,}000$. The beam width is the query-time recall knob: spend more distance
+computations, miss fewer true neighbors.
+
+</details>
+
+The next lesson surveys the production vector databases that wrap
 these algorithms.
 
 <Footnotes>

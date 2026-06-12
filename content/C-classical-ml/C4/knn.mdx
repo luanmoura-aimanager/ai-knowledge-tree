@@ -4,7 +4,7 @@ pillar: C
 subId: C4
 lessonId: knn
 order: 1
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Predict by majority vote (classification) or average (regression) over the k closest points, and choose k by cross-validation."
 prerequisites: []
 ---
@@ -135,8 +135,122 @@ print(f"k-NN regression test RMSE: {rmse:.3f}")
 
 The U-shape in $k$ is visible: $k = 1$ overfits, large $k$ underfits, with the
 sweet spot in between. Adding one high-magnitude noise feature drowns out the
-informative ones, confirming the scaling caveat. The next lesson explains why
-all of this gets worse as the dimension grows.
+informative ones, confirming the scaling caveat.
+
+## Exercises
+
+**Exercise 1.** A 1-NN classifier is trained on the four labeled points
+$(0, +)$, $(1, +)$, $(3, -)$, $(5, -)$ on the real line, with distance
+$d(a, b) = |a - b|$. Predict the label at the query $x_\star = 2$ and at
+$x_\star = 2.5$, and find the location of the decision boundary between the
+$+$ and $-$ regions.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $x_\star = 2$, the distances to the four points are
+$|2-0| = 2$, $|2-1| = 1$, $|2-3| = 1$, $|2-5| = 3$. The nearest are the
+point at $1$ (label $+$) and the point at $3$ (label $-$), both at distance
+$1$. The tie is broken toward the smaller index here, but the point of the
+exercise is the boundary, so push slightly off the tie.
+
+**Step 2.** At $x_\star = 2.5$, distances are $2.5$, $1.5$, $0.5$, $2.5$. The
+unique nearest is the point at $3$ (label $-$), so the prediction is $-$.
+
+**Step 3.** The boundary sits where the nearest $+$ point and the nearest
+$-$ point are equidistant. The relevant pair is the point at $1$ and the
+point at $3$; their midpoint is $(1 + 3)/2 = 2$. Queries with $x_\star < 2$
+are nearer the $+$ point at $1$ and predict $+$; queries with $x_\star > 2$
+are nearer the $-$ point at $3$ and predict $-$. The decision boundary is
+$x = 2$.
+
+</details>
+
+**Exercise 2.** With $k = n$ (every neighbor votes), show that k-NN
+classification predicts the global majority class at every query, and k-NN
+regression predicts the global mean of the training targets at every query.
+Explain why this is the maximum-bias, zero-variance end of the knob.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** When $k = n$, the set of $k$ nearest neighbors is the entire
+training set for any query, regardless of $x_\star$, because there are only
+$n$ points to choose from. The neighbor set no longer depends on $x_\star$.
+
+**Step 2.** Classification predicts the majority label among the neighbors.
+Since the neighbors are all $n$ points, that majority is the global majority
+class, the same for every query.
+
+**Step 3.** Regression predicts the mean of the neighbor targets, which is
+$\frac{1}{n}\sum_{i=1}^n y_i$, the global training mean, again independent of
+$x_\star$.
+
+**Step 4.** The prediction is a single constant over the whole input space,
+so it cannot track any local structure: that is maximal bias. But the
+prediction depends on the full sample only through one average, so resampling
+the training set barely moves it: that is minimal variance. This is the
+high-bias, low-variance extreme opposite to $k = 1$.
+
+</details>
+
+**Exercise 3 (code).** Implement distance-weighted k-NN classification,
+where each of the $k$ neighbors votes with weight $1/(d + \varepsilon)$ for a
+small $\varepsilon$ instead of weight $1$. On a two-blob problem, confirm
+that at $k = 15$ the weighted variant matches or beats uniform voting on test
+accuracy.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n_per = 150
+X_pos = rng.normal(loc=[1.5, 0.5], scale=0.7, size=(n_per, 2))
+X_neg = rng.normal(loc=[-1.0, -0.5], scale=0.7, size=(n_per, 2))
+X = np.vstack([X_pos, X_neg])
+y = np.array([1] * n_per + [0] * n_per)
+
+idx = rng.permutation(len(y))
+tr, te = idx[:200], idx[200:]
+Xtr, ytr = X[tr], y[tr]
+Xte, yte = X[te], y[te]
+
+def dists(Xq, Xtr):
+    return np.sqrt(((Xq[:, None, :] - Xtr[None, :, :]) ** 2).sum(axis=2))
+
+def knn_uniform(Xq, Xtr, ytr, k):
+    nn = np.argsort(dists(Xq, Xtr), axis=1)[:, :k]
+    return (ytr[nn].sum(axis=1) > k / 2).astype(int)
+
+def knn_weighted(Xq, Xtr, ytr, k, eps=1e-6):
+    d = dists(Xq, Xtr)
+    nn = np.argsort(d, axis=1)[:, :k]
+    rows = np.arange(len(Xq))[:, None]
+    w = 1.0 / (d[rows, nn] + eps)                  # weight per neighbor
+    labels = ytr[nn]
+    vote_pos = (w * (labels == 1)).sum(axis=1)
+    vote_neg = (w * (labels == 0)).sum(axis=1)
+    return (vote_pos > vote_neg).astype(int)
+
+k = 15
+acc_uniform = np.mean(knn_uniform(Xte, Xtr, ytr, k) == yte)
+acc_weighted = np.mean(knn_weighted(Xte, Xtr, ytr, k) == yte)
+print(f"uniform  k={k}: acc={acc_uniform:.3f}")
+print(f"weighted k={k}: acc={acc_weighted:.3f}")
+assert acc_weighted >= acc_uniform
+```
+
+Distance weighting lets nearby neighbors outvote the more distant members of
+the top-$k$ set, so it recovers some of the resolution a large uniform $k$
+washes out.
+
+</details>
+
+The next lesson explains why all of this gets worse as the dimension grows.
 
 <Footnotes>
   <FNItem n="1">**Cover, T. M., & Hart, P. E.** (1967). "Nearest neighbor pattern classification". *IEEE Transactions on Information Theory*, 13(1), 21-27. The original analysis of the nearest-neighbor rule and its asymptotic error bound ([doi:10.1109/TIT.1967.1053964](https://doi.org/10.1109/TIT.1967.1053964)).</FNItem>

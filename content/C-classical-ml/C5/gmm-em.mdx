@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: gmm-em
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Fit a mixture of Gaussians with the EM algorithm and interpret it as soft k-means with covariances."
 prerequisites: ["kmeans", "A2/mle"]
 ---
@@ -184,7 +184,119 @@ for K in [1, 2, 3, 4, 5]:
 ```
 
 GMM-EM recovers the mixing weights and means, the log-likelihood is
-monotonically increasing, and BIC correctly favors $K = 3$. The final C5
+monotonically increasing, and BIC correctly favors $K = 3$.
+
+## Exercises
+
+**Exercise 1.** A two-component GMM has mixing weights
+$\pi = (0.6, 0.4)$. At a point $x$, the component densities are
+$\mathcal{N}(x \mid \mu_1, \Sigma_1) = 0.10$ and
+$\mathcal{N}(x \mid \mu_2, \Sigma_2) = 0.30$. Compute the responsibilities
+$\gamma_{x1}$ and $\gamma_{x2}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form the weighted component values
+$\pi_k \mathcal{N}(x \mid \mu_k, \Sigma_k)$. Component 1:
+$0.6 \times 0.10 = 0.06$. Component 2: $0.4 \times 0.30 = 0.12$.
+
+**Step 2.** Normalize by their sum $0.06 + 0.12 = 0.18$:
+
+$$
+\gamma_{x1} = \frac{0.06}{0.18} = \frac{1}{3} \approx 0.333, \qquad
+\gamma_{x2} = \frac{0.12}{0.18} = \frac{2}{3} \approx 0.667.
+$$
+
+The point belongs twice as strongly to component 2, even though component 1 has
+the larger prior, because component 2's much higher density at $x$ outweighs the
+prior.
+
+</details>
+
+**Exercise 2.** Show that when $\Sigma_k = \sigma^2 I$ for all components with a
+common $\sigma$, the responsibilities reduce to a softmax over negative squared
+distances, and argue that as $\sigma \to 0$ this collapses to the hard k-means
+assignment.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $\Sigma_k = \sigma^2 I$ the Gaussian is
+$\mathcal{N}(x \mid \mu_k, \sigma^2 I) \propto \exp\!\big(-\lVert x - \mu_k \rVert^2 / (2\sigma^2)\big)$,
+the same normalizing constant for every $k$.
+
+**Step 2.** Substituting into the responsibility and cancelling the shared
+constant and $\pi_k$ (taking equal weights),
+
+$$
+\gamma_{ik} = \frac{\exp(-\lVert x_i - \mu_k\rVert^2 / 2\sigma^2)}
+                   {\sum_j \exp(-\lVert x_i - \mu_j\rVert^2 / 2\sigma^2)},
+$$
+
+a softmax over the negative squared distances scaled by $1/\sigma^2$.
+
+**Step 3.** As $\sigma \to 0$, the scale $1/(2\sigma^2) \to \infty$, so the
+softmax sharpens to an argmax: the component with the smallest
+$\lVert x_i - \mu_k \rVert^2$ gets responsibility $1$ and the rest $0$. That hard
+nearest-center assignment is the k-means assignment step, and the M-step mean
+update then matches k-means exactly.
+
+</details>
+
+**Exercise 3 (code).** Fit a two-component GMM with EM on data drawn from two
+Gaussians and verify that the per-iteration log-likelihood is non-decreasing,
+the monotonicity guaranteed by EM.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+X = np.vstack([rng.normal(loc=[-3.0, 0.0], scale=1.0, size=(150, 2)),
+               rng.normal(loc=[3.0, 0.0], scale=1.0, size=(150, 2))])
+
+def log_gaussian(X, mu, Sigma):
+    d = X.shape[1]
+    diff = X - mu
+    inv = np.linalg.inv(Sigma)
+    _, logdet = np.linalg.slogdet(Sigma)
+    return -0.5 * d * np.log(2 * np.pi) - 0.5 * logdet - 0.5 * np.sum(diff @ inv * diff, axis=1)
+
+def gmm_em(X, K, max_iter=50, rng=rng):
+    n, d = X.shape
+    mu = X[rng.choice(n, K, replace=False)]
+    Sigma = [np.eye(d) for _ in range(K)]
+    pi = np.full(K, 1 / K)
+    lls = []
+    for _ in range(max_iter):
+        log_resp = np.column_stack([log_gaussian(X, mu[k], Sigma[k]) + np.log(pi[k])
+                                    for k in range(K)])
+        log_norm = np.logaddexp.reduce(log_resp, axis=1)
+        gamma = np.exp(log_resp - log_norm[:, None])
+        lls.append(log_norm.sum())
+        Nk = gamma.sum(axis=0)
+        pi = Nk / n
+        for k in range(K):
+            mu[k] = (gamma[:, k][:, None] * X).sum(axis=0) / Nk[k]
+            diff = X - mu[k]
+            Sigma[k] = (gamma[:, k][:, None] * diff).T @ diff / Nk[k] + 1e-4 * np.eye(d)
+    return np.array(lls)
+
+lls = gmm_em(X, K=2)
+# EM never decreases the log-likelihood from one iteration to the next
+assert np.all(np.diff(lls) >= -1e-6)
+print("first ll:", round(lls[0], 1), " last ll:", round(lls[-1], 1))
+```
+
+The log-likelihood rises monotonically across iterations and levels off at the
+local maximum, the convergence behavior EM's Jensen-bound proof guarantees.
+
+</details>
+
+The final C5
 lesson covers the visualization-focused dimensionality-reduction methods
 t-SNE and UMAP.
 

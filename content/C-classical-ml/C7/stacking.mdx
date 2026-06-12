@@ -4,7 +4,7 @@ pillar: C
 subId: C7
 lessonId: stacking
 order: 2
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Train a meta-learner on out-of-fold predictions to combine heterogeneous base models."
 prerequisites: ["ensemble-theory"]
 ---
@@ -168,8 +168,112 @@ The meta-coefficients show how the meta-learner weights each base model.
 On this small two-learner toy with k-NN already dominating, stacking does
 not clearly beat the best single learner: the win from stacking comes from
 heterogeneity and from problems where no single model is best across the
-data, not from any two random base learners. The next lesson covers cheap
-alternatives to true stacking: snapshot ensembles and voting.
+data, not from any two random base learners.
+
+## Exercises
+
+**Exercise 1.** A stacking pipeline uses $5$-fold cross-validation with $M = 3$
+base learners on $n = 1000$ training rows. How many base-model fits are performed
+to build the out-of-fold matrix $\Phi$, and how many additional fits to prepare
+for inference? What are the dimensions of $\Phi$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For the OOF matrix, each of the $M = 3$ base learners is trained once
+per fold (on the other $4$ folds) and predicts on the held-out fold. That is
+$M \times k = 3 \times 5 = 15$ fits.
+
+**Step 2.** For inference each base learner is refit once on the full training
+set, adding $M = 3$ more fits, for $15 + 3 = 18$ total.
+
+**Step 3.** $\Phi$ has one row per training example and one column per base
+learner, so $\Phi \in \mathbb{R}^{1000 \times 3}$. The meta-learner is then fit on
+$(\Phi, y)$.
+
+</details>
+
+**Exercise 2.** The simplest meta-learner is a convex combination
+$\sum_m w_m f_m$ with $w_m \ge 0$, $\sum_m w_m = 1$. Take two base predictors
+$f_1, f_2$ with equal error variance $\sigma^2$ and error correlation $\rho$. Find
+the weight $w$ on $f_1$ (blend $w f_1 + (1-w) f_2$) that minimizes the blend's
+error variance, and evaluate it at $\rho = -1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let the errors be $\varepsilon_1, \varepsilon_2$ with
+$\operatorname{Var}(\varepsilon_i) = \sigma^2$ and
+$\operatorname{Cov}(\varepsilon_1, \varepsilon_2) = \rho\sigma^2$. The blend error
+is $w\varepsilon_1 + (1-w)\varepsilon_2$ with variance
+
+$$
+V(w) = w^2\sigma^2 + (1-w)^2\sigma^2 + 2w(1-w)\rho\sigma^2.
+$$
+
+**Step 2.** Differentiate and set to zero:
+
+$$
+\frac{dV}{dw} = \sigma^2\big(2w - 2(1-w) + 2(1-2w)\rho\big) = 0
+\;\Longrightarrow\; (w - (1-w)) + (1 - 2w)\rho = 0.
+$$
+
+By symmetry (equal variances) this solves to $w = \tfrac12$ for any
+$\rho \ne 1$.
+
+**Step 3.** At $\rho = -1$ the variance becomes
+$V(\tfrac12) = \sigma^2\big(\tfrac14 + \tfrac14 - \tfrac12\big) = 0$: perfectly
+anti-correlated errors cancel exactly at the equal blend. This is why stacking
+rewards base learners whose errors are uncorrelated or negatively correlated, not
+ones that agree.
+
+</details>
+
+**Exercise 3 (code).** Construct two base regressors whose errors are perfectly
+anti-correlated ($f_1 = y + e$, $f_2 = y - e$). Search over convex weights $w$ and
+confirm the best blend has lower mean squared error than either base model, with
+the optimum at $w \approx 0.5$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n = 5000
+y = rng.normal(size=n)
+
+# Base 1 overshoots by e, base 2 undershoots by e: anti-correlated errors.
+e = rng.normal(scale=1.0, size=n)
+f1 = y + e
+f2 = y - e
+
+def mse(pred):
+    return np.mean((pred - y) ** 2)
+
+mse1, mse2 = mse(f1), mse(f2)
+ws = np.linspace(0, 1, 101)
+mses = [mse(w * f1 + (1 - w) * f2) for w in ws]
+w_star = ws[int(np.argmin(mses))]
+mse_blend = min(mses)
+print(f"MSE f1={mse1:.3f}, f2={mse2:.3f}, best blend (w={w_star:.2f})={mse_blend:.4f}")
+
+assert mse_blend < min(mse1, mse2)           # blend beats both bases
+assert np.isclose(w_star, 0.5, atol=0.05)    # optimum at the equal blend
+assert mse_blend < 0.05                      # anti-correlated errors cancel
+```
+
+Each base model has MSE near $1.0$, but the equal blend cancels the
+anti-correlated errors and drives the MSE to essentially zero at $w = 0.5$. The
+gain comes entirely from the error structure, not from either model being good on
+its own.
+
+</details>
+
+The next lesson covers cheap alternatives to true stacking: snapshot ensembles
+and voting.
 
 <Footnotes>
   <FNItem n="1">**Wolpert, D. H.** (1992). "Stacked generalization". *Neural Networks*, 5(2), 241-259. The original formulation of training a meta-learner on base-model outputs ([doi:10.1016/S0893-6080(05)80023-1](https://doi.org/10.1016/S0893-6080(05)80023-1)).</FNItem>

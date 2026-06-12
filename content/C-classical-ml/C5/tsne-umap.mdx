@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: tsne-umap
 order: 8
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Use neighborhood-preserving methods to visualize high-dimensional structure, and know their failure modes."
 prerequisites: ["A1/low-rank-pca"]
 ---
@@ -152,7 +152,114 @@ print("\nPCA does fine here because separation is linear; on curved manifolds, t
 ```
 
 The t-SNE embedding pulls the three blobs apart in 2D, and PCA does the same
-on this linearly separable example. This closes C5 on unsupervised learning;
+on this linearly separable example.
+
+## Exercises
+
+**Exercise 1.** In a t-SNE plot, two well-separated clusters appear with one
+twice the diameter of the other, and they sit far apart on the page. State which
+of these two visual facts (relative cluster size, between-cluster distance) you
+may report as a property of the data, and justify it from how t-SNE builds the
+embedding.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** t-SNE matches a low-dimensional similarity distribution $Q$ to a
+high-dimensional one $P$ by minimizing $D_{\text{KL}}(P \| Q)$. The objective
+constrains neighborhood structure (who is near whom), not absolute scales.
+
+**Step 2.** Cluster diameter in the plot is set by the heavy-tailed Student-t
+kernel and the perplexity, not by the data's spread; a denser cluster can render
+larger or smaller depending on those settings. So relative cluster size is not a
+data property.
+
+**Step 3.** Between-cluster distance is likewise not preserved: once two clusters
+have negligible cross-similarity in $P$, the optimization is free to place them
+at any separation that keeps them apart. Neither visual fact may be reported as a
+data property; only the within-cluster neighborhood structure is meaningful.
+
+</details>
+
+**Exercise 2.** The t-SNE low-dimensional kernel is
+$(1 + \lVert y_i - y_j \rVert^2)^{-1}$. Compare its tail to a Gaussian kernel
+$\exp(-\lVert y_i - y_j \rVert^2)$ at a large separation $r = \lVert y_i - y_j \rVert$,
+and explain how the heavier tail addresses the crowding problem.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At large $r$ the Student-t kernel decays as
+$(1 + r^2)^{-1} \approx r^{-2}$, a polynomial tail. The Gaussian decays as
+$e^{-r^2}$, which falls off far faster; for instance at $r = 4$ the Student-t
+gives about $1/17 \approx 0.059$ while the Gaussian gives
+$e^{-16} \approx 1.1 \times 10^{-7}$.
+
+**Step 2.** The crowding problem is that a high-dimensional neighborhood has more
+room than a 2D one, so moderately distant points get squeezed together. A
+Gaussian low-dimensional kernel would assign them near-zero similarity and let
+them collapse. The polynomial tail keeps a nonnegligible similarity at moderate
+$r$, producing a finite repulsion that pushes such points apart and reclaims
+room, so clusters do not pile on top of each other.
+
+</details>
+
+**Exercise 3 (code).** On three well-separated 5D blobs, run the lesson's
+minimal t-SNE and verify the three class centroids in the 2D embedding are
+mutually farther apart than the within-class spread, the separation the plot is
+meant to show.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n_per = 60
+centers = [np.array([6, 0, 0, 0, 0]), np.array([-6, 0, 0, 0, 0]), np.array([0, 6, 0, 0, 0])]
+X = np.vstack([rng.normal(loc=c, scale=1.0, size=(n_per, 5)) for c in centers])
+y = np.array([0] * n_per + [1] * n_per + [2] * n_per)
+
+def tsne_simple(X, n_iter=300, lr=200, rng=rng):
+    n = len(X)
+    D2 = np.sum((X[:, None] - X[None, :])**2, axis=2)
+    sigma = np.std(X) * 2
+    P = np.exp(-D2 / (2 * sigma**2))
+    np.fill_diagonal(P, 0)
+    P = P / P.sum()
+    P = 0.5 * (P + P.T)
+    Y = rng.normal(scale=1e-4, size=(n, 2))
+    for _ in range(n_iter):
+        d2 = np.sum((Y[:, None] - Y[None, :])**2, axis=2)
+        Qn = 1 / (1 + d2)
+        np.fill_diagonal(Qn, 0)
+        Q = Qn / Qn.sum()
+        grad = np.zeros_like(Y)
+        for i in range(n):
+            w = 4 * (P[i] - Q[i]) * Qn[i]
+            grad[i] = (w[:, None] * (Y[i] - Y)).sum(axis=0)
+        Y -= lr * grad
+    return Y
+
+Y = tsne_simple(X)
+cent = np.array([Y[y == c].mean(axis=0) for c in range(3)])
+spread = np.mean([np.linalg.norm(Y[y == c] - cent[c], axis=1).mean() for c in range(3)])
+min_between = min(np.linalg.norm(cent[a] - cent[b])
+                  for a in range(3) for b in range(a + 1, 3))
+
+assert min_between > spread                         # clusters separate cleanly
+print("min between-centroid distance:", round(float(min_between), 2))
+print("mean within-class spread:", round(float(spread), 2))
+```
+
+The closest pair of class centroids is farther apart than the average
+within-class spread, so the three blobs land as distinct islands, the local
+neighborhood structure t-SNE is designed to surface.
+
+</details>
+
+This closes C5 on unsupervised learning;
 the next subsection turns to detecting points that do **not** belong to any
 cluster: anomalies.
 

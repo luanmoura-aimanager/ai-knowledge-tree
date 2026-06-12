@@ -4,7 +4,7 @@ pillar: C
 subId: C8
 lessonId: implicit-feedback
 order: 3
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Handle clicks and views (not ratings) with weighted alternating least squares."
 prerequisites: ["matrix-factorization"]
 ---
@@ -150,7 +150,105 @@ print(f"Implicit-MF pairwise AUC: {auc:.3f}  (>0.5 means observed items ranked h
 ```
 
 The implicit-MF model ranks observed items above unobserved with high
-probability. The next lesson tightens the model to nonneg factors with NMF.
+probability.
+
+## Exercises
+
+**Exercise 1.** A user interacted with an item $4$ times. Using the standard
+confidence rule $\alpha_{ui} = 1 + \alpha\, c_{ui}$ with $\alpha = 10$, compute
+the preference $p_{ui}$ and confidence $\alpha_{ui}$. Then give $p$ and
+$\alpha$ for a pair with zero interactions, and state in one sentence why the
+zero-count weight is small but not zero.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Preference is binary: any positive count gives $p_{ui} = 1$, so the
+$4$-interaction pair has $p_{ui} = 1$.
+
+**Step 2.** Confidence: $\alpha_{ui} = 1 + 10 \cdot 4 = 41$.
+
+**Step 3.** For the unobserved pair, $c_{ui} = 0$ gives $p_{ui} = 0$ and
+$\alpha_{ui} = 1 + 10 \cdot 0 = 1$. The weight is kept at $1$ rather than $0$
+because absence of interaction is weak evidence of dislike, not proof of it: the
+model should pull the predicted preference toward $0$ for unobserved pairs, but
+only gently, so a single missed item does not dominate a confirmed positive.
+
+</details>
+
+**Exercise 2.** The per-user ALS update solves
+$\mathbf{u}_u = (V^\top C_u V + \lambda I)^{-1} V^\top C_u\, p_u$ with
+$C_u = \operatorname{diag}(\alpha_{u\cdot})$. Show that
+$V^\top C_u V = V^\top V + V^\top (C_u - I) V$ and explain why this identity is
+what makes the update cost $O(k^2 |I_u| + k^3)$ instead of $O(k^2 n_i)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Split the diagonal confidence matrix as $C_u = I + (C_u - I)$.
+Substituting into the quadratic form and distributing,
+
+$$
+V^\top C_u V = V^\top (I + (C_u - I)) V = V^\top V + V^\top (C_u - I) V.
+$$
+
+**Step 2.** The first term $V^\top V$ does not depend on $u$, so it is computed
+once and reused for every user, costing $O(k^2 n_i)$ amortized to $O(k^2)$ per
+user.
+
+**Step 3.** For unobserved pairs $\alpha_{ui} = 1$, so the diagonal of
+$C_u - I$ is zero there and nonzero only on the $|I_u|$ items the user actually
+touched. The product $V^\top (C_u - I) V$ therefore sums over $|I_u|$ rank-one
+terms, costing $O(k^2 |I_u|)$. Adding the $O(k^3)$ solve of the $k \times k$
+system gives the stated $O(k^2 |I_u| + k^3)$, with no dependence on the full
+catalog size $n_i$ per user.
+
+</details>
+
+**Exercise 3 (code).** Implement the rewritten Gramian
+$V^\top C_u V = V^\top V + V^\top(C_u - I)V$ and verify it equals the naive
+$V^\top \operatorname{diag}(C_u) V$ on a small example, then confirm the implied
+$\mathbf{u}_u$ solves match.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+
+n_i, k = 12, 4
+V = rng.normal(size=(n_i, k))
+alpha = np.ones(n_i)
+touched = rng.choice(n_i, size=3, replace=False)
+alpha[touched] = 1 + 10 * rng.integers(1, 5, size=3)     # confidence on a few items
+p = np.zeros(n_i)
+p[touched] = 1.0
+lam = 0.1
+
+# Naive Gramian
+Cu = np.diag(alpha)
+A_naive = V.T @ Cu @ V + lam * np.eye(k)
+u_naive = np.linalg.solve(A_naive, V.T @ (alpha * p))
+
+# Rewritten: V^T V reused, plus sparse correction over touched items only
+VtV = V.T @ V
+correction = (V[touched] * (alpha[touched] - 1)[:, None]).T @ V[touched]
+A_fast = VtV + correction + lam * np.eye(k)
+u_fast = np.linalg.solve(A_fast, V.T @ (alpha * p))
+
+assert np.allclose(A_naive, A_fast)
+assert np.allclose(u_naive, u_fast)
+print("max Gramian diff:", np.abs(A_naive - A_fast).max())
+```
+
+The sparse correction over only the touched items reproduces the full Gramian
+exactly, so the scalable update returns the same embedding as the naive one.
+
+</details>
+
+The next lesson tightens the model to nonneg factors with NMF.
 
 <Footnotes>
   <FNItem n="1">**Hu, Y., Koren, Y., & Volinsky, C.** (2008). "Collaborative filtering for implicit feedback datasets". *ICDM*. [doi:10.1109/ICDM.2008.22](https://doi.org/10.1109/ICDM.2008.22). The preference/confidence split, weighted loss, and the scalable ALS update.</FNItem>

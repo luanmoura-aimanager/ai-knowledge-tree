@@ -4,7 +4,7 @@ pillar: C
 subId: C7
 lessonId: automl
 order: 4
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Survey AutoML systems and the search problem they solve over pipelines and hyperparameters."
 prerequisites: ["A3/bayesian-optimization"]
 ---
@@ -155,8 +155,116 @@ print(f"local search around best init: k={best_neighbor[0]}, C={best_neighbor[1]
 
 The random search produces a respectable result; the local search around the
 best initial point refines it modestly. Real AutoML systems do this at scale
-across pipeline spaces with hundreds of dimensions. This closes the C7
-ensembles track; the next subsection turns to recommendation systems.
+across pipeline spaces with hundreds of dimensions.
+
+## Exercises
+
+**Exercise 1.** An AutoML pipeline search has $4$ preprocessing choices, $3$
+feature-engineering choices, $5$ model classes, and on average $20$ hyperparameter
+settings per model class. How large is the pipeline space, and what does its size
+imply about the choice between exhaustive grid search and a guided search strategy?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The choices compose multiplicatively because each is made
+independently along the pipeline:
+
+$$
+4 \times 3 \times 5 \times 20 = 1200
+$$
+
+distinct pipelines.
+
+**Step 2.** Evaluating each pipeline means a full train-and-cross-validate run.
+At, say, one minute per evaluation, exhaustive grid search over $1200$ candidates
+costs $20$ hours, and this is a deliberately small space: realistic spaces are
+exponential in the number of components and quickly reach millions of
+configurations.
+
+**Step 3.** Exhaustive search is therefore infeasible at scale, which is why
+AutoML leans on guided strategies (Bayesian optimization, evolutionary search)
+and early-stopping (Hyperband) that spend the evaluation budget on the promising
+regions instead of the whole grid.
+
+</details>
+
+**Exercise 2.** Bayesian optimization spends part of its budget on configurations
+it expects to be poor. Explain the exploration-exploitation trade-off this
+reflects, and why a pure "always evaluate the configuration with the best
+predicted score" strategy can get stuck.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The surrogate model predicts both a mean score and an uncertainty for
+each untried configuration. Exploitation evaluates where the predicted mean is
+high; exploration evaluates where the uncertainty is high, even if the predicted
+mean is mediocre.
+
+**Step 2.** A pure-exploitation strategy evaluates only near the current best.
+Once it has a local optimum, the surrogate's mean is highest there, so it keeps
+sampling the same neighborhood and never tests distant regions whose true score
+it cannot know.
+
+**Step 3.** That strategy can get stuck in a local optimum: a better
+configuration in an unexplored region is never evaluated because its predicted
+mean, under an uninformed surrogate, looks unremarkable. Acquisition functions
+like expected improvement add value for uncertainty, deliberately probing
+high-variance regions so the search can escape and find globally better
+pipelines.
+
+</details>
+
+**Exercise 3 (code).** Demonstrate the Bergstra-Bengio result: when only one of
+several hyperparameters matters, random search explores more distinct values of
+the important one than grid search at the same budget, and so lands closer to the
+optimum. Use an objective that depends only on the first coordinate.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import itertools
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+D = 4
+def objective(x):
+    return -((x[0] - 0.7) ** 2)        # maximize; depends only on x[0]
+
+budget = 16
+
+# Grid search: 2 values per dim over 4 dims = 16 configs, but only 2 distinct
+# values of the one important coordinate x[0].
+grid_axis = [0.25, 0.75]
+grid = list(itertools.product(grid_axis, repeat=D))
+grid_best = max(objective(np.array(c)) for c in grid)
+grid_distinct_x0 = len(set(c[0] for c in grid))
+
+# Random search: 16 configs, each x[0] a fresh uniform draw -> 16 distinct values.
+rand = rng.random((budget, D))
+rand_best = max(objective(rand[i]) for i in range(budget))
+rand_distinct_x0 = len(set(np.round(rand[:, 0], 6)))
+
+print(f"grid:   best={grid_best:.4f}, distinct x0 tried={grid_distinct_x0}")
+print(f"random: best={rand_best:.4f}, distinct x0 tried={rand_distinct_x0}")
+
+assert rand_distinct_x0 > grid_distinct_x0   # random covers the important axis better
+assert rand_best > grid_best                 # and gets closer to the optimum
+```
+
+Grid search wastes its $16$ evaluations testing only $2$ values of the coordinate
+that matters (the rest vary the irrelevant dimensions), so its best score stalls
+near $-0.0025$. Random search tries $16$ distinct values of $x_0$ and lands within
+$0.0002$ of the optimum. The lesson generalizes: random search is hard to beat as
+a baseline precisely because real objectives have few effective dimensions.
+
+</details>
+
+This closes the C7 ensembles track; the next subsection turns to recommendation
+systems.
 
 <Footnotes>
   <FNItem n="1">**He, X., Zhao, K., & Chu, X.** (2021). "AutoML: a survey of the state-of-the-art". *Knowledge-Based Systems*, 212, 106622. Surveys the pipeline-search problem across feature engineering, model selection, and tuning ([doi:10.1016/j.knosys.2020.106622](https://doi.org/10.1016/j.knosys.2020.106622)).</FNItem>

@@ -4,7 +4,7 @@ pillar: C
 subId: C4
 lessonId: curse-of-dimensionality
 order: 2
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "See how nearest-neighbor methods degrade as dimension grows and pick metrics that respect the data."
 prerequisites: ["knn", "A1/norms"]
 ---
@@ -110,6 +110,111 @@ for d in d_grid:
 As $d$ grows, the ratio of farthest to nearest pairwise distance approaches
 1 and the relative spread of distances shrinks. In 100 dimensions, less than
 a half-percent of unit-cube points are even slightly away from the boundary.
+
+## Exercises
+
+**Exercise 1.** For two points drawn uniformly from $[0, 1]^d$, the squared
+distance is $D^2 = \sum_{j=1}^d (X_j - Y_j)^2$ with the $(X_j - Y_j)^2$ terms
+i.i.d. A single coordinate gap $U = X_j - Y_j$ has $\mathbb{E}[U^2] = 1/6$.
+Use this to derive $\mathbb{E}[D^2] = d/6$, and explain why the relative
+spread $\operatorname{sd}(D^2)/\mathbb{E}[D^2]$ shrinks like $1/\sqrt d$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $D^2$ is a sum of $d$ i.i.d. terms $T_j = (X_j - Y_j)^2$ with
+$\mathbb{E}[T_j] = 1/6$. By linearity,
+$\mathbb{E}[D^2] = \sum_{j=1}^d \mathbb{E}[T_j] = d/6$.
+
+**Step 2.** The terms are independent, so their variances add:
+$\operatorname{Var}(D^2) = \sum_{j=1}^d \operatorname{Var}(T_j) = d\,\sigma_T^2$,
+where $\sigma_T^2 = \operatorname{Var}(T_j)$ is a fixed positive constant that
+does not depend on $d$. Hence
+$\operatorname{sd}(D^2) = \sigma_T \sqrt d$.
+
+**Step 3.** The relative spread is
+$$
+\frac{\operatorname{sd}(D^2)}{\mathbb{E}[D^2]}
+= \frac{\sigma_T \sqrt d}{d/6}
+= \frac{6\sigma_T}{\sqrt d}.
+$$
+The numerator grows like $\sqrt d$ while the mean grows like $d$, so the ratio
+falls like $1/\sqrt d$ and tends to $0$. Distances bunch ever more tightly
+around $d/6$ relative to their own scale, which is distance concentration.
+
+</details>
+
+**Exercise 2.** A query point sits at the center of $[0, 1]^d$. To capture a
+fraction $r$ of the unit-cube volume inside an axis-aligned subcube centered
+on the query, the subcube must have side length $s = r^{1/d}$. Compute $s$ for
+$r = 0.01$ at $d = 1$, $d = 10$, and $d = 100$, and state what this says about
+the size of a "local" neighborhood in high dimensions.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A subcube of side $s$ centered in $[0, 1]^d$ has volume $s^d$.
+Setting $s^d = r$ gives $s = r^{1/d}$.
+
+**Step 2.** Evaluate $s = 0.01^{1/d}$:
+- $d = 1$: $s = 0.01$.
+- $d = 10$: $s = 0.01^{0.1} = 10^{-0.2} \approx 0.63$.
+- $d = 100$: $s = 0.01^{0.01} = 10^{-0.02} \approx 0.955$.
+
+**Step 3.** To enclose just $1\%$ of the volume in $100$ dimensions, the
+neighborhood must span about $95.5\%$ of the range of every coordinate. A
+neighborhood holding a small share of the data is no longer local in any
+coordinate, so "look at nearby points" stops meaning "look at points similar
+on each feature." Locality, the premise k-NN relies on, breaks.
+
+</details>
+
+**Exercise 3 (code).** Distances concentrate, but a low intrinsic dimension
+rescues them. Generate data that lives on a 2D plane embedded in $d = 200$
+ambient dimensions (a random linear map of 2 latent coordinates, plus a little
+ambient noise). Show that the max/min pairwise distance ratio is far larger
+(distances stay informative) than for genuinely 200-dimensional i.i.d.
+Gaussian data.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def ratio(X):
+    sq = (X * X).sum(axis=1)
+    d2 = sq[:, None] + sq[None, :] - 2 * X @ X.T
+    d2 = np.maximum(d2, 0.0)
+    off = np.sqrt(d2[~np.eye(len(X), dtype=bool)])
+    return off.max() / off.min()
+
+n, D = 300, 200
+
+# Genuinely high-dimensional: 200 independent Gaussian coordinates
+X_full = rng.normal(size=(n, D))
+
+# Low intrinsic dimension: 2 latent coords mapped into 200-D, plus small noise
+Z = rng.normal(size=(n, 2))
+A = rng.normal(size=(2, D))
+X_low = Z @ A + 0.01 * rng.normal(size=(n, D))
+
+r_full = ratio(X_full)
+r_low = ratio(X_low)
+print(f"max/min ratio, full 200-D : {r_full:.3f}")
+print(f"max/min ratio, 2-D in 200 : {r_low:.3f}")
+assert r_low > r_full
+```
+
+When the data really fill $200$ dimensions the ratio sits just above $1$
+(distances are uninformative), but when they lie on a $2$D plane the ratio is
+much larger, because the geometry that matters is two-dimensional regardless
+of the ambient count. This is why embedding before measuring distance works.
+
+</details>
+
 The next lesson uses Bayes' rule to build a probabilistic classifier whose
 distances are replaced by likelihood ratios: Naive Bayes.
 

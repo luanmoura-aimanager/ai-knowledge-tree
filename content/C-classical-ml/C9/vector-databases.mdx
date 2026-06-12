@@ -4,7 +4,7 @@ pillar: C
 subId: C9
 lessonId: vector-databases
 order: 5
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Compare FAISS, pgvector, and managed vector DBs along recall, throughput, and operational cost."
 prerequisites: ["hnsw", "ivf-pq"]
 ---
@@ -177,7 +177,104 @@ for q_idx in range(5):
 ```
 
 When the filter is selective (here, 1 of 5 categories), pre-filter
-recovers more relevant neighbors than post-filter. This closes the C9
+recovers more relevant neighbors than post-filter.
+
+## Exercises
+
+**Exercise 1.** A catalog of $5 \times 10^7$ vectors of dimension $d = 768$
+(float32) must be served with HNSW at $M = 32$ (store $2M$ 4-byte edge ids per
+node). Estimate the total RAM, then argue whether IVF-PQ at $16$ bytes per code
+would let the same data fit on a $128$ GB machine.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** HNSW raw vectors cost $5 \times 10^7 \cdot 768 \cdot 4 = 1.536
+\times 10^{11}$ bytes, about $154$ GB. Edges add $5 \times 10^7 \cdot 64 \cdot 4
+= 1.28 \times 10^{10}$ bytes, about $13$ GB, for roughly $167$ GB total.
+
+**Step 2.** That exceeds a $128$ GB machine, so plain HNSW does not fit; the
+vectors alone overflow it.
+
+**Step 3.** IVF-PQ at $16$ bytes per code costs $5 \times 10^7 \cdot 16 = 8
+\times 10^8$ bytes, about $0.8$ GB for codes, plus small codebooks and centroid
+lists. That fits with room to spare, which is the standard reason to pick
+compressed IVF-PQ over graph indices when RAM is the binding constraint.
+
+</details>
+
+**Exercise 2.** A query applies a metadata filter that keeps only $0.5\%$ of the
+catalog. Compare pre-filter and post-filter for this query: which one risks
+returning fewer than $k$ results, and what over-fetch factor would post-filter
+need to expect $k = 10$ survivors on average?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Pre-filter restricts to the $0.5\%$ that pass, then ranks them
+exactly, so it always returns the true filtered top-10 (as long as at least $10$
+items pass). It does not risk returning too few unless the category itself is
+tiny.
+
+**Step 2.** Post-filter ranks the unfiltered top-$F$ by similarity, then drops
+the $99.5\%$ that fail. Each fetched item survives with probability $0.005$, so
+the expected survivors are $0.005 \cdot F$. With a small $F$ almost all results
+are filtered out, leaving fewer than $k$.
+
+**Step 3.** To expect $10$ survivors, set $0.005 \cdot F = 10$, so $F = 2000$.
+Post-filter must over-fetch $200\times$ the target, and even then survivors are
+the globally nearest items rather than the nearest among the filtered set, so
+recall against the true filtered top-10 still lags pre-filter. High selectivity
+favors pre-filter or an integrated index.
+
+</details>
+
+**Exercise 3 (code).** Demonstrate why post-filter recall collapses as a filter
+gets more selective. Over-fetch a fixed $200$ candidates by similarity, keep
+those passing a category filter, and compare recall@10 against the exact
+filtered top-10 for a loose filter (half the catalog kept) versus a tight one
+(one twentieth kept).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+n, d = 20_000, 64
+
+def post_filter_recall(n_cat, over_fetch=200, seed=0):
+    rng = np.random.default_rng(seed)
+    X = rng.normal(size=(n, d))
+    queries = rng.normal(size=(50, d))
+    cats = rng.integers(0, n_cat, size=n)
+    mask = cats == 0                                   # keep one category
+    idx = np.where(mask)[0]
+    Xf = X[idx]
+    recalls = []
+    for q in queries:
+        cand = np.argsort(((X - q) ** 2).sum(1))[:over_fetch]   # ANN first
+        kept = cand[mask[cand]][:10]                            # then drop non-matches
+        truth = idx[np.argsort(((Xf - q) ** 2).sum(1))[:10]]    # exact filtered top-10
+        recalls.append(len(set(kept.tolist()) & set(truth.tolist())) / 10)
+    return float(np.mean(recalls))
+
+loose = post_filter_recall(n_cat=2)      # selectivity 1/2
+tight = post_filter_recall(n_cat=20)     # selectivity 1/20
+print(f"loose filter (1/2 kept):  post-filter recall@10 = {loose:.3f}")
+print(f"tight filter (1/20 kept): post-filter recall@10 = {tight:.3f}")
+assert tight < loose                     # restrictive filter starves post-filtering
+```
+
+A loose filter keeps enough of the over-fetched candidates to reach recall@10 of
+about $1.0$, while a tight filter (one twentieth kept) drops to about $0.83$
+because most of the $200$ nearest items are filtered out before the top-10 can
+fill. Raising the over-fetch budget recovers some recall, but pre-filter or an
+index that traverses only matching items avoids the waste entirely.
+
+</details>
+
+This closes the C9
 ANN track; the final C10 lessons cover the evaluation and selection
 machinery that ties everything together.
 

@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: poisson-gamma-glm
 order: 10
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Use Poisson regression for counts and Gamma regression for positive continuous durations."
 prerequisites: ["glm-framework"]
 ---
@@ -135,8 +135,117 @@ print(f"\nempirical Var/mean for Poisson data: {y.var() / y.mean():.2f}  (Poisso
 
 Both GLMs recover their true coefficients, the multiplicative interpretation
 of $e^\beta$ holds for the log link, and the Poisson sample variance is close
-to the sample mean. This closes the C1 linear-models track; the next subsection
-turns to a different geometric story: max-margin classifiers and kernels.
+to the sample mean.
+
+## Exercises
+
+**Exercise 1.** A Poisson regression for daily store visits fits intercept
+$\beta_0 = 2.0$ and a "weekend" coefficient $\beta_1 = 0.7$ (with $x_1 = 1$ on
+weekends, $0$ otherwise). Compute the expected count on a weekday and on a
+weekend, and state the multiplicative effect of the weekend.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The log link gives $\mu = e^{x^\top\beta}$. On a weekday $x_1 = 0$,
+so the linear predictor is $\beta_0 = 2.0$ and
+
+$$
+\mu_{\text{weekday}} = e^{2.0} \approx 7.389.
+$$
+
+**Step 2.** On a weekend $x_1 = 1$, so the predictor is $\beta_0 + \beta_1 = 2.7$
+and
+
+$$
+\mu_{\text{weekend}} = e^{2.7} \approx 14.880.
+$$
+
+**Step 3.** The ratio of the two means is $e^{2.7}/e^{2.0} = e^{0.7} \approx
+2.014$. The weekend multiplies the expected count by $e^{\beta_1} \approx 2.01$,
+the multiplicative reading of a log-link coefficient: each unit of the predictor
+scales the rate by $e^{\beta_j}$ rather than adding to it.
+
+</details>
+
+**Exercise 2.** Show that the Poisson log-likelihood
+$\ell(\beta) = \sum_i \big(y_i x_i^\top\beta - e^{x_i^\top\beta} - \log y_i!\big)$
+is concave in $\beta$, so any stationary point is the global maximum.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $\eta_i = x_i^\top\beta$ and $\mu_i = e^{\eta_i}$. The term
+$\log y_i!$ does not depend on $\beta$, so it drops out of every derivative.
+Differentiate one example's contribution with respect to $\beta$:
+
+$$
+\nabla_\beta\big(y_i \eta_i - e^{\eta_i}\big) = y_i x_i - e^{\eta_i} x_i = (y_i - \mu_i)\, x_i,
+$$
+
+using $\nabla_\beta \eta_i = x_i$ and $\frac{d}{d\eta} e^\eta = e^\eta$.
+
+**Step 2.** Differentiate again to get the Hessian. Since $\nabla_\beta \mu_i =
+\mu_i x_i$,
+
+$$
+\nabla^2_\beta\big(y_i \eta_i - e^{\eta_i}\big) = -\mu_i\, x_i x_i^\top.
+$$
+
+Summing over examples, $\nabla^2\ell = -\sum_i \mu_i x_i x_i^\top = -X^\top W X$
+with $W = \operatorname{diag}(\mu_i)$ and every $\mu_i = e^{\eta_i} > 0$.
+
+**Step 3.** For any vector $v$, $v^\top(-X^\top W X)v = -\sum_i \mu_i (x_i^\top
+v)^2 \le 0$, because each $\mu_i > 0$ and each squared term is nonnegative. The
+Hessian is negative semidefinite, so $\ell$ is concave and any stationary point
+is a global maximum.
+
+</details>
+
+**Exercise 3 (code).** Overdispersion is the signature that count data violates
+the Poisson mean-equals-variance assumption. Simulate a negative-binomial-like
+process (a Poisson whose rate is itself Gamma-distributed across units) and
+compare its variance-to-mean ratio against a plain Poisson sample with the same
+mean. Assert the mixed process is overdispersed (ratio above 1.5) while the
+plain Poisson sits near 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200_000
+mean_rate = 5.0
+
+# Plain Poisson: Var/mean should be ~1.
+y_pois = rng.poisson(mean_rate, size=n)
+ratio_pois = y_pois.var() / y_pois.mean()
+
+# Poisson-Gamma mixture: each unit's rate is Gamma with mean mean_rate.
+# This is the negative-binomial construction; it inflates the variance.
+shape = 1.0
+rates = rng.gamma(shape=shape, scale=mean_rate / shape, size=n)
+y_mix = rng.poisson(rates)
+ratio_mix = y_mix.var() / y_mix.mean()
+
+print(f"plain Poisson Var/mean: {ratio_pois:.3f}")
+print(f"Poisson-Gamma Var/mean: {ratio_mix:.3f}")
+
+assert abs(ratio_pois - 1.0) < 0.05        # Poisson: variance equals mean
+assert ratio_mix > 1.5                     # mixture is overdispersed
+```
+
+The plain Poisson sample has a variance-to-mean ratio near 1, matching
+$\operatorname{Var}(y) = \mu$. The Poisson-Gamma mixture, where each unit draws
+its own rate, has a ratio well above 1: this is the overdispersion that pushes
+the modeler from Poisson to Quasi-Poisson or Negative Binomial.
+
+</details>
+
+This closes the C1 linear-models track; the next subsection turns to a different
+geometric story: max-margin classifiers and kernels.
 
 <Footnotes>
   <FNItem n="1">**McCullagh, P., & Nelder, J. A.** (1989). *Generalized Linear Models* (2nd ed.), §6 (Poisson), §8 (Gamma). Chapman & Hall.</FNItem>

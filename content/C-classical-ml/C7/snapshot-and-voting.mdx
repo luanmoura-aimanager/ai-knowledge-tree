@@ -4,7 +4,7 @@ pillar: C
 subId: C7
 lessonId: snapshot-and-voting
 order: 3
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Average models cheaply via snapshots, hard/soft voting, and rank averaging."
 prerequisites: ["ensemble-theory"]
 ---
@@ -157,8 +157,97 @@ print(f"weighted soft vote:   {np.mean(weighted == y_true):.3f}")
 
 Both hard and soft voting beat the best single model when the models are
 roughly independent. Rank averaging gives similar results without needing
-calibrated probabilities. The next lesson hands the model search to an
-automatic system: AutoML.
+calibrated probabilities.
+
+## Exercises
+
+**Exercise 1.** Three calibrated binary classifiers output, for one input, the
+probabilities of class $1$: $p_1 = 0.8$, $p_2 = 0.45$, $p_3 = 0.6$. Give the hard
+vote and the soft vote, and explain why they disagree.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Hard vote: threshold each at $0.5$. Model 1 predicts class $1$
+($0.8 > 0.5$), model 2 predicts class $0$ ($0.45 < 0.5$), model 3 predicts class
+$1$ ($0.6 > 0.5$). The majority is $2$ to $1$ for class $1$.
+
+**Step 2.** Soft vote: average the probabilities,
+$\frac{0.8 + 0.45 + 0.6}{3} = \frac{1.85}{3} \approx 0.617$, then threshold:
+$0.617 > 0.5$, so class $1$.
+
+**Step 3.** Here they agree on the label, but the soft vote also carries the
+confidence $0.617$, whereas the hard vote discards it. They can disagree when the
+majority is confident-but-wrong on the count: if probabilities were
+$(0.51, 0.51, 0.05)$, hard voting says class $1$ ($2$ to $1$) while soft voting
+averages to $0.357$ and says class $0$. Soft voting lets one strongly-opposed
+model overrule two weakly-supporting ones.
+
+</details>
+
+**Exercise 2.** The Condorcet jury theorem says that for $M$ independent voters
+each correct with probability $p > 1/2$, majority-vote accuracy increases with
+$M$ and tends to $1$. Explain why the independence assumption is exactly the
+"correlated errors" failure mode from the ensemble-theory lesson, and what
+happens to the guarantee when the voters are perfectly correlated.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The theorem's power comes from averaging out independent mistakes:
+with independent voters, the probability that more than half are simultaneously
+wrong shrinks as $M$ grows, by the law of large numbers applied to the count of
+correct votes.
+
+**Step 2.** If the voters are perfectly correlated, every voter is wrong exactly
+when the others are wrong, so the majority is wrong with the same probability
+$1 - p$ regardless of $M$. The count of correct votes is either $M$ or $0$, never
+a partial split, so adding voters does nothing.
+
+**Step 3.** This is the correlated-errors failure mode: ensembling buys accuracy
+only to the extent the base models err on different inputs. Snapshots from one
+training run are more correlated than independent trainings, which is precisely
+why their variance reduction is smaller than a true ensemble's.
+
+</details>
+
+**Exercise 3 (code).** Simulate $M$ independent classifiers each correct with
+probability $p = 0.65$ and measure majority-vote accuracy for
+$M \in \{1, 3, 5, 11, 25\}$. Confirm accuracy rises with $M$ and that $25$ voters
+beat a single voter by a wide margin.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n = 200_000      # trials
+p = 0.65         # per-voter accuracy
+
+def majority_accuracy(M, p, rng):
+    correct = rng.random((n, M)) < p          # each voter correct w.p. p
+    return (correct.sum(axis=1) > (M / 2)).mean()
+
+for M in [1, 3, 5, 11, 25]:
+    print(f"M={M:2d}: majority-vote accuracy = {majority_accuracy(M, p, rng):.4f}")
+
+acc1 = majority_accuracy(1, p, rng)
+acc25 = majority_accuracy(25, p, rng)
+assert acc25 > acc1      # more voters help
+assert acc25 > 0.90      # 25 voters at p=0.65 clear 90%
+```
+
+A single voter sits at $0.65$, but the majority of $25$ independent voters reaches
+about $0.94$: independent errors cancel in the count, exactly the Condorcet
+mechanism. The same simulation with perfectly correlated voters would stay flat
+at $0.65$ for every $M$.
+
+</details>
+
+The next lesson hands the model search to an automatic system: AutoML.
 
 <Footnotes>
   <FNItem n="1">**Hansen, L. K., & Salamon, P.** (1990). "Neural network ensembles". *IEEE TPAMI*, 12(10), 993-1001. Averaging multiple trained networks improves accuracy over any single one ([doi:10.1109/34.58871](https://doi.org/10.1109/34.58871)).</FNItem>

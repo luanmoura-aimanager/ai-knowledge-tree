@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: svm-dual
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Form the SVM dual, identify support vectors via complementary slackness, and read sparsity off KKT."
 prerequisites: ["soft-margin-svm", "A3/duality"]
 ---
@@ -146,9 +146,119 @@ print(f"margin = 1/||w||: {1.0 / np.linalg.norm(w):.3f}")
 ```
 
 The training set splits cleanly into the three KKT buckets; only the support
-vectors (margin + bound) shape the decision boundary. The next lesson exploits
-the dual's inner-product structure to lift the SVM into nonlinear feature
-spaces via the kernel trick.
+vectors (margin + bound) shape the decision boundary.
+
+## Exercises
+
+**Exercise 1.** A soft-margin SVM with $C = 1$ returns multipliers
+$\alpha = (0, 1, 0.4, 0)$ on four training points. Classify each point into its
+KKT bucket and state which points contribute to $w$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compare each $\alpha_i$ against the endpoints $0$ and $C = 1$:
+
+- $\alpha_1 = 0$: the margin constraint is slack; the point is outside the
+  margin and contributes nothing to $w$.
+- $\alpha_2 = 1 = C$: a bound support vector; the point is inside the margin or
+  misclassified.
+- $\alpha_3 = 0.4$, strictly between $0$ and $C$: a margin support vector,
+  lying exactly on the margin boundary $y_3(w^\top x_3 + b) = 1$.
+- $\alpha_4 = 0$: outside the margin, like point 1.
+
+**Step 2.** Since $w = \sum_i \alpha_i y_i x_i$, only points with $\alpha_i > 0$
+enter the sum. Points 2 and 3 contribute; points 1 and 4 do not. Of these, only
+the margin support vector (point 3) can be used to recover $b$.
+
+</details>
+
+**Exercise 2.** Given the optimal dual solution and a margin support vector
+$x_k$ (with $0 < \alpha_k < C$), derive the bias $b = y_k - \sum_i \alpha_i y_i\, x_i^\top x_k$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A margin support vector satisfies the tight constraint
+$y_k(w^\top x_k + b) = 1$. Multiply both sides by $y_k$ and use $y_k^2 = 1$:
+
+$$
+w^\top x_k + b = y_k.
+$$
+
+**Step 2.** Substitute the stationarity expression $w = \sum_i \alpha_i y_i x_i$,
+so $w^\top x_k = \sum_i \alpha_i y_i\, x_i^\top x_k$:
+
+$$
+\sum_i \alpha_i y_i\, x_i^\top x_k + b = y_k.
+$$
+
+**Step 3.** Solve for $b$:
+
+$$
+b = y_k - \sum_i \alpha_i y_i\, x_i^\top x_k.
+$$
+
+The inner products $x_i^\top x_k$ are the only way the data enters, which is the
+exact hook the kernel trick replaces with $k(x_i, x_k)$. Averaging this over all
+margin support vectors reduces the numerical noise in $b$.
+
+</details>
+
+**Exercise 3 (code).** Run the dual coordinate-ascent on a mildly nonseparable
+dataset and verify the equality constraint $\sum_i \alpha_i y_i = 0$ holds and
+that the three KKT buckets partition all training points.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n_per = 40
+X = np.vstack([rng.normal([1.2, 0.5], 0.8, (n_per, 2)),
+               rng.normal([-1.2, -0.5], 0.8, (n_per, 2))])
+y = np.array([1.0] * n_per + [-1.0] * n_per)
+
+def svm_dual(X, y, C=1.0, lr=1e-3, steps=20000):
+    Q = (y[:, None] * y[None, :]) * (X @ X.T)
+    alpha = np.zeros(len(y))
+    for _ in range(steps):
+        grad = 1 - Q @ alpha
+        alpha = np.clip(alpha + lr * grad, 0, C)
+        alpha -= (y @ alpha) / (y @ y) * y        # project onto sum(y*alpha)=0
+        alpha = np.clip(alpha, 0, C)
+    return alpha
+
+C = 1.0
+alpha = svm_dual(X, y, C)
+
+assert abs(y @ alpha) < 1e-2                       # equality constraint
+
+n_zero = int(np.sum(alpha < 1e-4))
+n_margin = int(np.sum((alpha > 1e-4) & (alpha < C - 1e-4)))
+n_bound = int(np.sum(alpha > C - 1e-4))
+print(f"buckets: zero={n_zero}, margin={n_margin}, bound={n_bound}")
+assert n_zero + n_margin + n_bound == len(y)      # exact partition
+
+w = (alpha * y) @ X
+sv = alpha > 1e-4
+b = np.mean(y[sv] - X[sv] @ w)
+acc = np.mean(np.sign(X @ w + b) == y)
+print(f"accuracy: {acc:.3f}")
+assert acc > 0.85
+```
+
+The equality constraint holds to within solver tolerance, the three buckets
+account for every one of the 80 points, and the recovered classifier separates
+most of the overlapping data. Only the margin and bound support vectors carried
+any of that information.
+
+</details>
+
+The next lesson exploits the dual's inner-product structure to lift the SVM into
+nonlinear feature spaces via the kernel trick.
 
 <Footnotes>
   <FNItem n="1">**Cortes, C., & Vapnik, V.** (1995). "Support-vector networks". *Machine Learning*, 20(3), 273-297. Derives the dual QP and the inner-product structure ([doi:10.1007/BF00994018](https://doi.org/10.1007/BF00994018)).</FNItem>

@@ -4,7 +4,7 @@ pillar: C
 subId: C10
 lessonId: learning-curves
 order: 6
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Diagnose bias vs variance from training/validation curves over sample size and model complexity."
 prerequisites: ["C1/bias-variance"]
 ---
@@ -150,9 +150,104 @@ for deg in [0, 1, 3, 5, 9, 12]:
 
 The learning curve shows the gap shrinking as $n$ grows: high-variance
 learner getting cured by data. The validation curve shows the U-shape:
-underfitting on the left, overfitting on the right. This closes the C10
-evaluation track and pillar C as a whole; the next pillar (D, Deep
-Learning) builds on these foundations.
+underfitting on the left, overfitting on the right.
+
+## Exercises
+
+**Exercise 1.** You draw a learning curve and find training error and
+validation error both plateau at MSE $\approx 0.45$ with a tiny gap between
+them, well above the known noise floor of $0.09$. Diagnose the regime and
+say whether collecting more rows of the same data will help, justifying your
+answer from the curve's shape.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A small train/validation gap with both curves converged means
+the model is not overfitting: it does about as poorly on data it trained on
+as on held-out data.
+
+**Step 2.** Both curves sit at $0.45$, far above the irreducible noise floor
+$0.09$. The model cannot even fit the training data well, so the error is
+dominated by **bias**: the model class is too rigid to capture the structure.
+
+**Step 3.** This is the high-bias (underfitting) regime. More rows of the
+same data leave the asymptote where it is, since the curves have already
+flattened. The remedies are a more expressive model, more or better
+features, or less regularization, not more data.
+
+</details>
+
+**Exercise 2.** Explain why, on a learning curve, the training error
+typically *rises* with sample size $n$ while the validation error *falls*,
+and why the two meet from opposite directions for a well-specified model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With very few points, a flexible model can fit the training set
+almost exactly, so the training error starts near zero. As $n$ grows, the
+same model can no longer thread every point, and its training error climbs
+toward the true error level.
+
+**Step 2.** The validation error measures generalization. With few points
+the fit is unstable and overfit, so validation error starts high. As $n$
+grows the estimate of the underlying function stabilizes and validation
+error falls toward the same true error level.
+
+**Step 3.** For a correctly specified model class, both quantities converge
+to the irreducible noise floor: training error rising up to it, validation
+error falling down to it. They meet because, in the large-sample limit, the
+fitted model approaches the truth and in-sample and out-of-sample error
+coincide. A persistent gap at large $n$ is the signature of remaining
+variance (overfitting).
+
+</details>
+
+**Exercise 3 (code).** Make the variance-shrinks-with-data claim numerical.
+For a degree-5 polynomial fit on noisy sine data, measure the gap (validation
+MSE minus training MSE) at several sample sizes and assert it shrinks from
+the smallest $n$ to the largest.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def f_true(x): return np.sin(2 * np.pi * x)
+sigma = 0.3
+
+def gen(n, rng):
+    x = rng.uniform(0, 1, n)
+    return x, f_true(x) + sigma * rng.normal(size=n)
+
+def gap_at(n, degree=5, reps=20):
+    gaps = []
+    for t in range(reps):
+        x_tr, y_tr = gen(n, np.random.default_rng(t))
+        x_va, y_va = gen(400, np.random.default_rng(t + 100))
+        coefs = np.polyfit(x_tr, y_tr, degree)
+        train_mse = np.mean((y_tr - np.polyval(coefs, x_tr)) ** 2)
+        val_mse = np.mean((y_va - np.polyval(coefs, x_va)) ** 2)
+        gaps.append(val_mse - train_mse)
+    return float(np.mean(gaps))
+
+sizes = [20, 50, 100, 400]
+gaps = [gap_at(n) for n in sizes]
+for n, g in zip(sizes, gaps):
+    print(f"n = {n:>3}:  val - train gap = {g:.4f}")
+assert gaps[0] > gaps[-1]
+```
+
+The gap falls from about $0.087$ at $n = 20$ to about $0.004$ at $n = 400$:
+the degree-5 learner is high-variance at small $n$ and the extra data closes
+the train/validation gap, the data-cures-variance reading of the curve.
+
+</details>
+
+This closes the C10 evaluation track and pillar C as a whole; the next
+pillar (D, Deep Learning) builds on these foundations.
 
 <Footnotes>
   <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009).

@@ -4,7 +4,7 @@ pillar: C
 subId: C6
 lessonId: one-class-svm
 order: 3
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Carve out a small region containing most of the data with a kernel SVM, and use the boundary as a novelty detector."
 prerequisites: ["C2/kernel-trick"]
 ---
@@ -138,5 +138,118 @@ print(f"fraction of normal points flagged: {(scores_normal < 0).mean():.2f}  (nu
 
 The one-class SVM keeps normal points on the positive side of the boundary
 and flags most of the ring anomalies; the false-positive rate on normal
-points sits near the $\nu$ budget. The next lesson uses neural-network
-reconstruction error as the AD signal.
+points sits near the $\nu$ budget.
+
+## Exercises
+
+**Exercise 1.** The decision function is
+$f(x) = \sum_{i \in SV}\alpha_i\, k(x_i, x) - \rho$. Suppose a model has two
+support vectors with weights $\alpha_1 = 0.6$, $\alpha_2 = 0.4$ and offset
+$\rho = 0.5$, using an RBF kernel $k(x_i, x) = e^{-\gamma\lVert x_i - x\rVert^2}$
+with $\gamma = 1$. A query point sits at squared distance $0.25$ from the first
+support vector and $4$ from the second. Compute $f(x)$ and classify the point.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Evaluate each kernel value:
+
+$$
+k_1 = e^{-1 \cdot 0.25} = e^{-0.25} \approx 0.779, \qquad
+k_2 = e^{-1 \cdot 4} = e^{-4} \approx 0.0183.
+$$
+
+**Step 2.** Form the weighted sum and subtract $\rho$:
+
+$$
+f(x) = 0.6 \cdot 0.779 + 0.4 \cdot 0.0183 - 0.5
+\approx 0.467 + 0.007 - 0.5 = -0.026.
+$$
+
+**Step 3.** Since $f(x) < 0$, the point is flagged as anomalous, just barely: it
+is close to the first support vector but too far from the second to clear the
+offset $\rho$.
+
+</details>
+
+**Exercise 2.** In Schölkopf's $\nu$-SVM, $\nu \in (0, 1]$ is both an upper bound
+on the fraction of training points that end up outside the boundary and a lower
+bound on the fraction of support vectors. Explain why these two bounds force a
+floor on how few support vectors the model can use, and what that implies for
+the test-time cost when $\nu$ is large.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A point lands outside the boundary only if its slack $\xi_i > 0$,
+which at the optimum means its dual weight is pinned at the cap
+$\alpha_i = 1/(\nu n)$. Every such margin-error point is a support vector, so the
+outlier fraction (at most $\nu$) is a subset of the support-vector fraction (at
+least $\nu$).
+
+**Step 2.** The lower bound says support vectors are at least a $\nu$ fraction of
+the $n$ training points: roughly $\nu n$ of them. Raising $\nu$ to flag more
+outliers raises this floor, so the model cannot stay sparse.
+
+**Step 3.** Test-time cost is proportional to the number of support vectors,
+since $f(x)$ sums a kernel evaluation per support vector. A large $\nu$ therefore
+buys a looser, more permissive boundary at the price of a denser, slower scorer:
+the $\nu$ knob trades the outlier budget against inference cost.
+
+</details>
+
+**Exercise 3 (code).** Implement the uniform-weight special case of the one-class
+SVM, where every training point gets equal weight $\alpha_i = 1/n$ so the score is
+$f(x) = \frac{1}{n}\sum_i k(x_i, x) - \rho$. Set $\rho$ to the $\nu$-quantile of
+the training scores. On the lesson's normal cluster plus ring of anomalies, check
+that every ring point is flagged and the normal false-positive rate matches $\nu$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Uniform-weight one-class scorer: every training point has weight 1/n, so
+# f(x) = mean_i k(x_i, x) - rho is large near the dense normal region and
+# small far from it. A stable special case of the one-class SVM.
+def rbf(X1, X2, gamma):
+    d2 = np.sum(X1**2, 1)[:, None] + np.sum(X2**2, 1) - 2 * X1 @ X2.T
+    return np.exp(-gamma * np.maximum(d2, 0.0))
+
+n_normal = 200
+X_normal = rng.normal(scale=0.7, size=(n_normal, 2))
+theta = np.linspace(0, 2 * np.pi, 30, endpoint=False)
+X_anom = 4 * np.column_stack([np.cos(theta), np.sin(theta)]) + 0.1 * rng.normal(size=(30, 2))
+
+gamma = 0.5
+alpha = np.full(n_normal, 1.0 / n_normal)            # uniform weights
+
+nu = 0.05
+train_sim = rbf(X_normal, X_normal, gamma) @ alpha
+rho = np.quantile(train_sim, nu)                     # nu-quantile offset
+
+def f(Xq):
+    return rbf(Xq, X_normal, gamma) @ alpha - rho
+
+s_normal = f(X_normal)
+s_anom = f(X_anom)
+print(f"mean score on normal:    {s_normal.mean():.3f}")
+print(f"mean score on anomalies: {s_anom.mean():.3f}")
+print(f"fraction of anomalies flagged: {(s_anom < 0).mean():.2f}")
+print(f"fraction of normal flagged:    {(s_normal < 0).mean():.2f}  (nu = {nu})")
+
+assert (s_anom < 0).all()                            # every ring point flagged
+assert abs((s_normal < 0).mean() - nu) < 0.02        # normal false-positive rate ~ nu
+```
+
+Every ring anomaly sits far from the cluster, so all $30$ are flagged. Choosing
+$\rho$ as the $\nu$-quantile of training scores makes exactly a $\nu \approx 0.05$
+fraction of normal points fall below zero, reproducing the $\nu$ false-alarm
+budget the full SVM enforces.
+
+</details>
+
+The next lesson uses neural-network reconstruction error as the AD signal.

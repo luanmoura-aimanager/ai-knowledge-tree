@@ -4,7 +4,7 @@ pillar: C
 subId: C10
 lessonId: cv-strategies
 order: 4
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Pick k-fold, stratified, group, or time-series CV based on what the test distribution actually looks like."
 prerequisites: []
 ---
@@ -171,8 +171,124 @@ print(f"walk-forward MSE:    {np.mean(ts_scores):.4f}  (each test is future)")
 
 The random k-fold reports a low MSE that overestimates real generalization
 because patient-specific signal leaks; group k-fold gives the honest
-number for "new patient" generalization. The next lesson picks the
-hyperparameters using these CV scores.
+number for "new patient" generalization.
+
+## Exercises
+
+**Exercise 1.** A dataset has $n = 1000$ records, each tagged with one of
+$200$ patient ids (5 records per patient), and the production task is to
+predict on patients never seen in training. A colleague proposes stratified
+5-fold CV stratified on the binary label. State which leakage this fails to
+prevent and which CV strategy fixes it, and explain why the stratified
+estimate will read too optimistic.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Stratified k-fold balances the *label* across folds but assigns
+individual records to folds at random. With 5 records per patient, almost
+every patient has records in several folds, so the same patient appears in
+both train and test.
+
+**Step 2.** The model can then learn patient-specific shortcuts (a patient's
+baseline, habits, device quirks) and reuse them on the held-out records of
+that same patient. That is the group-leakage the production task forbids,
+since real deployment sees entirely new patients.
+
+**Step 3.** The fix is **group k-fold** keyed on patient id, which keeps all
+five records of a patient in a single fold so each test fold contains only
+unseen patients.
+
+**Step 4.** Because the stratified estimate scores on records whose patients
+were partly trained on, it credits the model for memorized
+patient signal that will not exist at deployment, so it reads too
+optimistic relative to the group-k-fold number.
+
+</details>
+
+**Exercise 2.** Explain precisely why standard shuffled k-fold leaks on
+time-ordered data, and why walk-forward CV does not. Give a concrete example
+of a feature whose leakage inflates the shuffled estimate.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Shuffled k-fold places some future-timestamped records in the
+training fold while testing on earlier-timestamped records. The model is
+then trained on information from after the test period.
+
+**Step 2.** Many time-series features are computed over windows that, after
+shuffling, can span the test point. A rolling mean of the target over the
+next 7 days, or a feature normalized by the full-series mean, both encode
+future values. Trained on those, the model effectively reads the answer; the
+shuffled CV score inflates because that information vanishes in real
+forecasting.
+
+**Step 3.** Walk-forward CV splits chronologically: train on
+$[t_0, t_k]$, test on $[t_k, t_{k+1}]$, always with the test window strictly
+after the training window. No future record ever enters training, so the
+estimate matches the deployed setting where only the past is known.
+
+**Step 4.** The cost is a smaller and growing training set per fold and
+fewer test folds, but that is the price of an estimate that does not
+silently leak the future.
+
+</details>
+
+**Exercise 3 (code).** Reproduce the group-leakage gap with a memorizing
+predictor. Build data where each group has its own strong intercept, then
+compare random k-fold against group k-fold for a model that predicts the
+training mean of a test record's group. Assert that random k-fold reports a
+lower (over-optimistic) MSE.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n_groups, per = 60, 8
+n = n_groups * per
+group = np.repeat(np.arange(n_groups), per)
+g_effect = rng.normal(0, 3, n_groups)              # strong per-group intercept
+y = g_effect[group] + 0.3 * rng.normal(size=n)
+
+def predict_group_mean(train, test, group, y):
+    glob = y[train].mean()
+    means = {g: y[train][group[train] == g].mean() for g in np.unique(group[train])}
+    return np.array([means.get(group[t], glob) for t in test])
+
+def mse(a, b): return np.mean((a - b) ** 2)
+
+# Random k-fold: a group's records straddle train and test, so the mean leaks
+random_folds = np.array_split(rng.permutation(n), 5)
+random_mse = np.mean([
+    mse(y[test], predict_group_mean(np.setdiff1d(np.arange(n), test), test, group, y))
+    for test in random_folds
+])
+
+# Group k-fold: hold out whole groups, so test groups are unseen
+group_folds = np.array_split(rng.permutation(n_groups), 5)
+group_mse = np.mean([
+    mse(y[np.isin(group, gf)],
+        predict_group_mean(np.where(~np.isin(group, gf))[0],
+                           np.where(np.isin(group, gf))[0], group, y))
+    for gf in group_folds
+])
+
+print(f"random k-fold MSE: {random_mse:.4f}")
+print(f"group  k-fold MSE: {group_mse:.4f}")
+assert random_mse < group_mse
+```
+
+Random k-fold reports about $0.12$ because every test record's group mean
+was learned from that group's other records; group k-fold reports about
+$8.1$, the honest error on genuinely new groups. The gap is the leakage.
+
+</details>
+
+The next lesson picks the hyperparameters using these CV scores.
 
 <Footnotes>
   <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009).

@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: dbscan
 order: 4
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Define clusters as dense, connected regions, separate noise points, and pick eps from a k-distance plot."
 prerequisites: ["kmeans"]
 ---
@@ -134,7 +134,112 @@ print("eps ~ knee of k-distance plot (around the percentile where the curve bend
 ```
 
 DBSCAN separates the two moons and labels the random points as noise; the
-k-distance plot suggests a reasonable $\varepsilon$. The next lesson handles
+k-distance plot suggests a reasonable $\varepsilon$.
+
+## Exercises
+
+**Exercise 1.** Five points lie on a line at positions $0, 1, 2, 10, 11$. With
+$\varepsilon = 1.5$ and `minPts` $= 3$ (counting the point itself), classify each
+point as core, border, or noise.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Count, for each point, how many points (including itself) fall within
+distance $1.5$. Point $0$: itself and $1$, so 2. Point $1$: $0, 1, 2$, so 3.
+Point $2$: itself and $1$, so 2. Point $10$: itself and $11$, so 2. Point $11$:
+itself and $10$, so 2.
+
+**Step 2.** A point is core when its neighbor count is at least `minPts` $= 3$.
+Only point $1$ qualifies, so $1$ is the lone core point.
+
+**Step 3.** Border points have fewer than `minPts` neighbors but lie within
+$\varepsilon$ of a core point. Points $0$ and $2$ are within $1.5$ of the core
+$1$, so both are border. Points $10$ and $11$ are far from any core point, so
+both are noise. The cluster is $\{0, 1, 2\}$; $\{10, 11\}$ is noise.
+
+</details>
+
+**Exercise 2.** Explain why raising `minPts` while holding $\varepsilon$ fixed
+can only turn core points into non-core points (never the reverse), and what
+effect this has on the amount of data flagged as noise.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Whether a point is core depends on the test "neighbor count within
+$\varepsilon$ is at least `minPts`". The neighbor count is fixed once
+$\varepsilon$ is fixed; only the threshold `minPts` changes.
+
+**Step 2.** Raising the threshold can only make the inequality harder to satisfy.
+A point that failed before still fails; a point that passed before may now fail
+if its count sits between the old and new threshold. No point that failed can
+start passing, so the set of core points shrinks (weakly).
+
+**Step 3.** Fewer core points means fewer seeds to grow clusters and fewer
+points reachable from a core, so more points end up neither core nor border.
+Raising `minPts` therefore increases the fraction of data labeled noise.
+
+</details>
+
+**Exercise 3 (code).** On one dense blob plus scattered uniform noise, run
+DBSCAN and verify it recovers a single cluster while flagging most of the
+scattered points as noise.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+blob = rng.normal(loc=[0.0, 0.0], scale=0.3, size=(150, 2))
+noise = rng.uniform(-5, 5, size=(30, 2))           # spread far from the blob
+X = np.vstack([blob, noise])
+
+def dbscan(X, eps, min_pts):
+    n = len(X)
+    labels = np.full(n, -1)
+    visited = np.zeros(n, dtype=bool)
+    D = np.linalg.norm(X[:, None] - X[None, :], axis=2)
+    cid = 0
+    for i in range(n):
+        if visited[i]:
+            continue
+        visited[i] = True
+        nb = list(np.where(D[i] <= eps)[0])
+        if len(nb) < min_pts:
+            continue
+        labels[i] = cid
+        seeds = list(nb)
+        while seeds:
+            j = seeds.pop()
+            if not visited[j]:
+                visited[j] = True
+                nj = list(np.where(D[j] <= eps)[0])
+                if len(nj) >= min_pts:
+                    seeds.extend(nj)
+            if labels[j] == -1:
+                labels[j] = cid
+        cid += 1
+    return labels
+
+labels = dbscan(X, eps=0.4, min_pts=5)
+n_clusters = len(set(labels) - {-1})
+n_noise = int((labels == -1).sum())
+
+assert n_clusters == 1                              # the dense blob is one cluster
+assert n_noise >= 20                                # most scattered points are noise
+print("clusters:", n_clusters, " noise points:", n_noise)
+```
+
+DBSCAN grows a single cluster out of the dense blob and rejects the scattered
+uniform points, the behavior that lets it separate signal from noise without a
+preset cluster count.
+
+</details>
+
+The next lesson handles
 the varying-density case where one $\varepsilon$ is not enough: HDBSCAN.
 
 <Footnotes>
