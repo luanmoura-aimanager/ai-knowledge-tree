@@ -71,6 +71,20 @@ quadratic penalty term dominates and the iterates can oscillate or diverge. On a
 quadratic with curvature $L$, the threshold $\eta = 2/L$ is exactly where the update
 starts to amplify the error instead of shrinking it.
 
+Numbers fix the scale. The quadratic in the code block below has Hessian $A$ with
+rows $(3, 1)$ and $(1, 2)$, whose eigenvalues are $1.382$ and $3.618$, so $L = 3.618$
+and the safe range is $0 < \eta < 2/L = 0.553$.
+Reading the bracket $1 - L\eta/2$ across that range:
+
+- $\eta = 0.05$ (well below the optimum): the step decreases $f$ but barely, throwing
+  away most of the allowed per-step drop.
+- $\eta = 1/L = 0.276$: the bracket is $1/2$, the largest guaranteed decrease, clean
+  convergence.
+- $\eta = 0.50$ (just under $2/L$): still convergent, but the bracket has shrunk to
+  $0.096$, so each step buys almost nothing and the path oscillates.
+- $\eta = 2.5/L = 0.691$: past the threshold, the bracket is negative, and the
+  iterates blow up to infinity.
+
 ![Gradient descent on a 2D quadratic: the path to the optimum (left), and how the step size η decides between slow descent, clean convergence at η = 1/L, oscillation, and divergence past η = 2/L (right).](/figures/A3/gradient-descent.svg)
 
 ## Check it on arrays

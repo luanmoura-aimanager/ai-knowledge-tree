@@ -54,6 +54,19 @@ forcing $\lVert x - y\rVert = 0$. $\qquad\blacksquare$
 The rate $L^k$ is **linear convergence**: each step shrinks the error by a constant
 factor. Reaching accuracy $\varepsilon$ takes $O(\log(1/\varepsilon)/\log(1/L))$ steps.
 
+The constant $L$ is the whole story, and its scale is worth feeling. To reach
+$\varepsilon = 10^{-6}$:
+
+- $L = 0.5$ (error halves each step) needs about 20 steps; after 10 steps the error
+  is already down to $0.5^{10} \approx 10^{-3}$.
+- $L = 0.9$ needs about 131 steps; 10 steps only knock the error down to
+  $0.9^{10} \approx 0.35$.
+- $L = 0.99$ needs about 1375 steps; 10 steps barely move it, to $0.9^{10}$'s far
+  worse cousin $0.99^{10} \approx 0.90$.
+
+The cosine map below has $L = |T'(x^\star)| = \sin(x^\star) \approx 0.674$, so it
+sits near the fast end and settles in a few dozen steps.
+
 ## Newton's method as a fixed-point iteration
 
 Solving $f(x) = 0$ can be cast as the fixed-point iteration $x_{k+1} = T(x_k)$ with

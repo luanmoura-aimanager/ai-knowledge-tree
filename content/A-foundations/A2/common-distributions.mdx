@@ -64,7 +64,17 @@ $$
 $$
 
 This equality is a quick diagnostic: count data with variance much larger than its
-mean is "overdispersed" and not Poisson.
+mean is "overdispersed" and not Poisson. The mean-variance relationship separates
+these count distributions sharply, using the parameters from the code below:
+
+- **Binomial(20, 0.3)** has mean $nq = 6$ but variance $nq(1-q) = 4.2$. The variance
+  sits below the mean, because a bounded count ($0 \le k \le 20$) cannot spread freely.
+- **Poisson(4)** has mean and variance both equal to $4$. Removing the upper bound
+  (Poisson counts run to infinity) lets the variance rise to match the mean.
+
+So variance below the mean points to a bounded Binomial-like count, variance equal to
+the mean to a Poisson, and variance above the mean to overdispersion that neither
+models.
 
 ## Gaussian: the bell curve
 
