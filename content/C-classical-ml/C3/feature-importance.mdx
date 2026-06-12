@@ -4,7 +4,7 @@ pillar: C
 subId: C3
 lessonId: feature-importance
 order: 5
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Compare Gini-impurity importance against permutation importance and know when each lies."
 prerequisites: ["bagging-rf"]
 ---
@@ -155,7 +155,132 @@ print("splits the credit and underestimates each individually.")
 ```
 
 MDI ranks the truly informative features 0 and 1 highest; permutation
-importance confirms but underrates the correlated pair. This closes the
+importance confirms but underrates the correlated pair.
+
+## Exercises
+
+**Exercise 1.** A single split on feature $j$ sits at a node holding 100 of the
+forest's 400 training examples and reduces Gini by $\Delta = 0.2$. It is the only
+split on $j$ in the tree. Compute its MDI contribution using the weighted-gain
+formula, and state how the contribution changes if the same split instead sat at
+a node holding only 20 examples.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The MDI contribution of a split is $\frac{|S_{\text{node}}|}{n}\,
+\Delta_{\text{node}}$. With $|S_{\text{node}}| = 100$, $n = 400$, $\Delta = 0.2$:
+
+$$
+\frac{100}{400}\cdot 0.2 = 0.25 \cdot 0.2 = 0.05.
+$$
+
+**Step 2.** At a node holding 20 examples with the same $\Delta = 0.2$:
+
+$$
+\frac{20}{400}\cdot 0.2 = 0.05 \cdot 0.2 = 0.01.
+$$
+
+**Step 3.** The same impurity drop contributes five times less when it happens
+deeper in the tree on fewer samples. MDI weights each split by the fraction of
+data reaching it, so high splits near the root dominate a feature's importance.
+
+</details>
+
+**Exercise 2.** The lesson says permutation importance splits the credit between
+two correlated features and underestimates each. Explain mechanically why, and
+predict what grouped permutation (shuffling both together) reports instead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Permutation importance of feature $j$ is the accuracy drop when only
+$j$ is shuffled. If feature $k$ is highly correlated with $j$, the model can read
+nearly the same signal through $k$ after $j$ is destroyed.
+
+**Step 2.** So shuffling $j$ alone barely hurts accuracy (the partner $k$ carries
+the signal), and shuffling $k$ alone barely hurts either. Each individual
+importance is small, even though the underlying signal is strong: the credit is
+split, and both look weak.
+
+**Step 3.** Shuffling $j$ and $k$ together destroys the shared signal with no
+surviving partner, so accuracy drops by the full amount the signal was worth. The
+grouped permutation recovers the true combined importance that the two
+single-feature permutations each undercounted.
+
+</details>
+
+**Exercise 3 (code).** Build a dataset with a truly relevant low-cardinality
+feature and a truly irrelevant high-cardinality feature (many distinct values).
+Fit a tree, compute MDI, and confirm the cardinality bias: the irrelevant
+high-cardinality feature receives nonzero MDI it does not deserve.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Make feature 0 a clean binary predictor of $y$ and feature 1 pure
+noise with a distinct value per row (maximum cardinality). Fit the lesson's
+importance-accumulating tree and read off MDI.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 400
+X = np.zeros((n, 2))
+X[:, 0] = (rng.random(n) < 0.5).astype(float)      # low-cardinality, relevant
+X[:, 1] = rng.random(n)                              # high-cardinality, irrelevant
+y = X[:, 0].astype(int)                              # y depends only on feature 0
+y[rng.random(n) < 0.1] ^= 1                          # 10% label noise
+
+def gini(labels):
+    if len(labels) == 0: return 0.0
+    p = np.bincount(labels, minlength=2) / len(labels)
+    return 1 - np.sum(p**2)
+
+class Node:
+    def __init__(self): self.leaf = self.feature = self.threshold = self.left = self.right = None
+
+def split(X, y):
+    n, d = X.shape; best = (None, None, -1); parent = gini(y)
+    for j in range(d):
+        for t in np.unique(X[:, j]):
+            m = X[:, j] <= t
+            if m.sum() == 0 or (~m).sum() == 0: continue
+            gain = parent - (m.sum()/n)*gini(y[m]) - ((~m).sum()/n)*gini(y[~m])
+            if gain > best[2]: best = (j, t, gain)
+    return best
+
+def build(X, y, max_depth, imp, total_n):
+    node = Node()
+    if max_depth == 0 or len(y) < 2 or gini(y) == 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    j, t, gain = split(X, y)
+    if j is None or gain <= 0:
+        node.leaf = int(np.argmax(np.bincount(y, minlength=2))); return node
+    imp[j] += (len(y) / total_n) * gain
+    m = X[:, j] <= t; node.feature, node.threshold = j, t
+    node.left = build(X[m], y[m], max_depth - 1, imp, total_n)
+    node.right = build(X[~m], y[~m], max_depth - 1, imp, total_n)
+    return node
+
+imp = np.zeros(2)
+build(X, y, max_depth=8, imp=imp, total_n=n)
+mdi = imp / imp.sum()
+
+assert mdi[0] > mdi[1]                               # relevant feature still ranks first
+assert mdi[1] > 0                                    # but the noise feature steals some credit
+print(f"MDI: relevant {mdi[0]:.3f}, irrelevant-high-cardinality {mdi[1]:.3f}")
+```
+
+**Step 2.** Feature 0 keeps the larger share, but the irrelevant continuous
+feature 1 collects nonzero MDI. Its many candidate thresholds let deeper splits
+find spurious gains on the noise, the cardinality bias the lesson warns about.
+Permutation importance on a held-out set would discount feature 1 toward zero.
+
+</details>
+
+This closes the
 single-tree thread; the next lesson moves to boosting, where trees are added
 sequentially to fix each other's mistakes.
 

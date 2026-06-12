@@ -4,7 +4,7 @@ pillar: C
 subId: C9
 lessonId: ann-problem
 order: 1
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "State the ANN problem, see why exact NN is infeasible at scale, and define recall@k."
 prerequisites: ["C4/curse-of-dimensionality"]
 ---
@@ -158,7 +158,111 @@ print(f"\ntrivial-LSH mean recall@10: {np.mean(ann_recall_at_10):.3f}  "
 ```
 
 Exact search becomes slow even at $n = 10^6$; the trivial random-hyperplane
-LSH already gives meaningful recall. The next lesson covers LSH carefully.
+LSH already gives meaningful recall.
+
+## Exercises
+
+**Exercise 1.** An exact linear scan over $n = 2 \times 10^8$ vectors of
+dimension $d = 96$ stored as 4-byte floats reads every vector once per query.
+At a memory bandwidth of $80$ GB/s, how long does a single query take, and how
+many queries per second can one machine sustain if it is bandwidth-bound?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bytes touched per query is $n \cdot d \cdot 4 = 2 \times 10^8 \cdot
+96 \cdot 4 = 7.68 \times 10^{10}$ bytes, about $76.8$ GB.
+
+**Step 2.** Time per query is bytes divided by bandwidth:
+
+$$
+t = \frac{7.68 \times 10^{10}}{80 \times 10^{9}} = 0.96 \text{ s}.
+$$
+
+**Step 3.** Throughput is the reciprocal: about $1/0.96 \approx 1.04$ queries
+per second. Roughly one query per second on a whole machine is why exact scan
+is untenable for interactive retrieval, and why ANN trades a little recall for
+orders of magnitude more throughput.
+
+</details>
+
+**Exercise 2.** A retrieval system returns recall@10 of $0.9$. A second system
+returns the same ten slots but reorders them so the single missed true neighbor
+is replaced by a different non-neighbor. What is the new recall@10? Explain why
+recall@k is insensitive to the ordering inside the returned set.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recall@10 is the size of the intersection of the returned top-10
+with the true top-10, divided by $10$. At $0.9$ the returned set contains $9$ of
+the true neighbors.
+
+**Step 2.** Swapping one non-neighbor for a different non-neighbor leaves the
+intersection at $9$ true neighbors, so recall@10 stays $9/10 = 0.9$.
+
+**Step 3.** The numerator counts set membership, not rank. Any permutation of
+the same ten returned items gives the same intersection, so recall@k measures
+which items are retrieved, not how they are ordered. Ranking quality inside the
+set needs a rank-aware metric (for example nDCG), not recall.
+
+</details>
+
+**Exercise 3 (code).** Take $n = 50{,}000$ Gaussian vectors in $d = 32$ and a
+16-bit random-hyperplane signature. For agreement thresholds $10$, $12$, and
+$14$ bits, restrict each query to points whose signature agrees on at least that
+many bits, then rank that candidate set by exact distance. Confirm that a
+stricter threshold shrinks the candidate fraction (and, with it, recall).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 50_000, 32
+X = rng.normal(size=(n, d))
+queries = rng.normal(size=(200, d))
+
+def exact_knn(X, q, k=10):
+    return np.argsort(((X - q)**2).sum(axis=1))[:k]
+
+def hyperplane_sig(V, normals):
+    return (V @ normals.T > 0).astype(np.uint8)
+
+normals = rng.normal(size=(16, d))
+H = hyperplane_sig(X, normals)
+Hq = hyperplane_sig(queries, normals)
+
+prev_frac = None
+for t in [10, 12, 14]:
+    recalls, fracs = [], []
+    for i, q in enumerate(queries):
+        agree = (H == Hq[i]).sum(axis=1)
+        cand = np.where(agree >= t)[0]
+        fracs.append(len(cand) / n)
+        if len(cand) < 10:
+            continue
+        d2 = ((X[cand] - q)**2).sum(axis=1)
+        ann = cand[np.argsort(d2)[:10]]
+        truth = exact_knn(X, q, 10)
+        recalls.append(len(set(ann.tolist()) & set(truth.tolist())) / 10)
+    mf = float(np.mean(fracs))
+    print(f"thr>={t}: recall@10={np.mean(recalls):.3f}  cand frac={mf:.4f}")
+    if prev_frac is not None:
+        assert mf < prev_frac            # stricter threshold => smaller candidate set
+    prev_frac = mf
+```
+
+Raising the threshold from $10$ to $14$ bits drops the candidate fraction from
+about $0.24$ to about $0.004$, and recall@10 falls from about $0.82$ to about
+$0.10$. This is the recall-cost trade at the heart of ANN: a smaller candidate
+set is cheaper to scan but more likely to miss a true neighbor.
+
+</details>
+
+The next lesson covers LSH carefully.
 
 <Footnotes>
   <FNItem n="1">**Indyk, P., & Motwani, R.** (1998). "Approximate nearest neighbors: towards removing the curse of dimensionality". *STOC*. [doi:10.1145/276698.276876](https://doi.org/10.1145/276698.276876). Formalized the ANN problem and its escape from the curse of dimensionality.</FNItem>

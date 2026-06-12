@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: hdbscan
 order: 5
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Build a hierarchy of DBSCAN clusterings and extract a flat clustering that adapts to varying density."
 prerequisites: ["dbscan"]
 ---
@@ -142,7 +142,96 @@ print(f"singletons: {sum(1 for s in sizes_sorted if s == 1)}")
 
 Increasing the threshold merges clusters, but the dense cluster persists
 across a much wider range than the noise; HDBSCAN's stability criterion
-picks out the persistent ones. The next lesson abandons the flat clustering
+picks out the persistent ones.
+
+## Exercises
+
+**Exercise 1.** Two points $a$ and $b$ have core distances
+$\text{core}(a) = 0.2$ and $\text{core}(b) = 0.9$, and geometric distance
+$d(a, b) = 0.5$. Compute the mutual reachability distance, and explain which of
+the three terms dominates and why that inflates sparse-region edges.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the definition
+$d_{\text{mreach}}(a, b) = \max(\text{core}(a), \text{core}(b), d(a, b))$:
+
+$$
+d_{\text{mreach}}(a, b) = \max(0.2,\ 0.9,\ 0.5) = 0.9.
+$$
+
+**Step 2.** The dominant term is $\text{core}(b) = 0.9$, the larger core
+distance. Point $b$ sits in a sparse region (its $k$-th neighbor is far), so its
+core distance lifts the edge above the raw geometric distance $0.5$. Every edge
+touching a sparse point is inflated to at least that point's core distance, which
+is what makes sparse clusters slower to grow than dense ones at small thresholds.
+
+</details>
+
+**Exercise 2.** A cluster appears at threshold $\tau = 2.0$ and splits at
+$\tau = 0.5$; a second cluster appears at $\tau = 1.0$ and splits at
+$\tau = 0.9$. Using lifetime (appearance threshold minus split threshold) as a
+proxy for stability, state which cluster HDBSCAN prefers and why this matches
+the durability intuition.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Lifetime of the first cluster is $2.0 - 0.5 = 1.5$. Lifetime of the
+second is $1.0 - 0.9 = 0.1$.
+
+**Step 2.** HDBSCAN prefers the higher-stability cluster, so it keeps the first
+($1.5$) over the second ($0.1$). The first cluster persists across a wide range
+of density thresholds, the signature of real structure; the second flickers into
+existence and splits almost immediately, the signature of a transient grouping.
+Stability-based extraction is exactly this lifetime comparison applied across the
+condensed tree.
+
+</details>
+
+**Exercise 3 (code).** On two blobs of very different density, compute mutual
+reachability distances and confirm that the average edge weight inside the
+sparse blob exceeds the average inside the dense blob.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+dense = rng.normal(loc=[0.0, 0.0], scale=0.3, size=(100, 2))
+sparse = rng.normal(loc=[8.0, 0.0], scale=1.5, size=(100, 2))
+X = np.vstack([dense, sparse])
+
+def mutual_reach(X, k):
+    D = np.linalg.norm(X[:, None] - X[None, :], axis=2)
+    cd = np.sort(D, axis=1)[:, k]                   # k-th NN distance = core dist
+    return np.maximum(np.maximum(D, cd[:, None]), cd[None, :])
+
+mreach = mutual_reach(X, k=5)
+
+def within_avg(idx):
+    sub = mreach[np.ix_(idx, idx)]
+    iu = np.triu_indices(len(idx), k=1)             # unique off-diagonal edges
+    return sub[iu].mean()
+
+dense_avg = within_avg(np.arange(100))
+sparse_avg = within_avg(np.arange(100, 200))
+
+assert sparse_avg > dense_avg
+print("dense within-edge avg:", round(dense_avg, 3))
+print("sparse within-edge avg:", round(sparse_avg, 3))
+```
+
+The sparse blob's larger core distances inflate its internal edges above the
+dense blob's, which is why a single global threshold cannot serve both and why
+HDBSCAN works on the mutual-reachability graph instead.
+
+</details>
+
+The next lesson abandons the flat clustering
 and walks the whole dendrogram explicitly.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: hierarchical-clustering
 order: 6
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Build dendrograms with single, complete, average, and Ward linkage; read them at a chosen cut."
 prerequisites: []
 ---
@@ -146,7 +146,97 @@ print(f"\nWard cut to 3 clusters: cluster sizes = {[int((labels == c).sum()) for
 ```
 
 Each linkage produces a different set of merge distances. Cutting Ward's
-dendrogram at 3 clusters recovers the three blobs. The next lesson takes a
+dendrogram at 3 clusters recovers the three blobs.
+
+## Exercises
+
+**Exercise 1.** Four points sit on a line at $0, 1, 5, 6$. Build the
+agglomerative dendrogram under single linkage by hand: list the merges in order
+with their merge distances.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Start with four singletons. Pairwise distances are $d(0,1) = 1$,
+$d(5,6) = 1$, $d(1,5) = 4$, and larger for the rest. The two closest pairs both
+have distance $1$.
+
+**Step 2.** Merge $\{0\}$ and $\{1\}$ at distance $1$ (ties broken arbitrarily;
+take this pair first). Then merge $\{5\}$ and $\{6\}$ at distance $1$. Two
+clusters remain: $\{0, 1\}$ and $\{5, 6\}$.
+
+**Step 3.** Under single linkage, the distance between the two clusters is the
+minimum cross distance, $\min(d(1,5), d(0,5), d(1,6), d(0,6)) = d(1,5) = 4$.
+Merge them at distance $4$. The merge sequence is: $\{0,1\}$ at $1$, $\{5,6\}$ at
+$1$, then $\{0,1,5,6\}$ at $4$. The jump from $1$ to $4$ is the large vertical
+gap that suggests cutting into two clusters.
+
+</details>
+
+**Exercise 2.** Show that single linkage and complete linkage give the same
+first merge on any dataset, then give a small example where their second merge
+differs.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At the start every cluster is a singleton, so for any pair the set of
+cross distances has a single element, $d(a, b)$. Both $\min$ and $\max$ over a
+one-element set return that element, so single and complete linkage both merge
+the globally closest pair first. The first merge is identical.
+
+**Step 2.** Take points on a line at $0, 1, 3$. First merge: $\{0\}$ and $\{1\}$
+at distance $1$ under both. Now compare cluster $\{0, 1\}$ to $\{3\}$. Single
+linkage uses $\min(d(1,3), d(0,3)) = \min(2, 3) = 2$. Complete linkage uses
+$\max(2, 3) = 3$. The recorded merge distance differs ($2$ versus $3$), even
+though the merge partners are the same here; on larger sets the differing
+distances can change which pair merges next.
+
+</details>
+
+**Exercise 3 (code).** Implement single-linkage agglomerative clustering and
+verify on the four-point set $\{0, 1, 5, 6\}$ that the final merge distance is
+$4$, matching Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+X = np.array([[0.0], [1.0], [5.0], [6.0]])
+
+def single_linkage(X):
+    n = len(X)
+    D = np.linalg.norm(X[:, None] - X[None, :], axis=2)
+    active = list(range(n))
+    merges = []
+    while len(active) > 1:
+        best = (None, None, np.inf)
+        for ai in active:
+            for bi in active:
+                if ai < bi and D[ai, bi] < best[2]:
+                    best = (ai, bi, D[ai, bi])
+        a, b, dist = best
+        merges.append(dist)
+        for c in active:
+            if c not in (a, b):
+                D[a, c] = D[c, a] = min(D[a, c], D[b, c])   # single linkage
+        active.remove(b)
+    return merges
+
+merges = single_linkage(X)
+assert np.isclose(merges[0], 1.0)
+assert np.isclose(merges[-1], 4.0)                 # final merge distance
+print("merge distances:", [round(m, 1) for m in merges])
+```
+
+The first two merges happen at distance $1$ and the final merge at distance $4$,
+reproducing the dendrogram derived by hand.
+
+</details>
+
+The next lesson takes a
 fundamentally different stance again: clusters as Gaussians fit by EM.
 
 <Footnotes>

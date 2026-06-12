@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: kmeans
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Run Lloyd's algorithm and see it as alternating minimization of the within-cluster sum of squares."
 prerequisites: []
 ---
@@ -127,7 +127,108 @@ print(f"best inertia over 10 random restarts: {best_inertia:.2f}")
 ```
 
 Lloyd recovers the three blobs' centers, inertia is monotonically decreasing,
-and random restarts find similar minima. The next lesson tackles the two
+and random restarts find similar minima.
+
+## Exercises
+
+**Exercise 1.** Three points lie on a line: $x_1 = 0$, $x_2 = 2$, $x_3 = 8$.
+With $k = 2$ and the initial assignment $\{x_1, x_2\}$ in cluster 1 and
+$\{x_3\}$ in cluster 2, run one full Lloyd iteration by hand and report the
+final centers, assignments, and inertia.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Update step on the given assignment. Cluster 1 mean is
+$\mu_1 = (0 + 2)/2 = 1$; cluster 2 has the single point, $\mu_2 = 8$.
+
+**Step 2.** Assignment step with these centers. Distances put $x_1$ (dist 1 vs 7)
+and $x_2$ (dist 1 vs 6) in cluster 1, and $x_3$ (dist 7 vs 0) in cluster 2.
+Assignments are unchanged, so the algorithm has converged.
+
+**Step 3.** Inertia is the sum of squared distances to the assigned center:
+
+$$
+J = (0 - 1)^2 + (2 - 1)^2 + (8 - 8)^2 = 1 + 1 + 0 = 2.
+$$
+
+The final centers are $\mu_1 = 1$, $\mu_2 = 8$ with inertia $2$.
+
+</details>
+
+**Exercise 2.** Prove that for a fixed set of points $C_k$, the center $\mu$
+minimizing $\sum_{i \in C_k} \lVert x_i - \mu \rVert^2$ is the mean
+$\bar{x} = \frac{1}{|C_k|}\sum_{i \in C_k} x_i$, justifying the update step.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Define $f(\mu) = \sum_{i \in C_k} \lVert x_i - \mu \rVert^2$. It is a
+sum of convex quadratics in $\mu$, so a stationary point is the global minimum.
+
+**Step 2.** Take the gradient with respect to $\mu$ and use
+$\nabla_\mu \lVert x_i - \mu \rVert^2 = -2(x_i - \mu)$:
+
+$$
+\nabla_\mu f = -2 \sum_{i \in C_k} (x_i - \mu).
+$$
+
+**Step 3.** Set the gradient to zero. With $|C_k|$ points,
+$\sum_{i \in C_k} x_i - |C_k|\,\mu = 0$, so
+
+$$
+\mu = \frac{1}{|C_k|} \sum_{i \in C_k} x_i = \bar{x}.
+$$
+
+The cluster mean is the unique minimizer, which is why the update step moves
+each center to the mean of its assigned points.
+
+</details>
+
+**Exercise 3 (code).** Implement the inertia $J(\mu, z)$ and verify the claim
+that each Lloyd step is non-increasing: across a run, every inertia value is
+less than or equal to the previous one. Report the gap between the first and
+last inertia.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+centers_true = np.array([[2.0, 0.0], [-2.0, 0.0], [0.0, 2.0]])
+X = np.vstack([rng.normal(loc=c, scale=0.5, size=(100, 2)) for c in centers_true])
+
+def kmeans_history(X, k, max_iter=100, rng=rng):
+    mu = X[rng.choice(len(X), size=k, replace=False)]
+    hist = []
+    for _ in range(max_iter):
+        d2 = ((X[:, None] - mu[None, :])**2).sum(axis=2)
+        z = d2.argmin(axis=1)
+        mu_new = np.array([X[z == j].mean(axis=0) if (z == j).sum() else mu[j]
+                           for j in range(k)])
+        # inertia after the update, recorded each iteration
+        hist.append(np.sum((X - mu_new[z])**2))
+        if np.allclose(mu, mu_new):
+            break
+        mu = mu_new
+    return np.array(hist)
+
+hist = kmeans_history(X, k=3)
+# every step is non-increasing within a tiny float tolerance
+assert np.all(np.diff(hist) <= 1e-9)
+print("first inertia:", round(hist[0], 2), " last:", round(hist[-1], 2))
+print("decrease:", round(hist[0] - hist[-1], 2))
+```
+
+The assertion confirms the inertia never rises from one iteration to the next,
+matching the monotone-decrease proof; the recorded sequence ends at the local
+minimum Lloyd settles into.
+
+</details>
+
+The next lesson tackles the two
 hardest practical questions: how to initialize the centers, and how to choose
 $k$.
 

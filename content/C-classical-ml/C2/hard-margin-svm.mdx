@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: hard-margin-svm
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define the geometric margin and derive the hard-margin SVM as a quadratic program."
 prerequisites: ["perceptron", "A3/kkt"]
 ---
@@ -154,8 +154,108 @@ print("min positive margin:", np.min(y * (X @ w + b)))
 ```
 
 The dual ascent identifies a handful of support vectors; the recovered weight
-vector classifies every training point correctly with a positive margin. The
-next lesson relaxes the hard constraints with slack variables so the SVM
+vector classifies every training point correctly with a positive margin.
+
+## Exercises
+
+**Exercise 1.** Two points lie on a line through the origin: $x_+ = (1, 1)$ with
+$y_+ = +1$ and $x_- = (-1, -1)$ with $y_- = -1$. Find the hard-margin solution
+$(w, b)$ and the geometric margin, by enforcing that both points sit on the
+margin boundary.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By symmetry the separating hyperplane passes through the origin, so
+$b = 0$, and $w$ points along $x_+ - x_- = (2, 2)$, i.e. $w = (a, a)$ for some
+$a > 0$.
+
+**Step 2.** The scale-fixing convention sets the closest functional margin to
+$1$. At $x_+$: $y_+(w^\top x_+ + b) = a + a = 2a = 1$, so $a = 1/2$ and
+$w = (1/2, 1/2)$.
+
+**Step 3.** The geometric margin is
+
+$$
+\gamma = \frac{1}{\lVert w\rVert} = \frac{1}{\sqrt{(1/2)^2 + (1/2)^2}} = \frac{1}{1/\sqrt2} = \sqrt2.
+$$
+
+Both points are $\sqrt2$ from the line $x_1 + x_2 = 0$, which matches: the
+distance from $(1,1)$ to that line is $|1+1|/\sqrt2 = \sqrt2$.
+
+</details>
+
+**Exercise 2.** From the stationarity condition $w = \sum_i \alpha_i y_i x_i$
+and $\sum_i \alpha_i y_i = 0$, prove that the squared norm equals
+$\lVert w\rVert^2 = \sum_i \alpha_i$, so the squared margin is $1/\sum_i \alpha_i$.
+(Use that for support vectors $y_i(w^\top x_i + b) = 1$.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expand $\lVert w\rVert^2 = w^\top w$ using $w = \sum_i \alpha_i y_i x_i$:
+
+$$
+\lVert w\rVert^2 = \sum_i \alpha_i y_i\, x_i^\top w = \sum_i \alpha_i y_i (w^\top x_i).
+$$
+
+**Step 2.** Only support vectors have $\alpha_i > 0$, and each satisfies the
+tight constraint $y_i(w^\top x_i + b) = 1$, hence $y_i\, w^\top x_i = 1 - y_i b$.
+Substitute:
+
+$$
+\lVert w\rVert^2 = \sum_i \alpha_i (1 - y_i b) = \sum_i \alpha_i - b\sum_i \alpha_i y_i.
+$$
+
+**Step 3.** The second sum is zero by the stationarity condition
+$\sum_i \alpha_i y_i = 0$, so $\lVert w\rVert^2 = \sum_i \alpha_i$. The geometric
+margin is $\gamma = 1/\lVert w\rVert$, so $\gamma^2 = 1/\lVert w\rVert^2 = 1/\sum_i \alpha_i$.
+A larger total multiplier mass means a smaller margin.
+
+</details>
+
+**Exercise 3 (code).** Take the two points of Exercise 1, run the projected-
+gradient dual ascent, and confirm it recovers $w = (1/2, 1/2)$, $b = 0$, a
+margin of $\sqrt2$, and equal multipliers $\alpha_+ = \alpha_-$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+X = np.array([[1.0, 1.0], [-1.0, -1.0]])
+y = np.array([1.0, -1.0])
+
+def hard_margin_dual(X, y, lr=1e-3, steps=50000):
+    K = X @ X.T
+    Q = (y[:, None] * y[None, :]) * K
+    alpha = np.zeros(len(y))
+    for _ in range(steps):
+        grad = 1 - Q @ alpha
+        alpha = np.maximum(alpha + lr * grad, 0)
+        alpha -= y * (y @ alpha) / (y @ y)     # project onto sum(y*alpha)=0
+        alpha = np.maximum(alpha, 0)
+    return alpha
+
+alpha = hard_margin_dual(X, y)
+w = (alpha * y) @ X
+sv = alpha > 1e-4
+b = np.mean(y[sv] - X[sv] @ w)
+margin = 1.0 / np.linalg.norm(w)
+
+print(f"w = {w}, b = {b:.3f}, margin = {margin:.4f}, alpha = {alpha}")
+assert np.allclose(w, [0.5, 0.5], atol=1e-2)
+assert np.isclose(margin, np.sqrt(2), atol=1e-2)
+assert np.isclose(alpha[0], alpha[1], atol=1e-3)   # symmetric multipliers
+```
+
+The dual reproduces the hand solution: equal multipliers on the two symmetric
+support vectors, weight $(1/2, 1/2)$, and margin $\sqrt2 \approx 1.414$.
+
+</details>
+
+The next lesson relaxes the hard constraints with slack variables so the SVM
 survives noisy and nonseparable data.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: lasso
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Solve the LASSO with proximal gradient (soft-thresholding) and explain why L1 produces sparse coefficients."
 prerequisites: ["ridge-regression", "A3/proximal-methods"]
 ---
@@ -122,7 +122,99 @@ for lam in [0.05, 0.1, 0.2, 0.5]:
 
 LASSO recovers the true sparse support exactly at moderate $\lambda$; sweeping
 $\lambda$ traces a path from dense (small $\lambda$) to all-zero (large
-$\lambda$). The next lesson combines L1 and L2 to fix LASSO's
+$\lambda$).
+
+## Exercises
+
+**Exercise 1.** Derive the one-dimensional soft-thresholding rule from scratch.
+Minimize $g(\beta) = \frac{1}{2}(\beta - v)^2 + \lambda|\beta|$ over $\beta \in \mathbb{R}$
+and show the minimizer is $\operatorname{sign}(v)\max(|v| - \lambda, 0)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Away from zero, $|\beta|$ is differentiable. For $\beta > 0$,
+$g'(\beta) = (\beta - v) + \lambda = 0$ gives $\beta = v - \lambda$, valid only
+when $v - \lambda > 0$, i.e. $v > \lambda$.
+
+**Step 2.** For $\beta < 0$, $g'(\beta) = (\beta - v) - \lambda = 0$ gives
+$\beta = v + \lambda$, valid only when $v + \lambda < 0$, i.e. $v < -\lambda$.
+
+**Step 3.** For $-\lambda \le v \le \lambda$ neither branch is feasible, so the
+minimum is at the kink $\beta = 0$. Checking the subgradient there: $0 \in (\beta - v) + \lambda\,\partial|\beta| = -v + \lambda[-1, 1]$
+holds exactly when $|v| \le \lambda$.
+
+**Step 4.** Stitching the three cases together gives
+$\hat\beta = \operatorname{sign}(v)\max(|v| - \lambda, 0)$: shift toward zero by
+$\lambda$, and clamp anything within $\lambda$ of zero to exactly zero. The exact
+zeros are where LASSO's sparsity comes from.
+
+</details>
+
+**Exercise 2.** For an orthonormal design ($X^\top X = I$), show that the full
+LASSO solution decouples into one soft-threshold per coordinate applied to the
+OLS estimate: $\hat\beta_j = \operatorname{sign}(\hat\beta_j^{\text{OLS}})\max(|\hat\beta_j^{\text{OLS}}| - \lambda, 0)$.
+Contrast this with ridge, which only scales each coordinate.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expand the squared-error term with $X^\top X = I$. Writing
+$\hat\beta^{\text{OLS}} = X^\top\mathbf{y}$,
+
+$$
+\tfrac{1}{2}\lVert\mathbf{y} - X\beta\rVert^2 = \tfrac{1}{2}\lVert\mathbf{y}\rVert^2 - \beta^\top X^\top\mathbf{y} + \tfrac{1}{2}\beta^\top\beta = \text{const} + \sum_j\left(\tfrac{1}{2}\beta_j^2 - \beta_j \hat\beta_j^{\text{OLS}}\right).
+$$
+
+**Step 2.** Add the penalty $\lambda\sum_j|\beta_j|$. The objective separates into
+independent per-coordinate problems $\frac{1}{2}\beta_j^2 - \beta_j\hat\beta_j^{\text{OLS}} + \lambda|\beta_j| = \frac{1}{2}(\beta_j - \hat\beta_j^{\text{OLS}})^2 + \lambda|\beta_j| + \text{const}$.
+
+**Step 3.** Each is the scalar problem of Exercise 1 with $v = \hat\beta_j^{\text{OLS}}$,
+so $\hat\beta_j = \operatorname{sign}(\hat\beta_j^{\text{OLS}})\max(|\hat\beta_j^{\text{OLS}}| - \lambda, 0)$.
+
+**Step 4.** Ridge with $X^\top X = I$ instead solves
+$\frac{1}{2}(\beta_j - \hat\beta_j^{\text{OLS}})^2 + \frac{\lambda}{2}\beta_j^2$,
+giving $\hat\beta_j = \hat\beta_j^{\text{OLS}} / (1 + \lambda)$: a uniform
+multiplicative shrink that never reaches zero. LASSO subtracts a constant and
+clips; ridge scales. That difference is exactly sparsity vs no sparsity.
+
+</details>
+
+**Exercise 3 (code).** The soft-thresholding operator is claimed to be the
+proximal operator of $\lambda|\cdot|$. Verify it numerically: for many random $v$,
+solve $\arg\min_\beta \frac{1}{2}(\beta - v)^2 + \lambda|\beta|$ by a fine 1D grid
+search and confirm it matches $\operatorname{soft}(v, \lambda)$, with values inside
+$[-\lambda, \lambda]$ sent exactly to zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def soft(v, t):
+    return np.sign(v) * np.maximum(np.abs(v) - t, 0.0)
+
+rng = np.random.default_rng(0)
+lam = 0.4
+vs = rng.uniform(-2, 2, 1000)
+grid = np.linspace(-3, 3, 60001)        # fine 1D search shared across all v
+sol = np.array([grid[np.argmin(0.5 * (grid - v) ** 2 + lam * np.abs(grid))] for v in vs])
+closed = soft(vs, lam)
+
+assert np.max(np.abs(sol - closed)) < 1e-3        # grid minimizer matches closed form
+small = vs[np.abs(vs) <= lam]
+assert np.allclose(soft(small, lam), 0.0)         # within the band -> exactly zero
+print("max |grid_min - soft| =", round(float(np.max(np.abs(sol - closed))), 5))
+```
+
+The grid minimizer tracks the closed-form soft-threshold to within the grid
+spacing, and every $v$ with $|v| \le \lambda$ maps to zero, confirming
+soft-thresholding is the prox of the L1 penalty that each ISTA step applies.
+
+</details>
+
+The next lesson combines L1 and L2 to fix LASSO's
 correlated-feature behavior.
 
 <Footnotes>

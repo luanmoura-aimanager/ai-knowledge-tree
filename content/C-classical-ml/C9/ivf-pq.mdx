@@ -4,7 +4,7 @@ pillar: C
 subId: C9
 lessonId: ivf-pq
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Partition the space with coarse clusters and compress residuals with product quantization for billion-scale search."
 prerequisites: ["ann-problem", "C5/kmeans"]
 ---
@@ -159,7 +159,116 @@ for nprobe in [1, 2, 4, 8, 16]:
 ```
 
 Increasing `nprobe` raises recall while visiting a small fraction of the
-database. The next lesson covers the graph-based alternative that often
+database.
+
+## Exercises
+
+**Exercise 1.** An IVF index holds $n = 10^9$ vectors with $K = \sqrt{n}$
+centroids, and the vectors are spread evenly across the inverted lists. With
+`nprobe` $= 8$, how many vectors does a query scan, and what fraction of the
+database is that? Why does this fraction stay tiny as $n$ grows?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $K = \sqrt{n}$ even lists, each list holds $n/K = \sqrt{n}$
+vectors. Here $\sqrt{n} = \sqrt{10^9} \approx 31{,}623$ per list.
+
+**Step 2.** Probing $8$ lists scans about $8 \cdot \sqrt{n} = 8 \cdot 31{,}623
+\approx 2.53 \times 10^5$ vectors, plus the $K \approx 31{,}623$ centroid
+distances for the coarse search.
+
+**Step 3.** The scanned fraction is $8\sqrt{n}/n = 8/\sqrt{n} \approx 2.5 \times
+10^{-4}$, about $0.025\%$. Because the fraction is $\texttt{nprobe}/\sqrt{n}$, it
+shrinks as $n$ grows: the same `nprobe` touches a smaller share of a bigger
+database, which is how IVF stays sublinear at billion scale.
+
+</details>
+
+**Exercise 2.** A raw vector has $d = 128$ float32 entries. A PQ code uses
+$m = 16$ subspaces with $K_s = 256$ centroids each. Give the bytes per code, the
+compression ratio versus the raw vector, and the bits per subspace index.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each subspace index selects one of $K_s = 256$ centroids, which needs
+$\log_2 256 = 8$ bits, exactly one byte. With $m = 16$ subspaces a code is
+$16$ bytes.
+
+**Step 2.** The raw vector is $128 \cdot 4 = 512$ bytes. The compression ratio is
+$512 / 16 = 32\times$. (The $8\times$ figure in the lesson used $m = 16$ on a raw
+size counted as $d = 128$ bytes; against the full $512$-byte float32 vector the
+ratio is $32\times$.)
+
+**Step 3.** The codebooks themselves cost $m \cdot K_s \cdot (d/m) \cdot 4 =
+16 \cdot 256 \cdot 8 \cdot 4 = 131{,}072$ bytes, a fixed overhead amortized over
+all $n$ codes, so per-vector storage approaches the $16$-byte code as $n$ grows.
+
+</details>
+
+**Exercise 3 (code).** Implement product quantization directly: train one
+k-means codebook per subspace, encode the database as subspace indices, and
+score queries with the asymmetric distance (ADC) lookup tables. Confirm the
+$16$-byte-style codes still recover a meaningful share of the exact top-10 and
+that the code is far smaller than the raw vector.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 10_000, 32
+m, Ks = 8, 64                 # 8 subspaces, 64 centroids each
+sub = d // m
+X = rng.normal(size=(n, d)).astype(np.float32)
+
+def kmeans(Xs, k, n_iter=15, rng=rng):
+    centers = Xs[rng.choice(len(Xs), k, replace=False)].copy()
+    for _ in range(n_iter):
+        z = ((Xs[:, None] - centers[None]) ** 2).sum(2).argmin(1)
+        for j in range(k):
+            if (z == j).any():
+                centers[j] = Xs[z == j].mean(0)
+    return centers
+
+codebooks, codes = [], np.empty((n, m), dtype=np.int64)
+for s in range(m):
+    Xs = X[:, s*sub:(s+1)*sub]
+    C = kmeans(Xs, Ks)
+    codebooks.append(C)
+    codes[:, s] = ((Xs[:, None] - C[None]) ** 2).sum(2).argmin(1)
+
+def adc_dist(q):                                  # sum of per-subspace table lookups
+    total = np.zeros(n)
+    for s in range(m):
+        table = ((codebooks[s] - q[s*sub:(s+1)*sub]) ** 2).sum(1)
+        total += table[codes[:, s]]
+    return total
+
+queries = rng.normal(size=(30, d)).astype(np.float32)
+recalls = []
+for q in queries:
+    pq_top = set(np.argsort(adc_dist(q))[:10].tolist())
+    ex_top = set(np.argsort(((X - q) ** 2).sum(1))[:10].tolist())
+    recalls.append(len(pq_top & ex_top) / 10)
+
+print("PQ recall@10:", round(float(np.mean(recalls)), 3))
+print("bytes/vector:", m, "vs raw float32:", d * 4)
+assert np.mean(recalls) > 0.3        # compressed codes still recover top neighbors
+assert m < d * 4                     # the code is much smaller than the raw vector
+```
+
+The $8$-byte codes recover about $0.41$ recall@10 against the exact ranking while
+using $8$ bytes per vector instead of $128$, a $16\times$ shrink. ADC never
+decompresses a stored vector: it sums $m$ precomputed table entries, which is why
+billion-scale IVF-PQ fits in a single machine's RAM.
+
+</details>
+
+The next lesson covers the graph-based alternative that often
 beats IVF at moderate scale: HNSW.
 
 <Footnotes>

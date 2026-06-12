@@ -4,7 +4,7 @@ pillar: C
 subId: C10
 lessonId: regression-metrics
 order: 2
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Compare MSE, MAE, R^2, MAPE, and quantile losses, and know when each one misleads."
 prerequisites: []
 ---
@@ -155,8 +155,106 @@ print("MSE and R^2 hate it; MAE notices but is less catastrophic.")
 ```
 
 The same predictor is judged very differently across metrics: MSE punishes
-the few huge errors; MAE is more forgiving. The next lesson tackles a
-different metric concern: are the predicted probabilities believable?
+the few huge errors; MAE is more forgiving.
+
+## Exercises
+
+**Exercise 1.** A model produces residuals $r_i = y_i - \hat y_i$ equal to
+$(-2, 1, 3, -1, -1)$ on five test points. Compute the MSE, RMSE, and MAE by
+hand, and say which residual contributes most to each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Square each residual: $4, 1, 9, 1, 1$, summing to $16$. The MSE
+is the average:
+
+$$
+\text{MSE} = \frac{16}{5} = 3.2, \qquad \text{RMSE} = \sqrt{3.2} = 1.789.
+$$
+
+**Step 2.** Take absolute values: $2, 1, 3, 1, 1$, summing to $8$. The MAE is
+
+$$
+\text{MAE} = \frac{8}{5} = 1.6.
+$$
+
+**Step 3.** The residual of $3$ dominates the MSE: its squared contribution
+$9$ is more than half the total $16$, while under MAE it contributes
+$3$ of $8$, a smaller share. The quadratic penalty magnifies the largest
+error relative to the linear one.
+
+</details>
+
+**Exercise 2.** The lesson states that the conditional median minimizes MAE.
+Prove the one-dimensional version: for a fixed sample $y_1, \dots, y_n$, the
+constant $c$ minimizing $\sum_i |y_i - c|$ is a median of the sample.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $g(c) = \sum_i |y_i - c|$. Each term $|y_i - c|$ is convex in
+$c$, so $g$ is convex; a minimizer is any point where $0$ lies in the
+subgradient.
+
+**Step 2.** Away from the data points, $\frac{d}{dc}|y_i - c|$ is $-1$ when
+$c < y_i$ and $+1$ when $c > y_i$. So for $c$ not equal to any $y_i$,
+
+$$
+g'(c) = \#\{i : c > y_i\} - \#\{i : c < y_i\} = (\text{points below } c) - (\text{points above } c).
+$$
+
+**Step 3.** $g'(c)$ is negative while fewer than half the points lie below
+$c$ and positive once more than half do. The sign changes where the count
+below equals the count above, which is the definition of a median: at least
+half the mass on each side.
+
+**Step 4.** By convexity, the sign change of the derivative locates the
+global minimum. So a median minimizes $\sum_i |y_i - c|$. (For even $n$ any
+point between the two central order statistics works, matching the
+non-uniqueness of the median.)
+
+</details>
+
+**Exercise 3 (code).** Confirm the two optimal-point-prediction facts at
+once: on a heavy-tailed sample, the constant minimizing average squared
+error is the mean, and the constant minimizing average absolute error is the
+median. Scan a dense grid of candidate constants and check each argmin
+against the closed-form value.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+y = rng.normal(5, 3, 400)
+y[:10] += 40                       # a heavy right tail to separate mean and median
+
+cands = np.linspace(y.min(), y.max(), 4000)
+spacing = cands[1] - cands[0]
+mse = np.array([np.mean((y - c) ** 2) for c in cands])
+mae = np.array([np.mean(np.abs(y - c)) for c in cands])
+
+c_mse = cands[mse.argmin()]
+c_mae = cands[mae.argmin()]
+print(f"argmin MSE = {c_mse:.4f}  vs mean   = {y.mean():.4f}")
+print(f"argmin MAE = {c_mae:.4f}  vs median = {np.median(y):.4f}")
+
+assert abs(c_mse - y.mean()) < spacing
+assert abs(c_mae - np.median(y)) < spacing
+```
+
+The squared-error optimum sits at the mean (here about $5.89$), pulled up by
+the heavy tail, while the absolute-error optimum sits at the median (about
+$4.93$), which the tail barely moves. Both asserts pass to within the grid
+spacing.
+
+</details>
+
+The next lesson tackles a different metric concern: are the predicted
+probabilities believable?
 
 <Footnotes>
   <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009).

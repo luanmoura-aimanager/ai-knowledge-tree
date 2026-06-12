@@ -4,7 +4,7 @@ pillar: C
 subId: C9
 lessonId: lsh
 order: 2
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Hash similar points to the same bucket with high probability, with MinHash for Jaccard and SimHash for cosine."
 prerequisites: ["ann-problem"]
 ---
@@ -162,7 +162,110 @@ for k_bits in [4, 8, 12]:
 ```
 
 Longer signatures cut the candidate set; more tables (OR amplification)
-boost recall. The next lesson covers an inverted-index approach (IVF) that
+boost recall.
+
+## Exercises
+
+**Exercise 1.** A SimHash family has collision probability $p_1 = 0.9$ for a
+similar pair and $p_2 = 0.4$ for a dissimilar pair. Form an AND composite of
+$k = 5$ bits, then an OR over $L = 10$ such composites. Compute the final
+collision probability for each pair and explain why the gap widened.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** AND concatenates $k$ independent bits, so a composite collides only
+if all $k$ agree: $p \to p^k$. The similar pair becomes $0.9^5 = 0.59049$; the
+dissimilar pair becomes $0.4^5 = 0.01024$.
+
+**Step 2.** OR over $L$ tables collides if any one composite matches, so the
+miss probability is $(1 - p^k)^L$ and the collision probability is
+$1 - (1 - p^k)^L$. For the similar pair:
+
+$$
+1 - (1 - 0.59049)^{10} = 1 - 0.40951^{10} \approx 1 - 0.00013 \approx 0.99987.
+$$
+
+For the dissimilar pair:
+
+$$
+1 - (1 - 0.01024)^{10} = 1 - 0.98976^{10} \approx 1 - 0.9022 \approx 0.0978.
+$$
+
+**Step 3.** The similar pair now collides with probability about $0.9999$ while
+the dissimilar pair sits near $0.098$. AND pushed both probabilities down but
+hit the small $p_2$ far harder (the ratio $(p_1/p_2)^k$ grew); OR then lifted
+the survivor $p_1^k$ back toward $1$ without much helping the already-tiny
+$p_2^k$. The combination sharpens a soft monotone signal into a near-threshold.
+
+</details>
+
+**Exercise 2.** Two documents have MinHash signatures of length $k = 200$ that
+agree in $150$ positions. Estimate their Jaccard similarity and the standard
+error of that estimate. Why does a longer signature give a tighter estimate?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each position is an independent Bernoulli trial that matches with
+probability exactly $J(A, B)$, so the fraction of agreements is an unbiased
+estimator: $\hat{J} = 150/200 = 0.75$.
+
+**Step 2.** The agreement count is Binomial$(k, J)$, so the estimator has
+variance $J(1 - J)/k$. Plugging the estimate, the standard error is
+
+$$
+\sqrt{\frac{0.75 \cdot 0.25}{200}} = \sqrt{9.375 \times 10^{-4}} \approx 0.031.
+$$
+
+**Step 3.** The standard error scales as $1/\sqrt{k}$. Doubling the signature
+length shrinks it by a factor $\sqrt{2}$, so longer signatures trade memory and
+hashing cost for a more precise Jaccard estimate.
+
+</details>
+
+**Exercise 3 (code).** Verify the SimHash collision identity
+$\Pr_w(h_w(x) = h_w(y)) = 1 - \theta(x, y)/\pi$. Build pairs at several known
+angles $\theta$ in a high-dimensional space, draw many random hyperplanes, and
+check that the empirical collision rate matches $1 - \theta/\pi$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d = 64
+
+def unit(v):
+    return v / np.linalg.norm(v)
+
+# Build an orthonormal pair (x, y0) so cos(theta) x + sin(theta) y0 has angle theta to x
+x = unit(rng.normal(size=d))
+y0 = rng.normal(size=d)
+y0 = unit(y0 - (y0 @ x) * x)
+
+normals = rng.normal(size=(200_000, d))      # random hyperplanes
+
+for theta in [np.pi/6, np.pi/3, np.pi/2, 2*np.pi/3]:
+    y = np.cos(theta) * x + np.sin(theta) * y0
+    hx = (normals @ x) > 0
+    hy = (normals @ y) > 0
+    collide = (hx == hy).mean()
+    predicted = 1 - theta / np.pi
+    print(f"theta={theta:.3f}  empirical={collide:.3f}  predicted={predicted:.3f}")
+    assert abs(collide - predicted) < 0.01
+```
+
+At $\theta = \pi/3$ the collision rate is about $0.667 = 1 - (\pi/3)/\pi$, and at
+$\theta = \pi/2$ it is about $0.5$. The empirical rate tracks $1 - \theta/\pi$ to
+within sampling error, which is why Hamming distance between SimHash signatures
+estimates angular distance.
+
+</details>
+
+The next lesson covers an inverted-index approach (IVF) that
 scales to billions of vectors.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: softmax-regression
 order: 8
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Generalize logistic regression to multiple classes via the softmax and the cross-entropy loss."
 prerequisites: ["logistic-regression", "A2/kl-cross-entropy"]
 ---
@@ -136,9 +136,123 @@ print("softmax K=2 matches logistic:", np.allclose(p1, softmax(X[:2 * n_per_clas
 ```
 
 The classifier gets the three Gaussian blobs apart, probabilities normalize per
-row, and the binary case reduces to logistic on the score difference. The next
-lesson zooms out to the general framework that unifies linear, logistic, and
-Poisson regression: GLMs.
+row, and the binary case reduces to logistic on the score difference.
+
+## Exercises
+
+**Exercise 1.** Compute the softmax of the score vector $z = (2, 1, 0)$ over
+three classes by hand, then give the cross-entropy loss in nats if the true
+class is class 0.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Exponentiate each score: $e^2 \approx 7.389$, $e^1 \approx 2.718$,
+$e^0 = 1$. Their sum is $7.389 + 2.718 + 1 = 11.107$.
+
+**Step 2.** Divide each by the sum to normalize:
+
+$$
+p = \left(\frac{7.389}{11.107},\ \frac{2.718}{11.107},\ \frac{1}{11.107}\right) \approx (0.665,\ 0.245,\ 0.090).
+$$
+
+The entries are nonnegative and sum to 1, as a probability vector must.
+
+**Step 3.** The cross-entropy loss for true class 0 is $-\log p_0$:
+
+$$
+-\log 0.665 \approx 0.408 \text{ nats}.
+$$
+
+</details>
+
+**Exercise 2.** Prove the shift invariance of the softmax: adding the same
+constant $c$ to every score leaves the output probabilities unchanged. This is
+why only differences between scores carry information.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the softmax of the shifted vector $z + c\mathbf{1}$, where every
+entry increases by $c$. Component $k$ is
+
+$$
+\frac{\exp(z_k + c)}{\sum_j \exp(z_j + c)}.
+$$
+
+**Step 2.** Factor $\exp(c)$ out of each exponential, using $\exp(z_k + c) =
+\exp(z_k)\exp(c)$ in both numerator and denominator:
+
+$$
+\frac{\exp(z_k)\exp(c)}{\sum_j \exp(z_j)\exp(c)} = \frac{\exp(c)\,\exp(z_k)}{\exp(c)\sum_j \exp(z_j)}.
+$$
+
+**Step 3.** The common factor $\exp(c)$ cancels, leaving
+
+$$
+\frac{\exp(z_k)}{\sum_j \exp(z_j)},
+$$
+
+the softmax of the original $z$. The output is invariant to a common additive
+shift, which is exactly the model's overparameterization (adding $c$ to every
+$\beta_k$) and the reason the stable softmax subtracts the maximum score before
+exponentiating.
+
+</details>
+
+**Exercise 3 (code).** Implement softmax cross-entropy and its gradient with
+respect to the scores $Z$. For one-hot labels the gradient is $P - Y$ (predicted
+probabilities minus the one-hot targets). Verify this gradient against a
+finite-difference check on the total loss, and confirm the max difference is
+below $10^{-6}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, K = 12, 4
+Z = rng.normal(size=(n, K))                    # raw scores
+y = rng.integers(0, K, size=n)
+Y = np.eye(K)[y]                               # one-hot targets
+
+def softmax(Z):
+    Z = Z - Z.max(axis=1, keepdims=True)
+    e = np.exp(Z)
+    return e / e.sum(axis=1, keepdims=True)
+
+def loss(Z):
+    P = softmax(Z)
+    return -np.sum(Y * np.log(P + 1e-12))
+
+P = softmax(Z)
+grad_analytic = P - Y                           # d loss / d Z
+
+# Finite-difference check on every entry of Z.
+eps = 1e-6
+grad_numeric = np.zeros_like(Z)
+for i in range(n):
+    for k in range(K):
+        Zp = Z.copy(); Zp[i, k] += eps
+        Zm = Z.copy(); Zm[i, k] -= eps
+        grad_numeric[i, k] = (loss(Zp) - loss(Zm)) / (2 * eps)
+
+max_diff = np.abs(grad_analytic - grad_numeric).max()
+assert max_diff < 1e-6
+print("max |analytic - numeric| gradient:", round(float(max_diff), 9))
+```
+
+The analytic gradient $P - Y$ matches finite differences to under $10^{-6}$. The
+data-residual form (predicted probability minus the one-hot indicator) is the
+multi-class echo of the logistic gradient $\mathbf{y} - \mathbf{p}$, and is what
+the training loop multiplies by $X^\top$ to update the coefficients.
+
+</details>
+
+The next lesson zooms out to the general framework that unifies linear,
+logistic, and Poisson regression: GLMs.
 
 <Footnotes>
   <FNItem n="1">**Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*, §4.3.4. Springer. Softmax (multinomial logistic) regression.</FNItem>

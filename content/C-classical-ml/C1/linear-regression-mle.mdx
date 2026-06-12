@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: linear-regression-mle
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Show that OLS is the MLE under Gaussian noise, and recover the noise variance from the residuals."
 prerequisites: ["linear-regression-ols", "A2/mle"]
 ---
@@ -141,6 +141,97 @@ for j, (b, s, bt) in enumerate(zip(beta_hat, se, beta_true)):
 The MLE for $\beta$ recovers the OLS estimate, the MLE noise variance is slightly
 biased low (the unbiased version with $n - d$ is closer to truth), and the 95%
 confidence intervals from the Fisher information cover the true coefficients.
+
+## Exercises
+
+**Exercise 1.** A single feature-free model fits a constant: $y_i \sim \mathcal{N}(\mu, \sigma^2)$,
+so $X$ is the all-ones column and $\beta = \mu$. Show that the MLE is the sample
+mean $\hat\mu = \frac{1}{n}\sum_i y_i$ by differentiating the log-likelihood.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $x_i^\top\beta = \mu$ for every $i$, the log-likelihood from the
+lesson is
+
+$$
+\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i - \mu)^2.
+$$
+
+**Step 2.** Only the second term depends on $\mu$. Differentiate and set to zero:
+
+$$
+\frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2}\sum_{i=1}^n (y_i - \mu) = 0.
+$$
+
+**Step 3.** The positive prefactor $1/\sigma^2$ drops out, leaving
+$\sum_i y_i - n\mu = 0$, so $\hat\mu = \frac{1}{n}\sum_i y_i$. The sample mean is
+the special case of OLS with an intercept-only design, and it is the MLE under
+Gaussian noise.
+
+</details>
+
+**Exercise 2.** Prove the residuals are orthogonal to every column of $X$:
+$X^\top r = 0$ at $\hat\beta_{\text{MLE}}$, where $r = \mathbf{y} - X\hat\beta$.
+Use this to explain why fitting $d$ coefficients forces the residual vector into
+an $(n - d)$-dimensional subspace, the degrees-of-freedom story behind the
+$n - d$ divisor.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The MLE for $\beta$ minimizes $\lVert \mathbf{y} - X\beta\rVert^2$.
+The gradient is $\nabla_\beta \lVert \mathbf{y} - X\beta\rVert^2 = -2 X^\top(\mathbf{y} - X\beta)$.
+Setting it to zero at $\hat\beta$ gives $X^\top(\mathbf{y} - X\hat\beta) = X^\top r = 0$.
+
+**Step 2.** $X^\top r = 0$ is $d$ independent linear constraints on the $n$
+residual components (one per column of the full-rank $X$). The residual vector
+therefore lives in the orthogonal complement of the $d$-dimensional column space,
+an $(n - d)$-dimensional subspace.
+
+**Step 3.** Only $n - d$ of the residual coordinates are free to vary; the other
+$d$ are pinned by the constraints. The expected squared residual length is
+$\mathbb{E}[\lVert r\rVert^2] = (n - d)\sigma^2$, so dividing $\sum_i r_i^2$ by
+$n - d$ (not $n$) returns an unbiased $\sigma^2$.
+
+</details>
+
+**Exercise 3 (code).** Confirm the $\hat\sigma^2_{\text{MLE}}$ bias factor
+$(n - d)/n$ empirically. Fit OLS with $d = 4$ coefficients over many random
+datasets for several sample sizes, and check that the average of
+$\hat\sigma^2_{\text{MLE}} / \sigma^2$ matches $(n - d)/n$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+d = 4
+sigma2 = 1.5
+print("n      mean(MLE)/true   expected (n-d)/n")
+for n in [8, 20, 100, 1000]:
+    ratios = []
+    for t in range(2000):
+        r = np.random.default_rng(1000 + t)
+        X = np.column_stack([np.ones(n)] + [r.normal(size=n) for _ in range(d - 1)])
+        beta = r.normal(size=d)
+        y = X @ beta + np.sqrt(sigma2) * r.normal(size=n)
+        bhat = np.linalg.lstsq(X, y, rcond=None)[0]
+        res = y - X @ bhat
+        ratios.append(np.mean(res**2) / sigma2)
+    mean_ratio = float(np.mean(ratios))
+    expected = (n - d) / n
+    print(f"{n:>5}  {mean_ratio:.4f}          {expected:.4f}")
+    assert np.isclose(mean_ratio, expected, atol=0.02)
+```
+
+The MLE runs low by the factor $(n - d)/n$: about $0.50$ at $n = 8$ (a $50\%$
+underestimate when $d$ is half the sample), and effectively $1$ by $n = 1000$,
+matching the lesson's claim that the correction is negligible once $n \gg d$.
+
+</details>
+
 The next lesson tackles the universal tradeoff every estimator faces:
 bias and variance.
 

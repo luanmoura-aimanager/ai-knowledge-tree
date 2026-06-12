@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: gaussian-processes
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Treat the function as a draw from a GP prior, condition on data, and get closed-form posterior mean and variance."
 prerequisites: ["common-kernels", "A2/map-conjugate"]
 ---
@@ -154,9 +154,124 @@ print(f"best ell by marginal likelihood: {best_ell:.2f}")
 
 The GP posterior fits the training data, gives tight uncertainty near the
 samples and wide uncertainty far from them, and the marginal likelihood picks
-a reasonable length scale. This closes the C2 margin-and-kernels track; the
-next subsection switches to a very different inductive bias: trees that split
-the input space along axis-aligned cuts.
+a reasonable length scale.
+
+## Exercises
+
+**Exercise 1.** A noiseless GP ($\sigma_n^2 = 0$) has a single training point
+$x_1 = 0$ with $y_1 = 1$, and an RBF kernel with $\sigma_f = 1$, $\ell = 1$, so
+$k(x, x') = \exp(-\tfrac12 (x - x')^2)$. Compute the posterior mean and variance
+at a test point $x_\star$, and evaluate them at $x_\star = 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With one training point, $K_{XX} = k(0, 0) = 1$ and
+$K_{\star X} = k(x_\star, 0) = \exp(-\tfrac12 x_\star^2)$. The posterior mean is
+
+$$
+\mu_\star = K_{\star X}\, K_{XX}^{-1}\, y_1 = \exp\!\left(-\tfrac12 x_\star^2\right) \cdot 1 \cdot 1 = \exp\!\left(-\tfrac12 x_\star^2\right).
+$$
+
+**Step 2.** The posterior variance is
+
+$$
+\Sigma_\star = K_{\star\star} - K_{\star X} K_{XX}^{-1} K_{X\star} = 1 - \exp\!\left(-\tfrac12 x_\star^2\right)^2 = 1 - \exp(-x_\star^2).
+$$
+
+**Step 3.** At $x_\star = 0$: $\mu_\star = e^0 = 1$, recovering the observation
+exactly (a noiseless GP interpolates its data), and $\Sigma_\star = 1 - 1 = 0$,
+zero uncertainty at the observed location. Far from data ($|x_\star| \to \infty$)
+the mean decays to the zero prior and the variance grows to the prior variance
+$1$.
+
+</details>
+
+**Exercise 2.** In the log marginal likelihood
+$-\tfrac12 \mathbf{y}^\top A^{-1}\mathbf{y} - \tfrac12 \log\det A - \tfrac{n}{2}\log(2\pi)$
+with $A = K_{XX} + \sigma_n^2 I$, explain why the $-\tfrac12\log\det A$ term acts
+as a complexity penalty. (Consider how $\det A$ changes when the kernel is made
+more flexible.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $A$ is symmetric positive definite, so
+$\log\det A = \sum_i \log \lambda_i$ where $\lambda_i > 0$ are its eigenvalues.
+The eigenvalues measure the variance the prior assigns along each principal
+direction of the data covariance.
+
+**Step 2.** A more flexible kernel (larger amplitude $\sigma_f$, or a shorter
+length scale that lets nearby points vary more independently) inflates the prior
+variance, raising the eigenvalues $\lambda_i$, hence raising $\log\det A$. The
+term $-\tfrac12\log\det A$ then becomes more negative, lowering the marginal
+likelihood.
+
+**Step 3.** So a flexible model that could fit many datasets is charged for that
+flexibility, while the data-fit term $-\tfrac12 \mathbf{y}^\top A^{-1}\mathbf{y}$
+rewards explaining the actual $\mathbf{y}$. Maximizing the sum balances the two,
+which is the Bayesian Occam's razor: it prefers the least flexible kernel that
+still fits, with no held-out validation set.
+
+</details>
+
+**Exercise 3 (code).** On a 1D toy regression, verify that a near-noiseless GP
+interpolates its training points (posterior mean matches $y$, posterior standard
+deviation near zero at training inputs), and that the posterior standard
+deviation is larger at a point far from all data than at a point near the data.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def f_true(x):
+    return np.sin(2 * x) + 0.3 * np.cos(7 * x)
+
+n = 12
+x_train = np.sort(rng.uniform(-3, 3, n))[:, None]
+y_train = f_true(x_train).ravel() + 0.1 * rng.normal(size=n)
+
+def rbf(X1, X2, ell=1.0, sigma_f=1.0):
+    d2 = np.sum(X1**2, 1)[:, None] + np.sum(X2**2, 1) - 2 * X1 @ X2.T
+    return sigma_f**2 * np.exp(-0.5 * d2 / ell**2)
+
+def gp_posterior(x_train, y_train, x_test, ell, sigma_f, sigma_n):
+    Kxx = rbf(x_train, x_train, ell, sigma_f) + sigma_n**2 * np.eye(len(x_train))
+    Kxs = rbf(x_train, x_test, ell, sigma_f)
+    Kss = rbf(x_test, x_test, ell, sigma_f) + 1e-8 * np.eye(len(x_test))
+    L = np.linalg.cholesky(Kxx)
+    alpha = np.linalg.solve(L.T, np.linalg.solve(L, y_train))
+    v = np.linalg.solve(L, Kxs)
+    mu = Kxs.T @ alpha
+    cov = Kss - v.T @ v
+    return mu, np.sqrt(np.maximum(np.diag(cov), 0))
+
+# Near-noiseless GP interpolates the training points
+mu_tr, sd_tr = gp_posterior(x_train, y_train, x_train, 0.5, 1.0, 1e-6)
+assert np.allclose(mu_tr, y_train, atol=1e-3)
+assert sd_tr.max() < 1e-2
+
+# Uncertainty grows away from data
+_, sd_far = gp_posterior(x_train, y_train, np.array([[10.0]]), 0.5, 1.0, 0.1)
+_, sd_near = gp_posterior(x_train, y_train, x_train[n // 2:n // 2 + 1], 0.5, 1.0, 0.1)
+print(f"sd far from data: {sd_far[0]:.3f}, sd near data: {sd_near[0]:.3f}")
+assert sd_far[0] > sd_near[0]
+```
+
+The near-noiseless posterior passes through every training point with vanishing
+variance there, and the standard deviation at $x_\star = 10$ (about $1.0$, the
+prior) dwarfs the standard deviation at an in-sample location (about $0.09$).
+Calibrated uncertainty falls out of the same closed form, no extra fitting.
+
+</details>
+
+This closes the C2 margin-and-kernels track; the next subsection switches to a
+very different inductive bias: trees that split the input space along
+axis-aligned cuts.
 
 <Footnotes>
   <FNItem n="1">**Rasmussen, C. E., & Williams, C. K. I.** (2006). *Gaussian Processes for Machine Learning.* MIT Press. The canonical reference for GP regression, the posterior formulas, and scalable approximations.</FNItem>

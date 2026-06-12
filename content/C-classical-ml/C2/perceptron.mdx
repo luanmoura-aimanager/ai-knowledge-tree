@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: perceptron
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Run the perceptron update rule and prove convergence on linearly separable data with Novikoff's theorem."
 prerequisites: []
 ---
@@ -128,8 +128,105 @@ print(f"Novikoff bound (R/gamma)^2 = {bound:.0f}, actual mistakes = {mistakes}")
 ```
 
 The perceptron separates the two Gaussian blobs, achieves 100% training
-accuracy, and the actual mistake count sits below the Novikoff bound. The next
-lesson asks for more: among all separating hyperplanes, which one is the
+accuracy, and the actual mistake count sits below the Novikoff bound.
+
+## Exercises
+
+**Exercise 1.** Two one-dimensional points are given: $x_+ = 1$ with $y_+ = +1$
+and $x_- = -1$ with $y_- = -1$. Using $w^\star = 1$ (unit norm in 1D), compute
+the margin $\gamma$ and radius $R$, then the Novikoff bound on the number of
+perceptron updates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The functional score of each point under $w^\star = 1$ is
+$y_i\, w^\star x_i$. For $x_+ = 1$: $(+1)(1)(1) = 1$. For $x_- = -1$:
+$(-1)(1)(-1) = 1$. Both equal $1$, so the margin is $\gamma = \min_i y_i w^\star x_i = 1$.
+
+**Step 2.** The radius bounds the input norm: $R = \max_i |x_i| = 1$.
+
+**Step 3.** Novikoff's theorem caps the updates at
+
+$$
+\left(\frac{R}{\gamma}\right)^2 = \left(\frac{1}{1}\right)^2 = 1.
+$$
+
+A single mistake suffices: starting from $w = 0$, the first misclassified point
+updates $w$ to a separating direction, after which both points are correct.
+
+</details>
+
+**Exercise 2.** Show that scaling every input by a constant $c > 0$ (so
+$x_i \mapsto c\, x_i$) leaves the geometric margin $\gamma/R$ unchanged, hence
+leaves the Novikoff bound unchanged.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under $x_i \mapsto c\, x_i$, the separating direction $w^\star$ is
+unchanged (the same hyperplane through the origin separates the rescaled data).
+The functional margin scales: $y_i\, w^{\star\top}(c\, x_i) = c\, (y_i\, w^{\star\top} x_i) \ge c\gamma$,
+so the new margin is $\gamma' = c\gamma$.
+
+**Step 2.** The radius scales the same way: $\lVert c\, x_i\rVert = c\lVert x_i\rVert \le cR$,
+so $R' = cR$.
+
+**Step 3.** The Novikoff bound depends on the ratio:
+
+$$
+\left(\frac{R'}{\gamma'}\right)^2 = \left(\frac{cR}{c\gamma}\right)^2 = \left(\frac{R}{\gamma}\right)^2.
+$$
+
+The $c$ cancels. Rescaling all inputs cannot make the perceptron converge in
+fewer steps; only the dimensionless ratio $R/\gamma$ controls the bound.
+
+</details>
+
+**Exercise 3 (code).** The XOR labels are not linearly separable. Run the
+perceptron on the four XOR points for up to 1000 passes and confirm it never
+completes a mistake-free pass (it cycles), and that no setting of $w$ it reaches
+classifies all four correctly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# Bias-augmented XOR: first column is the constant intercept feature
+X = np.array([[1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]], float)
+y = np.array([-1, 1, 1, -1])           # XOR: differ -> +1, same -> -1
+
+def perceptron(X, y, max_passes):
+    w = np.zeros(X.shape[1])
+    converged = False
+    for _ in range(max_passes):
+        any_mistake = False
+        for i in range(len(y)):
+            if y[i] * (w @ X[i]) <= 0:
+                w += y[i] * X[i]
+                any_mistake = True
+        if not any_mistake:
+            converged = True
+            break
+    return w, converged
+
+w, converged = perceptron(X, y, max_passes=1000)
+acc = np.mean(np.sign(X @ w) == y)
+print(f"converged: {converged}, accuracy at stop: {acc:.2f}")
+assert not converged                    # no mistake-free pass in 1000 tries
+assert acc < 1.0                        # the final w cannot separate XOR
+```
+
+The loop exhausts all 1000 passes without a clean sweep: XOR has no linear
+separator, so Novikoff's premise (a positive margin) fails and the convergence
+guarantee does not apply. This is the gap the next lessons close by lifting the
+data into a richer feature space.
+
+</details>
+
+The next lesson asks for more: among all separating hyperplanes, which one is the
 **best** by a margin argument?
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: C
 subId: C3
 lessonId: tree-pruning
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Control depth, leaf size, and cost-complexity pruning to keep trees from memorizing the training set."
 prerequisites: ["impurity-criteria"]
 ---
@@ -139,7 +139,108 @@ for d in [1, 2, 4, 8, None]:
 ```
 
 Deep trees achieve near-perfect training accuracy but lose on the test set;
-the shallow tree, with far fewer leaves, generalizes better. The next lesson
+the shallow tree, with far fewer leaves, generalizes better.
+
+## Exercises
+
+**Exercise 1.** A grown tree $T_0$ has 8 leaves and a training
+misclassification rate $R(T_0) = 0.05$. A pruned subtree $T_1$ has 5 leaves and
+$R(T_1) = 0.08$. Using $R_\alpha(T) = R(T) + \alpha\,|T|$, find the value of
+$\alpha$ at which the two trees have equal cost, and state which tree the
+objective prefers above and below that $\alpha$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the two costs and set them equal:
+
+$$
+R(T_0) + \alpha\,|T_0| = R(T_1) + \alpha\,|T_1|,
+\qquad
+0.05 + 8\alpha = 0.08 + 5\alpha.
+$$
+
+**Step 2.** Solve for $\alpha$:
+
+$$
+8\alpha - 5\alpha = 0.08 - 0.05,
+\qquad
+3\alpha = 0.03,
+\qquad
+\alpha = 0.01.
+$$
+
+**Step 3.** For $\alpha < 0.01$ the per-leaf penalty is cheap, so the lower-loss
+$T_0$ wins; for $\alpha > 0.01$ each leaf costs more than it saves in loss, so
+the smaller $T_1$ wins. At $\alpha = 0.01$ they tie, which is the weakest-link
+threshold where $T_0$ collapses to $T_1$.
+
+</details>
+
+**Exercise 2.** The lesson names the horizon effect as the weakness of
+pre-pruning. Construct a small concrete target where a min-impurity-decrease stop
+rule prunes a node that a later split would have made highly informative, and
+explain why post-pruning avoids the trap.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the XOR target: $y = 1$ when exactly one of $x_1 > 0$, $x_2 > 0$
+holds, else $y = 0$, with the four quadrants equally populated.
+
+**Step 2.** The first split on either feature alone, say $x_1 > 0$, leaves each
+child with a 50/50 class mix (each child still spans both $x_2$ regions), so the
+impurity decrease is zero. A min-impurity-decrease pre-pruning rule stops here
+and declares a useless single-leaf tree.
+
+**Step 3.** Post-pruning grows the full tree first: the second-level splits on
+$x_2$ inside each child are perfectly informative, producing four pure leaves.
+Only after seeing that depth-2 payoff does cost-complexity pruning decide whether
+to keep it. Building the whole tree before trimming is what lets it see past the
+zero-gain first split that the horizon effect hides from a greedy stop rule.
+
+</details>
+
+**Exercise 3 (code).** Implement weakest-link cost-complexity selection on a
+two-candidate choice: given the grown tree's leaf count and loss and a pruned
+subtree's leaf count and loss, sweep $\alpha$ over a grid and report the smallest
+$\alpha$ at which the pruned subtree is preferred. Confirm it matches Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Define $R_\alpha$ for each tree and scan $\alpha$, returning the first
+grid point where the pruned subtree's regularized cost is at most the grown
+tree's.
+
+```python
+import numpy as np
+
+# (loss, leaves) for the grown tree T0 and the pruned subtree T1
+R0, n0 = 0.05, 8
+R1, n1 = 0.08, 5
+
+def cost(R, n_leaves, alpha):
+    return R + alpha * n_leaves
+
+alphas = np.linspace(0, 0.05, 5001)
+prefers_pruned = np.array([cost(R1, n1, a) <= cost(R0, n0, a) for a in alphas])
+alpha_star = alphas[np.argmax(prefers_pruned)]   # first True on the grid
+
+# Closed-form crossover from Exercise 1
+crossover = (R1 - R0) / (n0 - n1)
+assert np.isclose(alpha_star, crossover, atol=1e-3)
+print(f"grid alpha*: {alpha_star:.4f}, closed-form crossover: {crossover:.4f}")
+```
+
+**Step 2.** The grid crossover lands at $\alpha \approx 0.01$, matching the
+closed-form $(R_1 - R_0)/(|T_0| - |T_1|) = 0.03/3 = 0.01$. Increasing $\alpha$
+past this point flips the preference from the large tree to the pruned one,
+exactly the weakest-link transition.
+
+</details>
+
+The next lesson
 exploits this variance directly: average many bootstrap-resampled trees to
 get a Random Forest.
 

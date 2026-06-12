@@ -4,7 +4,7 @@ pillar: C
 subId: C4
 lessonId: naive-bayes
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Assume conditional independence of features given the class, fit class-conditional models, and classify via Bayes' rule."
 prerequisites: ["A2/bayes-rule"]
 ---
@@ -176,9 +176,124 @@ mnb = fit_multinomial_nb(X_count[tr], y_doc[tr])
 print(f"Multinomial NB test acc: {np.mean(predict_multinomial_nb(X_count[te], mnb) == y_doc[te]):.3f}")
 ```
 
-Both NB flavors classify their respective tasks well. The next lesson tightens
-the Gaussian-NB assumption to use full per-class covariance matrices: LDA and
-QDA.
+Both NB flavors classify their respective tasks well.
+
+## Exercises
+
+**Exercise 1.** A Bernoulli Naive Bayes spam filter uses two binary word
+features. The class priors are equal, $\pi_{\text{spam}} = \pi_{\text{ham}} =
+0.5$. For the word "win," $\Pr(\text{win} \mid \text{spam}) = 0.6$ and
+$\Pr(\text{win} \mid \text{ham}) = 0.1$. For the word "meeting,"
+$\Pr(\text{meeting} \mid \text{spam}) = 0.1$ and
+$\Pr(\text{meeting} \mid \text{ham}) = 0.5$. A message contains "win" and not
+"meeting." Compute the posterior $\Pr(\text{spam} \mid x)$ by hand under the
+naive assumption.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bernoulli NB scores a class by $\pi_c$ times the product over
+features of $\Pr(\text{present} \mid c)$ for present words and
+$\Pr(\text{absent} \mid c) = 1 - \Pr(\text{present} \mid c)$ for absent words.
+Here "win" is present and "meeting" is absent.
+
+**Step 2.** Unnormalized spam score:
+$$
+\pi_{\text{spam}}\,\Pr(\text{win}\mid\text{spam})\,(1 - \Pr(\text{meeting}\mid\text{spam}))
+= 0.5 \cdot 0.6 \cdot 0.9 = 0.27.
+$$
+
+**Step 3.** Unnormalized ham score:
+$$
+\pi_{\text{ham}}\,\Pr(\text{win}\mid\text{ham})\,(1 - \Pr(\text{meeting}\mid\text{ham}))
+= 0.5 \cdot 0.1 \cdot 0.5 = 0.025.
+$$
+
+**Step 4.** Normalize:
+$$
+\Pr(\text{spam}\mid x) = \frac{0.27}{0.27 + 0.025} = \frac{0.27}{0.295}
+\approx 0.915.
+$$
+The message is classified as spam.
+
+</details>
+
+**Exercise 2.** A class has seen a vocabulary word $j$ exactly $n_{cj} = 0$
+times, with the class's total count $\sum_k n_{ck} = 100$ and vocabulary size
+$V = 1000$. Compute the smoothed probability $p_{cj}$ under Laplace smoothing
+($\alpha = 1$), and explain in one sentence what the unsmoothed MLE would do to
+the score of any document containing word $j$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The smoothed estimate is
+$$
+p_{cj} = \frac{n_{cj} + \alpha}{\sum_k n_{ck} + \alpha V}
+= \frac{0 + 1}{100 + 1 \cdot 1000} = \frac{1}{1100} \approx 9.09 \times 10^{-4}.
+$$
+
+**Step 2.** The unsmoothed MLE is $p_{cj} = 0/100 = 0$. The document score
+sums $n_{xj}\log p_{cj}$, and $\log 0 = -\infty$, so any document containing
+even one occurrence of word $j$ would get score $-\infty$ for this class,
+making the class impossible no matter how strong the rest of the evidence is.
+Smoothing keeps the probability strictly positive and avoids that collapse.
+
+</details>
+
+**Exercise 3 (code).** The lesson claims correlated features inflate Naive
+Bayes posteriors by double-counting evidence. Build a 2-feature Gaussian NB
+problem where the two features are duplicates (perfectly correlated within
+each class). Show that the NB posterior at a test point is more extreme (closer
+to $0$ or $1$) than the posterior from a single copy of the feature, while the
+argmax label is unchanged.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# One informative feature: class means +1 / -1, unit variance, equal priors.
+mu = {1: 1.0, 0: -1.0}
+var = 1.0
+
+def log_post_spam(x_vec, means):
+    # Gaussian NB log-scores for a single test vector over given feature means.
+    scores = {}
+    for c in (0, 1):
+        ll = -0.5 * np.sum(np.log(2 * np.pi * var) + (x_vec - means[c]) ** 2 / var)
+        scores[c] = ll + np.log(0.5)              # equal priors
+    m = max(scores.values())
+    p1 = np.exp(scores[1] - m)
+    p0 = np.exp(scores[0] - m)
+    return p1 / (p1 + p0), int(scores[1] > scores[0])
+
+x = 0.5                                            # test point on the + side
+
+# Single feature
+post1, lab1 = log_post_spam(np.array([x]), {1: np.array([mu[1]]), 0: np.array([mu[0]])})
+
+# Duplicated feature: NB treats the two identical copies as independent
+post2, lab2 = log_post_spam(np.array([x, x]),
+                            {1: np.array([mu[1], mu[1]]), 0: np.array([mu[0], mu[0]])})
+
+print(f"single-feature posterior P(y=1): {post1:.4f}, label {lab1}")
+print(f"duplicated-feature posterior   : {post2:.4f}, label {lab2}")
+assert post2 > post1            # double-counting pushes the posterior more extreme
+assert lab1 == lab2             # but the decision is unchanged
+```
+
+The duplicated feature pushes the posterior from about $0.73$ to about $0.88$,
+confirming that independent multiplication of correlated evidence over-sharpens
+the probability, while the class decision survives intact.
+
+</details>
+
+The next lesson tightens the Gaussian-NB assumption to use full per-class
+covariance matrices: LDA and QDA.
 
 <Footnotes>
   <FNItem n="1">**Murphy, K. P.** (2012). *Machine Learning: A Probabilistic Perspective.* MIT Press. Naive Bayes classifiers and their flavors (§3.5).</FNItem>

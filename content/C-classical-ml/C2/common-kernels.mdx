@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: common-kernels
 order: 6
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Build the workhorse kernels, understand their hyperparameters, and combine them with sum/product rules."
 prerequisites: ["kernel-trick"]
 ---
@@ -149,8 +149,112 @@ print(K_str.astype(int))
 
 All three Gram matrices come out PSD; the median-distance heuristic gives a
 reasonable starting $\gamma$; the bigram spectrum kernel correctly puts
-"statistics" closer to its morphological neighbors than to "biology". The
-next lesson takes the kernel idea to its probabilistic extreme: Gaussian
+"statistics" closer to its morphological neighbors than to "biology".
+
+## Exercises
+
+**Exercise 1.** Compute the bigram ($k = 2$) spectrum kernel $k(s, t)$ by hand
+for the strings $s = $ "aba" and $t = $ "abab", and for $k(s, s)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** List the length-2 substrings (bigrams) of each string with counts.
+For $s = $ "aba": positions give "ab" and "ba", so $\#\text{ab}(s) = 1$,
+$\#\text{ba}(s) = 1$. For $t = $ "abab": "ab", "ba", "ab", so
+$\#\text{ab}(t) = 2$, $\#\text{ba}(t) = 1$.
+
+**Step 2.** The spectrum kernel is the dot product of these count histograms
+over shared bigrams:
+
+$$
+k(s, t) = \#\text{ab}(s)\,\#\text{ab}(t) + \#\text{ba}(s)\,\#\text{ba}(t) = (1)(2) + (1)(1) = 3.
+$$
+
+**Step 3.** The self-similarity uses the same counts for both arguments:
+
+$$
+k(s, s) = 1^2 + 1^2 = 2.
+$$
+
+The histogram view makes the kernel a plain inner product of $k$-mer counts,
+which is why it is automatically a valid kernel.
+
+</details>
+
+**Exercise 2.** The product $k(x, x') = k_1(x, x')\, k_2(x, x')$ of two valid
+kernels is again a valid kernel. Take $k_1 = k_2 = x^\top x'$ on
+$\mathbb{R}^2$ and exhibit the explicit feature map of the product, confirming it
+contains the degree-2 monomials.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the product out for $x = (x_1, x_2)$, $x' = (x'_1, x'_2)$:
+
+$$
+k(x, x') = (x^\top x')^2 = (x_1 x'_1 + x_2 x'_2)^2 = x_1^2 x_1'^2 + 2 x_1 x_2 x'_1 x'_2 + x_2^2 x_2'^2.
+$$
+
+**Step 2.** Group each term as (function of $x$)(same function of $x'$):
+$x_1^2 x_1'^2 = (x_1^2)(x_1'^2)$, $2 x_1 x_2 x'_1 x'_2 = (\sqrt2\, x_1 x_2)(\sqrt2\, x'_1 x'_2)$,
+and $x_2^2 x_2'^2 = (x_2^2)(x_2'^2)$. The feature map is
+
+$$
+\phi(x) = \left(x_1^2,\ \sqrt2\, x_1 x_2,\ x_2^2\right).
+$$
+
+**Step 3.** Its components are exactly the degree-2 monomials in $x_1, x_2$, so
+$\phi(x)^\top \phi(x') = (x^\top x')^2 = k(x, x')$. The product of the two
+linear kernels lifts into the space of quadratic interactions, and being an
+inner product of $\phi$ it is a valid kernel.
+
+</details>
+
+**Exercise 3 (code).** Take an RBF Gram matrix and a degree-3 polynomial Gram
+matrix on random data. Verify that their sum is still positive semidefinite, and
+that the RBF kernel, after normalization $k(x,x')/\sqrt{k(x,x)\,k(x',x')}$, has a
+unit diagonal and entries within $[-1, 1]$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(50, 4))
+
+def rbf(X1, X2, gamma):
+    d2 = np.sum(X1**2, 1)[:, None] + np.sum(X2**2, 1) - 2 * X1 @ X2.T
+    return np.exp(-gamma * d2)
+
+def poly(X1, X2, gamma=1.0, c=1.0, p=3):
+    return (gamma * X1 @ X2.T + c)**p
+
+K_rbf = rbf(X, X, gamma=0.5)
+K_poly = poly(X, X, p=3)
+
+# Sum of two valid kernels stays PSD
+K_sum = K_rbf + K_poly
+assert np.linalg.eigvalsh(K_sum).min() > -1e-8
+
+# Normalized kernel: unit diagonal, entries in [-1, 1]
+d = np.sqrt(np.diag(K_rbf))
+K_norm = K_rbf / np.outer(d, d)
+assert np.allclose(np.diag(K_norm), 1.0)
+assert K_norm.max() <= 1 + 1e-9 and K_norm.min() >= -1 - 1e-9
+print(f"sum-kernel min eigenvalue: {np.linalg.eigvalsh(K_sum).min():.4f}")
+```
+
+The summed Gram matrix has only nonnegative eigenvalues (closure under
+addition), and normalizing the RBF kernel rescales each entry by the geometric
+mean of the diagonal, forcing self-similarity to $1$ and every cross-similarity
+into $[-1, 1]$, the cosine-like form used to compare kernels across scales.
+
+</details>
+
+The next lesson takes the kernel idea to its probabilistic extreme: Gaussian
 processes.
 
 <Footnotes>

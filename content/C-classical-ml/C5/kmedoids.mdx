@@ -4,7 +4,7 @@ pillar: C
 subId: C5
 lessonId: kmedoids
 order: 3
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Swap means for actual data points to handle non-Euclidean distances and outliers."
 prerequisites: ["kmeans"]
 ---
@@ -136,7 +136,92 @@ print("\nk-medoids stays near the bulk; k-means centers shift toward the extreme
 ```
 
 The k-medoids centers are actual data points near each blob; k-means'
-centers are dragged toward the extreme outliers. The next lesson takes a
+centers are dragged toward the extreme outliers.
+
+## Exercises
+
+**Exercise 1.** A one-dimensional cluster holds the points
+$\{1, 2, 3, 4, 100\}$. Find the medoid (the data point minimizing total
+absolute distance to the others) and the mean, and report how far each sits
+from the bulk $\{1, 2, 3, 4\}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For each candidate medoid, sum the absolute distances to the other
+four points. For $3$: $|3-1| + |3-2| + |3-4| + |3-100| = 2 + 1 + 1 + 97 = 101$.
+For $2$: $1 + 1 + 2 + 98 = 102$. For $4$: $3 + 2 + 1 + 96 = 102$. The minimum
+total distance is at the medoid $m = 3$.
+
+**Step 2.** The mean is $(1 + 2 + 3 + 4 + 100)/5 = 110/5 = 22$.
+
+**Step 3.** The medoid $3$ sits inside the bulk $\{1, 2, 3, 4\}$, while the mean
+$22$ is pulled 18 units past the largest bulk point. The single outlier at $100$
+drags the mean out but leaves the medoid in place, the robustness k-medoids
+buys.
+
+</details>
+
+**Exercise 2.** Explain why the k-medoids objective
+$J = \sum_i \min_j d(x_i, m_j)$ is well defined for a cosine dissimilarity while
+the k-means objective is not, and state the one structural constraint k-medoids
+adds compared to k-means.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** k-means requires forming cluster means, which assumes the data live
+in a vector space where averaging coordinates is meaningful and squared
+Euclidean distance to that average is the cost. Under cosine dissimilarity the
+"average" of unit vectors is not itself a meaningful center of the metric, so
+the mean-based objective has no grounding.
+
+**Step 2.** k-medoids only evaluates $d(x_i, m_j)$ between existing points, so
+any dissimilarity (cosine, Hamming, edit) plugs in directly; no averaging is
+needed. The structural constraint it adds is that each center $m_j$ must be an
+actual data point, not an arbitrary point in space. This is what lets it skip
+the mean and what occasionally costs it inertia, since it cannot place a center
+between clusters.
+
+</details>
+
+**Exercise 3 (code).** With the L1 distance, compare a medoid (the in-cluster
+point of minimum total distance) against the coordinate-wise mean on a blob
+contaminated by one extreme outlier. Verify the medoid stays near the blob
+center while the mean is dragged far out.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+blob = rng.normal(loc=[0.0, 0.0], scale=0.5, size=(50, 2))
+X = np.vstack([blob, np.array([[50.0, 50.0]])])    # one extreme outlier
+
+def l1(a, b):
+    return np.abs(a - b).sum(axis=-1)
+
+# medoid: data point minimizing total L1 distance to all others
+D = l1(X[:, None], X[None, :])
+medoid = X[D.sum(axis=1).argmin()]
+mean = X.mean(axis=0)
+
+# medoid stays inside the blob; mean is pulled toward the outlier
+assert np.linalg.norm(medoid) < 2.0
+assert np.linalg.norm(mean) > 0.8
+print("medoid:", medoid.round(2), " dist from origin:", round(float(np.linalg.norm(medoid)), 2))
+print("mean:  ", mean.round(2), " dist from origin:", round(float(np.linalg.norm(mean)), 2))
+```
+
+The medoid lands within the dense blob near the origin, while the mean is shifted
+toward the outlier at $(50, 50)$, the same contrast the lesson's two-blob example
+shows.
+
+</details>
+
+The next lesson takes a
 completely different geometric stance: clusters are dense regions, identified
 by DBSCAN.
 

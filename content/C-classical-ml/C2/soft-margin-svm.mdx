@@ -4,7 +4,7 @@ pillar: C
 subId: C2
 lessonId: soft-margin-svm
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Relax separability with slack variables, get the hinge-loss primal, and tune the regularization C."
 prerequisites: ["hard-margin-svm"]
 ---
@@ -152,8 +152,108 @@ print(f"\ntotal hinge loss = {hinge_loss:.3f}  (= sum of optimal slacks)")
 ```
 
 Larger $C$ tightens the margin and reduces the fraction of margin violations;
-the total hinge loss equals the sum of optimal slacks. The next lesson casts
-the SVM in its dual form, where the support-vector structure becomes explicit.
+the total hinge loss equals the sum of optimal slacks.
+
+## Exercises
+
+**Exercise 1.** Four points have signed margins $z_i = y_i(w^\top x_i + b)$
+equal to $2.0$, $0.7$, $0.0$, and $-1.0$. Compute the optimal slack $\xi_i$ for
+each, the per-example hinge loss, and classify each point as outside the margin,
+inside the band, on the boundary, or misclassified.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The optimal slack is $\xi_i = \max(0, 1 - z_i)$, which is also the
+hinge loss $\ell_{\text{hinge}}(z_i)$:
+
+$$
+\xi(2.0) = 0, \quad \xi(0.7) = 0.3, \quad \xi(0.0) = 1.0, \quad \xi(-1.0) = 2.0.
+$$
+
+**Step 2.** Read off the regime from $z_i$ and $\xi_i$:
+
+- $z = 2.0$, $\xi = 0$: outside the margin (confidently correct).
+- $z = 0.7$, $\xi = 0.3$: inside the band, still on the correct side
+  ($0 < \xi \le 1$).
+- $z = 0.0$, $\xi = 1.0$: on the decision boundary; slack of exactly $1$ is the
+  inside/misclassified boundary.
+- $z = -1.0$, $\xi = 2.0$: misclassified ($\xi > 1$).
+
+The total hinge loss is $0 + 0.3 + 1.0 + 2.0 = 3.3$.
+
+</details>
+
+**Exercise 2.** For fixed $(w, b)$, the soft-margin objective in the slack
+$\xi_i$ is $\min_{\xi_i \ge 0} C\xi_i$ subject to $\xi_i \ge 1 - z_i$ with
+$z_i = y_i(w^\top x_i + b)$. Show the minimizer is $\xi_i^\star = \max(0, 1 - z_i)$,
+which is why the slack penalty collapses to the hinge loss.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cost $C\xi_i$ is increasing in $\xi_i$ (since $C > 0$), so the
+minimizer is the smallest $\xi_i$ that is still feasible.
+
+**Step 2.** Feasibility requires both $\xi_i \ge 0$ and $\xi_i \ge 1 - z_i$, so
+the smallest feasible value is the larger of the two lower bounds:
+$\xi_i^\star = \max(0, 1 - z_i)$.
+
+**Step 3.** Two cases confirm it. If $z_i \ge 1$, then $1 - z_i \le 0$ and the
+binding bound is $0$, so $\xi_i^\star = 0$ (no penalty). If $z_i < 1$, then
+$1 - z_i > 0$ is the binding bound, so $\xi_i^\star = 1 - z_i > 0$. Both cases
+are summarized by $\max(0, 1 - z_i)$, the hinge loss. Substituting $\xi_i^\star$
+into $C\sum_i \xi_i$ turns the constrained QP into unconstrained regularized
+hinge-loss minimization.
+
+</details>
+
+**Exercise 3 (code).** On two overlapping Gaussian classes, sweep
+$C \in \{0.01, 1, 100\}$ with subgradient descent and confirm that the margin
+width $1/\lVert w\rVert$ is non-increasing in $C$ (larger $C$ penalizes
+violations harder, so the margin tightens).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200
+X = np.vstack([rng.normal([0.8, 0], 1.0, (n // 2, 2)),
+               rng.normal([-0.8, 0], 1.0, (n // 2, 2))])
+y = np.array([1.0] * (n // 2) + [-1.0] * (n // 2))
+
+def soft_margin_svm(X, y, C, lr=0.1, steps=5000):
+    n, d = X.shape
+    w = np.zeros(d)
+    b = 0.0
+    for _ in range(steps):
+        viol = y * (X @ w + b) < 1.0               # points inside the margin
+        grad_w = w - C * (y[viol, None] * X[viol]).sum(axis=0)
+        grad_b = -C * y[viol].sum()
+        w -= lr * grad_w / n
+        b -= lr * grad_b / n
+    return w, b
+
+margins = []
+for C in [0.01, 1.0, 100.0]:
+    w, b = soft_margin_svm(X, y, C)
+    margins.append(1.0 / np.linalg.norm(w))
+
+print("margins by C:", [round(m, 3) for m in margins])
+assert margins[0] >= margins[1] >= margins[2]      # margin shrinks as C grows
+```
+
+The margin falls from about $1.51$ at $C = 0.01$ to about $0.53$ at $C = 100$:
+tightening $C$ buys fewer violations at the cost of a narrower band, the
+bias-variance trade in SVM clothing.
+
+</details>
+
+The next lesson casts the SVM in its dual form, where the support-vector
+structure becomes explicit.
 
 <Footnotes>
   <FNItem n="1">**Cortes, C., & Vapnik, V.** (1995). "Support-vector networks". *Machine Learning*, 20(3), 273-297. Introduces the soft-margin SVM with slack variables ([doi:10.1007/BF00994018](https://doi.org/10.1007/BF00994018)).</FNItem>

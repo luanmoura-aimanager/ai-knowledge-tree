@@ -4,7 +4,7 @@ pillar: C
 subId: C1
 lessonId: logistic-regression
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Build logistic regression from log-odds, write its log-likelihood, and fit it with IRLS or gradient descent."
 prerequisites: ["A2/mle", "A2/exponential-family"]
 ---
@@ -155,7 +155,121 @@ print("Hessian eigvals all <= 0:", np.all(np.linalg.eigvalsh(H) <= 1e-10))
 
 IRLS converges in a handful of steps; gradient descent reaches the same
 solution more slowly; the Hessian's eigenvalues are nonpositive, confirming
-concavity. The next lesson generalizes to multi-class with the softmax.
+concavity.
+
+## Exercises
+
+**Exercise 1.** A fitted model has $\beta = (-0.5, 1.5, -1.0, 0.7)$ (the first
+entry is the intercept). For a feature vector $x = (1, 1, 0, 0)$ (the leading 1
+is the intercept term), compute the linear score, the predicted probability
+$\sigma(x^\top\beta)$, and the odds, by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The score is the dot product
+$x^\top\beta = 1\cdot(-0.5) + 1\cdot 1.5 + 0\cdot(-1.0) + 0\cdot 0.7 = 1.0$.
+
+**Step 2.** Apply the sigmoid:
+
+$$
+\sigma(1.0) = \frac{1}{1 + e^{-1.0}} = \frac{1}{1 + 0.3679} = \frac{1}{1.3679} \approx 0.7311.
+$$
+
+**Step 3.** The odds are $\frac{p}{1 - p} = \frac{0.7311}{0.2689} \approx 2.718$,
+which equals $e^{1.0}$, the exponentiated score. This is the log-odds reading:
+the score is the log of the odds, so the odds are $e^{\text{score}}$.
+
+</details>
+
+**Exercise 2.** Derive the gradient $\nabla\ell = X^\top(\mathbf{y} -
+\mathbf{p})$ of the log-likelihood, starting from
+$\ell(\beta) = \sum_i y_i x_i^\top\beta - \log(1 + e^{x_i^\top\beta})$ and using
+$\sigma'(z) = \sigma(z)(1 - \sigma(z))$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate one example's contribution with respect to $\beta$. The
+first term $y_i x_i^\top\beta$ has gradient $y_i x_i$. For the second term, with
+$z_i = x_i^\top\beta$,
+
+$$
+\nabla_\beta \log(1 + e^{z_i}) = \frac{e^{z_i}}{1 + e^{z_i}}\, x_i = \sigma(z_i)\, x_i = p_i\, x_i,
+$$
+
+using $\frac{e^z}{1 + e^z} = \frac{1}{1 + e^{-z}} = \sigma(z)$ and the chain rule
+$\nabla_\beta z_i = x_i$.
+
+**Step 2.** Combine the two terms for example $i$:
+
+$$
+\nabla_\beta\big(y_i z_i - \log(1 + e^{z_i})\big) = y_i x_i - p_i x_i = (y_i - p_i)\, x_i.
+$$
+
+**Step 3.** Sum over examples. Writing the residuals $y_i - p_i$ as the vector
+$\mathbf{y} - \mathbf{p}$ and stacking the $x_i$ as rows of $X$,
+
+$$
+\nabla\ell = \sum_i (y_i - p_i)\, x_i = X^\top(\mathbf{y} - \mathbf{p}).
+$$
+
+The gradient is the design matrix applied to the prediction residuals, the same
+shape as the OLS gradient with $\mathbf{p}$ replacing $X\beta$.
+
+</details>
+
+**Exercise 3 (code).** The log-likelihood is concave, so it has a unique
+maximum. Implement the negative log-likelihood and its gradient, then verify the
+gradient is correct against a finite-difference approximation at a random
+$\beta$. Confirm the maximum absolute difference is below $10^{-5}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 200, 4
+X = np.column_stack([np.ones(n), rng.normal(size=(n, d - 1))])
+beta_true = np.array([-0.5, 1.5, -1.0, 0.7])
+p_true = 1 / (1 + np.exp(-X @ beta_true))
+y = (rng.random(n) < p_true).astype(float)
+
+def sigmoid(z): return 1 / (1 + np.exp(-z))
+
+def neg_log_lik(beta):
+    z = X @ beta
+    # log(1 + e^z) computed stably as max(z,0) + log(1 + e^{-|z|})
+    log1pexp = np.maximum(z, 0) + np.log1p(np.exp(-np.abs(z)))
+    return -np.sum(y * z - log1pexp)
+
+def grad(beta):
+    return -X.T @ (y - sigmoid(X @ beta))   # negative of X^T(y - p)
+
+beta0 = rng.normal(size=d)
+g_analytic = grad(beta0)
+
+# Central finite differences
+eps = 1e-6
+g_numeric = np.zeros(d)
+for j in range(d):
+    step = np.zeros(d); step[j] = eps
+    g_numeric[j] = (neg_log_lik(beta0 + step) - neg_log_lik(beta0 - step)) / (2 * eps)
+
+max_diff = np.abs(g_analytic - g_numeric).max()
+assert max_diff < 1e-5
+print("max |analytic - numeric| gradient:", round(float(max_diff), 9))
+```
+
+The analytic gradient $X^\top(\mathbf{y} - \mathbf{p})$ matches the
+finite-difference estimate to well under $10^{-5}$, confirming the derivation in
+Exercise 2 and the formula used inside IRLS.
+
+</details>
+
+The next lesson generalizes to multi-class with the softmax.
 
 <Footnotes>
   <FNItem n="1">**Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.), §4.4. Springer. [doi:10.1007/978-0-387-84858-7](https://doi.org/10.1007/978-0-387-84858-7). Logistic regression and its log-odds link.</FNItem>
