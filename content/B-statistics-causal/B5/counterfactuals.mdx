@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: counterfactuals
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Compute counterfactuals by the three-step procedure (abduction, action, prediction) in a structural equation model and connect them to potential outcomes."
 prerequisites: ["do-calculus"]
 ---
@@ -143,6 +143,112 @@ print(f"Std of ITE: {ite.std():.4f}  (variation across units)")
 
 Even with a constant structural coefficient $b=2$, the ITE varies across units
 because $X_{\text{obs}}$ differs, and we are asking $Y_i(X_{\text{obs},i}) - Y_i(0)$.
+
+## Exercises
+
+**Exercise 1.** Use the linear SCM from the lesson, $X = U_X$, $Y = 2X + U_Y$ with
+$U_X, U_Y \sim \mathcal{N}(0,1)$ independent. A unit is observed at
+$(X = 2, Y = 5)$. Compute the counterfactual outcome $Y_{X=-1}$ for this unit by
+the three-step procedure, and report its individual treatment effect relative to
+the observed outcome.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (Abduction).** The noise is pinned by the observation. From $X = U_X$,
+$U_X = 2$. From $Y = 2X + U_Y$, $U_Y = Y - 2X = 5 - 2 \cdot 2 = 1$.
+
+**Step 2 (Action).** Replace the equation for $X$ with $X = -1$, keeping the
+equation $Y = 2X + U_Y$ and the abduced $U_Y = 1$.
+
+**Step 3 (Prediction).** Recompute $Y$ with the modified $X$ and the same noise:
+
+$$
+Y_{X=-1} = 2 \cdot (-1) + U_Y = -2 + 1 = -1.
+$$
+
+The individual treatment effect relative to the observed outcome is
+$Y_{X=2} - Y_{X=-1} = 5 - (-1) = 6$. This equals the structural coefficient times
+the change in $X$: $2 \cdot (2 - (-1)) = 2 \cdot 3 = 6$, as a linear SCM requires.
+
+</details>
+
+**Exercise 2.** Pearl's hierarchy ranks association, intervention, and
+counterfactual as strictly increasing in information. Give a single SCM on which
+two distinct structural models agree on every interventional distribution
+$P(Y \mid do(X))$ yet disagree on a counterfactual. Explain why this proves a
+counterfactual cannot be deduced from interventional data alone.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take a binary $X$ and binary $Y$ with no confounding, so
+$P(Y \mid do(X=x)) = P(Y \mid X=x)$ is fixed by the data. Suppose intervention
+gives $P(Y=1 \mid do(X=0)) = 0.5$ and $P(Y=1 \mid do(X=1)) = 0.5$: the treatment
+changes nothing on average.
+
+**Step 2.** Model A: $Y = U$ with $U \sim \text{Bernoulli}(0.5)$ independent of
+$X$, so $Y$ ignores $X$. Every unit has $Y_{X=0} = Y_{X=1}$: the treatment never
+flips the outcome.
+
+**Step 3.** Model B: $Y = X \oplus U$ (exclusive-or) with the same
+$U \sim \text{Bernoulli}(0.5)$. Then $P(Y=1 \mid do(X=x)) = 0.5$ for both $x$, so
+B matches A on every intervention. But here every unit has
+$Y_{X=1} = 1 - Y_{X=0}$: the treatment always flips the outcome.
+
+**Step 4.** The counterfactual probability of necessity
+$P(Y_{X=0} = 0 \mid X=1, Y=1)$ is $0$ under model A and $1$ under model B, yet the
+two models are indistinguishable at the interventional level. Counterfactuals
+depend on the joint behaviour of $Y$ across hypothetical values of $X$ for the
+same noise draw, which interventional marginals never reveal.
+
+</details>
+
+**Exercise 3 (code).** For the lesson's confounded SCM
+($C \to X$, $C \to Y$, $X \to Y$ with $X = aC + U_X$, $Y = bX + cC + U_Y$,
+$a=1, b=2, c=0.5$, $C$ observed), simulate $n = 20000$ units, abduce the noise
+for each, and verify that the mean individual treatment effect for the
+counterfactual "set $X = 0$" equals the structural coefficient $b$ times the mean
+observed $X$, within tolerance. Confirm the per-unit ITE equals $b \cdot X_i$
+exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 20000
+a, b, c = 1.0, 2.0, 0.5
+
+U_C = rng.normal(0, 1, n)
+U_X = rng.normal(0, 1, n)
+U_Y = rng.normal(0, 0.5, n)
+
+C = U_C
+X = a * C + U_X
+Y = b * X + c * C + U_Y
+
+# Abduction: with C observed the noise is pinned exactly
+U_X_ab = X - a * C
+U_Y_ab = Y - b * X - c * C
+
+# Action + prediction: set X = 0, reuse abduced noise and observed C
+Y_cf = b * 0.0 + c * C + U_Y_ab
+ite = Y - Y_cf
+
+# Per-unit ITE is exactly b * X_i (the c*C and U_Y terms cancel)
+assert np.allclose(ite, b * X)
+assert np.isclose(ite.mean(), b * X.mean(), atol=1e-9)
+print(round(ite.mean(), 4), round(b * X.mean(), 4))
+```
+
+The per-unit ITE is $Y_i - Y_{i,X=0} = (bX_i + cC_i + U_{Y,i}) - (cC_i + U_{Y,i})
+= bX_i$, so the confounder and noise cancel and the assertions hold to machine
+precision.
+
+</details>
 
 The next lesson leaves the SCM framework and turns to propensity scores: a
 practical strategy for estimating causal effects from observational data when

@@ -4,7 +4,7 @@ pillar: B
 subId: B2
 lessonId: posterior-predictive
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Marginalize the likelihood over the posterior to form the posterior predictive; compute it in closed form for the Beta-Binomial and Gaussian models."
 prerequisites: ["hierarchical-models"]
 ---
@@ -126,6 +126,93 @@ print(f"\nPPC: P(sim_mean >= obs_mean) = {p_ppc:.3f}  (near 0.5 = good fit)")
 
 The PPC p-value near 0.5 indicates the model generates data whose mean distribution
 is consistent with the observed mean.
+
+## Exercises
+
+**Exercise 1.** A Beta-Binomial model has posterior $\theta \mid k \sim \mathrm{Beta}(5, 3)$.
+Compute the posterior predictive probability that the next single trial is a success.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For one new trial the predictive probability of a success is the posterior
+mean of $\theta$, because
+
+$$
+P(\tilde x = 1 \mid k) = \int_0^1 \theta\, \mathrm{Beta}(\theta; \alpha', \beta')\, d\theta
+ = E[\theta \mid k] = \frac{\alpha'}{\alpha' + \beta'}.
+$$
+
+**Step 2.** Substitute $\alpha' = 5$, $\beta' = 3$:
+
+$$
+P(\tilde x = 1 \mid k) = \frac{5}{5 + 3} = \frac{5}{8} = 0.625.
+$$
+
+Averaging the success probability over the posterior, rather than plugging in a single
+$\hat\theta$, is what propagates parameter uncertainty into the prediction.
+
+</details>
+
+**Exercise 2.** Derive the Gaussian predictive variance. With posterior
+$\mu \mid x_{1:n} \sim \mathcal{N}(\mu_n, \tau_n^2)$ and likelihood
+$\tilde x \mid \mu \sim \mathcal{N}(\mu, \sigma^2)$, write $\tilde x = \mu + \varepsilon$
+with $\varepsilon \sim \mathcal{N}(0, \sigma^2)$ independent of $\mu$, and show
+$\mathrm{Var}(\tilde x \mid x_{1:n}) = \sigma^2 + \tau_n^2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the predictive mean. Since $E[\varepsilon] = 0$ and
+$E[\mu \mid x_{1:n}] = \mu_n$,
+
+$$
+E[\tilde x \mid x_{1:n}] = E[\mu \mid x_{1:n}] + E[\varepsilon] = \mu_n.
+$$
+
+**Step 2.** Take the variance. Because $\mu$ and $\varepsilon$ are independent given
+the data, their variances add:
+
+$$
+\mathrm{Var}(\tilde x \mid x_{1:n}) = \mathrm{Var}(\mu \mid x_{1:n}) + \mathrm{Var}(\varepsilon)
+ = \tau_n^2 + \sigma^2.
+$$
+
+The two terms separate posterior uncertainty $\tau_n^2$, which shrinks as $n$ grows,
+from the irreducible observation noise $\sigma^2$, which never vanishes. A plug-in
+prediction using only $\sigma^2$ would understate the spread by $\tau_n^2$.
+
+</details>
+
+**Exercise 3 (code).** Verify the Gaussian predictive variance by simulation in numpy.
+Draw $\mu$ from the posterior $\mathcal{N}(\mu_n, \tau_n^2)$, then draw $\tilde x$ from
+$\mathcal{N}(\mu, \sigma^2)$, and confirm the sample variance of $\tilde x$ matches
+$\sigma^2 + \tau_n^2$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+mu_n, tau_n_sq, sigma_sq = 2.4, 0.05, 1.0
+
+N = 2_000_000
+mu_draws = rng.normal(mu_n, np.sqrt(tau_n_sq), N)
+x_draws  = rng.normal(mu_draws, np.sqrt(sigma_sq))   # x | mu ~ N(mu, sigma^2)
+
+emp_var = x_draws.var()
+theory  = sigma_sq + tau_n_sq
+
+assert np.isclose(emp_var, theory, atol=5e-3)
+print(f"empirical var={emp_var:.4f}, theory={theory:.4f}")
+```
+
+The two-stage draw reproduces the predictive variance exactly because the variance of
+a sum of independent pieces is the sum of their variances.
+
+</details>
 
 The next lesson uses the marginal likelihood (the normalizing constant $p(x)$) to
 compare Bayesian models.

@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: scm-dags
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Write a structural causal model as a DAG with structural equations; distinguish causes from associations and read intervention effects from the graph."
 prerequisites: ["potential-outcomes"]
 ---
@@ -140,6 +140,97 @@ print(f"Stratified ATE:     {np.mean(strata_ates):.4f}  (adjusting for C)")
 
 Conditioning on the confounder $C$ removes the selection bias and recovers the
 true effect.
+
+## Exercises
+
+**Exercise 1.** In the SCM with structural equations $E = f_E(U_E)$,
+$X = f_X(E, U_X)$, $S = f_S(E, X, U_S)$, list the parents of each variable, name
+the confounder of the pair $(X, S)$, and state which edges the intervention
+$do(E = e)$ removes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read the parents straight off the equations: each $f_i$ takes the
+direct causes as arguments. $E$ has no endogenous parents (only its noise $U_E$);
+$X$ has parent $E$; $S$ has parents $E$ and $X$.
+
+**Step 2.** A confounder of $(X, S)$ is a common cause with an edge into each.
+Education $E$ satisfies $E \to X$ and $E \to S$, so $E$ confounds the $X \to S$
+relationship.
+
+**Step 3.** The do-operator severs all edges into the intervened variable. $E$
+has no incoming edges from endogenous variables, so $do(E = e)$ removes only the
+dependence on $U_E$ (the equation $E = f_E(U_E)$ is replaced by $E = e$); the
+outgoing edges $E \to X$ and $E \to S$ stay.
+
+</details>
+
+**Exercise 2.** On the graph $C \to X$, $C \to Y$, $X \to Y$ from the lesson, the
+naive contrast $E[Y\mid X=1] - E[Y\mid X=0]$ overstates the causal effect of $X$.
+Explain in SCM terms which path makes association exceed causation, and which
+operation closes it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Two routes connect $X$ to $Y$. The direct edge $X \to Y$ is the causal
+effect being targeted. The path $X \leftarrow C \to Y$ runs backward through the
+common cause $C$: it is a back-door path, carrying association that is not caused
+by $X$.
+
+**Step 2.** Conditioning on $X$ alone leaves the back-door path open, so the naive
+contrast sums the causal effect and the confounding flow through $C$. In the lesson
+simulation this inflates the true $2.0$ to $3.24$.
+
+**Step 3.** Two operations close the back-door path. The intervention $do(X)$
+severs $C \to X$, which physically breaks the path; equivalently, conditioning on
+$C$ (stratifying or adjusting) blocks the flow at the common cause. Both recover
+the true effect near $2.0$.
+
+</details>
+
+**Exercise 3 (code).** On a fresh SCM $C \to X \to Y$ with $C \to Y$ and a true
+effect of $X$ on $Y$ of $3.0$, confirm with a fixed seed that the naive contrast
+exceeds the truth, that simulating $do(X)$ by severing the $C \to X$ edge recovers
+the effect within tolerance, and that adjusting for $C$ by regressing $Y$ on
+$(X, C)$ recovers the coefficient near $3.0$ as well.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200_000
+C = rng.normal(0, 1, n)
+X = (0.9 * C + rng.normal(0, 1, n) > 0).astype(float)   # C -> X
+Y = 3.0 * X + 1.5 * C + rng.normal(0, 1, n)             # X -> Y, C -> Y
+
+# observational (naive) contrast leaves the back-door path open
+naive = Y[X == 1].mean() - Y[X == 0].mean()
+
+# do(X): assign X independently of C, severing C -> X
+X_do = rng.integers(0, 2, n).astype(float)
+Y_do = 3.0 * X_do + 1.5 * C + rng.normal(0, 1, n)
+do_effect = Y_do[X_do == 1].mean() - Y_do[X_do == 0].mean()
+
+# back-door adjustment: OLS of Y on [1, X, C], read coefficient on X
+M = np.column_stack([np.ones(n), X, C])
+beta = np.linalg.lstsq(M, Y, rcond=None)[0]
+adj = beta[1]
+
+assert naive > 3.0 + 0.1            # confounding inflates the naive contrast
+assert abs(do_effect - 3.0) < 0.05  # intervention recovers the truth
+assert abs(adj - 3.0) < 0.05        # so does adjusting for C
+print(f"naive {naive:.3f}, do(X) {do_effect:.3f}, adjusted {adj:.3f}")
+```
+
+The naive contrast clears $3.0$ by the confounding flow through $C$, while both
+graph surgery and back-door adjustment land within tolerance of the true $3.0$.
+
+</details>
 
 The next lesson introduces d-separation, the graphical rule for reading which
 conditional independencies follow from a DAG.

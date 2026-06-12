@@ -4,7 +4,7 @@ pillar: B
 subId: B1
 lessonId: method-of-moments
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Equate population moments to sample moments to derive closed-form parameter estimates, and compare MoM and MLE efficiency on the Gamma distribution."
 prerequisites: ["sampling-distributions"]
 ---
@@ -131,6 +131,77 @@ print(f"True alpha={alpha_true},    beta={beta_true}")
 Both estimators are close to the truth at $n=500$; MLE is slightly more accurate
 on average because it extracts more information from the data (uses the full
 likelihood, not just two moments).
+
+## Exercises
+
+**Exercise 1.** Derive the method-of-moments estimator for the rate $\lambda$ of
+an Exponential distribution, whose density is $f(x) = \lambda e^{-\lambda x}$ for
+$x \ge 0$ with $E[X] = 1/\lambda$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** There is one parameter, so one moment equation suffices. Set the
+first population moment equal to the first sample moment:
+
+$$
+\mu_1(\lambda) = E[X] = \frac{1}{\lambda} = \hat\mu_1 = \bar X.
+$$
+
+**Step 2.** Solve for $\lambda$:
+
+$$
+\hat\lambda = \frac{1}{\bar X}.
+$$
+
+The estimator is the reciprocal of the sample mean, which matches the intuition
+that a small mean signals a high rate of events.
+
+</details>
+
+**Exercise 2.** A Uniform$(0, \theta)$ distribution has $E[X] = \theta/2$. Derive
+the method-of-moments estimator $\hat\theta$, then explain why it can produce an
+estimate smaller than some observed data point.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With one parameter, match the first moment:
+$\mu_1(\theta) = \theta/2 = \bar X$, so $\hat\theta = 2\bar X$.
+
+**Step 2.** The estimator uses only the average. If a single large draw sits near
+the true $\theta$ but the rest cluster low, $\bar X$ stays small and $2\bar X$ can
+fall below that large draw. Method of moments ignores the constraint that every
+observation must be at most $\theta$, a constraint the maximum-likelihood
+estimator $\max_i X_i$ respects by construction. Matching moments does not
+guarantee a feasible estimate.
+
+</details>
+
+**Exercise 3 (code).** Verify the Exponential estimator from Exercise 1. Draw
+$n = 2000$ samples from an Exponential with rate $\lambda = 0.5$, compute
+$\hat\lambda = 1/\bar X$, and check it lands near the truth.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+lam_true = 0.5
+# numpy parameterizes Exponential by scale = 1/rate.
+data = rng.exponential(scale=1.0 / lam_true, size=2000)
+
+lam_hat = 1.0 / data.mean()
+print("lambda_hat:", round(lam_hat, 4), " true:", lam_true)
+assert abs(lam_hat - lam_true) < 0.05
+```
+
+The estimate sits within $0.05$ of the true rate, confirming that inverting the
+sample mean recovers $\lambda$.
+
+</details>
 
 The next lesson on bias, consistency, and efficiency formalizes exactly what
 "more accurate on average" means.

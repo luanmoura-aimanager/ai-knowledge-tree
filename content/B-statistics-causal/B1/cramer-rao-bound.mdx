@@ -4,7 +4,7 @@ pillar: B
 subId: B1
 lessonId: cramer-rao-bound
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Prove the CRLB from the Cauchy-Schwarz inequality and use it to verify that the sample mean achieves the bound for Gaussian location families."
 prerequisites: ["estimator-properties", "A2/information-geometry"]
 ---
@@ -131,6 +131,88 @@ for n in ns:
 
 The ratio converges to 1.0, confirming that the sample mean saturates the
 Cramér-Rao bound for the Gaussian mean.
+
+## Exercises
+
+**Exercise 1.** For a Bernoulli($\theta$) observation with mass function
+$p(x;\theta) = \theta^x(1-\theta)^{1-x}$, compute the Fisher information $I(\theta)$
+and the CRLB for an unbiased estimator of $\theta$ from $n$ i.i.d. samples.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The log-mass is $\log p(x;\theta) = x\log\theta + (1-x)\log(1-\theta)$.
+The score is
+
+$$
+s(x;\theta) = \frac{x}{\theta} - \frac{1-x}{1-\theta}.
+$$
+
+**Step 2.** Use the second-derivative form. Differentiating the score:
+
+$$
+\frac{\partial s}{\partial\theta} = -\frac{x}{\theta^2} - \frac{1-x}{(1-\theta)^2}.
+$$
+
+Take $-E_\theta[\cdot]$ with $E[X] = \theta$:
+
+$$
+I(\theta) = \frac{\theta}{\theta^2} + \frac{1-\theta}{(1-\theta)^2} = \frac{1}{\theta} + \frac{1}{1-\theta} = \frac{1}{\theta(1-\theta)}.
+$$
+
+**Step 3.** For $n$ samples the bound is $1/(nI(\theta)) = \theta(1-\theta)/n$.
+The sample proportion $\bar X$ has variance $\theta(1-\theta)/n$, so it attains
+the bound and is efficient.
+
+</details>
+
+**Exercise 2.** For $X_i \sim \mathcal{N}(\mu, \sigma^2)$ with $\mu$ known and
+$\sigma^2$ the unknown parameter, the Fisher information for $\sigma^2$ is
+$I(\sigma^2) = 1/(2\sigma^4)$. State the CRLB for an unbiased estimator of
+$\sigma^2$ from $n$ samples, and compare it with the variance of the estimator
+$\hat\sigma^2 = \frac{1}{n}\sum_i (X_i - \mu)^2$, which equals $2\sigma^4/n$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With total information $nI(\sigma^2) = n/(2\sigma^4)$, the CRLB is
+
+$$
+\mathrm{Var}(\widehat{\sigma^2}) \ge \frac{1}{nI(\sigma^2)} = \frac{2\sigma^4}{n}.
+$$
+
+**Step 2.** The given estimator has variance $2\sigma^4/n$, which equals the
+bound exactly. With $\mu$ known, $\hat\sigma^2$ is efficient for $\sigma^2$.
+This relies on $\mu$ being known; the usual sample variance with $\mu$ estimated
+loses a degree of freedom and the comparison shifts.
+
+</details>
+
+**Exercise 3 (code).** Verify the Bernoulli result from Exercise 1. For
+$\theta = 0.3$ and $n = 40$, simulate the variance of the sample proportion over
+many trials and check it matches the CRLB $\theta(1-\theta)/n$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+theta, n, reps = 0.3, 40, 200_000
+samples = (rng.random((reps, n)) < theta).astype(float)
+phat = samples.mean(axis=1)
+
+var_emp = phat.var()
+crlb = theta * (1 - theta) / n
+print("empirical Var:", round(var_emp, 6), " CRLB:", round(crlb, 6))
+assert np.isclose(var_emp, crlb, rtol=0.05)
+```
+
+The empirical variance of the sample proportion matches $\theta(1-\theta)/n$, so
+the proportion saturates the Cramér-Rao bound for the Bernoulli parameter.
+
+</details>
 
 With the CRLB in hand, the next lesson turns to hypothesis testing: deciding from
 data whether a parameter differs from a specified null value.

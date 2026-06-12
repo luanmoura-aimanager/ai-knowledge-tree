@@ -4,7 +4,7 @@ pillar: B
 subId: B2
 lessonId: hierarchical-models
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Build a two-level model with hyperpriors over group parameters and explain how partial pooling balances no-pooling and complete pooling."
 prerequisites: ["conjugate-priors"]
 ---
@@ -131,6 +131,98 @@ print(f"\nRMSE no-pooling={rmse_np:.2f}, partial-pooling={rmse_pp:.2f}")
 
 Partial pooling reduces RMSE because small groups are shrunk toward a more accurate
 estimate while large groups retain their own data.
+
+## Exercises
+
+**Exercise 1.** A group has $n_j = 4$ observations with mean $\bar Y_j = 70$. The
+population mean is $\mu = 50$, within-group variance $\sigma^2 = 100$, and
+between-group variance $\tau^2 = 25$. Compute the shrinkage weight $\lambda_j$ and the
+partial-pooling estimate $\hat\theta_j$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The shrinkage weight is
+$\lambda_j = \frac{\sigma^2/n_j}{\sigma^2/n_j + \tau^2}$. With $\sigma^2/n_j = 100/4 = 25$:
+
+$$
+\lambda_j = \frac{25}{25 + 25} = 0.5.
+$$
+
+**Step 2.** The estimate is the weighted average
+$\hat\theta_j = (1 - \lambda_j)\bar Y_j + \lambda_j \mu$:
+
+$$
+\hat\theta_j = 0.5 \times 70 + 0.5 \times 50 = 60.
+$$
+
+With only four observations and equal within-and-between spread, the estimate sits
+exactly halfway between the group mean and the population mean.
+
+</details>
+
+**Exercise 2.** Show that the two pooling extremes are limiting cases of partial
+pooling. Take $\lambda_j = \frac{\sigma^2/n_j}{\sigma^2/n_j + \tau^2}$ and find
+$\hat\theta_j$ as $\tau^2 \to \infty$ (groups unrelated) and as $\tau^2 \to 0$ (groups
+identical).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** As $\tau^2 \to \infty$, the denominator $\sigma^2/n_j + \tau^2$ grows
+without bound while the numerator $\sigma^2/n_j$ stays fixed, so $\lambda_j \to 0$.
+Then $\hat\theta_j = (1 - 0)\bar Y_j + 0 \cdot \mu = \bar Y_j$. With infinite
+between-group variance the model believes groups are unrelated and uses each group's
+own mean: this is **no pooling**.
+
+**Step 2.** As $\tau^2 \to 0$, the numerator $\sigma^2/n_j$ stays fixed and the
+denominator approaches $\sigma^2/n_j$, so $\lambda_j \to 1$. Then
+$\hat\theta_j = 0 \cdot \bar Y_j + 1 \cdot \mu = \mu$. With zero between-group variance
+the model believes all groups share one mean and uses the population value for every
+group: this is **complete pooling**.
+
+Partial pooling interpolates between these by trading off the two variances, and the
+sample size $n_j$ shifts each group along that line.
+
+</details>
+
+**Exercise 3 (code).** Confirm that partial pooling beats no pooling on average. Run
+many simulated datasets of $J$ groups with unequal sizes, compute the no-pooling
+(group-mean) and partial-pooling RMSE against the true group parameters on each run,
+and assert that partial pooling wins more often than not.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+J, mu, tau, sigma = 8, 50.0, 10.0, 15.0
+wins = 0
+trials = 300
+for _ in range(trials):
+    ns = rng.integers(3, 30, J)
+    theta = rng.normal(mu, tau, J)
+    group_means = np.array([rng.normal(theta[j], sigma, ns[j]).mean()
+                            for j in range(J)])
+    grand = group_means.mean()
+    # known variances plugged in, as in the lesson
+    lam = (sigma**2 / ns) / (sigma**2 / ns + tau**2)
+    partial = (1 - lam) * group_means + lam * grand
+    rmse_np = np.sqrt(((group_means - theta)**2).mean())
+    rmse_pp = np.sqrt(((partial - theta)**2).mean())
+    wins += rmse_pp < rmse_np
+
+frac = wins / trials
+assert frac > 0.5
+print(f"partial pooling wins {frac:.2%} of runs")
+```
+
+Partial pooling wins on a clear majority of runs because shrinking noisy small-group
+means toward the grand mean removes more error than it introduces.
+
+</details>
 
 The next lesson uses the posterior over $\theta$ to make predictions about new data
 by integrating out the uncertainty in the parameters.

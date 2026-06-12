@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: do-calculus
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Define do(X=x) as a graph surgery, state the three rules of do-calculus, and derive the backdoor and frontdoor adjustment formulas."
 prerequisites: ["d-separation"]
 ---
@@ -148,6 +148,103 @@ print(f"Naive: {naive2:.4f}, Frontdoor adj: {fd_ate:.4f}")
 
 The backdoor adjustment recovers 2.0 and the frontdoor formula recovers 3.0 from
 observational data, without ever randomizing $X$.
+
+## Exercises
+
+**Exercise 1.** In the confounding DAG $C \to X$, $C \to Y$, $X \to Y$ with $C$
+observed, write out the backdoor adjustment formula for $P(Y \mid do(X=x))$ and
+explain, using d-separation in the mutilated graph $G_{\overline{X}}$, why
+adjusting for $C$ is valid while the naive $P(Y \mid X=x)$ is biased.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The backdoor formula is
+
+$$
+P(Y \mid do(X=x)) = \sum_c P(Y \mid X=x, C=c)\, P(C=c).
+$$
+
+**Step 2.** Check the backdoor criterion for $Z = \{C\}$. The only backdoor path
+from $X$ to $Y$ is $X \leftarrow C \to Y$, on which $C$ is a fork. Conditioning on
+the fork node $C$ blocks the path, and $C$ is not a descendant of $X$, so $Z$
+satisfies the criterion.
+
+**Step 3.** The bias of the naive estimate. In the unmutilated graph,
+$P(Y \mid X=x)$ mixes the causal path $X \to Y$ with the open backdoor path
+$X \leftarrow C \to Y$, so high-$X$ units differ from low-$X$ units in $C$ as well.
+Averaging $P(Y \mid X=x, C=c)$ over $P(C=c)$ rather than over $P(C=c \mid X=x)$
+severs that dependence: it sets $C$ to its population distribution, the same one
+the intervention $do(X=x)$ leaves untouched when it removes the edge $C \to X$.
+
+</details>
+
+**Exercise 2.** Apply Rule 2 of do-calculus to the simplest case: a DAG with a
+single edge $X \to Y$ and no other nodes. Show that
+$P(Y \mid do(X=x)) = P(Y \mid X=x)$, identifying the condition on the graph that
+licenses the step.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Rule 2 (action/observation exchange) lets you replace $do(X)$ by an
+observation of $X$ when $Y \perp X$ in the graph $G_{\underline{X}}$, where
+$\underline{X}$ deletes edges leaving $X$.
+
+**Step 2.** Form $G_{\underline{X}}$: delete the outgoing edge $X \to Y$. The
+remaining graph has $X$ and $Y$ disconnected, so $Y \perp X$ holds in
+$G_{\underline{X}}$ with no conditioning set.
+
+**Step 3.** The condition of Rule 2 is met, so
+$P(Y \mid do(X=x)) = P(Y \mid X=x)$. The graph condition that licenses it is the
+absence of any backdoor path from $X$ to $Y$: with no common cause, intervening
+and observing coincide.
+
+</details>
+
+**Exercise 3 (code).** Simulate the backdoor DAG $C \to X$, $C \to Y$, $X \to Y$
+with $X = \mathbf{1}[C + U_X > 0]$ binary, $Y = 2X + 1.5C + U_Y$, $C$ standard
+normal, $n = 40000$. Estimate the ATE by the naive difference of means and by
+backdoor stratification on a binned $C$. Assert the adjusted estimate is within
+$0.1$ of the true effect $2.0$ and strictly closer to it than the naive estimate.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 40000
+
+C = rng.normal(0, 1, n)
+X = (C + rng.normal(0, 1, n) > 0).astype(float)
+Y = 2.0 * X + 1.5 * C + rng.normal(0, 0.5, n)   # true effect of X = 2.0
+
+naive = Y[X == 1].mean() - Y[X == 0].mean()
+
+# Backdoor adjustment: stratify on 20 quantile bins of C, average within-stratum
+n_bins = 20
+edges = np.percentile(C, np.linspace(0, 100, n_bins + 1))
+C_bin = np.clip(np.digitize(C, edges), 1, n_bins)
+ate_adj = 0.0
+for b in range(1, n_bins + 1):
+    mask = C_bin == b
+    treated, control = Y[mask & (X == 1)], Y[mask & (X == 0)]
+    if treated.size == 0 or control.size == 0:
+        continue
+    ate_adj += mask.mean() * (treated.mean() - control.mean())
+
+assert abs(ate_adj - 2.0) < 0.1
+assert abs(ate_adj - 2.0) < abs(naive - 2.0)
+print(round(naive, 4), round(ate_adj, 4))
+```
+
+The naive contrast inflates the effect because high-$X$ units carry high $C$, and
+$C$ raises $Y$ on its own. Stratifying on $C$ and averaging over its population
+distribution removes that backdoor channel and lands near the true $2.0$.
+
+</details>
 
 The next lesson addresses counterfactual queries: given that unit $i$ received
 treatment and had outcome $Y_i$, what would $Y_i$ have been under control?

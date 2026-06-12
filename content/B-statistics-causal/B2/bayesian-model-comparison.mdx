@@ -4,7 +4,7 @@ pillar: B
 subId: B2
 lessonId: bayesian-model-comparison
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Compute the marginal likelihood as the evidence for model selection, define the Bayes factor, and compare it to frequentist p-values."
 prerequisites: ["posterior-predictive", "B1/hypothesis-testing"]
 ---
@@ -136,6 +136,96 @@ for n, k in [(10, 8), (20, 15), (50, 35), (100, 65)]:
 At $n=100, k=65$, the p-value is very small (strong rejection of $H_0$) and the
 Bayes factor is also large, but they measure different things: the p-value gives
 the tail probability under $H_0$; the Bayes factor gives the relative evidence.
+
+## Exercises
+
+**Exercise 1.** A coin is flipped $n = 4$ times, landing heads every time ($k = 4$).
+Compute the Bayes factor $\mathrm{BF}_{10}$ for $H_1$ ($\theta \sim \mathrm{Beta}(1,1)$)
+against $H_0$ ($\theta = 0.5$) by hand, and read it against Jeffreys' scale.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The marginal likelihood under the uniform prior is $1/(n+1)$ for any $k$,
+so $p(k \mid H_1) = 1/5 = 0.2$.
+
+**Step 2.** Under $H_0$ the data probability is
+$\binom{n}{k}(0.5)^n = \binom{4}{4}(0.5)^4 = 1 \cdot \tfrac{1}{16} = 0.0625$.
+
+**Step 3.** The Bayes factor is the ratio:
+
+$$
+\mathrm{BF}_{10} = \frac{p(k \mid H_1)}{p(k \mid H_0)} = \frac{0.2}{0.0625} = 3.2.
+$$
+
+On Jeffreys' scale $3.2$ is just into the "substantial" band ($3$ to $10$): four heads
+in a row nudge the evidence toward a biased coin but fall well short of decisive.
+
+</details>
+
+**Exercise 2.** Prove that the marginal likelihood under the uniform prior is $1/(n+1)$
+for every $k \in \{0, 1, \ldots, n\}$, so the predictions form a uniform distribution
+over outcomes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the marginal as the integral of the binomial likelihood against the
+$\mathrm{Beta}(1,1)$ prior, whose density is $1$ on $[0,1]$:
+
+$$
+p(k \mid H_1) = \int_0^1 \binom{n}{k}\theta^k(1-\theta)^{n-k}\, d\theta
+ = \binom{n}{k} \int_0^1 \theta^k (1-\theta)^{n-k}\, d\theta.
+$$
+
+**Step 2.** The remaining integral is the Beta function
+$B(k+1, n-k+1) = \frac{k!\,(n-k)!}{(n+1)!}$.
+
+**Step 3.** Combine with the binomial coefficient
+$\binom{n}{k} = \frac{n!}{k!\,(n-k)!}$:
+
+$$
+p(k \mid H_1) = \frac{n!}{k!\,(n-k)!} \cdot \frac{k!\,(n-k)!}{(n+1)!}
+ = \frac{n!}{(n+1)!} = \frac{1}{n+1}.
+$$
+
+The $k$-dependent factorials cancel, so every outcome $k$ has the same marginal
+probability $1/(n+1)$: under a flat prior the model spreads its predictions uniformly
+over the $n+1$ possible head counts.
+
+</details>
+
+**Exercise 3 (code).** Compute the Bayes factor $\mathrm{BF}_{10}$ in numpy for a range
+of $(n, k)$ without scipy, working in log space for numerical stability, and verify the
+lesson's value for $n = 10$, $k = 8$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from math import lgamma
+
+def log_choose(n, k):
+    return lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1)
+
+def log_bf_10(n, k):
+    log_h1 = -np.log(n + 1)                      # uniform prior marginal
+    log_h0 = log_choose(n, k) + n * np.log(0.5)  # theta = 0.5
+    return log_h1 - log_h0
+
+bf = np.exp(log_bf_10(10, 8))
+for n, k in [(10, 8), (20, 15), (50, 35)]:
+    print(f"n={n}, k={k}: BF_10={np.exp(log_bf_10(n, k)):.3f}")
+
+assert np.isclose(bf, 2.07, atol=0.01)
+print(f"check BF(10,8)={bf:.3f}")
+```
+
+The value $\mathrm{BF}_{10} \approx 2.07$ for eight heads in ten flips matches the
+worked example: anecdotal evidence for a biased coin, not enough to overturn fairness.
+
+</details>
 
 B3 turns from inference to computation: the bootstrap and permutation tests let
 you estimate sampling distributions without knowing them analytically.

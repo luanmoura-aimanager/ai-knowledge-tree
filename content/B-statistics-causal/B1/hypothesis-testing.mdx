@@ -4,7 +4,7 @@ pillar: B
 subId: B1
 lessonId: hypothesis-testing
 order: 5
-estimatedMinutes: 25
+estimatedMinutes: 35
 goal: "State null and alternative hypotheses, derive the z-test and t-test for means and the χ² test for variance, and compute p-values from sampling distributions."
 prerequisites: ["sampling-distributions"]
 ---
@@ -141,6 +141,84 @@ print(f"Empirical Type I error: {rejects/n_trials:.3f}")
 ```
 
 The empirical Type I error near 0.05 confirms that the test is calibrated.
+
+## Exercises
+
+**Exercise 1.** A sample of $n = 64$ has mean $\bar X = 52$. Test
+$H_0: \mu = 50$ against $H_1: \mu \ne 50$ with known $\sigma = 8$. Compute the
+$z$-statistic and decide at $\alpha = 0.05$ (critical value $z_{0.025} = 1.96$).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The standard error is $\sigma/\sqrt n = 8/\sqrt{64} = 8/8 = 1$.
+
+**Step 2.** The statistic is
+
+$$
+z = \frac{\bar X - \mu_0}{\sigma/\sqrt n} = \frac{52 - 50}{1} = 2.
+$$
+
+**Step 3.** Since $|z| = 2 > 1.96$, reject $H_0$ at $\alpha = 0.05$. The
+observed mean sits two standard errors above the null, just past the conventional
+boundary.
+
+</details>
+
+**Exercise 2.** Show that for two independent groups of equal size
+$n_1 = n_2 = n$ and equal sample variances $s_1^2 = s_2^2 = s^2$, the two-sample
+$t$-statistic reduces to $T = (\bar X_1 - \bar X_2)/(s\sqrt{2/n})$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The pooled variance with $n_1 = n_2 = n$ and $s_1^2 = s_2^2 = s^2$ is
+
+$$
+s_p^2 = \frac{(n-1)s^2 + (n-1)s^2}{2n - 2} = \frac{2(n-1)s^2}{2(n-1)} = s^2,
+$$
+
+so $s_p = s$.
+
+**Step 2.** Substitute into the two-sample statistic with $1/n_1 + 1/n_2 = 2/n$:
+
+$$
+T = \frac{\bar X_1 - \bar X_2}{s_p\sqrt{1/n_1 + 1/n_2}} = \frac{\bar X_1 - \bar X_2}{s\sqrt{2/n}}.
+$$
+
+With balanced groups the pooled standard deviation is the common $s$ and the
+standard error of the difference is $s\sqrt{2/n}$.
+
+</details>
+
+**Exercise 3 (code).** Implement the two-sided $z$-test of Exercise 1 in numpy,
+computing the $p$-value with an erf-based normal CDF (no scipy). Confirm the
+$z$-statistic is $2$ and the $p$-value is about $0.0455$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from math import erf, sqrt
+
+def norm_cdf(z):
+    # Standard normal CDF via the error function.
+    return 0.5 * (1.0 + erf(z / sqrt(2.0)))
+
+xbar, mu0, sigma, n = 52.0, 50.0, 8.0, 64
+z = (xbar - mu0) / (sigma / np.sqrt(n))
+p = 2.0 * (1.0 - norm_cdf(abs(z)))   # two-sided
+
+print("z:", round(z, 4), " p:", round(p, 4))
+assert np.isclose(z, 2.0)
+assert np.isclose(p, 0.0455, atol=1e-3)
+```
+
+The statistic is $z = 2$ and the two-sided $p$-value is $0.0455$, below
+$\alpha = 0.05$, so the null is rejected.
+
+</details>
 
 The next lesson extends hypothesis testing to multiple groups simultaneously via
 ANOVA.

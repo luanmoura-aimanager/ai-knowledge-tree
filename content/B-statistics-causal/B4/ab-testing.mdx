@@ -4,7 +4,7 @@ pillar: B
 subId: B4
 lessonId: ab-testing
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Design a two-sample proportion test, translate a minimum detectable effect into a sample size, and control Type I and II errors."
 prerequisites: ["B1/hypothesis-testing", "B1/multiple-testing"]
 ---
@@ -106,6 +106,101 @@ for delta in [0.01, 0.02, 0.05, 0.10]:
 
 Detecting a 1pp lift on a 10% baseline requires tens of thousands of observations;
 detecting a 10pp lift requires only a few hundred.
+
+## Exercises
+
+**Exercise 1.** A baseline conversion rate is $p_A = 0.10$. You want to detect a
+lift to $p_B = 0.12$ at $\alpha = 0.05$ (two-sided) with power $0.80$. Use the
+sample-size formula to compute the required $n$ per group by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Read off the critical values: $z_{\alpha/2} = z_{0.025} = 1.96$ and
+$z_\beta = z_{0.20} = 0.84$, so $(z_{\alpha/2} + z_\beta)^2 = 2.80^2 = 7.84$.
+
+**Step 2.** Compute the variance factor with $\delta = 0.02$:
+
+$$
+p_A(1-p_A) + p_B(1-p_B) = 0.10 \cdot 0.90 + 0.12 \cdot 0.88 = 0.09 + 0.1056 = 0.1956.
+$$
+
+**Step 3.** Plug into the formula:
+
+$$
+n = \frac{7.84 \cdot 0.1956}{0.02^2} = \frac{1.5335}{0.0004} \approx 3834.
+$$
+
+About $3834$ users per group, so roughly $7700$ in total. Halving the MDE to
+$0.01$ would quadruple $n$, since $n \propto 1/\delta^2$.
+
+</details>
+
+**Exercise 2.** The pooled-variance denominator uses $\hat p(1-\hat p)(1/n_A + 1/n_B)$.
+Show that for fixed total sample size $N = n_A + n_B$, the variance term
+$1/n_A + 1/n_B$ is minimized by the equal split $n_A = n_B = N/2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $n_B = N - n_A$ and minimize $g(n_A) = 1/n_A + 1/(N - n_A)$ over
+$0 < n_A < N$.
+
+**Step 2.** Differentiate and set to zero:
+
+$$
+g'(n_A) = -\frac{1}{n_A^2} + \frac{1}{(N - n_A)^2} = 0
+\implies (N - n_A)^2 = n_A^2.
+$$
+
+**Step 3.** The positive root gives $N - n_A = n_A$, so $n_A = N/2$. The second
+derivative $g''(n_A) = 2/n_A^3 + 2/(N-n_A)^3 > 0$ confirms a minimum. An equal
+split gives the tightest confidence interval, which is why balanced A/B tests are
+the default when both arms cost the same to serve.
+
+</details>
+
+**Exercise 3 (code).** The runnable environment has no `scipy`, so write a numpy
+normal CDF from the Abramowitz-Stegun approximation, check it against the known
+value $\Phi(1.96) \approx 0.975$, then simulate $20{,}000$ A/B tests under the null
+($p_A = p_B = 0.10$, $n = 4000$) and confirm the empirical Type I error is close to
+$\alpha = 0.05$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def norm_cdf(x):
+    x = np.asarray(x, float)
+    t = 1.0 / (1.0 + 0.2316419 * np.abs(x))
+    d = 0.3989422804014327 * np.exp(-x * x / 2.0)
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937
+              + t * (-1.821255978 + t * 1.330274429))))
+    cdf = 1.0 - d * poly
+    return np.where(x >= 0, cdf, 1.0 - cdf)
+
+assert np.isclose(norm_cdf(0.0), 0.5, atol=1e-6)
+assert abs(norm_cdf(1.96) - 0.975) < 1e-3
+
+rng = np.random.default_rng(0)
+n, p, n_sim, z_crit = 4000, 0.10, 20_000, 1.96
+kA = rng.binomial(n, p, n_sim)
+kB = rng.binomial(n, p, n_sim)
+ppool = (kA + kB) / (2 * n)
+se = np.sqrt(ppool * (1 - ppool) * 2 / n)
+z = (kB / n - kA / n) / se
+type_I = np.mean(np.abs(z) > z_crit)
+
+assert abs(type_I - 0.05) < 0.01      # null rejection rate tracks alpha
+print("empirical Type I error:", round(type_I, 4))
+```
+
+The rejection rate lands near $0.05$, confirming the test holds its nominal size
+when the null is true.
+
+</details>
 
 The next lesson formalizes the power calculation and shows how to plot power as a
 function of sample size and effect size.

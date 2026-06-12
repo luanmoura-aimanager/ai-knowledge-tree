@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: propensity-scores
 order: 6
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Estimate propensity scores with logistic regression, balance covariates via nearest-neighbor matching, and estimate the ATE with inverse-probability weighting."
 prerequisites: ["potential-outcomes"]
 ---
@@ -135,6 +135,113 @@ print(f"  Treated: {X1[W==1].mean():.3f}, Matched ctrl: {X1[matched_ctrl_idx].me
 
 After matching, the mean of $X_1$ in the matched control group is close to the
 treated group, confirming that the propensity score successfully balanced the covariate.
+
+## Exercises
+
+**Exercise 1.** Four units have estimated propensity scores and observed outcomes:
+a treated unit with $\hat e = 0.25$, $Y = 8$; a treated unit with $\hat e = 0.5$,
+$Y = 6$; a control unit with $\hat e = 0.4$, $Y = 3$; a control unit with
+$\hat e = 0.8$, $Y = 5$. Compute the Horvitz-Thompson IPW estimate of the ATE by
+hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Horvitz-Thompson estimator is
+$\hat\tau_{\mathrm{IPW}} = \frac{1}{n}\sum_i \big(\frac{W_i Y_i}{\hat e_i} - \frac{(1-W_i)Y_i}{1-\hat e_i}\big)$,
+with $n = 4$. Treated units contribute only the first term, control units only the
+second.
+
+**Step 2.** Treated terms: $8 / 0.25 = 32$ and $6 / 0.5 = 12$. Control terms:
+$3 / (1 - 0.4) = 3 / 0.6 = 5$ and $5 / (1 - 0.8) = 5 / 0.2 = 25$.
+
+**Step 3.** Sum with the signs and divide by $n$:
+
+$$
+\hat\tau_{\mathrm{IPW}} = \frac{(32 + 12) - (5 + 25)}{4} = \frac{44 - 30}{4} = \frac{14}{4} = 3.5.
+$$
+
+The control unit with $\hat e = 0.8$ is upweighted heavily ($1/0.2 = 5$) because a
+control unit that looks likely to be treated is rare and must stand in for many
+similar units.
+
+</details>
+
+**Exercise 2.** Show that the IPW estimator is unbiased for $E[Y(1)]$ in its
+treated arm, $E\big[\frac{W Y}{e(X)}\big] = E[Y(1)]$, using strong ignorability
+and the definition $e(X) = P(W=1\mid X)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Condition on $X$ and use the tower rule:
+$E\big[\frac{W Y}{e(X)}\big] = E\Big[\frac{1}{e(X)} E[W Y \mid X]\Big]$, since
+$e(X)$ is a function of $X$.
+
+**Step 2.** On the treated arm the observed $Y$ equals $Y(1)$, so
+$W Y = W Y(1)$. By strong ignorability $W \perp Y(1) \mid X$, so the inner
+expectation factors:
+
+$$
+E[W Y(1)\mid X] = E[W\mid X]\, E[Y(1)\mid X] = e(X)\, E[Y(1)\mid X].
+$$
+
+**Step 3.** The $e(X)$ cancels, leaving
+$E\big[\frac{W Y}{e(X)}\big] = E\big[E[Y(1)\mid X]\big] = E[Y(1)]$ by the tower
+rule. The symmetric argument with $1-W$ and $1-e(X)$ gives $E[Y(0)]$, so the
+difference identifies the ATE.
+
+</details>
+
+**Exercise 3 (code).** Generate confounded data from a known logistic propensity
+$e(X) = \sigma(0.5 X_1 + 0.3 X_2)$ with true ATE $1.0$. Fit the propensity by
+plain-numpy logistic-regression gradient descent (no library), then verify with a
+fixed seed that the naive contrast is biased high and that normalized (Hajek) IPW
+recovers the ATE within tolerance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 50_000
+X1 = rng.normal(0, 1, n)
+X2 = rng.normal(0, 1, n)
+
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
+
+e_true = sigmoid(0.5 * X1 + 0.3 * X2)
+W = (rng.random(n) < e_true).astype(float)
+Y0 = 0.5 * X1 + 0.2 * X2 + rng.normal(0, 1, n)
+Y = W * (Y0 + 1.0) + (1 - W) * Y0          # true ATE = 1.0
+
+# logistic regression by gradient descent (intercept + X1 + X2)
+Xd = np.column_stack([np.ones(n), X1, X2])
+beta = np.zeros(3)
+for _ in range(500):
+    grad = Xd.T @ (sigmoid(Xd @ beta) - W) / n
+    beta -= 1.0 * grad
+e_hat = sigmoid(Xd @ beta)
+
+# normalized (Hajek) IPW
+wt = W / e_hat
+wc = (1 - W) / (1 - e_hat)
+ipw = (Y * wt).sum() / wt.sum() - (Y * wc).sum() / wc.sum()
+naive = Y[W == 1].mean() - Y[W == 0].mean()
+
+assert naive > 1.0 + 0.05          # confounding biases the naive contrast high
+assert abs(ipw - 1.0) < 0.05       # IPW recovers the true ATE
+print(f"naive {naive:.3f}, IPW {ipw:.3f}")
+```
+
+The hand-rolled logistic fit reproduces the propensity well enough that Hajek IPW
+lands within tolerance of the true $1.0$, while the naive contrast stays biased
+high by the confounding through $X_1$ and $X_2$.
+
+</details>
 
 The next lesson addresses a setting where all confounders are unobserved but a
 valid **instrument** is available: a variable that affects treatment but has no

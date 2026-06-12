@@ -4,7 +4,7 @@ pillar: B
 subId: B1
 lessonId: multiple-testing
 order: 7
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Quantify how FWER inflates with the number of tests, apply Bonferroni correction, and derive the Benjamini-Hochberg step-up procedure for FDR control."
 prerequisites: ["hypothesis-testing"]
 ---
@@ -125,6 +125,90 @@ print(f"BH         {tp_h:2d}  {fp_h:2d}  {fn_h:2d}  {fdr_h:.3f}  {pow_h:.3f}")
 
 BH rejects more true alternatives at the cost of a small number of extra false
 positives, while Bonferroni keeps FP near zero but misses more discoveries.
+
+## Exercises
+
+**Exercise 1.** You run $m = 20$ independent tests, all true nulls, each at
+$\alpha = 0.05$. Compute the FWER without correction, then the per-test threshold
+Bonferroni uses to hold the FWER at $0.05$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With independent true nulls, the probability of at least one false
+rejection is
+
+$$
+\mathrm{FWER} = 1 - (1 - 0.05)^{20} = 1 - 0.95^{20} \approx 1 - 0.358 = 0.642.
+$$
+
+Nearly two-thirds of such families produce at least one false positive.
+
+**Step 2.** Bonferroni rejects test $i$ when $p_i < \alpha/m = 0.05/20 = 0.0025$.
+Each test now runs at $0.0025$, and the union bound caps the FWER at
+$m \cdot 0.0025 = 0.05$.
+
+</details>
+
+**Exercise 2.** Given the sorted p-values $0.001, 0.008, 0.039, 0.041, 0.9$ with
+$m = 5$ and $\alpha = 0.05$, apply the Benjamini-Hochberg step-up procedure and
+list the rejected hypotheses.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form the BH thresholds $\frac{k}{m}\alpha$ for $k = 1,\ldots,5$:
+$0.01, 0.02, 0.03, 0.04, 0.05$.
+
+**Step 2.** Compare each $p_{(k)}$ to its threshold, scanning for the largest $k$
+with $p_{(k)} \le \frac{k}{m}\alpha$:
+
+- $k=1$: $0.001 \le 0.01$ yes
+- $k=2$: $0.008 \le 0.02$ yes
+- $k=3$: $0.039 \le 0.03$ no
+- $k=4$: $0.041 \le 0.04$ no
+- $k=5$: $0.9 \le 0.05$ no
+
+**Step 3.** The largest $k$ satisfying the condition is $k = 2$. The step-up
+procedure rejects all hypotheses up to that rank, so $H_{(1)}$ and $H_{(2)}$
+(p-values $0.001$ and $0.008$) are rejected, the other three retained. Note that
+$0.039$ failing does not stop rejection of smaller ranks, but here no larger $k$
+passes, so only the first two are rejected.
+
+</details>
+
+**Exercise 3 (code).** Implement the Benjamini-Hochberg procedure in numpy (no
+scipy) and confirm it reproduces the Exercise 2 result.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def benjamini_hochberg(p, alpha=0.05):
+    p = np.asarray(p, float)
+    m = p.size
+    order = np.argsort(p)
+    ranked = p[order]
+    thresh = (np.arange(1, m + 1) / m) * alpha
+    passing = np.where(ranked <= thresh)[0]
+    reject = np.zeros(m, dtype=bool)
+    if passing.size > 0:
+        kstar = passing[-1]                 # largest passing rank (0-based)
+        reject[order[: kstar + 1]] = True
+    return reject
+
+p = np.array([0.001, 0.008, 0.039, 0.041, 0.9])
+reject = benjamini_hochberg(p, 0.05)
+print("rejected indices:", np.where(reject)[0].tolist())
+assert reject.tolist() == [True, True, False, False, False]
+```
+
+The procedure rejects exactly the first two hypotheses, matching the hand
+computation in Exercise 2.
+
+</details>
 
 With frequentist inference covered, B2 moves to the Bayesian perspective: starting
 from a prior and updating to a posterior via Bayes' rule.

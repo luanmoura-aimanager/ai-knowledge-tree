@@ -4,7 +4,7 @@ pillar: B
 subId: B3
 lessonId: permutation-tests
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Compute an exact permutation p-value by permuting labels under the null; connect permutation tests to the two-sample t-test and rank tests."
 prerequisites: ["B1/hypothesis-testing"]
 ---
@@ -116,6 +116,120 @@ print(f"Permutation Type I error: {perm_type1/1000:.3f}  (target 0.05)")
 
 All three tests give similar p-values under normality. The permutation test has
 exact Type I error control by construction.
+
+## Exercises
+
+**Exercise 1.** Two groups have sizes $n_A = 2$ and $n_B = 2$, with observed values
+$A = \{1, 2\}$ and $B = \{5, 6\}$. Using the difference in means $\bar X_A - \bar X_B$
+as the statistic, enumerate all $\binom{4}{2} = 6$ label assignments and compute the
+exact two-sided permutation p-value.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The observed statistic is $\bar X_A - \bar X_B = 1.5 - 5.5 = -4$, so
+$|t_{\mathrm{obs}}| = 4$.
+
+**Step 2.** List every way to choose which two of $\{1, 2, 5, 6\}$ are labeled $A$,
+and compute the group-mean difference for each:
+
+- $\{1,2\}$ vs $\{5,6\}$: $1.5 - 5.5 = -4$
+- $\{1,5\}$ vs $\{2,6\}$: $3 - 4 = -1$
+- $\{1,6\}$ vs $\{2,5\}$: $3.5 - 3.5 = 0$
+- $\{2,5\}$ vs $\{1,6\}$: $3.5 - 3.5 = 0$
+- $\{2,6\}$ vs $\{1,5\}$: $4 - 3 = 1$
+- $\{5,6\}$ vs $\{1,2\}$: $5.5 - 1.5 = 4$
+
+**Step 3.** Count the permutations with $|t^{(p)}| \ge 4$: the first and last, so two
+of the six. Using the lesson's $+1$ convention with full enumeration, every listed
+assignment is a valid permutation including the observed one, so
+
+$$
+\hat p = \frac{\#\{p : |t^{(p)}| \ge 4\}}{6} = \frac{2}{6} = \frac{1}{3} \approx 0.333.
+$$
+
+With only four points, the most extreme possible separation still cannot beat
+$p = 1/3$: small samples bound how significant a permutation test can be.
+
+</details>
+
+**Exercise 2.** Explain why the permutation p-value uses the $+1$ correction
+$\hat p = \frac{1 + \#\{p : |t^{(p)}| \ge |t_{\mathrm{obs}}|\}}{P + 1}$ for the random
+(sampled) version, and show this guarantees $\hat p > 0$ and that the test never
+reports an impossibly small p-value.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under $H_0$ the observed labeling is itself one of the equally likely
+assignments. The $+1$ in both numerator and denominator counts $t_{\mathrm{obs}}$
+among the reference set, so the test treats the observed data as one draw from the
+null alongside the $P$ random permutations.
+
+**Step 2.** Because $|t_{\mathrm{obs}}| \ge |t_{\mathrm{obs}}|$ always holds, the
+observed dataset always contributes to the numerator count. The smallest possible
+value is therefore
+
+$$
+\hat p = \frac{1 + 0}{P + 1} = \frac{1}{P + 1} > 0,
+$$
+
+reached when no random permutation is as extreme as the observation.
+
+**Step 3.** Without the $+1$, a value of $0$ would be possible, claiming infinite
+evidence from a finite resample. The correction also makes $\hat p$ a valid p-value:
+under $H_0$, $\Pr(\hat p \le \alpha) \le \alpha$ for the discrete grid of attainable
+values, so Type I error is controlled at the nominal level.
+
+</details>
+
+**Exercise 3 (code).** Implement the two-sample permutation test in pure numpy (no
+scipy). With `np.random.default_rng(0)`, generate two normal groups with a true mean
+gap of $1.5$ and confirm the permutation p-value is small; then confirm that under the
+null (equal means) the p-value is not small. Use the difference in means as the
+statistic.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def perm_pvalue(a, b, rng, P=10_000):
+    combined = np.concatenate([a, b])
+    n_a = len(a)
+    t_obs = a.mean() - b.mean()
+    count = 0
+    for _ in range(P):
+        perm = rng.permutation(combined)
+        t = perm[:n_a].mean() - perm[n_a:].mean()
+        count += abs(t) >= abs(t_obs)
+    return (count + 1) / (P + 1)
+
+rng = np.random.default_rng(0)
+n_a = n_b = 40
+
+# Alternative: a real 1.5 mean gap should be detected
+a = rng.normal(5.0, 2.0, n_a)
+b = rng.normal(6.5, 2.0, n_b)
+p_alt = perm_pvalue(a, b, rng)
+
+# Null: equal means, the test should not flag a difference
+a0 = rng.normal(5.0, 2.0, n_a)
+b0 = rng.normal(5.0, 2.0, n_b)
+p_null = perm_pvalue(a0, b0, rng)
+
+assert p_alt < 0.05          # real effect detected
+assert p_null > 0.05         # no false alarm here
+assert 1 / 10_001 <= p_alt   # +1 correction floors the p-value above 0
+print(round(p_alt, 4), round(p_null, 4))
+```
+
+The seeded run yields a tiny p-value for the genuine $1.5$ gap and a large one when
+the groups share a mean, with both bounded below by $1/(P+1)$ from the $+1$
+correction.
+
+</details>
 
 The next lesson turns to model evaluation: cross-validation, which uses
 leave-out resampling to estimate prediction error.

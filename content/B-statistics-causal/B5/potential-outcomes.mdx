@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: potential-outcomes
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define potential outcomes Y(1) and Y(0), the ATE, ATT, and ATU, and state the fundamental problem of causal inference."
 prerequisites: ["B1/hypothesis-testing"]
 ---
@@ -143,6 +143,100 @@ print(f"Selection bias: {naive - ate_true:.4f}")
 The naive estimator deviates from the true ATE because treated units have higher
 $Y(0)$ on average (they are drawn from a higher-$X$ population), creating upward
 selection bias.
+
+## Exercises
+
+**Exercise 1.** A study has $P(W=1) = 0.4$. The average treatment effect on the
+treated is $\tau_{\mathrm{ATT}} = 3$ and on the untreated is
+$\tau_{\mathrm{ATU}} = 8$. Compute the ATE by hand, and explain in one sentence
+why it is closer to the ATU.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Use the decomposition stated in the lesson,
+$\tau_{\mathrm{ATE}} = P(W=1)\,\tau_{\mathrm{ATT}} + P(W=0)\,\tau_{\mathrm{ATU}}$,
+a probability-weighted average of the two subgroup effects.
+
+**Step 2.** Substitute the numbers, with $P(W=0) = 1 - 0.4 = 0.6$:
+
+$$
+\tau_{\mathrm{ATE}} = 0.4 \cdot 3 + 0.6 \cdot 8 = 1.2 + 4.8 = 6.
+$$
+
+The ATE is $6$, nearer the ATU value $8$ because the untreated group carries the
+larger weight $0.6$.
+
+</details>
+
+**Exercise 2.** Starting from $Y_i^{\text{obs}} = W_i Y_i(1) + (1-W_i) Y_i(0)$,
+derive the decomposition of the naive estimator into the ATT plus the selection
+bias term, $\hat\tau_{\mathrm{naive}} = \tau_{\mathrm{ATT}} + \big(E[Y(0)\mid W=1] - E[Y(0)\mid W=0]\big)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For treated units $W=1$, the observed outcome is $Y(1)$; for control
+units $W=0$, it is $Y(0)$. So the two conditional means are
+$E[Y\mid W=1] = E[Y(1)\mid W=1]$ and $E[Y\mid W=0] = E[Y(0)\mid W=0]$.
+
+**Step 2.** Add and subtract $E[Y(0)\mid W=1]$, the missing counterfactual mean
+for the treated group:
+
+$$
+E[Y\mid W=1] - E[Y\mid W=0] = \underbrace{E[Y(1)\mid W=1] - E[Y(0)\mid W=1]}_{\tau_{\mathrm{ATT}}} + \underbrace{E[Y(0)\mid W=1] - E[Y(0)\mid W=0]}_{\text{selection bias}}.
+$$
+
+**Step 3.** The first bracket is $E[Y(1) - Y(0)\mid W=1] = \tau_{\mathrm{ATT}}$ by
+definition. The second is the baseline gap between the groups. Under random
+assignment $W \perp (Y(0), Y(1))$, the two $Y(0)$ means are equal and the bias
+vanishes.
+
+</details>
+
+**Exercise 3 (code).** Simulate a population with a known, heterogeneous treatment
+effect, then confirm three claims numerically with a fixed seed: that the naive
+estimator overstates the ATE, that the measured selection bias equals the baseline
+gap $E[Y(0)\mid W=1] - E[Y(0)\mid W=0]$ to floating-point precision, and that the
+ATE is the weighted average of ATT and ATU.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200_000
+X = rng.normal(0, 1, n)
+W = (X + rng.normal(0, 1, n) > 0).astype(int)   # treated units skew high-X
+
+Y0 = 0.5 * X + rng.normal(0, 1, n)
+tau = 1.0 + 0.5 * X                              # heterogeneous effect
+Y1 = Y0 + tau
+Y  = W * Y1 + (1 - W) * Y0
+
+ate = tau.mean()
+att = tau[W == 1].mean()
+atu = tau[W == 0].mean()
+naive = Y[W == 1].mean() - Y[W == 0].mean()
+selection = Y0[W == 1].mean() - Y0[W == 0].mean()
+pW = W.mean()
+
+# naive overstates the true ATE (positive selection bias)
+assert naive > ate
+# the naive contrast splits exactly into ATT plus the baseline gap
+assert np.isclose(naive, att + selection)
+# ATE is the probability-weighted average of ATT and ATU
+assert np.isclose(ate, pW * att + (1 - pW) * atu)
+print(f"ATE {ate:.4f}, naive {naive:.4f}, selection bias {selection:.4f}")
+```
+
+The first assert shows the upward bias, the second confirms the Step 2
+decomposition holds in the sample, and the third recovers the ATT/ATU weighting
+from Exercise 1.
+
+</details>
 
 The next lesson introduces structural causal models and directed acyclic graphs,
 which make confounding structures explicit and readable.

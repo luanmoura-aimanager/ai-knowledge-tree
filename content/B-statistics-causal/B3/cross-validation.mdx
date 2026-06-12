@@ -4,7 +4,7 @@ pillar: B
 subId: B3
 lessonId: cross-validation
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Build k-fold, leave-one-out, stratified, and time-series CV; characterize their bias-variance tradeoff and the conditions under which each is appropriate."
 prerequisites: ["B1/estimator-properties", "bootstrap"]
 ---
@@ -134,6 +134,105 @@ print(f"Time-series CV: {scores_ts.mean():.4f} +/- {scores_ts.std():.4f}")
 
 The time-series CV score can differ from the i.i.d. CV score when temporal structure
 exists; here the data are i.i.d. so they are similar.
+
+## Exercises
+
+**Exercise 1.** A dataset of $n = 100$ points is split into $K = 5$ folds. State how
+many points are in each test fold and each training set, and explain why $K = 5$ is
+mildly pessimistic relative to fitting on the full data.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $K = 5$ equal folds, each test fold holds $n/K = 100/5 = 20$ points,
+and each training set holds the remaining $n - n/K = 80$ points.
+
+**Step 2.** Every CV model is fit on $80$ points, not the full $100$. A model trained
+on less data generalizes slightly worse, so the average held-out loss
+$\widehat{\mathrm{Err}}_5$ estimates the error of an $80$-point model, which is a bit
+larger than the error of the $100$-point model actually deployed.
+
+**Step 3.** This upward (pessimistic) bias shrinks as $K$ grows, since the training
+fraction $\frac{K-1}{K}$ approaches $1$: at $K = 10$ each fit uses $90$ points, and at
+$K = n$ (LOOCV) each uses $99$. The bias is driven by training-set size, matching the
+worked $K = 2, 5, 10$ comparison in the lesson.
+
+</details>
+
+**Exercise 2.** For a linear model the LOOCV error has the closed form
+$\frac{1}{n}\sum_i \left(\frac{y_i - \hat y_i}{1 - H_{ii}}\right)^2$ with
+$H = X(X^TX)^{-1}X^T$. Show that the diagonal entries satisfy $0 \le H_{ii} \le 1$ and
+$\sum_i H_{ii} = p$, the number of columns of $X$, and say what $H_{ii} \to 1$ implies
+for the LOOCV term of point $i$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $H$ is a projection: $H^2 = X(X^TX)^{-1}X^TX(X^TX)^{-1}X^T = X(X^TX)^{-1}X^T = H$,
+and $H^T = H$. An idempotent symmetric matrix is an orthogonal projection, so its
+eigenvalues are $0$ or $1$.
+
+**Step 2.** For a projection, the diagonal entry $H_{ii} = e_i^T H e_i = \|H e_i\|^2$
+because $H = H^2$ and $H = H^T$ give $e_i^T H e_i = e_i^T H^T H e_i = \|H e_i\|^2 \ge 0$.
+Also $H e_i$ is a projection of the unit vector $e_i$, so $\|H e_i\| \le \|e_i\| = 1$,
+giving $H_{ii} \le 1$. Hence $0 \le H_{ii} \le 1$.
+
+**Step 3.** The trace of a projection equals its rank. With $X$ full column rank,
+$\mathrm{rank}(H) = p$, so $\sum_i H_{ii} = \mathrm{tr}(H) = p$.
+
+**Step 4.** As $H_{ii} \to 1$ the denominator $1 - H_{ii} \to 0$, so the LOOCV term
+for point $i$ blows up: a high-leverage point dominates the LOOCV error, because
+removing it changes the fit sharply.
+
+</details>
+
+**Exercise 3 (code).** Implement $K$-fold CV for ridge-free linear regression in pure
+numpy, and verify the LOOCV closed form against brute-force leave-one-out refitting.
+Use `np.random.default_rng(0)`, $n = 60$ points, and a design with an intercept plus
+one feature.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 60
+x = rng.standard_normal(n)
+y = 2.0 * x + rng.standard_normal(n)
+X = np.column_stack([np.ones(n), x])     # intercept + slope
+
+# Full-data fit and per-point leverage h_i = x_i^T (X^T X)^-1 x_i
+XtX_inv = np.linalg.inv(X.T @ X)
+beta = XtX_inv @ (X.T @ y)
+y_hat = X @ beta
+h = np.einsum('ij,jk,ik->i', X, XtX_inv, X)   # diagonal of the hat matrix
+
+# Closed-form LOOCV
+loocv_closed = np.mean(((y - y_hat) / (1 - h))**2)
+
+# Brute-force LOOCV: refit n times
+errs = []
+for i in range(n):
+    keep = np.arange(n) != i
+    b = np.linalg.inv(X[keep].T @ X[keep]) @ (X[keep].T @ y[keep])
+    errs.append((y[i] - X[i] @ b)**2)
+loocv_brute = np.mean(errs)
+
+# Hat diagonals are valid leverages and sum to p = 2
+assert np.all((h >= 0) & (h <= 1))
+assert np.isclose(h.sum(), 2.0)
+# Closed form matches the n refits
+assert np.isclose(loocv_closed, loocv_brute)
+print(round(loocv_closed, 4), round(loocv_brute, 4), round(h.sum(), 4))
+```
+
+The single-fit closed form reproduces the $n$-refit LOOCV to numerical precision, and
+the leverages sum to the two columns of $X$, confirming the hat-matrix identity from
+Exercise 2.
+
+</details>
 
 B4 moves from estimating to deciding: experimental design, power analysis, and
 bandit algorithms for adaptive experimentation.

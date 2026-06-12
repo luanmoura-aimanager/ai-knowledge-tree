@@ -4,7 +4,7 @@ pillar: B
 subId: B5
 lessonId: iv-estimation
 order: 7
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "State the three IV conditions, derive the Wald estimator and two-stage least squares, and identify the local average treatment effect (LATE)."
 prerequisites: ["propensity-scores"]
 ---
@@ -141,6 +141,103 @@ print(f"Approximate F-statistic: {F_approx:.1f}")
 The OLS estimate is biased upward (positive confounding from $U$); 2SLS recovers
 the true LATE of 2.0. The large F-statistic in the first stage confirms the
 instrument is relevant.
+
+## Exercises
+
+**Exercise 1.** A binary instrument $Z$ gives $E[Y\mid Z=1] = 6.4$ and
+$E[Y\mid Z=0] = 5.0$, with first-stage compliance $E[W\mid Z=1] = 0.7$ and
+$E[W\mid Z=0] = 0.3$. Compute the Wald estimate by hand, and state what would
+happen to it if the first-stage gap shrank toward zero.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Wald estimator is the reduced-form effect over the first-stage
+effect:
+
+$$
+\hat\tau_{\mathrm{IV}} = \frac{E[Y\mid Z=1] - E[Y\mid Z=0]}{E[W\mid Z=1] - E[W\mid Z=0]} = \frac{6.4 - 5.0}{0.7 - 0.3} = \frac{1.4}{0.4} = 3.5.
+$$
+
+**Step 2.** The denominator is the fraction of compliers, here $0.4$. As the
+first-stage gap shrinks toward zero (a weak instrument), the denominator goes to
+zero while the numerator stays small but noisy, so the ratio blows up and its
+sampling variance explodes. This is the weak-instrument problem the F-statistic
+guards against.
+
+</details>
+
+**Exercise 2.** Prove the Wald identity $E[Y\mid Z=1] - E[Y\mid Z=0] = \tau \cdot
+\big(E[W\mid Z=1] - E[W\mid Z=0]\big)$ under a constant treatment effect $\tau$
+and the three IV conditions, then solve for $\tau$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By the exclusion restriction, $Z$ moves $Y$ only through $W$, so write
+the outcome as $Y = \tau W + h(U) + \text{noise}$ with $h(U)$ the contribution of
+the unobserved confounder. Take the conditional expectation given $Z$:
+
+$$
+E[Y\mid Z=z] = \tau\, E[W\mid Z=z] + E[h(U)\mid Z=z].
+$$
+
+**Step 2.** By independence, $Z \perp U$, so $E[h(U)\mid Z=z] = E[h(U)]$ does not
+depend on $z$. Subtracting the $Z=0$ line from the $Z=1$ line cancels that common
+term:
+
+$$
+E[Y\mid Z=1] - E[Y\mid Z=0] = \tau\,\big(E[W\mid Z=1] - E[W\mid Z=0]\big).
+$$
+
+**Step 3.** Relevance guarantees the first-stage gap is nonzero, so divide to get
+$\tau = \Delta Y / \Delta W$, the Wald estimator.
+
+</details>
+
+**Exercise 3 (code).** Simulate a one-instrument SCM with an unobserved confounder
+and a true effect of $2.5$. With a fixed seed, confirm that naive OLS is biased
+away from the truth, that the Wald and 2SLS estimates agree with each other to
+floating-point precision (they coincide for a single binary instrument), and that
+both land within tolerance of $2.5$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 100_000
+tau = 2.5
+
+Z = rng.binomial(1, 0.5, n).astype(float)
+U = rng.normal(0, 1, n)                                  # unobserved confounder
+W = (0.6 * Z + 0.8 * U + rng.normal(0, 1, n) > 0).astype(float)
+Y = tau * W + 1.0 * U + rng.normal(0, 0.5, n)
+
+# naive OLS of Y on [1, W] is confounded by U
+beta_ols = np.linalg.lstsq(np.column_stack([np.ones(n), W]), Y, rcond=None)[0][1]
+
+# Wald estimator
+wald = (Y[Z == 1].mean() - Y[Z == 0].mean()) / (W[Z == 1].mean() - W[Z == 0].mean())
+
+# 2SLS: stage 1 predicts W from [1, Z], stage 2 regresses Y on [1, W_hat]
+Xz = np.column_stack([np.ones(n), Z])
+W_hat = Xz @ np.linalg.lstsq(Xz, W, rcond=None)[0]
+b_2sls = np.linalg.lstsq(np.column_stack([np.ones(n), W_hat]), Y, rcond=None)[0][1]
+
+assert abs(beta_ols - tau) > 0.1     # OLS is biased by U
+assert np.isclose(wald, b_2sls)      # single binary instrument: Wald == 2SLS
+assert abs(wald - tau) < 0.1         # IV recovers the truth
+print(f"OLS {beta_ols:.3f}, Wald {wald:.3f}, 2SLS {b_2sls:.3f}")
+```
+
+OLS is pulled off $2.5$ by the confounder $U$, while the Wald and 2SLS estimates
+coincide (a single binary instrument makes them algebraically identical) and both
+recover the true effect within tolerance.
+
+</details>
 
 The next lesson covers difference-in-differences, which uses panel data and a
 parallel-trends assumption to estimate causal effects without an instrument.
