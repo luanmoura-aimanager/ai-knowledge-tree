@@ -4,7 +4,7 @@ pillar: E
 subId: E1
 lessonId: tokenization
 order: 3
-estimatedMinutes: 25
+estimatedMinutes: 35
 goal: "Implement BPE merge training on a toy corpus and encode a new word at inference; contrast WordPiece likelihood and SentencePiece unigram variants."
 prerequisites: ["ngram-lm"]
 ---
@@ -177,6 +177,101 @@ graph LR
 Larger vocabularies cover non-Latin scripts more efficiently (a Chinese character
 needs 3 bytes; without a specific vocabulary entry it costs 3 tokens). The tradeoff:
 each vocabulary entry adds one row to the embedding matrix and the LM head.
+
+## Exercises
+
+**Exercise 1.** Continue the worked BPE example by hand. After merging `(e,s) -> es`, `(es,t) -> est`, and `(est,</w>) -> est</w>`, find the next most frequent pair across the corpus and state the merge. Corpus (word, frequency): `l o w </w>`:5, `l o w e r </w>`:2, `n e w e s t </w>`:6, `w i d e s t </w>`:3.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the three merges already done. "newest" becomes `n e w est</w>` (the `e s t </w>` tail collapses to `est</w>`), and "widest" becomes `w i d est</w>`. "low" and "lower" contain no `e s` pair, so they are unchanged: `l o w </w>` and `l o w e r </w>`.
+
+**Step 2.** Count adjacent pairs over the current symbol sequences, weighting by word frequency:
+
+- `(l, o)`: appears in "low" (5) and "lower" (2) gives $5 + 2 = 7$.
+- `(o, w)`: "low" (5) and "lower" (2) gives $7$.
+- `(w, </w>)`: "low" only gives $5$.
+- `(w, e)`: "lower" (2) and "newest" (`n e w est</w>` has `w` then `est</w>`, not `e`) gives $2$.
+- `(n, e)`, `(e, w)`, `(w, est</w>)`: each from "newest" only, $6$.
+- `(w, i)`, `(i, d)`, `(d, est</w>)`: each from "widest" only, $3$.
+
+**Step 3.** The maximum is the tie between `(l, o)` and `(o, w)` at $7$, both above the $6$ from "newest". Breaking the tie by first-encountered (the convention `max` uses on insertion order), the next merge is `(l, o) -> lo`, with frequency $7$.
+
+</details>
+
+**Exercise 2.** WordPiece scores a candidate merge $(a, b)$ by $\frac{c(ab)}{c(a)\,c(b)}$ rather than raw frequency $c(ab)$. Consider two candidate pairs: pair P with $c(ab) = 100$, $c(a) = 1000$, $c(b) = 500$; pair Q with $c(ab) = 30$, $c(a) = 40$, $c(b) = 50$. Which does raw-frequency BPE merge first, and which does WordPiece merge first?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Raw-frequency BPE picks the larger $c(ab)$. Pair P has $100$ versus pair Q's $30$, so BPE merges P first.
+
+**Step 2.** WordPiece computes the score $\frac{c(ab)}{c(a)\,c(b)}$ for each:
+
+$$
+\text{score}(P) = \frac{100}{1000 \cdot 500} = \frac{100}{500000} = 2 \times 10^{-4},
+$$
+
+$$
+\text{score}(Q) = \frac{30}{40 \cdot 50} = \frac{30}{2000} = 1.5 \times 10^{-2}.
+$$
+
+**Step 3.** $\text{score}(Q) = 0.015$ is $75$ times larger than $\text{score}(P) = 0.0002$, so WordPiece merges Q first. The reason is that P's components $a$ and $b$ are each very common on their own, so co-occurring is unremarkable; Q's components are rare individually but almost always appear together, which is the high-PMI signal WordPiece rewards.
+
+</details>
+
+**Exercise 3 (code).** Implement BPE training on the worked corpus and confirm that the first three learned merges are `(e,s)`, `(es,t)`, `(est,</w>)`, matching the hand derivation.
+
+<details>
+<summary>Solution</summary>
+
+```python
+from collections import Counter
+
+def get_pairs(corpus):
+    pairs = Counter()
+    for word, freq in corpus.items():
+        syms = word.split()
+        for i in range(len(syms) - 1):
+            pairs[(syms[i], syms[i + 1])] += freq
+    return pairs
+
+def merge_pair(pair, corpus):
+    a, b = pair
+    ab = a + b
+    new_corpus = {}
+    for word, freq in corpus.items():
+        syms = word.split()
+        out, i = [], 0
+        while i < len(syms):
+            if i < len(syms) - 1 and syms[i] == a and syms[i + 1] == b:
+                out.append(ab); i += 2
+            else:
+                out.append(syms[i]); i += 1
+        new_corpus[" ".join(out)] = freq
+    return new_corpus
+
+corpus = {
+    "l o w </w>": 5,
+    "l o w e r </w>": 2,
+    "n e w e s t </w>": 6,
+    "w i d e s t </w>": 3,
+}
+merges = []
+for _ in range(3):
+    pairs = get_pairs(corpus)
+    best = max(pairs, key=pairs.get)
+    corpus = merge_pair(best, corpus)
+    merges.append(best)
+
+assert merges == [("e", "s"), ("es", "t"), ("est", "</w>")]
+print("first three merges:", merges)
+```
+
+The `(e,s)` pair wins the first round at frequency 9 (newest 6 + widest 3); each subsequent suffix pair inherits the same 9 occurrences, so the suffix `est</w>` is built greedily, exactly as derived by hand.
+
+</details>
 
 The next subsection moves to neural models that consume these token sequences.
 

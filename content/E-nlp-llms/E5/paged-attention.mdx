@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: paged-attention
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Manage KV cache as fixed-size pages mapped to logical blocks (PagedAttention), and use continuous batching to saturate GPU throughput across requests of different lengths."
 prerequisites: ["kv-cache"]
 codeExempt: true
@@ -124,6 +124,78 @@ In the original vLLM paper, PagedAttention + continuous batching achieved:
 
 These techniques are now standard in all production LLM serving frameworks (vLLM, TGI,
 SGLang, TensorRT-LLM).
+
+## Exercises
+
+**Exercise 1.** A request generates 200 tokens but naive serving pre-allocated KV
+slots for the model's 4096-token maximum. Compute the fraction of allocated KV
+memory actually used, then the effective utilization if the GPU runs 100 such
+requests in parallel with the same pattern.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The request uses $200$ of $4096$ pre-allocated slots:
+
+$$
+\frac{200}{4096} = 0.0488,
+$$
+
+about $4.9\%$ utilization. The other $3896$ slots are reserved and wasted for the
+life of the request.
+
+**Step 2.** Utilization is a per-slot ratio, so 100 identical requests each waste the
+same proportion; the aggregate utilization is still $4.9\%$. Static pre-allocation to
+the maximum length is what makes naive serving waste $60$ to $80\%$ of the KV cache in
+practice, and the fix is to allocate on demand rather than to the worst case.
+
+</details>
+
+**Exercise 2.** PagedAttention uses fixed blocks of 16 token slots. A sequence has
+70 tokens. How many blocks does it occupy, how many slots are wasted in the last
+block, and what is the internal fragmentation as a fraction of the sequence length?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Blocks needed is the ceiling of $70/16$. Since $4 \times 16 = 64 < 70$
+and $5 \times 16 = 80 \ge 70$, the sequence occupies $5$ blocks ($80$ slots).
+
+**Step 2.** The last block holds $70 - 64 = 6$ live tokens, so $16 - 6 = 10$ slots
+are wasted.
+
+**Step 3.** Fragmentation as a fraction of the sequence is $10/70 = 0.143$, but the
+meaningful bound is that waste never exceeds one block per sequence regardless of
+length: at $T = 700$ tokens the same $\le 10$ wasted slots are $1.4\%$. Paging caps
+internal fragmentation at under one block per request, versus the thousands of wasted
+slots under max-length pre-allocation.
+
+</details>
+
+**Exercise 3.** A chat service has 500 concurrent sessions that all share an
+identical 1000-token system prompt, then diverge. Compare the KV cache used for the
+shared prefix with and without PagedAttention's copy-on-write block sharing (use the
+$1$ MiB-per-token figure from the kv-cache lesson), and state the assumption that
+makes the sharing safe.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Without sharing, each session stores its own copy of the 1000-token
+prefix: $500 \times 1000 \times 1 \text{ MiB} = 500{,}000$ MiB $\approx 488$ GiB of
+KV cache for the prefix alone.
+
+**Step 2.** With block sharing, the identical prefix is stored once and all 500 block
+tables point to the same physical blocks: $1 \times 1000 \times 1 \text{ MiB} = 1000$
+MiB $\approx 0.98$ GiB, a $500\times$ reduction on the shared region.
+
+**Step 3.** The sharing is safe only because the prefix blocks are read-only while
+shared: keys and values of a generated token never change once written (the kv-cache
+lesson's reusability argument). When a session generates its first divergent token it
+triggers copy-on-write, allocating a private block from that point on, so correctness
+is preserved while the common prefix stays shared.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Kwon, W., et al.** (2023). "Efficient memory management for large language model serving with PagedAttention".

@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: superposition
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Model why a network with fewer neurons than features stores multiple features per neuron in nearly-orthogonal directions (superposition); show toy models that exhibit the phase transition."
 prerequisites: ["circuits"]
 ---
@@ -136,6 +136,134 @@ polytope structure:
 
 This geometric structure predicts which features will "collapse" (merge into one direction)
 when the network must compress more features into fewer dimensions under limited sparsity.
+
+## Exercises
+
+**Exercise 1.** Suppose $n = d + 1$ features are stored as the vertices of a regular
+simplex in $d$ dimensions, so all pairwise cosine similarities are equal. Using the fact
+that the unit vectors sum to zero, derive that the shared cosine similarity is exactly
+$-\tfrac{1}{d}$, and evaluate it for $d = 4$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $\mathbf{v}_1, \dots, \mathbf{v}_{d+1}$ be the unit feature directions of
+a regular simplex. By symmetry they are centered, so their sum is the zero vector:
+$\sum_i \mathbf{v}_i = \mathbf{0}$.
+
+**Step 2.** Take the squared norm of that sum and expand it:
+
+$$
+0 = \left\|\sum_i \mathbf{v}_i\right\|^2 = \sum_i \|\mathbf{v}_i\|^2 + \sum_{i \ne j} \mathbf{v}_i \cdot \mathbf{v}_j.
+$$
+
+**Step 3.** Each $\|\mathbf{v}_i\|^2 = 1$, giving $\sum_i \|\mathbf{v}_i\|^2 = d + 1$. By
+symmetry every off-diagonal dot product equals the same value $c$, and there are
+$(d+1)d$ ordered off-diagonal pairs. So
+
+$$
+0 = (d + 1) + (d + 1)\,d\,c \quad\Longrightarrow\quad c = -\frac{1}{d}.
+$$
+
+Since the vectors are unit length, this dot product is the cosine similarity.
+
+**Step 4.** For $d = 4$, the shared cosine similarity is $-\tfrac{1}{4} = -0.25$. The
+simplex spreads the $d + 1$ directions as far apart as a fixed dimension allows, which is
+why it is the minimal-interference packing.
+
+</details>
+
+**Exercise 2.** Two features each fire independently with probability $p$ (so sparsity is
+$1 - p$ in the lesson's convention of "probability of being zero" $= 1 - p$). They share a
+single stored direction (collision). Interference costs the model only when **both** fire
+at once. Compute the probability of a collision event as a function of $p$, and explain why
+high sparsity (small $p$) makes sharing a direction nearly free.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The two features are independent, each on with probability $p$. A collision
+requires both to be on simultaneously, which has probability
+
+$$
+P(\text{both on}) = p \cdot p = p^2.
+$$
+
+**Step 2.** When only one of the two fires, the shared direction carries exactly that one
+feature with no ambiguity, so no interference is paid. The cost is incurred only on the
+$p^2$ fraction of inputs where both are active and their values superimpose.
+
+**Step 3.** As sparsity rises ($p \to 0$), $p^2$ shrinks quadratically, far faster than the
+linear $p$ rate at which each feature individually appears. For example at $p = 0.05$ each
+feature is on $5\%$ of the time, but collisions happen only $p^2 = 0.25\%$ of the time. The
+model gains a whole extra feature direction while paying interference on a quarter of one
+percent of inputs. This quadratic suppression of collisions is exactly why sparse features
+"happily share directions," and why the superposition regime opens up as sparsity grows.
+
+</details>
+
+**Exercise 3 (code).** Train the lesson's toy model in both regimes and confirm the
+qualitative prediction: with **more features than dimensions** and **high sparsity**, the
+model packs features into near-orthogonal directions (small off-diagonal Gram entries),
+whereas with **dense** features it cannot, and the off-diagonal interference is larger.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def relu(x):
+    return np.maximum(0, x)
+
+def train(n_features, n_hidden, sparsity, n_steps=4000, lr=0.01, seed=0):
+    rng = np.random.default_rng(seed)
+    W = rng.normal(0, 0.1, (n_hidden, n_features))
+    I = 0.9 ** np.arange(n_features)
+    for _ in range(n_steps):
+        B = 256
+        f = rng.uniform(0, 1, (B, n_features))
+        f *= (rng.random((B, n_features)) > sparsity)   # zero with prob = sparsity
+        h = f @ W.T
+        f_hat = relu(h @ W)
+        diff = f - f_hat
+        df_hat = -2 * I[None, :] * diff / (B * n_features)
+        df_hat *= (h @ W) > 0
+        grad_W = h.T @ df_hat + (f.T @ (df_hat @ W.T)).T
+        W -= lr * grad_W
+    return W
+
+def mean_interference(W):
+    norms = np.linalg.norm(W, axis=0)
+    Wn = W / (norms[None, :] + 1e-9)
+    gram = Wn.T @ Wn
+    off = gram - np.eye(gram.shape[0])
+    return np.abs(off).mean()
+
+# 10 features, 5 dimensions. Sparse vs dense.
+W_sparse = train(n_features=10, n_hidden=5, sparsity=0.9, seed=0)   # rarely co-active
+W_dense  = train(n_features=10, n_hidden=5, sparsity=0.1, seed=0)   # usually co-active
+
+intf_sparse = mean_interference(W_sparse)
+intf_dense  = mean_interference(W_dense)
+print(f"mean |off-diagonal| interference  sparse: {intf_sparse:.4f}")
+print(f"mean |off-diagonal| interference  dense:  {intf_dense:.4f}")
+
+# Sparse features pack with less interference than dense ones.
+assert intf_sparse < intf_dense
+```
+
+The sparse model achieves a smaller mean off-diagonal Gram entry: because its features
+rarely co-occur, it can afford to stack ten of them into five dimensions along nearly
+orthogonal directions. The dense model, whose features collide constantly, pays a higher
+interference cost and packs less cleanly, the phase distinction the superposition
+hypothesis predicts.
+
+</details>
+
+The next lesson takes the practical consequence of superposition seriously: since
+features are directions rather than neurons, recovering them calls for a dedicated
+decomposition tool, the sparse autoencoder.
 
 <Footnotes>
   <FNItem n="1">**Elhage, N., et al.** (2022). "Toy models of superposition". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2022/toy_model/index.html). Source of the toy model, the phase transition, and the polytope geometry.</FNItem>

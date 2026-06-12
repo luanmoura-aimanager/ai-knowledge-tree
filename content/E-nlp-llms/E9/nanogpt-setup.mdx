@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: nanogpt-setup
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Stand up the minimal training scaffold: character-level tokenization of TinyShakespeare, batched next-token targets, and the train/estimate-loss loop the rest of the capstone reuses."
 prerequisites: ["E3/decoder-only", "D1/dl-optimizers"]
 ---
@@ -115,8 +115,107 @@ def train(model, max_iters=5000, eval_interval=500, lr=3e-4):
 
 A useful sanity check before any real architecture: a model that ignores context and
 predicts a uniform distribution has loss $\ln(\text{vocab\_size})$, about $4.17$ for a
-65-character vocabulary. Any working model must beat that. The next lesson builds the model
-that does, [the transformer block from scratch](transformer-block-from-scratch).
+65-character vocabulary. Any working model must beat that.
+
+## Exercises
+
+**Exercise 1.** §2 forms targets `y` as `x` shifted left by one position, so
+predicting `y[:, t]` from `x[:, :t+1]` is the autoregressive objective. For a
+single contiguous slice of the encoded corpus starting at offset $i$ with block
+size $T$, write down exactly which corpus indices fill `x[t]` and `y[t]`, and
+explain why `len(d) - block_size` is the correct upper bound for the random
+offset in `get_batch`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The slice for `x` is `d[i : i + T]`, so `x[t] = d[i + t]` for
+$t = 0, \dots, T-1$. The slice for `y` is `d[i + 1 : i + T + 1]`, so
+`y[t] = d[i + t + 1]`. Each target is the corpus token one position after the
+corresponding input token, which is the next character to predict.
+
+**Step 2.** The largest index `y` touches is `d[i + T]`. For that to be in range
+the offset must satisfy $i + T \le \text{len}(d) - 1$, i.e. $i \le \text{len}(d) - T - 1$.
+
+**Step 3.** `torch.randint(len(d) - block_size, ...)` draws $i$ uniformly from
+$\{0, \dots, \text{len}(d) - T - 1\}$, since `randint`'s upper bound is
+exclusive. That is exactly the valid range from Step 2, so every sampled batch
+has a fully in-bounds target slice.
+
+</details>
+
+**Exercise 2 (code).** Verify the uniform-baseline claim: a model that predicts a
+uniform distribution over a vocabulary of size $V$ incurs cross-entropy
+$\ln V$. Compute it in numpy for $V = 65$ and check it against $4.17$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+V = 65
+# Uniform predicted distribution over V classes.
+probs = np.full(V, 1.0 / V)
+
+# Cross-entropy of the true (one-hot) label under the uniform prediction is
+# -log(prob assigned to the true class) = -log(1/V) = log(V), the same for
+# whichever class is the target.
+true_class = 7
+loss = -np.log(probs[true_class])
+
+assert np.isclose(loss, np.log(V))
+assert np.isclose(loss, 4.17, atol=0.01)
+print("uniform baseline loss:", round(float(loss), 4))
+```
+
+The per-token cross-entropy of a context-blind uniform model is $\ln 65 \approx 4.174$,
+the floor every trained model must beat.
+
+</details>
+
+**Exercise 3 (code).** The training loop minimizes mean cross-entropy over the
+flattened `(B*T)` predictions. Implement softmax cross-entropy in numpy for a
+small batch of logits and integer targets, and verify it matches the manual
+`-log(softmax prob of the target)` averaged over the batch.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def cross_entropy(logits, targets):
+    # logits: (N, V), targets: (N,) integer class ids
+    z = logits - logits.max(axis=1, keepdims=True)      # stabilize
+    logsumexp = np.log(np.exp(z).sum(axis=1))
+    logp_true = z[np.arange(len(targets)), targets] - logsumexp
+    return -logp_true.mean()
+
+N, V = 4, 65
+logits = rng.standard_normal((N, V))
+targets = rng.integers(0, V, size=N)
+
+ce = cross_entropy(logits, targets)
+
+# Manual check via an explicit softmax.
+e = np.exp(logits - logits.max(axis=1, keepdims=True))
+softmax = e / e.sum(axis=1, keepdims=True)
+manual = -np.log(softmax[np.arange(N), targets]).mean()
+
+assert np.isclose(ce, manual)
+print("cross-entropy:", round(float(ce), 4))
+```
+
+The stabilized log-sum-exp form agrees with the direct softmax computation,
+which is the loss the AdamW step descends each iteration.
+
+</details>
+
+The next lesson builds the model
+that beats the baseline, [the transformer block from scratch](transformer-block-from-scratch).
 
 <Footnotes>
   <FNItem n="1">**Karpathy, A.** (2022). *nanoGPT.* GitHub repository, [github.com/karpathy/nanoGPT](https://github.com/karpathy/nanoGPT). The reference implementation this capstone follows.</FNItem>

@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: pretraining-data
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Survey the pipeline that turns raw web crawls into a clean pretraining corpus: quality filtering, deduplication, domain mixing, and data curricula."
 prerequisites: ["E3/decoder-only"]
 codeExempt: true
@@ -109,6 +109,85 @@ compute on padding tokens.
 
 For long documents that span multiple chunks, the model never sees the document boundary
 across chunks (gradient is not backpropagated across chunk boundaries in most implementations).
+
+## Exercises
+
+**Exercise 1.** Two web documents share most of their text. Document $A$ has token set
+of size $1000$, document $B$ has $1200$, and their intersection is $900$ tokens. Compute
+the Jaccard similarity $|A \cap B| / |A \cup B|$ and decide whether a MinHash deduplication
+threshold of $0.8$ would mark them as near-duplicates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The union size by inclusion-exclusion is
+$|A \cup B| = |A| + |B| - |A \cap B| = 1000 + 1200 - 900 = 1300$.
+
+**Step 2.** The Jaccard similarity is
+
+$$
+J = \frac{|A \cap B|}{|A \cup B|} = \frac{900}{1300} \approx 0.692.
+$$
+
+**Step 3.** Since $0.692 < 0.8$, the pair falls below the threshold and is **not** marked
+a near-duplicate. The two documents are kept as distinct, despite sharing 900 tokens,
+because the union is large enough that the overlap fraction stays under the cutoff.
+
+</details>
+
+**Exercise 2.** A pretraining mix targets these proportions: web $50\%$, code $25\%$,
+books $10\%$, scientific $10\%$, Wikipedia $5\%$. The available corpus has $10\text{T}$ web,
+$1\text{T}$ code, $0.5\text{T}$ books, $0.5\text{T}$ scientific, $0.2\text{T}$ Wikipedia
+tokens. If you train on a total of $2\text{T}$ tokens at the target proportions, which
+domains require **upsampling** (seeing examples more than once), and by what factor for code?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Target token counts at $2\text{T}$ total: web $1\text{T}$, code $0.5\text{T}$,
+books $0.2\text{T}$, scientific $0.2\text{T}$, Wikipedia $0.1\text{T}$.
+
+**Step 2.** Compare each target to what the corpus holds. Web: need $1\text{T}$, have
+$10\text{T}$, fine. Code: need $0.5\text{T}$, have $1\text{T}$, fine. Books: need $0.2\text{T}$,
+have $0.5\text{T}$, fine. Scientific: need $0.2\text{T}$, have $0.5\text{T}$, fine. Wikipedia:
+need $0.1\text{T}$, have $0.2\text{T}$, fine.
+
+**Step 3.** At a $2\text{T}$ budget, every domain has enough unique tokens, so no upsampling
+is required; the code factor is $0.5\text{T}/1\text{T} = 0.5$, meaning code is in fact
+**downsampled** (half of it is used once). Upsampling would only be forced at a larger budget:
+for example at $6\text{T}$ total, code's target $1.5\text{T}$ exceeds its $1\text{T}$ of
+unique tokens, requiring a $1.5\times$ repeat.
+
+</details>
+
+**Exercise 3.** The Chinchilla finding is that "1T deduplicated tokens is worth more than
+2T raw tokens." Frame this as a design trade-off: a team can spend a fixed engineering
+budget either on a more aggressive deduplication pass (halving the corpus but removing
+near-duplicates) or on crawling twice as much raw web data. Argue which they should prefer
+and name the failure mode the dedup pass prevents.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify the quantity that matters. Training loss scales with the number of
+**informative** tokens, not raw tokens. Near-duplicate documents add token count without
+adding new information, so raw size overstates the effective dataset.
+
+**Step 2.** Compare the two options. Crawling twice as much raw web data brings in more
+near-duplicates (the web is heavily mirrored), so a large fraction of the added tokens is
+redundant; the effective dataset grows far less than $2\times$. The dedup pass removes the
+redundancy already present, raising the informative fraction of every token seen.
+
+**Step 3.** Name the failure mode. Training repeatedly on near-duplicates drives
+**memorization**: the model learns to copy frequent passages verbatim rather than
+generalize, and verbatim memorization also raises privacy and contamination risk. The
+Chinchilla result says the dedup pass is the better spend: deduplicated tokens carry more
+signal per token, so $1\text{T}$ clean tokens beat $2\text{T}$ raw ones.
+
+</details>
+
+With a clean, mixed, deduplicated corpus in hand, the next question is how large a model
+and how many of these tokens to train on, which the scaling-laws lesson answers.
 
 <Footnotes>
   <FNItem n="1">**Brown, T., et al.** (2020). "Language models are few-shot learners (GPT-3)".

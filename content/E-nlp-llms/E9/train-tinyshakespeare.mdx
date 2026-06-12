@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: train-tinyshakespeare
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Assemble the full tiny GPT, run training, watch train and validation loss separate, and sample text autoregressively to see the model move from noise to Shakespeare-shaped output."
 prerequisites: ["transformer-block-from-scratch"]
 ---
@@ -100,6 +100,106 @@ $\ln(\text{vocab\_size}) \approx 4.17$, confirming the model uses context. As tr
 continues, validation loss flattens and then drifts up while train loss keeps falling: that
 gap is overfitting, the [bias-variance](/pillar/C/C1/bias-variance) tradeoff showing up in a
 transformer, and it is what dropout and weight decay hold back.
+
+## Exercises
+
+**Exercise 1.** §4 reads the cross-entropy loss directly. A more interpretable
+companion is perplexity, $\text{ppl} = e^{\mathcal{L}}$ (with natural-log loss).
+Compute the perplexity of the uniform baseline $\mathcal{L} = \ln(65) \approx 4.17$,
+and interpret what perplexity means operationally for a character-level model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Perplexity exponentiates the natural-log cross-entropy:
+$\text{ppl} = e^{\mathcal{L}}$. For the uniform baseline,
+$\text{ppl} = e^{\ln 65} = 65$.
+
+**Step 2.** Operationally, perplexity is the effective number of equally likely
+choices the model is deciding among at each step. A perplexity of $65$ means the
+context-blind model is as uncertain as if it were guessing uniformly among all
+$65$ characters, which is exactly the uniform baseline.
+
+**Step 3.** A trained model that reaches, say, $\mathcal{L} = 1.5$ has
+$\text{ppl} = e^{1.5} \approx 4.48$: at each character it behaves as if choosing
+among roughly four or five plausible next characters, far fewer than $65$. Lower
+perplexity is a smaller effective branching factor, the same information the
+loss carries on a more tangible scale.
+
+</details>
+
+**Exercise 2 (code).** Verify the loss-to-perplexity correspondence and the
+uniform baseline in numpy. Confirm that the perplexity of the uniform model over
+$65$ characters is exactly $65$, and that a sharper predicted distribution gives a
+lower perplexity.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+V = 65
+
+# Uniform model: cross-entropy is ln(V), perplexity is V.
+uniform_loss = np.log(V)
+uniform_ppl = np.exp(uniform_loss)
+assert np.isclose(uniform_ppl, V)
+
+# A confident, mostly-correct model: put most mass on the true class.
+true = 7
+probs = np.full(V, 0.001)
+probs[true] = 1.0 - 0.001 * (V - 1)
+confident_loss = -np.log(probs[true])
+confident_ppl = np.exp(confident_loss)
+
+assert confident_ppl < uniform_ppl
+print("uniform perplexity:  ", round(float(uniform_ppl), 4))
+print("confident perplexity:", round(float(confident_ppl), 4))
+```
+
+The uniform model's perplexity is exactly $65$, and concentrating mass on the
+true character collapses perplexity toward $1$, the floor of perfect prediction.
+
+</details>
+
+**Exercise 3 (code).** The `generate` function samples the next token from the
+softmax of the final-position logits. Reproduce that sampling step in numpy:
+softmax a logit vector, draw many samples, and verify the empirical frequencies
+converge to the softmax probabilities, confirming `torch.multinomial` samples
+from the predicted distribution.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def softmax(z):
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+V = 6
+logits = rng.standard_normal(V)
+probs = softmax(logits)
+
+# Sample many next-token draws from the categorical distribution.
+draws = rng.choice(V, size=200_000, p=probs)
+freqs = np.bincount(draws, minlength=V) / len(draws)
+
+# Empirical frequencies match the softmax probabilities to sampling tolerance.
+assert np.allclose(freqs, probs, atol=0.01)
+print("softmax probs:", np.round(probs, 4))
+print("empirical:    ", np.round(freqs, 4))
+```
+
+The sampled frequencies track the softmax probabilities within sampling noise,
+which is the autoregressive draw `generate` takes at every step.
+
+</details>
 
 The output at this point is recognizably Shakespeare-shaped but the architecture is the 2017
 design. The [next lesson](rope-rmsnorm) modernizes it with RoPE and RMSNorm.

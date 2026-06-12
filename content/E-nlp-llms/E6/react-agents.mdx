@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: react-agents
 order: 6
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Interleave reasoning traces with tool actions in a Thought-Action-Observation loop (ReAct); add memory-based self-reflection to diagnose and correct past failures (Reflexion)."
 prerequisites: ["chain-of-thought", "function-calling"]
 ---
@@ -169,6 +169,120 @@ be careful about whether the question asks about the city or the country.
 **ReAct:** tasks requiring external data (web search, APIs, code execution).
 **Reflexion:** tasks where the agent can evaluate its own success and where multiple
 attempts are acceptable (HotpotQA, coding challenges, Alfworld).
+
+## Exercises
+
+**Exercise 1.** Write a ReAct trajectory for the question "How many years passed between
+the founding of the company that makes the iPhone and the release of the first iPhone?"
+using only a `search` tool and a `calculator` tool. Label every line as Thought, Action,
+Observation, or Answer, and give the two facts your searches would return (Apple founded
+1976; first iPhone released 2007).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The trajectory interleaves reasoning, grounded tool calls, and injected
+observations:
+
+```
+Question: How many years between Apple's founding and the first iPhone?
+
+Thought: I need the iPhone's maker, then its founding year.
+Action: search("company that makes the iPhone")
+Observation: The iPhone is made by Apple, founded in 1976.
+
+Thought: Now I need the first iPhone's release year.
+Action: search("first iPhone release year")
+Observation: The first iPhone was released in 2007.
+
+Thought: The gap is 2007 minus 1976.
+Action: calculator("2007 - 1976")
+Observation: 31
+
+Thought: I have the answer.
+Answer: 31 years.
+```
+
+**Step 2.** The Observation lines are produced by the environment, not the model; the
+model only emits Thought, Action, and the final Answer. The calculator offloads the
+arithmetic so the reasoning step does not have to compute $2007 - 1976$ itself.
+
+</details>
+
+**Exercise 2.** Reflexion retries a task after failure, storing one reflection per
+failed trial. Suppose each independent attempt succeeds with probability $0.5$, and the
+reflection raises the success probability of each subsequent attempt to $0.7$. With a
+budget of 3 attempts, compute the probability the task is eventually solved. Compare it
+to 3 memoryless attempts at $0.5$ each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With memory: attempt 1 succeeds with probability $0.5$. If it fails
+(probability $0.5$), attempts 2 and 3 each succeed with $0.7$. The task fails overall
+only if all three fail:
+
+$$
+P(\text{fail}) = 0.5 \cdot 0.3 \cdot 0.3 = 0.045, \qquad P(\text{solve}) = 1 - 0.045 = 0.955.
+$$
+
+**Step 2.** Memoryless: each attempt is $0.5$, so failure is $0.5^3 = 0.125$ and
+$P(\text{solve}) = 1 - 0.125 = 0.875$.
+
+**Step 3.** Reflection lifts the solve rate from $0.875$ to $0.955$, a gain of $0.08$,
+because each diagnosed failure makes the next attempt more likely to succeed rather than
+repeating the same blind draw.
+
+</details>
+
+**Exercise 3 (code).** Implement the ReAct action parser from the lesson with a regex,
+then drive a scripted ReAct loop on the iPhone question from Exercise 1 and assert the
+final answer is the integer 31.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import re
+
+TOOLS = {
+    "search": lambda q: {
+        "company that makes the iphone": "Apple, founded in 1976.",
+        "first iphone release year": "Released in 2007.",
+    }.get(q.lower(), "No result."),
+    "calculator": lambda expr: str(eval(expr, {"__builtins__": {}}, {})),
+}
+
+def step_action(model_output):
+    m = re.search(r'Action:\s*(\w+)\("([^"]+)"\)', model_output)
+    if not m:
+        return None
+    name, arg = m.group(1), m.group(2)
+    return TOOLS[name](arg)
+
+scripted = [
+    'Thought: find the maker.\nAction: search("company that makes the iPhone")',
+    'Thought: find release year.\nAction: search("first iPhone release year")',
+    'Thought: subtract.\nAction: calculator("2007 - 1976")',
+    'Answer: 31',
+]
+
+final = None
+for out in scripted:
+    if out.strip().startswith("Answer:"):
+        final = int(out.split("Answer:")[1].strip())
+        break
+    obs = step_action(out)
+    print("Observation:", obs)
+
+assert final == 31
+print("final answer:", final)
+```
+
+The parser extracts each tool call, the environment returns the observation, and the
+loop terminates on the `Answer:` line with $2007 - 1976 = 31$.
+
+</details>
 
 ReAct and Reflexion are the conceptual basis for modern agent frameworks (LangGraph,
 CrewAI, AutoGen). The next lesson covers test-time compute scaling, which scales this

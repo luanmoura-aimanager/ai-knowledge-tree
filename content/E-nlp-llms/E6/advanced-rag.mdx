@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: advanced-rag
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Generate a hypothetical document to improve sparse retrieval (HyDE), add a cross-encoder reranker to re-score retrieved passages, and connect entities in a knowledge graph (GraphRAG)."
 prerequisites: ["dense-retrieval"]
 codeExempt: true
@@ -136,6 +136,90 @@ RAG evaluation is a two-stage problem:
   relevance (does it answer the question?), context precision (is the retrieved context useful?).
 
 **RAGAS** (Shahul et al.) is a popular framework for all three metrics using LLM-as-judge.
+
+## Exercises
+
+**Exercise 1.** A bi-encoder returns three passages for a query. The single relevant
+passage sits at rank 2; the other two are irrelevant. A cross-encoder reranker promotes
+the relevant passage to rank 1. Using binary relevance and
+$\text{DCG} = \sum_i \text{rel}_i / \log_2(i + 1)$ with ranks $i = 1, 2, 3$, compute
+NDCG@3 before and after reranking and state the improvement.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Before reranking the relevances by rank are $(0, 1, 0)$. The only nonzero
+term is at rank 2:
+
+$$
+\text{DCG} = \frac{1}{\log_2(2 + 1)} = \frac{1}{\log_2 3} \approx \frac{1}{1.585} \approx 0.631.
+$$
+
+**Step 2.** The ideal ranking puts the relevant passage at rank 1, giving
+$\text{IDCG} = 1 / \log_2 2 = 1$. So NDCG@3 before is $0.631 / 1 = 0.631$.
+
+**Step 3.** After reranking the relevances are $(1, 0, 0)$, so
+$\text{DCG} = 1 / \log_2 2 = 1$ and NDCG@3 $= 1.0$.
+
+**Step 4.** The reranker lifts NDCG@3 from $0.631$ to $1.0$, a gain of $0.369$, by
+moving the relevant passage from rank 2 to rank 1. The reranker could not have helped if
+the relevant passage had been absent from the bi-encoder's top 3, since it only reorders
+what it is given.
+
+</details>
+
+**Exercise 2.** HyDE retrieves documents similar to a generated hypothetical answer
+rather than to the raw query. For each of these two queries, decide whether HyDE is
+likely to help or hurt, and justify it from the mechanism: (a) "What are the common side
+effects of ibuprofen?" on a medical corpus; (b) "What was the exact closing share price
+of an obscure startup on 3 March 2019?"
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** HyDE helps when the model can generate a plausible answer in the corpus's
+vocabulary and style, closing the query-document mismatch. For (a), ibuprofen side
+effects are well-represented in pretraining, so the hypothetical document ("nausea,
+stomach pain, bleeding...") lands in the same region as the real passages and improves
+retrieval.
+
+**Step 2.** HyDE hurts when the model lacks the knowledge and hallucinates. For (b), an
+exact share price of an obscure startup on a specific date is not something the model
+reliably knows, so the hypothetical answer will invent a number. Retrieval then chases
+passages near the hallucination rather than the truth.
+
+**Step 3.** The deciding factor is whether the LLM has enough prior knowledge to produce
+a hypothetical close to the real answer. Factual recall queries on well-covered topics
+benefit; precise, long-tail factoid queries do not.
+
+</details>
+
+**Exercise 3.** A corpus has 50,000 passages. Simple RAG indexing embeds each passage
+once. GraphRAG additionally runs one LLM entity-extraction call per passage at a cost of
+0.002 dollars per call, and the lesson notes GraphRAG indexing is 10 to 30 times more
+expensive than simple RAG. Estimate the extraction cost, and argue when this cost is
+justified despite being far larger than a plain embedding pass.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** One extraction call per passage at 0.002 dollars over 50,000 passages costs
+$50000 \times 0.002 = 100$ dollars for the entity-extraction stage alone, before
+community detection and summarization, which add more LLM calls and push toward the upper
+end of the 10-to-30x range.
+
+**Step 2.** The cost is justified for queries that no single passage can answer:
+multi-hop questions ("what city was the founder of the company that made the first
+iPhone born in?") need facts chained across documents, and corpus-wide questions ("what
+are the main themes?") need community summaries. Both are failure modes of flat
+passage retrieval.
+
+**Step 3.** For a corpus answering mostly single-passage factual queries, the graph
+build is wasted; flat RAG suffices. The graph pays off only when the expected query mix
+is dominated by multi-hop or global-summarization questions that recover more than the
+one-time indexing premium.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Lewis, P., et al.** (2020). "Retrieval-augmented generation for knowledge-intensive NLP tasks". *NeurIPS*. [arXiv:2005.11401](https://arxiv.org/abs/2005.11401). The basic retrieve-then-generate pipeline these techniques extend.</FNItem>

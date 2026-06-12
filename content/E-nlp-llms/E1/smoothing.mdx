@@ -4,7 +4,7 @@ pillar: E
 subId: E1
 lessonId: smoothing
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Fix zero-probability n-grams with Laplace add-one and Kneser-Ney interpolation, and measure the improvement with perplexity."
 prerequisites: ["ngram-lm"]
 ---
@@ -137,6 +137,91 @@ No smoothing method overcomes the **fixed-range** structural limit. Redistributi
 unseen bigrams says nothing about *which* unseen bigrams are more likely; that requires
 generalizing through the geometry of word representations, which is exactly what embedding-based
 neural models provide.
+
+## Exercises
+
+**Exercise 1.** A context $a$ has $c(a) = 4$ and a vocabulary of $V = 6$. The only bigram seen with this context is $(a, b)$ with $c(a, b) = 4$. Compute $\hat{p}_{\text{add-1}}(b \mid a)$ and $\hat{p}_{\text{add-1}}(b' \mid a)$ for any unseen $b'$, and check that the row sums to 1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the add-one formula $\hat{p}_{\text{add-1}}(b \mid a) = \frac{c(a,b) + 1}{c(a) + V}$ to the seen pair:
+
+$$
+\hat{p}_{\text{add-1}}(b \mid a) = \frac{4 + 1}{4 + 6} = \frac{5}{10} = 0.5.
+$$
+
+**Step 2.** For any of the $V - 1 = 5$ unseen next-tokens $b'$, $c(a, b') = 0$:
+
+$$
+\hat{p}_{\text{add-1}}(b' \mid a) = \frac{0 + 1}{4 + 6} = \frac{1}{10} = 0.1.
+$$
+
+**Step 3.** Sum over the whole vocabulary: one seen token at $0.5$ plus five unseen at $0.1$:
+
+$$
+0.5 + 5 \cdot 0.1 = 0.5 + 0.5 = 1.
+$$
+
+The row normalizes. Note the distortion: the MLE gave $b$ probability $4/4 = 1$, but add-one shrinks it to $0.5$ to fund the unseen mass, even though $b$ was the only thing ever observed here.
+
+</details>
+
+**Exercise 2.** Kneser-Ney replaces the unigram back-off with the continuation probability $p_{\text{KN}}(b) \propto |\{a : c(a, b) > 0\}|$. Take a corpus where "York" appears 100 times but always after "New", and "city" appears 40 times after 12 distinct words. Which word has the larger continuation probability, and why is that the behavior KN wants?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Continuation probability counts *distinct preceding contexts*, not raw frequency. "York" appears in exactly one context ("New"), so its continuation count is $|\{a : c(a, \text{York}) > 0\}| = 1$.
+
+**Step 2.** "city" appears after 12 distinct words, so its continuation count is $12$.
+
+**Step 3.** The unnormalized continuation scores are $1$ for "York" and $12$ for "city", so "city" has the larger continuation probability despite "York" having higher raw frequency ($100$ versus $40$).
+
+**Step 4.** This is the behavior KN wants. When the model backs off because a context was never seen, the question is "how plausible is this word as a generic continuation?" "York" is frequent only because of one fixed collocation; outside "New", seeing "York" is unlikely. "city" genuinely follows many words, so it is a safer back-off bet. Penalizing words trapped in a single collocation is the central KN idea.
+
+</details>
+
+**Exercise 3 (code).** On the toy corpus, build add-one and MLE bigram models. Verify that the MLE assigns probability 0 to the unseen bigram ("I", "like") while add-one assigns it a positive probability, and that the add-one row for context "I" still sums to 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from collections import Counter
+
+corpus = [
+    ["<bos>", "I", "am", "Sam", "<eos>"],
+    ["<bos>", "Sam", "I", "am", "<eos>"],
+    ["<bos>", "I", "do", "not", "like", "green", "eggs", "<eos>"],
+]
+unigrams = Counter(w for sent in corpus for w in sent)
+bigrams = Counter((a, b) for sent in corpus for a, b in zip(sent, sent[1:]))
+V = len(unigrams)
+vocab = list(unigrams)
+
+def p_mle(a, b):
+    return bigrams[(a, b)] / unigrams[a] if unigrams[a] else 0.0
+
+def p_add1(a, b):
+    return (bigrams[(a, b)] + 1) / (unigrams[a] + V)
+
+# "I like" never occurs in training
+assert p_mle("I", "like") == 0.0
+assert p_add1("I", "like") > 0.0
+
+# Add-one row for context "I" sums to 1 over the full vocabulary
+row_sum = sum(p_add1("I", w) for w in vocab)
+assert np.isclose(row_sum, 1.0)
+print("p_mle(I->like) =", p_mle("I", "like"),
+      " p_add1(I->like) =", round(p_add1("I", "like"), 4),
+      " row sum =", round(row_sum, 4))
+```
+
+The MLE gives the unseen bigram exactly 0; add-one lifts it to $1 / (c(\text{I}) + V)$ and the smoothed row still normalizes over the whole vocabulary.
+
+</details>
 
 The next lesson introduces BPE subword tokenization, which is a prerequisite for any neural LM.
 

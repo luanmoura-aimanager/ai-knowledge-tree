@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: sparse-autoencoders
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Decompose residual stream activations into a sparse linear combination of monosemantic dictionary features using an L1-penalized autoencoder; evaluate with feature ablation."
 prerequisites: ["superposition"]
 ---
@@ -170,6 +170,166 @@ Anthropic trained SAEs on Claude 3 Sonnet's residual stream (Templeton et al., 2
 This is the closest the field has come to a full dictionary of neural network concepts.
 The remaining challenge: coverage is incomplete (many activations are not explained by
 identified features), and higher-order interactions between features remain opaque.
+
+## Exercises
+
+**Exercise 1.** An SAE has dictionary size $m = 32{,}768$ and on a given token its code
+$\mathbf{c}$ has exactly $20$ nonzero entries. The activation dimension is $d = 768$.
+Compute the **L0 sparsity** (number of active features) and the corresponding fraction
+of the dictionary that is active. Then explain why the L1 penalty $\lambda\|\mathbf{c}\|_1$,
+rather than a direct L0 count, is what the training loss uses.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The L0 sparsity is just the count of nonzero entries, so L0 $= 20$. The
+active fraction is
+
+$$
+\frac{20}{32{,}768} \approx 6.1 \times 10^{-4},
+$$
+
+roughly $0.06\%$ of the dictionary firing per token. This is the sense in which the
+code is sparse: almost every feature is off.
+
+**Step 2.** L0 counts nonzeros, which is a step function of each coordinate: its gradient
+with respect to $\mathbf{c}$ is zero almost everywhere and undefined at the kink. There is
+no useful descent direction, so gradient training cannot push the code toward sparsity
+through L0 directly.
+
+**Step 3.** The L1 norm $\|\mathbf{c}\|_1 = \sum_i |c_i|$ is the tightest convex surrogate
+for L0. It has a constant subgradient $\operatorname{sign}(c_i)$ that pulls every active
+coordinate toward zero, and combined with the ReLU it produces exact zeros once the
+benefit of a feature falls below $\lambda$. L1 is differentiable enough to train while
+still inducing the sparsity L0 only describes.
+
+</details>
+
+**Exercise 2.** A decoder column $W_{\text{dec}}[:, i]$ is constrained to unit norm. Show
+that without this constraint, the L1 penalty can be driven arbitrarily small without
+changing the reconstruction, making the sparsity term meaningless. (Hint: consider scaling
+column $i$ by a constant $s$ and the code entry $c_i$ by $1/s$.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Pick a feature $i$ and replace its decoder column and code entry by
+
+$$
+W_{\text{dec}}[:, i] \mapsto s\, W_{\text{dec}}[:, i], \qquad c_i \mapsto c_i / s,
+$$
+
+for any scalar $s > 0$. The contribution of feature $i$ to the reconstruction is
+$c_i\, W_{\text{dec}}[:, i]$, and under the rescaling it becomes
+$(c_i/s)(s\, W_{\text{dec}}[:, i]) = c_i\, W_{\text{dec}}[:, i]$, unchanged. So
+$\hat{\mathbf{x}}$ and the reconstruction loss are invariant.
+
+**Step 2.** The L1 penalty on that entry is $\lambda |c_i|$, which under the rescaling
+becomes $\lambda |c_i| / s$. Letting $s \to \infty$ sends this term to zero while
+reconstruction stays fixed.
+
+**Step 3.** So the model could push the entire L1 penalty toward zero by inflating
+decoder columns and shrinking codes, with no change to fit. The sparsity objective would
+no longer constrain anything. Fixing $\|W_{\text{dec}}[:, i]\|_2 = 1$ removes this gauge
+freedom: the size of $c_i$ now genuinely measures how strongly feature $i$ fires, and the
+penalty bites.
+
+</details>
+
+**Exercise 3 (code).** Generate synthetic activations that are a sparse non-negative
+combination of a known overcomplete dictionary, then train the `SparseAutoencoder` from
+this lesson on them. Verify that after training the reconstruction error is small and the
+learned codes are sparser (fewer active features per token) than at initialization.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# Reuse the lesson's SAE.
+class SparseAutoencoder:
+    def __init__(self, d, m, lam=0.01, seed=0):
+        rng = np.random.default_rng(seed)
+        self.lam = lam
+        self.W_enc = rng.normal(0, 0.02, (m, d))
+        self.b_enc = np.zeros(m)
+        self.W_dec = rng.normal(0, 0.02, (d, m))
+        self.b_dec = np.zeros(d)
+        self._normalize_dec()
+
+    def _normalize_dec(self):
+        norms = np.linalg.norm(self.W_dec, axis=0, keepdims=True) + 1e-9
+        self.W_dec /= norms
+
+    def encode(self, x):
+        return np.maximum(0, (x - self.b_dec) @ self.W_enc.T + self.b_enc)
+
+    def decode(self, c):
+        return c @ self.W_dec.T + self.b_dec
+
+    def step(self, x, lr=1e-3):
+        B = x.shape[0]
+        c = self.encode(x)
+        x_hat = self.decode(c)
+        d_recon = 2 * (x_hat - x) / B
+        dW_dec = d_recon.T @ c
+        db_dec = d_recon.mean(axis=0)
+        dc = d_recon @ self.W_dec
+        gate = (c > 0).astype(float)
+        dc_total = dc * gate + self.lam * np.sign(c) * gate
+        dW_enc = dc_total.T @ (x - self.b_dec) / B
+        db_enc = dc_total.mean(axis=0)
+        self.W_enc -= lr * dW_enc
+        self.b_enc -= lr * db_enc
+        self.W_dec -= lr * dW_dec
+        self.b_dec -= lr * db_dec
+        self._normalize_dec()
+
+rng = np.random.default_rng(2)
+d, m_true = 16, 40
+D_true = rng.normal(0, 1, (d, m_true))           # ground-truth overcomplete dictionary
+D_true /= np.linalg.norm(D_true, axis=0, keepdims=True)
+
+def sample_activations(B):
+    # Each sample fires ~4 of 40 latent features, non-negative.
+    codes = np.zeros((B, m_true))
+    for b in range(B):
+        on = rng.choice(m_true, size=4, replace=False)
+        codes[b, on] = rng.uniform(0.5, 2.0, size=4)
+    return codes @ D_true.T
+
+sae = SparseAutoencoder(d, m=64, lam=0.02, seed=0)
+
+x0 = sample_activations(1000)
+init_active = (sae.encode(x0) > 0).sum(axis=1).mean()
+init_err = np.mean((x0 - sae.decode(sae.encode(x0))) ** 2)
+
+for _ in range(4000):
+    sae.step(sample_activations(256), lr=1e-3)
+
+xt = sample_activations(1000)
+final_active = (sae.encode(xt) > 0).sum(axis=1).mean()
+final_err = np.mean((xt - sae.decode(sae.encode(xt))) ** 2)
+
+print(f"reconstruction MSE: init {init_err:.4f} -> final {final_err:.4f}")
+print(f"active features/token: init {init_active:.1f} -> final {final_active:.1f}")
+
+# Training lowers reconstruction error and concentrates activity into fewer features.
+assert final_err < init_err
+assert final_active < init_active
+assert final_err < 0.5
+```
+
+Training drives the reconstruction error down while shrinking the number of features
+active per token, the two halves of the SAE objective working together: the dictionary
+learns to reconstruct the planted sparse structure, and the L1 penalty keeps the codes
+concentrated on a handful of features.
+
+</details>
+
+The next lesson puts these features to work for control: steering the model by adding a
+feature's direction back into the residual stream at inference time.
 
 <Footnotes>
   <FNItem n="1">**Bricken, T., et al.** (2023). "Towards monosemanticity: decomposing language models with dictionary learning". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2023/monosemantic-features/index.html). The SAE dictionary-learning recipe.</FNItem>

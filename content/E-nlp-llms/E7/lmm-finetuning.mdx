@@ -4,7 +4,7 @@ pillar: E
 subId: E7
 lessonId: lmm-finetuning
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Survey instruction fine-tuning for LMMs: visual instruction tuning datasets, the two-stage freeze-then-unfreeze schedule, and GPT-4V's proprietary pipeline."
 prerequisites: ["vlm-architecture", "E4/sft"]
 codeExempt: true
@@ -130,6 +130,85 @@ Long-video understanding requires additional temporal modeling.
 
 **Grounded generation:** output bounding box coordinates and segmentation masks, not
 just text. Requires training on detection and segmentation datasets.
+
+## Exercises
+
+**Exercise 1.** In the two-stage schedule, stage 1 freezes both the image encoder and the
+LLM and trains only the projection, while stage 2 unfreezes the LLM but keeps the image
+encoder frozen. Explain why the image encoder stays frozen in both stages, and what would
+go wrong if it were unfrozen in stage 1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The image encoder is a pretrained CLIP model whose features are already well
+aligned with language from contrastive pretraining on 400M pairs. That alignment is the
+asset the VLM is built on; there is nothing to gain by re-learning it.
+
+**Step 2.** In stage 1 only the projection is trained, on a relatively small set of
+image-caption pairs. If the image encoder were also unfrozen, the gradient from this small,
+noisy alignment objective would flow into its millions of parameters and pull them away from
+the broad CLIP representation, a form of catastrophic forgetting.
+
+**Step 3.** The result would be an encoder overfit to the caption data and weaker on the
+diverse downstream tasks (OCR, charts, spatial reasoning) the VLM must handle. Freezing it
+preserves the general-purpose visual features and lets the small projection do the cheap job
+of translating them into the LLM's token space.
+
+</details>
+
+**Exercise 2.** ShareGPT4V found that a smaller amount of GPT-4V-generated (vision-grounded)
+instruction data outperformed a larger amount of GPT-4-text-generated data, where text-only
+GPT-4 never saw the image and worked from captions plus bounding boxes. Give two distinct
+mechanisms by which the text-only pipeline injects errors that vision-grounded annotation
+avoids, and name one task category where this gap would be largest.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Mechanism one is hallucinated detail: text-only GPT-4 fills gaps the captions
+leave with plausible-but-wrong content (a color, a count, an object never actually present),
+because it is generating from a lossy textual proxy rather than the pixels.
+
+**Step 2.** Mechanism two is missing or mislocated detail: anything the caption and bounding
+boxes did not record (small text, fine textures, exact spatial layout) is invisible to the
+text-only model, so its answers cannot reference it and its spatial claims drift. Vision-
+grounded GPT-4V reads these directly off the image.
+
+**Step 3.** The gap is largest on tasks that hinge on fine-grained pixel evidence: OCR /
+TextVQA and chart or document understanding, where the answer is literally the small text or
+plotted values that never survive into a caption.
+
+</details>
+
+**Exercise 3.** A team fine-tunes a 7B-parameter VLM for stage 2. Option A is full
+fine-tuning of the LLM; option B applies LoRA to the LLM's attention matrices with the base
+weights frozen. The lesson notes LoRA "converges faster but may plateau below full
+fine-tuning quality on complex reasoning." Recommend an option for (a) a startup adapting the
+model to a narrow document-QA domain on a single GPU, and (b) a lab pushing state of the art
+on MMMU, and justify each from the stated trade-off.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Restate the trade-off: LoRA trains a small number of low-rank adapter parameters,
+so it is far cheaper in memory and converges quickly, but its limited capacity can cap
+quality on hard, broad reasoning. Full fine-tuning updates all LLM weights, costing much more
+memory and time but reaching the higher ceiling.
+
+**Step 2.** Case (a), narrow document-QA on one GPU, favors LoRA. The domain is narrow, so
+the capacity ceiling is unlikely to bind, and the single-GPU budget makes full fine-tuning's
+memory cost the binding constraint. Fast convergence and low memory match the situation.
+
+**Step 3.** Case (b), pushing MMMU, favors full fine-tuning. MMMU is the hardest benchmark,
+requiring college-level multi-discipline reasoning, exactly where LoRA is said to plateau. A
+lab chasing state of the art has the compute budget and should pay for the higher quality
+ceiling rather than accept LoRA's cap.
+
+</details>
+
+These data and schedule choices set up the generation side of multimodality: the next
+lessons turn the conditioning around and synthesize images and video from text.
 
 <Footnotes>
   <FNItem n="1">**Liu, H., Li, C., Wu, Q., & Lee, Y. J.** (2023). "Visual instruction tuning (LLaVA)". *NeurIPS*. [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)</FNItem>

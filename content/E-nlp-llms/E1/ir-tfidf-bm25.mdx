@@ -4,7 +4,7 @@ pillar: E
 subId: E1
 lessonId: ir-tfidf-bm25
 order: 7
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Derive TF-IDF from information-theoretic first principles, then improve it with BM25's saturation and length normalization; implement a tiny inverted index."
 prerequisites: []
 ---
@@ -153,6 +153,111 @@ for doc_id, score in ranked:
 ```
 
 ![BM25 saturates term frequency: the first occurrence of a query term counts a lot, each extra one less and less, unlike raw TF, which grows without bound. The k1 knob sets the saturation rate.](/figures/E1/ir-tfidf-bm25.svg)
+
+## Exercises
+
+**Exercise 1.** A corpus has $N = 1000$ documents. Term "neural" appears in $\text{df} = 10$ of them; term "the" appears in all $1000$. Using the lesson's IDF definition $\text{IDF}(t) = \log\frac{N}{1 + \text{df}(t)}$ (natural log), compute both IDF weights and the ratio between them.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For "neural":
+
+$$
+\text{IDF}(\text{neural}) = \log \frac{1000}{1 + 10} = \log \frac{1000}{11} = \log(90.9) \approx 4.51.
+$$
+
+**Step 2.** For "the":
+
+$$
+\text{IDF}(\text{the}) = \log \frac{1000}{1 + 1000} = \log \frac{1000}{1001} = \log(0.999) \approx -0.001 \approx 0.
+$$
+
+**Step 3.** The rare term carries weight $\approx 4.51$; the stopword is driven to essentially $0$. The ratio is roughly $4.51 / 0.001$, effectively unbounded: IDF all but deletes the stopword's contribution while keeping the discriminative term, which is the whole point of the weighting.
+
+</details>
+
+**Exercise 2.** BM25's TF factor is $\frac{\text{tf}(k_1 + 1)}{\text{tf} + k_1(1 - b + b \cdot |d|/\text{avgdl})}$. For a document of average length ($|d| = \text{avgdl}$) with $k_1 = 1.5$, $b = 0.75$, compute the TF factor at $\text{tf} = 1$ and at $\text{tf} = 10$, and the saturation ceiling as $\text{tf} \to \infty$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $|d| = \text{avgdl}$, the length term is $1 - b + b \cdot 1 = 1$, so the denominator simplifies to $\text{tf} + k_1 = \text{tf} + 1.5$ and the numerator to $\text{tf} \cdot 2.5$.
+
+**Step 2.** At $\text{tf} = 1$:
+
+$$
+\frac{1 \cdot 2.5}{1 + 1.5} = \frac{2.5}{2.5} = 1.0.
+$$
+
+**Step 3.** At $\text{tf} = 10$:
+
+$$
+\frac{10 \cdot 2.5}{10 + 1.5} = \frac{25}{11.5} \approx 2.17.
+$$
+
+**Step 4.** As $\text{tf} \to \infty$, the ratio $\frac{\text{tf} \cdot 2.5}{\text{tf} + 1.5} \to 2.5 = k_1 + 1$. So going from 1 to 10 occurrences raised the factor only from $1.0$ to about $2.17$, and it can never exceed $2.5$: ten times the count buys roughly twice the score, not ten times, which is the saturation BM25 was built to impose.
+
+</details>
+
+**Exercise 3 (code).** Build a small inverted index over four documents and rank them for the query "quick fox" with BM25. Confirm that the documents containing both query terms outrank those containing only one, and that any document containing neither term scores exactly 0.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from collections import defaultdict, Counter
+import math
+
+docs = {
+    "d1": "the quick brown fox jumps over the lazy dog",
+    "d2": "the fox is quick and agile",
+    "d3": "lazy animals sleep all day and night",   # neither query term
+    "d4": "the dog chased the quick brown fox",
+}
+
+def tokenize(text):
+    return text.lower().split()
+
+index = defaultdict(list)
+doc_lengths = {}
+for doc_id, text in docs.items():
+    tokens = tokenize(text)
+    doc_lengths[doc_id] = len(tokens)
+    for term, count in Counter(tokens).items():
+        index[term].append((doc_id, count))
+
+N = len(docs)
+avgdl = np.mean(list(doc_lengths.values()))
+k1, b = 1.5, 0.75
+
+def idf(term):
+    df = len(index.get(term, []))
+    return math.log((N - df + 0.5) / (df + 0.5) + 1)
+
+def bm25_score(query, doc_id):
+    score = 0.0
+    for term in tokenize(query):
+        postings = {d: tf for d, tf in index.get(term, [])}
+        tf = postings.get(doc_id, 0)
+        L = doc_lengths[doc_id]
+        score += idf(term) * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * L / avgdl))
+    return score
+
+scores = {d: bm25_score("quick fox", d) for d in docs}
+
+# d3 has neither "quick" nor "fox": exact zero
+assert scores["d3"] == 0.0
+# d1, d2, d4 all contain both terms; each beats d3
+for d in ["d1", "d2", "d4"]:
+    assert scores[d] > scores["d3"]
+print({d: round(s, 3) for d, s in sorted(scores.items(), key=lambda x: -x[1])})
+```
+
+The document with neither term scores exactly 0 because every query term has $\text{tf} = 0$, zeroing its BM25 contribution; documents matching both terms accumulate two positive contributions and rank on top.
+
+</details>
 
 ## Sparse retrieval in the LLM era
 

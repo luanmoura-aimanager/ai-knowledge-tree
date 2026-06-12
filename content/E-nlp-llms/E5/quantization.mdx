@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: quantization
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Reduce weight precision from fp16 to int8 or int4 using post-training quantization; compare the one-shot Hessian-based GPTQ, the activation-aware AWQ, and the portable GGUF format."
 prerequisites: ["kv-cache"]
 codeExempt: true
@@ -129,6 +129,84 @@ limited hardware. The right choice depends on the tradeoff:
 - **Quantization:** best accuracy at low memory cost; no fine-tuning required.
 - **LoRA + quantization (QLoRA):** enables fine-tuning a large model on consumer hardware.
 - **Smaller model:** lower accuracy ceiling; better latency on the same hardware.
+
+## Exercises
+
+**Exercise 1.** A weight column has values in the range $[x_{\min}, x_{\max}] =
+[-0.4, 0.6]$. Using uniform quantization, compute the step size $\Delta$ at 4-bit
+and at 8-bit precision, and the worst-case quantization error $\Delta/2$ for each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The range spans $x_{\max} - x_{\min} = 0.6 - (-0.4) = 1.0$. The step is
+$\Delta = (x_{\max} - x_{\min}) / (2^b - 1)$.
+
+**Step 2.** At $b = 4$, there are $2^4 - 1 = 15$ intervals:
+
+$$
+\Delta_4 = \frac{1.0}{15} = 0.0667, \qquad \Delta_4/2 = 0.0333.
+$$
+
+**Step 3.** At $b = 8$, there are $2^8 - 1 = 255$ intervals:
+
+$$
+\Delta_8 = \frac{1.0}{255} = 0.00392, \qquad \Delta_8/2 = 0.00196.
+$$
+
+Each extra bit halves the step size, so going from 4-bit to 8-bit shrinks the
+worst-case error by a factor $255/15 = 17$, close to the $2^4 = 16$ expected from
+the four added bits (the small excess is the $2^b - 1$ versus $2^b$ correction).
+
+</details>
+
+**Exercise 2.** Estimate the on-disk size of a 13B-parameter model at fp16, int8,
+and int4, ignoring per-channel scale overhead. Then explain why a real Q4_K_M GGUF
+file of the same model is closer to $\approx 7.5$ GB than to the $6.5$ GB a pure
+4-bit count predicts.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bytes per weight are bits over 8: fp16 is $2$ bytes, int8 is $1$ byte,
+int4 is $0.5$ bytes. Multiply by $13 \times 10^9$ parameters:
+
+$$
+\text{fp16} = 26 \text{ GB}, \quad \text{int8} = 13 \text{ GB}, \quad \text{int4} = 6.5 \text{ GB}.
+$$
+
+**Step 2.** Q4_K_M is not uniformly 4-bit. Block quantization attaches a scale (and
+often a min) per block of 32 or 64 weights, which adds overhead, and the most
+sensitive tensors (embeddings, output projection, some attention layers) are kept at
+5 or 6 bits. The mixed precision and per-block metadata push the effective rate to
+roughly $4.5$ bits per weight, so $13 \times 10^9 \times 4.5 / 8 \approx 7.3$ GB,
+matching the observed $\approx 7.5$ GB rather than the flat $6.5$ GB.
+
+</details>
+
+**Exercise 3.** A team must serve a 70B model on a single 80 GB A100 with room for
+roughly 30 GB of KV cache at their target batch size, leaving about 50 GB for
+weights. They consider int8 GPTQ ($70$ GB), int4 AWQ ($35$ GB), and a 34B fp16 model
+($68$ GB). Which fit, and what is the central tradeoff between the two viable LLM
+options?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compare each weight footprint against the $50$ GB budget: int8 GPTQ at
+$70$ GB does not fit; the 34B fp16 model at $68$ GB does not fit; int4 AWQ at $35$ GB
+fits with $15$ GB to spare.
+
+**Step 2.** Only int4 AWQ of the 70B fits on this single GPU. The realistic
+alternatives are then int4-quantize the 70B (this option) or step down to a smaller
+model that fits at higher precision. The tradeoff is capability versus precision: the
+quantized 70B keeps the larger model's knowledge and reasoning ceiling at the cost of
+a 1-3 perplexity-point degradation from 4-bit rounding, while a smaller fp16 model
+avoids quantization error but has a lower accuracy ceiling. For most tasks the
+quantized larger model wins, which is why int4 serving of large models is the common
+production choice.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Frantar, E., Ashkboos, S., Hoefler, T., & Alistarh, D.** (2023). "GPTQ: accurate post-training quantization for generative pre-trained transformers".

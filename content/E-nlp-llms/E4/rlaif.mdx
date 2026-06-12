@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: rlaif
 order: 8
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Replace human feedback with AI feedback: have a supervisor model critique and revise responses using a written constitution, then train the policy with RL."
 prerequisites: ["ppo-rlhf"]
 codeExempt: true
@@ -108,6 +108,89 @@ graph LR
 **Hybrid approach (LLM-as-judge):** modern systems use RLHF for initial alignment and
 RLAIF for continued self-improvement. Frameworks like Llama-2-chat use human feedback for
 safety-critical principles and LLM-generated feedback for general helpfulness.
+
+## Exercises
+
+**Exercise 1.** Trace the two stages of Constitutional AI for a single harmful prompt.
+Name the model role acting at each step, the input it consumes, and the output it produces,
+from the initial response through to the data used to train the reward model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** SL-CAI, generate. The base policy consumes the (possibly harmful) prompt and
+produces an initial response, deliberately including failure modes.
+
+**Step 2.** SL-CAI, critique. A supervisor model consumes the response plus a randomly
+sampled constitutional principle and produces a critique identifying how the response
+violates that principle.
+
+**Step 3.** SL-CAI, revise then fine-tune. The supervisor consumes the response and its
+critique and produces a revised response; the target model is then supervised-fine-tuned on
+(prompt, revised response) pairs.
+
+**Step 4.** RLAIF stage. The supervisor consumes pairs of responses plus a principle and
+produces a preference label (which is less harmful). These AI-labeled pairs are the
+training data for a Bradley-Terry reward model, which then drives PPO or DPO. No human
+preference annotation enters after the constitution is written.
+
+</details>
+
+**Exercise 2.** The RLHF-vs-RLAIF table lists RLAIF as high consistency, low cost, and
+fast, but its quality "depends on supervisor quality" and it inherits "supervisor model
+biases." Design a hybrid pipeline that keeps RLAIF's scale while bounding its worst failure
+mode, and justify which signal you route to humans versus the AI supervisor.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify the worst failure mode. A biased or miscalibrated AI supervisor can
+systematically mislabel a whole category (e.g. safety-critical refusals) at scale, and
+because RLAIF is consistent it will reproduce that bias uniformly rather than averaging it
+out across annotators.
+
+**Step 2.** Route by stakes. Send safety-critical and value-laden judgments (harm,
+legality, deception) to human annotators, where the cost is justified and the human-authored
+constitution anchors the values. Send high-volume, lower-stakes judgments (general
+helpfulness, style, formatting) to the AI supervisor, where throughput matters and errors
+are cheap.
+
+**Step 3.** Justify the split. This is the Llama-2-chat pattern: humans set the value
+anchor and cover the cases where a supervisor bias would be most damaging, while RLAIF
+supplies the volume of feedback that human annotation cannot match. The constitution gives
+both signals a shared, fixed reference so the AI supervisor stays aligned to human-authored
+principles even as it scales.
+
+</details>
+
+**Exercise 3.** Scalable oversight asks how supervision stays effective when the AI exceeds
+human ability to verify its reasoning. Explain why a fixed written constitution is the part
+of the CAI pipeline that addresses this, and identify one way the self-critique chain could
+still fail even with a good constitution.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** State the scalable-oversight problem. As the supervisor model surpasses humans,
+humans can no longer check individual judgments, so the supervision signal cannot come from
+per-example human verification.
+
+**Step 2.** Locate the human anchor. The constitution is human-authored and fixed: it
+encodes the values once, in natural language, and the (possibly superhuman) AI supervisor
+interprets and applies them. Humans verify the principles, not every judgment, so the
+anchor scales independently of how capable the supervisor becomes.
+
+**Step 3.** Name a residual failure. Even with a sound constitution, the self-critique
+chain relies on the same model recognizing its own faults. If the model is systematically
+blind to a class of harm (it does not represent the harm as a violation of any principle),
+its critiques will miss that class, and the revised data will encode the blind spot. The
+constitution bounds the values but not the model's ability to perceive when they are
+breached; this is the gap that empirical tests of weak-to-strong supervision probe.
+
+</details>
+
+The constitution fixes the values; the open question of how far a weaker supervisor can
+steer a stronger model is what the weak supervision lesson takes up next.
 
 <Footnotes>
   <FNItem n="1">**Bai, Y., et al.** (2022). "Constitutional AI: harmlessness from AI feedback".

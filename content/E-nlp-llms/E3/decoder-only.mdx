@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: decoder-only
 order: 5
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Trace a decoder-only language model from token ids to next-token logits through causal masking, and walk through GPT-2's parameter counts."
 prerequisites: ["positional-encodings"]
 ---
@@ -162,7 +162,87 @@ Untrained, the loss should be close to $\log V$ (uniform over the vocabulary).
 | LLaMA-3 70B | 8,192 | 80 | 128K | 70B | 15T |
 
 The architecture is nearly identical across the family; gains come from scale (parameters
-and tokens) and improved data quality. The next lesson introduces encoder-only transformers
+and tokens) and improved data quality.
+
+## Exercises
+
+**Exercise 1.** GPT-2 small ties its output projection to the token embedding
+$W_e \in \mathbb{R}^{V \times d}$. Using $V = 50257$ and $d = 768$, compute the
+parameter count of $W_e$, and state how many parameters the tie saves versus an
+untied output head of the same shape.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The embedding matrix has $V \times d = 50257 \times 768 = 38{,}597{,}376$
+parameters, about $38.6$M.
+
+**Step 2.** An untied output head would be a second matrix of the same
+$V \times d$ shape, another $38.6$M parameters. Weight tying reuses $W_e^\top$ for
+the unembed, so it saves the full $38.6$M, roughly a third of the model's $117$M
+total. This is why the embedding dominates the budget at small vocab.
+
+</details>
+
+**Exercise 2.** A decoder-only block applies pre-norm causal attention then a
+pre-norm FFN, both with residual connections. For width $d = 768$ and
+$d_{\text{ff}} = 3072$, count the parameters in one block's four attention
+projections ($Q, K, V, O$) and its two FFN matrices (ignore biases and
+LayerNorm). Which dominates?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each of $W^Q, W^K, W^V, W^O$ is $d \times d$, so the attention block
+holds $4 d^2 = 4 \cdot 768^2 = 2{,}359{,}296$ parameters, about $2.36$M.
+
+**Step 2.** The FFN has $W_1 \in \mathbb{R}^{d_{\text{ff}} \times d}$ and
+$W_2 \in \mathbb{R}^{d \times d_{\text{ff}}}$, so $2 d\, d_{\text{ff}} =
+2 \cdot 768 \cdot 3072 = 4{,}718{,}592$ parameters, about $4.72$M.
+
+**Step 3.** The FFN holds twice the attention count. At fixed $d$, the
+$d_{\text{ff}} = 4d$ expansion makes the FFN the dominant per-block cost.
+
+</details>
+
+**Exercise 3 (code).** Build the causal attention pattern for a length-$T$
+sequence and verify two structural facts: every attention row is a valid
+distribution (sums to one), and row $t$ places zero weight on any future
+position $j > t$, so position $t$ attends to exactly $t + 1$ positions.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+rng = np.random.default_rng(0)
+T, dk = 5, 4
+Q = rng.standard_normal((T, dk))
+K = rng.standard_normal((T, dk))
+
+scores = Q @ K.T / np.sqrt(dk)
+mask = np.triu(np.ones((T, T)), k=1).astype(bool)   # strictly-future positions
+scores[mask] = -1e9
+A = softmax(scores)
+
+assert np.allclose(A.sum(axis=1), 1.0)              # each row is a distribution
+assert np.allclose(A[mask], 0.0, atol=1e-6)         # no leakage to the future
+nonzero_per_row = (A > 1e-6).sum(axis=1)
+assert np.array_equal(nonzero_per_row, np.arange(1, T + 1))
+print("attended positions per row:", nonzero_per_row)
+```
+
+Row $t$ has exactly $t + 1$ nonzero weights, the causal cone that makes
+next-token prediction a valid objective.
+
+</details>
+
+The next lesson introduces encoder-only transformers
 (BERT) which use bidirectional attention for understanding tasks rather than generation.
 
 <Footnotes>

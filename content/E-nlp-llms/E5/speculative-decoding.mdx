@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: speculative-decoding
 order: 3
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Draft k tokens with a small model, verify them in a single parallel forward pass of the target model, and prove the acceptance-rejection scheme preserves the target distribution."
 prerequisites: ["kv-cache"]
 ---
@@ -161,6 +161,94 @@ simultaneously. Lower hardware cost than a separate draft model.
 
 **EAGLE:** predicts draft tokens by conditioning on the target model's hidden states at
 the last accepted position, achieving higher acceptance rates than independent draft models.
+
+## Exercises
+
+**Exercise 1.** For a single token the draft and target distributions over three
+outcomes are $p = (0.5, 0.3, 0.2)$ and $q = (0.6, 0.1, 0.3)$. Compute the
+per-token acceptance probability $\alpha = \sum_x \min(p(x), q(x))$, and confirm the
+adjusted distribution $p_{\text{adj}}(x) \propto \max(0, q(x) - p(x))$ is a valid
+distribution.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the elementwise minimum of $p$ and $q$: $\min(0.5, 0.6) = 0.5$,
+$\min(0.3, 0.1) = 0.1$, $\min(0.2, 0.3) = 0.2$. Their sum is
+
+$$
+\alpha = 0.5 + 0.1 + 0.2 = 0.8.
+$$
+
+**Step 2.** The unnormalized residual is $\max(0, q - p) = (0.1, 0, 0.1)$, summing
+to $Z = 0.2$. Note $Z = 1 - \alpha = 0.2$, as it must, since the accepted mass and
+the residual mass partition the target. Normalizing gives $p_{\text{adj}} =
+(0.5, 0, 0.5)$, which is nonnegative and sums to $1$, a valid distribution.
+
+</details>
+
+**Exercise 2.** A draft model proposes $k = 4$ tokens, the draft is $8\times$ faster
+than the target, and the per-token acceptance rate is $\alpha = 0.8$. Using the
+speedup expression $\frac{1 + k\alpha}{1 + k/s}$ with $s$ the draft speed ratio,
+compute the speedup, then explain why pushing $k$ to $20$ at the same $\alpha$ does
+not multiply the gain by five.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute $k = 4$, $\alpha = 0.8$, $s = 8$:
+
+$$
+\frac{1 + 4 \cdot 0.8}{1 + 4/8} = \frac{1 + 3.2}{1 + 0.5} = \frac{4.2}{1.5} = 2.8.
+$$
+
+**Step 2.** At $k = 20$ the same formula gives $\frac{1 + 20 \cdot 0.8}{1 + 20/8}
+= \frac{17}{3.5} = 4.86$, not $14$. The numerator grows linearly in $k$, but so does
+the denominator (each drafted token still costs draft time), and the expected number
+of accepted tokens is bounded by the geometric truncation at the first rejection:
+once a draft is rejected the remaining drafts are discarded, so the realized
+acceptance run averages $\frac{1 - \alpha^{k+1}}{1 - \alpha}$, which saturates near
+$\frac{1}{1-\alpha} = 5$ tokens regardless of how large $k$ gets. Beyond that, longer
+drafts mostly add wasted draft work.
+
+</details>
+
+**Exercise 3 (code).** Verify the losslessness claim empirically. With $p$ and $q$
+from Exercise 1, run the single-token accept-reject scheme many times in numpy and
+check the empirical output distribution matches $q$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+p = np.array([0.5, 0.3, 0.2])
+q = np.array([0.6, 0.1, 0.3])
+Z = np.maximum(0, q - p).sum()
+p_adj = np.maximum(0, q - p) / Z
+
+N = 400_000
+counts = np.zeros(3)
+for _ in range(N):
+    x = rng.choice(3, p=p)                  # draft a token
+    if rng.random() <= q[x] / p[x]:         # accept with prob min(1, q/p)
+        counts[x] += 1
+    else:
+        counts[rng.choice(3, p=p_adj)] += 1 # else sample the residual
+emp = counts / N
+assert np.allclose(emp, q, atol=0.01)       # output distribution equals the target
+print("empirical:", emp.round(3), " target:", q)
+```
+
+The empirical frequencies land on $q$ within sampling noise: the accept-reject
+correction reproduces the target distribution exactly, independent of the draft $p$.
+
+</details>
+
+The next lesson cuts the other half of the inference bill, the weight memory itself,
+by quantizing the model below 16-bit precision.
 
 <Footnotes>
   <FNItem n="1">**Leviathan, Y., Kalman, M., & Matias, Y.** (2023). "Fast inference from transformers via speculative decoding".

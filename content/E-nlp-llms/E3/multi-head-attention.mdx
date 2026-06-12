@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: multi-head-attention
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Project queries, keys, and values into h parallel subspaces, run h attention heads, and concatenate; show that heads learn complementary patterns."
 prerequisites: ["self-attention"]
 ---
@@ -129,6 +129,101 @@ print(np.round(attn[0, :3, :3], 3))
 In practice, the $h$ projections are fused into a single matrix multiply producing
 $(B, T, 3 d_{\text{model}})$ and then split into Q, K, V -- a factor-of-3 memory
 reduction and better GPU utilization vs. $3h$ separate matrix multiplies.
+
+## Exercises
+
+**Exercise 1.** Take $d_{\text{model}} = 512$ and $h = 8$. Find the per-head dimension
+$d_k$, the parameter count of the four projection matrices, and confirm it matches a single
+full-rank attention with $d_k = d_{\text{model}}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The head dimension splits the model dimension: $d_k = d_{\text{model}}/h = 512/8 = 64$.
+
+**Step 2.** The query, key, and value projections together hold $3 h d_{\text{model}} d_k$
+parameters. Substituting $d_k = d_{\text{model}}/h$ cancels the $h$:
+
+$$
+3 h \, d_{\text{model}} \cdot \frac{d_{\text{model}}}{h} = 3 d_{\text{model}}^2 = 3 \cdot 512^2 = 786{,}432.
+$$
+
+**Step 3.** Add the output projection $W^O$, which is $d_{\text{model}}^2 = 262{,}144$:
+
+$$
+3 d_{\text{model}}^2 + d_{\text{model}}^2 = 4 d_{\text{model}}^2 = 1{,}048{,}576.
+$$
+
+A single head of full width $d_k = d_{\text{model}}$ would use $3 d_{\text{model}}^2$ for QKV
+plus $d_{\text{model}}^2$ for the output map, the same $4 d_{\text{model}}^2$. Splitting into
+heads redistributes the same budget across subspaces, it does not spend more.
+
+</details>
+
+**Exercise 2.** The `split_heads` operation reshapes $(T, d_{\text{model}})$ to
+$(h, T, d_k)$ and the final concat reverses it. Explain why reshape-then-transpose is the
+correct order, and why simply reshaping to $(h, T, d_k)$ without a transpose would be wrong.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Row $t$ of the input is one token's vector of length $d_{\text{model}}$. The
+head split must keep that token's coordinates together: coordinates $[0, d_k)$ belong to
+head 0, $[d_k, 2 d_k)$ to head 1, and so on. Reshaping $(T, d_{\text{model}})$ to
+$(T, h, d_k)$ does exactly this, since the last axis is the fastest-varying in row-major
+memory.
+
+**Step 2.** Attention runs per head, so head must become the leading (batch-like) axis.
+Transposing $(T, h, d_k)$ to $(h, T, d_k)$ moves head to the front without disturbing which
+coordinates sit in each head.
+
+**Step 3.** Reshaping straight to $(h, T, d_k)$ skips the intermediate $(T, h, d_k)$ layout.
+In row-major order that reinterprets the first $T d_k$ contiguous values as head 0, which
+mixes coordinates from every token into one head and scrambles the token boundaries. The
+attention scores would then be computed over a meaningless grouping. Reshape to
+$(T, h, d_k)$ first, then transpose.
+
+</details>
+
+**Exercise 3 (code).** Verify the split/concat roundtrip is exact, and that two heads of a
+randomly initialized layer produce different attention patterns (so the heads are not
+redundant copies).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+rng = np.random.default_rng(0)
+T, d_model, h = 6, 16, 4
+dk = d_model // h
+
+x = rng.normal(size=(T, d_model))
+split = x.reshape(T, h, dk).transpose(1, 0, 2)   # (h, T, dk)
+concat = split.transpose(1, 0, 2).reshape(T, d_model)
+assert np.allclose(concat, x)                    # roundtrip is lossless
+
+Wq = rng.normal(0, 0.5, (d_model, d_model))
+Wk = rng.normal(0, 0.5, (d_model, d_model))
+Q = (x @ Wq).reshape(T, h, dk).transpose(1, 0, 2)
+K = (x @ Wk).reshape(T, h, dk).transpose(1, 0, 2)
+attn = softmax(Q @ K.transpose(0, 2, 1) / np.sqrt(dk))   # (h, T, T)
+
+assert not np.allclose(attn[0], attn[1])         # head 0 and head 1 differ
+print("roundtrip exact; heads attend differently, max diff",
+      round(np.abs(attn[0] - attn[1]).max(), 3))
+```
+
+The reshape-transpose pair is its own inverse, and because each head reads a different
+slice of the projected space its attention matrix differs, confirming heads carry
+independent patterns rather than copies.
+
+</details>
 
 The next lesson assembles multi-head attention, a position-wise feed-forward network,
 residual connections, and layer normalization into the full **transformer block**.

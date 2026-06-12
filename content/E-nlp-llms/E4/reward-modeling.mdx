@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: reward-modeling
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Collect human preference pairs, train a Bradley-Terry reward model, and understand how the reward score will guide policy optimization."
 prerequisites: ["sft"]
 ---
@@ -143,6 +143,94 @@ The trained reward model $r_\phi(x, y)$ is frozen and used to score policy rollo
 2. Generate a response $y \sim \pi_\theta(y \mid x)$.
 3. Score the response: $r = r_\phi(x, y)$.
 4. Update $\pi_\theta$ to increase $r$ while staying close to the SFT model.
+
+## Exercises
+
+**Exercise 1.** A reward model scores a preferred response at $r(x, y_w) = 2.3$ and a
+dispreferred one at $r(x, y_l) = 0.8$. Compute the Bradley-Terry preference probability
+$p(y_w \succ y_l)$ and the per-pair loss $-\log \sigma(\Delta)$ in nats. Then state what
+happens to both if a constant $c$ is added to every reward.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The reward gap is $\Delta = r(x, y_w) - r(x, y_l) = 2.3 - 0.8 = 1.5$.
+
+**Step 2.** The preference probability is $\sigma(1.5) = 1/(1 + e^{-1.5})$. With
+$e^{-1.5} \approx 0.22313$, $\sigma(1.5) \approx 1/1.22313 \approx 0.8176$.
+
+**Step 3.** The loss is $-\log \sigma(1.5) = -\log 0.8176 \approx 0.2014$ nats.
+
+**Step 4.** Adding a constant $c$ to every reward leaves the gap unchanged:
+$(r_w + c) - (r_l + c) = \Delta = 1.5$. The BT model sees only the difference, so the
+probability and loss are both invariant to the shift. Absolute reward scale is arbitrary.
+
+</details>
+
+**Exercise 2.** Derive the gradient of the Bradley-Terry loss with respect to the reward
+gap $\Delta = r_w - r_l$, and use it to explain why a pair already ordered with
+$\Delta = 5$ produces almost no learning signal.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The per-pair loss is $\ell = -\log \sigma(\Delta)$. Using
+$\frac{d}{dz}\log\sigma(z) = 1 - \sigma(z)$:
+
+$$
+\frac{d\ell}{d\Delta} = -\big(1 - \sigma(\Delta)\big) = \sigma(\Delta) - 1.
+$$
+
+**Step 2.** At $\Delta = 0$, $\sigma(0) = 0.5$, so $d\ell/d\Delta = -0.5$: a large gradient
+pushing the gap to grow.
+
+**Step 3.** At $\Delta = 5$, $\sigma(5) \approx 0.9933$, so $d\ell/d\Delta \approx -0.0067$.
+The magnitude is roughly $75\times$ smaller. Once a pair is confidently ordered, the
+sigmoid saturates, $\sigma(\Delta) \to 1$, and the gradient $\sigma(\Delta) - 1 \to 0$, so
+the loss flattens and the optimizer spends its capacity on still-ambiguous pairs.
+
+</details>
+
+**Exercise 3 (code).** Implement the Bradley-Terry loss and its gradient in numpy and
+verify the gradient against a finite-difference estimate. Confirm the loss is invariant to
+a constant shift of both rewards.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
+
+def bt_loss(r_w, r_l):
+    return -np.log(sigmoid(r_w - r_l))
+
+def bt_grad_gap(r_w, r_l):
+    # d/dDelta of -log sigmoid(Delta) = sigmoid(Delta) - 1
+    return sigmoid(r_w - r_l) - 1.0
+
+r_w, r_l = 2.3, 0.8
+delta = r_w - r_l
+
+# Analytic gradient vs finite difference w.r.t. the gap.
+h = 1e-6
+fd = (bt_loss(r_w + h, r_l) - bt_loss(r_w - h, r_l)) / (2 * h)
+assert np.isclose(bt_grad_gap(r_w, r_l), fd, atol=1e-6)
+
+# Loss matches the hand computation and is shift-invariant.
+assert np.isclose(bt_loss(r_w, r_l), -np.log(sigmoid(1.5)))
+c = 4.7
+assert np.isclose(bt_loss(r_w + c, r_l + c), bt_loss(r_w, r_l))
+print("loss:", round(float(bt_loss(r_w, r_l)), 4),
+      "grad:", round(float(bt_grad_gap(r_w, r_l)), 4))
+```
+
+The analytic gradient $\sigma(\Delta) - 1$ matches finite differences, and shifting both
+rewards by $c$ leaves the loss unchanged, confirming the BT model depends only on the gap.
+
+</details>
 
 Step 4 is PPO (next lesson). The RM turns the non-differentiable human preference signal
 into a gradient signal the policy can be trained on.

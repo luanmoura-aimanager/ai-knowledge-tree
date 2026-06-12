@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: grpo
 order: 7
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Replace the value baseline in PPO with a group-relative reward; show how this simplifies the training loop and scales to DeepSeek-R1-style reasoning."
 prerequisites: ["ppo-rlhf"]
 ---
@@ -157,6 +157,86 @@ graph LR
 | Online (policy rollouts) | Yes | No | Yes |
 | Works with verifiable rewards | Yes | No | Yes |
 | Computational cost | Highest | Lowest | Medium |
+
+## Exercises
+
+**Exercise 1.** A group of $G = 4$ responses to one prompt earns verifiable rewards
+$r = (1, 0, 1, 0)$. Compute the group-mean baseline, the raw advantages $A_i = r_i - \bar r$,
+and the normalized advantages $\hat A_i = (A_i - \text{mean}(A)) / \text{std}(A)$ (population
+std). State which responses get a positive gradient.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The group mean is $\bar r = (1 + 0 + 1 + 0)/4 = 0.5$.
+
+**Step 2.** Raw advantages $A_i = r_i - 0.5$: $A = (0.5, -0.5, 0.5, -0.5)$.
+
+**Step 3.** $\text{mean}(A) = 0$ (subtracting the mean already centers the advantages). The
+population variance is $\frac{1}{4}(0.5^2 + 0.5^2 + 0.5^2 + 0.5^2) = 0.25$, so
+$\text{std}(A) = 0.5$.
+
+**Step 4.** Normalized: $\hat A_i = A_i / 0.5 = (1, -1, 1, -1)$. The two correct responses
+get $\hat A = +1$ (positive gradient, made more likely); the two wrong ones get $\hat A = -1$
+(made less likely).
+
+</details>
+
+**Exercise 2.** Take a verifiable reward $r \in \{0, 1\}$ and a group of $G$ responses of
+which $k$ are correct. Show that a single correct response gets raw advantage
+$A = 1 - k/G$ and a single wrong response gets $A = -k/G$. Use this to explain why a group
+where all responses agree ($k = 0$ or $k = G$) produces no update.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The group mean reward is $\bar r = k/G$ (the fraction correct).
+
+**Step 2.** A correct response has $r_i = 1$, so $A = 1 - k/G$. A wrong response has
+$r_i = 0$, so $A = 0 - k/G = -k/G$.
+
+**Step 3.** If $k = G$ (all correct), $\bar r = 1$, every $r_i = 1$, so every $A = 0$. If
+$k = 0$ (all wrong), $\bar r = 0$, every $A = 0$. In both cases all advantages vanish, the
+normalization is undefined or zero, and the policy gets no gradient: a group whose responses
+all agree carries no relative signal.
+
+</details>
+
+**Exercise 3 (code).** Implement the group-relative advantage (raw and normalized) in numpy.
+Verify the Exercise 1 numbers, and confirm that a unanimous group ($r$ all equal) yields
+all-zero raw advantages.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def group_advantages(rewards):
+    r = np.asarray(rewards, float)
+    raw = r - r.mean()                          # leave-one-out style baseline
+    std = raw.std()                             # population std
+    norm = (raw - raw.mean()) / (std + 1e-8)
+    return raw, norm
+
+# Exercise 1: rewards (1, 0, 1, 0).
+raw, norm = group_advantages([1, 0, 1, 0])
+assert np.allclose(raw, [0.5, -0.5, 0.5, -0.5])
+assert np.allclose(norm, [1.0, -1.0, 1.0, -1.0])
+
+# Unanimous group -> all-zero raw advantages, no update.
+raw_all_correct, _ = group_advantages([1, 1, 1, 1])
+assert np.allclose(raw_all_correct, 0.0)
+raw_all_wrong, _ = group_advantages([0, 0, 0, 0])
+assert np.allclose(raw_all_wrong, 0.0)
+print("raw:", raw, "norm:", norm)
+```
+
+The raw advantages are $\pm 0.5$ and normalize to $\pm 1$, while a unanimous group gives
+all-zero advantages, matching the automatic-curriculum argument: only groups with mixed
+outcomes move the policy.
+
+</details>
 
 GRPO occupies a useful middle ground: simpler than PPO (no value model), but online
 (generates new rollouts) and compatible with verifiable rewards -- making it the method

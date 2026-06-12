@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: dense-retrieval
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Train a bi-encoder with contrastive loss on positive/negative passage pairs (DPR) and build a FAISS index for approximate nearest neighbor search."
 prerequisites: ["rag-fundamentals"]
 ---
@@ -154,6 +154,101 @@ query.
 
 Production systems use a two-stage approach: **bi-encoder retrieves top-100**, **cross-encoder
 reranks** the 100 results to produce the final top-$k$. This balances accuracy and speed.
+
+## Exercises
+
+**Exercise 1.** A query embeds to $\mathbf{e}_q = (1, 2, 2)$. Two documents embed to
+$\mathbf{e}_{d_1} = (2, 4, 4)$ and $\mathbf{e}_{d_2} = (2, 0, 0)$. Compute the cosine
+similarity of each to the query by hand and state which document a top-1 dense
+retriever returns.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute the query norm: $\|\mathbf{e}_q\| = \sqrt{1 + 4 + 4} = \sqrt{9} = 3$.
+
+**Step 2.** Document 1: the dot product is $1\cdot 2 + 2\cdot 4 + 2\cdot 4 = 18$, and
+$\|\mathbf{e}_{d_1}\| = \sqrt{4 + 16 + 16} = \sqrt{36} = 6$, so
+
+$$
+\text{sim}(q, d_1) = \frac{18}{3 \cdot 6} = 1.0.
+$$
+
+$d_1$ is a positive scalar multiple of $q$, so cosine similarity is exactly 1.
+
+**Step 3.** Document 2: the dot product is $1\cdot 2 + 2\cdot 0 + 2\cdot 0 = 2$, and
+$\|\mathbf{e}_{d_2}\| = \sqrt{4} = 2$, so
+
+$$
+\text{sim}(q, d_2) = \frac{2}{3 \cdot 2} = \frac{1}{3} \approx 0.333.
+$$
+
+**Step 4.** The retriever ranks by similarity, so it returns $d_1$ first ($1.0 > 0.333$).
+
+</details>
+
+**Exercise 2.** A test set has 200 questions, each with one correct passage. A dense
+retriever places the correct passage in the top 5 for 138 questions, and in the top 1
+for 92. Compute Recall@1 and Recall@5. Then a cross-encoder reranks the top 5 and lifts
+the correct passage into rank 1 for 124 of the 138. What is the reranked Recall@1, and
+why can it never exceed the original Recall@5?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recall@k is the fraction of questions whose correct passage appears in the
+top $k$. Recall@1 $= 92 / 200 = 0.46$ and Recall@5 $= 138 / 200 = 0.69$.
+
+**Step 2.** The reranker only reorders the top 5 it was given, so it can only promote
+passages that were already retrieved. Reranked Recall@1 $= 124 / 200 = 0.62$.
+
+**Step 3.** A passage absent from the original top 5 is never seen by the reranker, so
+the reranked Recall@1 is bounded above by the first-stage Recall@5 of $0.69$. Here
+$0.62 \le 0.69$, as required. The reranker recovers most, not all, of the recall
+headroom the bi-encoder left.
+
+</details>
+
+**Exercise 3 (code).** Implement Recall@k for a flat cosine retriever over a small
+labeled set, then verify that Recall@k is monotonically nondecreasing in $k$ (a correct
+passage in the top $k$ is also in the top $k+1$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def cosine_sim_matrix(Q, D):
+    Qn = Q / (np.linalg.norm(Q, axis=1, keepdims=True) + 1e-9)
+    Dn = D / (np.linalg.norm(D, axis=1, keepdims=True) + 1e-9)
+    return Qn @ Dn.T
+
+def recall_at_k(queries, docs, gold, k):
+    sims = cosine_sim_matrix(queries, docs)          # (Nq, Nd)
+    topk = np.argsort(-sims, axis=1)[:, :k]          # k best doc indices per query
+    hits = [gold[i] in topk[i] for i in range(len(queries))]
+    return np.mean(hits)
+
+rng = np.random.default_rng(0)
+d, Nq, Nd = 16, 60, 500
+docs = rng.normal(0, 1, (Nd, d))
+gold = rng.integers(0, Nd, Nq)                       # one correct doc per query
+# Build queries as the gold doc plus noise so retrieval is imperfect but meaningful
+queries = docs[gold] + rng.normal(0, 1.5, (Nq, d))
+
+recalls = [recall_at_k(queries, docs, gold, k) for k in range(1, 11)]
+print("Recall@1..10:", [round(r, 3) for r in recalls])
+
+# Monotone nondecreasing in k: widening the top-k can only add correct passages
+assert all(recalls[i] <= recalls[i + 1] + 1e-12 for i in range(len(recalls) - 1))
+assert recalls[0] < recalls[-1]                      # recall genuinely improves with k
+```
+
+The recall curve never drops as $k$ grows, because widening the retrieved set can only
+add correct passages, never remove them.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Karpukhin, V., et al.** (2020). "Dense passage retrieval for open-domain question answering". *EMNLP*. [arXiv:2004.04906](https://arxiv.org/abs/2004.04906). Source of the bi-encoder, in-batch negatives, and the reported Recall numbers.</FNItem>

@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: elmo
 order: 5
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Train a bidirectional language model and extract ELMo representations as a weighted sum of layer activations; contrast with static word2vec."
 prerequisites: ["lstm-gru"]
 ---
@@ -111,6 +111,97 @@ graph LR
   B --> Cc
   Cc --> E["contextual embeddings"]
 ```
+
+## Exercises
+
+**Exercise 1.** A 2-layer biLM gives a token three concatenated layer vectors
+$\mathbf{r}^0 = (1, 1)$, $\mathbf{r}^1 = (2, 2)$, $\mathbf{r}^2 = (3, 3)$. The raw
+layer logits are $\mathbf{w} = (1, 0, 0)$ and the scale is $\gamma = 2$. Compute the
+ELMo representation $\mathbf{e} = \gamma \sum_{\ell} s_\ell\, \mathbf{r}^\ell$ with
+$\mathbf{s} = \mathrm{softmax}(\mathbf{w})$, by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Softmax the logits. The exponentials are $e^1 = 2.7183$, $e^0 = 1$,
+$e^0 = 1$, summing to $Z = 4.7183$. So
+$\mathbf{s} = (2.7183, 1, 1)/4.7183 = (0.5761, 0.2119, 0.2119)$, which sums to $1$.
+
+**Step 2.** Form the weighted sum of the layer vectors. Each component is identical,
+so work with one:
+
+$$
+0.5761 \cdot 1 + 0.2119 \cdot 2 + 0.2119 \cdot 3 = 0.5761 + 0.4238 + 0.6357 = 1.6356.
+$$
+
+**Step 3.** Apply the scale $\gamma = 2$: $\mathbf{e} = 2 \cdot (1.6356, 1.6356) =
+(3.2712, 3.2712)$. The softmax weights mix the three layers; $\gamma$ then rescales
+the whole blend for the downstream task.
+
+</details>
+
+**Exercise 2.** ELMo learns $\mathbf{s}^k$ and $\gamma^k$ per task while the biLM
+weights stay frozen. Explain why a sequence-labeling task such as POS tagging might
+learn weights $\mathbf{s}$ that favor lower biLM layers, while a word-sense task
+might favor upper layers.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recall what the layers encode: lower biLM layers capture syntax and
+surface features (part of speech, morphology), upper layers capture semantics and
+word-sense disambiguation.
+
+**Step 2.** POS tagging needs syntactic and surface signal at each token. Putting
+more softmax mass on the lower layer $\mathbf{r}^1$ surfaces exactly that signal, so
+the learned $\mathbf{s}$ shifts weight downward.
+
+**Step 3.** Word-sense disambiguation needs to tell apart senses of the same word
+type, which lives in the upper, more semantic layer $\mathbf{r}^2$. The task
+therefore learns $\mathbf{s}$ weighted toward the top layer. The per-task weights let
+one frozen biLM serve both needs without retraining the backbone.
+
+</details>
+
+**Exercise 3 (code).** Implement the ELMo weighted sum
+$\mathbf{e} = \gamma \sum_\ell s_\ell \mathbf{r}^\ell$ with
+$\mathbf{s} = \mathrm{softmax}(\mathbf{w})$ in numpy. Verify the weights sum to $1$,
+and that when one raw logit dominates, ELMo reduces to that single layer (scaled by
+$\gamma$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+def elmo(layer_reps, w_raw, gamma):
+    """layer_reps: (L+1, T, D) stack of biLM layer vectors."""
+    s = softmax(w_raw)                       # (L+1,) layer weights
+    mixed = np.tensordot(s, layer_reps, axes=([0], [0]))  # (T, D)
+    return gamma * mixed, s
+
+rng = np.random.default_rng(0)
+L1, T, D = 3, 4, 5                            # L+1 = 3 layers
+reps = rng.normal(0, 1, (L1, T, D))
+
+w_peaked = np.array([0.0, 0.0, 10.0])         # logit dominates top layer
+out, s = elmo(reps, w_peaked, gamma=1.0)
+
+assert np.isclose(s.sum(), 1.0)               # softmax normalizes
+assert np.allclose(out, reps[2], atol=1e-3)   # collapses to the top layer
+print("layer weights:", np.round(s, 4))
+```
+
+With one logit far above the others the softmax concentrates on that layer, so the
+weighted sum recovers it: ELMo's learned weights interpolate between "use only the
+top layer" and "average all layers."
+
+</details>
 
 ## The path to BERT
 

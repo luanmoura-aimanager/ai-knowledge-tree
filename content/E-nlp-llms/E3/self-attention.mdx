@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: self-attention
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Derive the query-key-value soft lookup, show why 1/sqrt(d_k) scaling is necessary, and implement a single attention head in numpy."
 prerequisites: ["E2/seq2seq"]
 ---
@@ -140,6 +140,107 @@ For a sequence of length $T$:
 
 This quadratic scaling in $T$ is the core limitation of standard attention, motivating
 FlashAttention (D7) and linear attention variants.
+
+## Exercises
+
+**Exercise 1.** A single query $q = (1, 0)$ attends to two keys $k_1 = (1, 0)$ and
+$k_2 = (0, 1)$ with values $v_1 = (1, 0)$ and $v_2 = (0, 1)$, head dimension $d_k = 2$.
+Compute the scaled scores, the attention weights, and the output vector by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Raw scores are the dot products $q \cdot k_1 = 1$ and $q \cdot k_2 = 0$.
+Scale by $1/\sqrt{d_k} = 1/\sqrt{2}$:
+
+$$
+\left( \tfrac{1}{\sqrt 2},\ 0 \right) = (0.7071,\ 0).
+$$
+
+**Step 2.** Softmax the scaled scores. The weight on $k_1$ is
+
+$$
+\frac{e^{0.7071}}{e^{0.7071} + e^{0}} = \frac{2.0281}{2.0281 + 1} = 0.6698,
+$$
+
+so the weights are $(0.6698,\ 0.3302)$.
+
+**Step 3.** The output is the weighted sum of values:
+
+$$
+0.6698 \cdot (1, 0) + 0.3302 \cdot (0, 1) = (0.6698,\ 0.3302).
+$$
+
+The query leans toward the matching key $k_1$ but stays soft; the non-matching value
+still contributes a third of the output.
+
+</details>
+
+**Exercise 2.** Two keys produce raw scores that differ by $8$ (everything else fixed).
+Compute the softmax weight on the larger key with no scaling, and again after dividing by
+$\sqrt{d_k} = 8$. Explain why the scaled case keeps gradient flowing to the smaller key.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Unscaled, the scores are $(8, 0)$. The weight on the larger key is
+
+$$
+\frac{e^{8}}{e^{8} + e^{0}} = \frac{2980.96}{2981.96} = 0.9997,
+$$
+
+so the smaller key receives $0.0003$.
+
+**Step 2.** After dividing by $\sqrt{d_k} = 8$, the gap becomes $1$ and the scores are
+$(1, 0)$:
+
+$$
+\frac{e^{1}}{e^{1} + e^{0}} = \frac{2.7183}{3.7183} = 0.7311,
+$$
+
+so the smaller key now holds $0.2689$.
+
+**Step 3.** The softmax gradient with respect to a logit is proportional to the weight
+times one minus the weight, $w(1 - w)$. At $w = 0.9997$ this is about $0.0003$, vanishingly
+small; at $w = 0.7311$ it is about $0.197$, three orders of magnitude larger. Scaling pulls
+the distribution out of the saturated regime so both keys carry usable gradient.
+
+</details>
+
+**Exercise 3 (code).** Implement scaled dot-product attention and verify two structural
+facts on a random causal example: every attention row sums to $1$, and the strictly upper
+triangle (future positions) is exactly zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def attention(Q, K, V, mask=None):
+    d_k = Q.shape[-1]
+    scores = Q @ K.T / np.sqrt(d_k)
+    if mask is not None:
+        scores = np.where(mask, -1e9, scores)
+    attn = np.exp(scores - scores.max(axis=-1, keepdims=True))
+    attn /= attn.sum(axis=-1, keepdims=True)
+    return attn @ V, attn
+
+rng = np.random.default_rng(0)
+T, d_k, d_v = 6, 8, 8
+Q, K, V = rng.normal(size=(T, d_k)), rng.normal(size=(T, d_k)), rng.normal(size=(T, d_v))
+mask = np.triu(np.ones((T, T), dtype=bool), k=1)   # True above diagonal = future
+
+out, attn = attention(Q, K, V, mask=mask)
+assert np.allclose(attn.sum(axis=1), 1.0)          # rows are distributions
+assert np.allclose(attn[mask], 0.0)                # no weight on the future
+print("rows sum to 1, upper triangle zeroed; output shape", out.shape)
+```
+
+The mask drives future logits to $-10^9$, which softmax sends to zero, while each row
+still normalizes to a valid distribution over the visible past.
+
+</details>
 
 The next lesson stacks $h$ independent attention heads in parallel -- multi-head attention --
 which allows different heads to attend to different representation subspaces.

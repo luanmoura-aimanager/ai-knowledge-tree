@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: positional-encodings
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Show why attention is position-agnostic, add sinusoidal absolute encodings, and upgrade to rotary (RoPE) and length-extrapolating (ALiBi) schemes."
 prerequisites: ["transformer-block"]
 ---
@@ -168,6 +168,112 @@ print("ALiBi bias[0]:\n", bias[0].round(3))  # head 0: steepest penalty
 
 Modern LLMs (LLaMA 3, Qwen, Mistral) universally use RoPE. ALiBi is preferred when
 extrapolation is a hard requirement without fine-tuning.
+
+## Exercises
+
+**Exercise 1.** Write the sinusoidal encoding vector $\mathbf{p}_0$ at position $t = 0$ for
+any dimension $d$. What does it equal, and why does that make $t = 0$ a natural reference
+point?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $t = 0$ every angle argument is $0/10000^{2i/d} = 0$, regardless of the
+dimension index $i$.
+
+**Step 2.** The even entries are $\sin(0) = 0$ and the odd entries are $\cos(0) = 1$, so
+
+$$
+\mathbf{p}_0 = (0, 1, 0, 1, \dots, 0, 1).
+$$
+
+**Step 3.** Every position $t$ is an alternating $(\sin, \cos)$ pair of growing angle, and
+position $0$ is the zero-angle case, the same vector in every model dimension. It anchors
+the rotation: each later position is a rotation of this fixed starting phase, so $t = 0$
+serves as the reference the relative offsets are measured against.
+
+</details>
+
+**Exercise 2.** RoPE rotates each 2D slice of $\mathbf{q}$ and $\mathbf{k}$ by an angle
+proportional to position. Prove that rotating both vectors by the *same* angle leaves their
+dot product unchanged, then explain why this makes the attention score depend only on the
+offset $t - s$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A 2D rotation by angle $\alpha$ is the orthogonal matrix $R_\alpha$ with
+$R_\alpha^\top R_\alpha = I$. For two vectors $u, v$,
+
+$$
+(R_\alpha u) \cdot (R_\alpha v) = u^\top R_\alpha^\top R_\alpha v = u^\top v = u \cdot v.
+$$
+
+Rotating both by the same angle is an orthogonal transformation, which preserves inner
+products.
+
+**Step 2.** RoPE rotates the query slice by $t\theta_i$ and the key slice by $s\theta_i$.
+Their dot product is
+
+$$
+(R_{t\theta_i} q) \cdot (R_{s\theta_i} k) = q^\top R_{t\theta_i}^\top R_{s\theta_i} k = q^\top R_{(s - t)\theta_i} k,
+$$
+
+using $R_{a}^\top = R_{-a}$ and $R_{-a} R_{b} = R_{b - a}$. The result depends on the two
+positions only through their difference $s - t$ (equivalently $t - s$), not on either
+absolute position.
+
+**Step 3.** When $t = s$ the residual rotation is $R_0 = I$, recovering Step 1: a token
+against itself scores the unrotated $q \cdot k$. So $(t, s) = (2, 0)$ and $(10, 8)$, both
+offset $2$, give identical scores.
+
+</details>
+
+**Exercise 3 (code).** Implement RoPE and verify both claims numerically: equal offsets give
+equal scores at different absolute placements, and a zero offset reproduces the unrotated
+dot product.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def apply_rope(x, positions):
+    T, d = x.shape
+    assert d % 2 == 0
+    half = d // 2
+    thetas = 10000 ** (-2 * np.arange(half) / d)
+    angles = positions[:, None] * thetas[None, :]
+    cos_a, sin_a = np.cos(angles), np.sin(angles)
+    x_even, x_odd = x[:, 0::2], x[:, 1::2]
+    out = np.empty_like(x)
+    out[:, 0::2] = x_even * cos_a - x_odd * sin_a
+    out[:, 1::2] = x_even * sin_a + x_odd * cos_a
+    return out
+
+rng = np.random.default_rng(0)
+q = rng.normal(size=(1, 8))
+k = rng.normal(size=(1, 8))
+
+def score(t, s):
+    qt = apply_rope(q, np.array([t]))
+    ks = apply_rope(k, np.array([s]))
+    return (qt @ ks.T)[0, 0]
+
+# same offset (= 2) at three placements
+s_far = [score(2, 0), score(5, 3), score(10, 8)]
+assert np.allclose(s_far, s_far[0])              # offset fixes the score
+
+# zero offset equals the unrotated dot product
+assert np.isclose(score(0, 0), (q @ k.T)[0, 0])
+print("offset-2 score", round(s_far[0], 4), "| zero offset == raw dot")
+```
+
+The three offset-$2$ placements return the same number because only $t - s$ survives the
+rotation, and the zero-offset case collapses to the plain dot product, matching the proof.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need".

@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: scalable-oversight
 order: 7
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Survey scalable oversight: debate, amplification, and recursive reward modeling; then study the weak-to-strong experiment as an empirical proxy for aligning a model smarter than its supervisor."
 prerequisites: ["E4/rlaif"]
 codeExempt: true
@@ -130,8 +130,96 @@ optimal strategy. No current oversight method is robust to this.
 
 **Interpretability as oversight:** if SAEs and circuits reveal what the model internally
 represents and computes, they could provide oversight without relying on evaluating outputs.
+
+## Exercises
+
+**Exercise 1.** Debate is argued to help because "if one agent is telling the truth, the
+other must lie, and the truthful agent can expose any lie." Construct a concrete situation
+where this argument fails, and identify which assumption of the debate protocol your
+situation violates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take a claim whose verification is asymmetric in the wrong direction: a
+$10{,}000$-step formal proof with one subtly invalid step buried in the middle. The honest
+agent asserts the proof is flawed; the dishonest agent defends it.
+
+**Step 2.** To expose the lie, the honest agent must direct the judge to the specific bad
+step and show why it fails. But for a sufficiently deep proof, locating and explaining the
+flaw to a bounded human judge can require nearly as much work and expertise as verifying
+the whole proof. The judge cannot follow the exposure within the debate's budget, so the
+lie is not exposable in practice even though it is exposable in principle.
+
+**Step 3.** This violates the load-bearing assumption that **lies are cheaply exposable
+within the debate format**, that refuting a falsehood is easier for the judge to follow
+than establishing the truth from scratch. When exposing an error costs as much as
+independent verification, debate loses its leverage and collapses back to "the judge must
+evaluate the hard claim directly," which is exactly what scalable oversight was trying to
+avoid.
+
+</details>
+
+**Exercise 2.** Iterated Amplification chains supervisors $H \to A_1 \to A_2 \to \dots$,
+each imitating the previous amplified pair. Suppose each imitation step preserves alignment
+with probability $0.99$ independently. Reason qualitatively about what happens to end-to-end
+alignment as the number of steps grows, and explain why this is the "errors compound"
+concern named in the lesson. (No precise number is required; argue the trend.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** If each of $k$ steps independently preserves alignment with probability $0.99$,
+the chance that *all* steps preserve it is the product $0.99^k$, which decreases as $k$
+grows. After $10$ steps it is already noticeably below one; after many steps it tends
+toward zero. Alignment is only as strong as the weakest accumulated link.
+
+**Step 2.** The trend is monotone decay: every additional amplification round is another
+multiplicative chance to introduce a small misalignment, and those chances multiply rather
+than cancel. There is no step that repairs an earlier drift, so deviations accumulate down
+the chain.
+
+**Step 3.** This is precisely the "small misalignments compound" worry. Each round's
+supervisor only imperfectly understands the AI it is training (the human supervising $A_1$
+inside an amplified pair may not fully grasp $A_1$'s reasoning), so a slight error slips in,
+and the next round builds on top of it. Over a long ladder reaching superhuman capability,
+the compounded drift can become large even when every single step looked nearly perfect.
+
+</details>
+
+**Exercise 3.** Weak-to-strong generalization is interpreted optimistically (the strong
+student elicits its own latent competence from weak labels) and pessimistically (the student
+may instead generalize toward its own misaligned pretraining). Design a single experiment,
+using only the weak-supervisor / strong-student setup, whose outcome would distinguish these
+two interpretations. State what result would support each side.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Pick a task where the strong student's pretraining is known to encode a
+*specific, identifiable bias* that diverges from the intended target (for example a
+sentiment task on which the pretrained model has a documented skew). The weak supervisor is
+trained to give labels matching the intended target, not the bias.
+
+**Step 2.** Fine-tune the strong student on the weak supervisor's labels and measure not
+just overall accuracy but the direction of its errors: do residual mistakes point toward the
+weak supervisor's intended target, or toward the student's known pretraining bias? The
+optimistic and pessimistic stories make opposite predictions about *where the student lands
+when the two pull apart*, so the task must be one where they genuinely conflict.
+
+**Step 3.** If the student's errors and generalization track the intended target and it
+*overcomes* its pretraining bias using only weak signal, that supports the optimistic reading:
+weak labels elicited genuine latent competence. If instead the student reverts to its
+pretraining bias wherever the weak supervision is sparse or noisy, ignoring the intended
+direction, that supports the pessimistic reading: it generalized toward its own priors rather
+than the supervisor's intent. Measuring the *direction of generalization under conflict*, not
+raw accuracy, is what separates the two.
+
+</details>
+
 This is the long-term vision connecting mechanistic interpretability (E8) to scalable
-oversight.
+oversight, and it closes the loop on the pillar: the circuits and features of the earlier
+lessons become the instruments of oversight here.
 
 <Footnotes>
   <FNItem n="1">**Bowman, S. R., et al.** (2022). "Measuring progress on scalable oversight for large language models". [arXiv:2211.03540](https://arxiv.org/abs/2211.03540). Frames and empirically probes the scalable-oversight problem.</FNItem>

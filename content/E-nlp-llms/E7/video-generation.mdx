@@ -4,7 +4,7 @@ pillar: E
 subId: E7
 lessonId: video-generation
 order: 6
-estimatedMinutes: 15
+estimatedMinutes: 25
 goal: "Extend spatial diffusion to spacetime patches, understand the role of DiT (diffusion transformers) for video, and survey the training and evaluation challenges at video scale."
 prerequisites: ["text-to-image"]
 codeExempt: true
@@ -121,6 +121,85 @@ weights available for research.
 
 These open models enable research and fine-tuning, but production-quality video generation
 at the level of Sora or Veo remains in the proprietary domain as of 2025.
+
+## Exercises
+
+**Exercise 1.** A 5-second clip at 24 fps and a 10-second clip at 24 fps are both generated.
+How many frames does each contain? If each frame costs the same as one diffusion image, by
+what factor is the 10-second clip more expensive than a single image, and how much more
+expensive than the 5-second clip?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Frames equal duration times frame rate. The 5-second clip is
+$5 \times 24 = 120$ frames; the 10-second clip is $10 \times 24 = 240$ frames.
+
+**Step 2.** At one-image cost per frame, the 10-second clip is $240\times$ a single image,
+and the 5-second clip is $120\times$.
+
+**Step 3.** Between the two clips the ratio is $240 / 120 = 2$, exactly the duration ratio,
+because frame count is linear in time. This per-frame counting is the optimistic bound;
+spatiotemporal attention adds a super-linear term on top, which the next exercises probe.
+
+</details>
+
+**Exercise 2.** A $256 \times 256$ video of 16 frames is compressed by the video VAE to
+$32 \times 32 \times 2$ latents. The patchifier uses a 4x spatial patch and a 2x temporal
+patch. How many spacetime tokens enter the DiT? If the spatial resolution doubles to
+$512 \times 512$ (latents $64 \times 64 \times 2$) with the same patch sizes, how many tokens
+result, and how does the DiT's self-attention cost change?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Tokens are the latent grid divided by the patch sizes along each axis:
+
+$$
+\frac{32}{4} \times \frac{32}{4} \times \frac{2}{2} = 8 \times 8 \times 1 = 64 \text{ tokens}.
+$$
+
+**Step 2.** Doubling spatial resolution gives latents $64 \times 64 \times 2$, so
+
+$$
+\frac{64}{4} \times \frac{64}{4} \times \frac{2}{2} = 16 \times 16 \times 1 = 256 \text{ tokens},
+$$
+
+a $4\times$ increase in sequence length (each spatial side doubled, so $2 \times 2 = 4$).
+
+**Step 3.** Self-attention is $O(T^2)$ in the token count, so cost scales as
+$(256 / 64)^2 = 4^2 = 16\times$. A 2x resolution bump costs 16x more attention, which is why
+video models lean on aggressive VAE compression and large patches before the transformer.
+
+</details>
+
+**Exercise 3.** Position encodings for video must handle three axes (two spatial, one
+temporal). One design uses full 3D RoPE; another factors it into 2D spatial plus 1D temporal
+encodings. State one advantage of the factored approach for the "variable duration and
+resolution" training Sora relies on, and one risk it carries compared to a joint 3D encoding.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Factoring separates the spatial encoding from the temporal one, so the same
+spatial encoding applies at any clip length and the temporal encoding extends independently.
+This lets the model train and generate at variable durations and resolutions without
+relearning positions, matching Sora's variable-length patch sequences.
+
+**Step 2.** The cost is expressiveness: a factored encoding treats space and time as
+separable, so it represents couplings between a position and a moment less directly than a
+joint 3D encoding. Phenomena where spatial location and timing interact (an object's motion
+trajectory) are harder to encode crisply, risking weaker long-range physics, exactly the
+failure mode the lesson notes for falling objects that hover.
+
+**Step 3.** The trade-off is generalization across duration and resolution (factored) versus
+richer spatiotemporal coupling (joint 3D), and most systems favor the factored or 3D-RoPE
+designs because variable-length training is the harder constraint to give up.
+
+</details>
+
+These spacetime-token and position-encoding choices are what let one diffusion transformer
+span images and minute-long video, closing the multimodal arc this pillar opened with CLIP.
 
 <Footnotes>
   <FNItem n="1">**Ho, J., et al.** (2022). "Video diffusion models". *NeurIPS*. [arXiv:2204.03458](https://arxiv.org/abs/2204.03458)</FNItem>

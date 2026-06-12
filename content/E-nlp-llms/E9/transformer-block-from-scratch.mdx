@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: transformer-block-from-scratch
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Write causal multi-head self-attention, the MLP, residual connections, and LayerNorm as PyTorch modules from scratch, and assemble them into the decoder-only block this capstone trains."
 prerequisites: ["nanogpt-setup", "E3/transformer-block"]
 ---
@@ -117,6 +117,125 @@ class Block(nn.Module):
 Each `forward` returns the input plus a branch output, never an overwrite, which is the
 property that lets gradients flow through deep stacks and lets later analysis read each
 block's additive contribution.
+
+## Exercises
+
+**Exercise 1.** The head scales scores by $1/\sqrt{d_k}$ before the softmax
+(`k.shape[-1] ** -0.5`). Assume the query and key coordinates are independent
+with mean zero and unit variance. Show that an unscaled dot product
+$q \cdot k$ over $d_k$ dimensions has variance $d_k$, and explain why dividing by
+$\sqrt{d_k}$ is the correction that keeps the score variance at $1$ regardless of
+head size.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The dot product is $q \cdot k = \sum_{i=1}^{d_k} q_i k_i$. Each term
+$q_i k_i$ is a product of two independent mean-zero unit-variance variables, so
+$\mathbb{E}[q_i k_i] = 0$ and $\text{Var}(q_i k_i) = \mathbb{E}[q_i^2]\mathbb{E}[k_i^2] = 1$.
+
+**Step 2.** The terms are independent across $i$, so variances add:
+$\text{Var}(q \cdot k) = \sum_{i=1}^{d_k} 1 = d_k$. The unscaled score therefore
+has standard deviation $\sqrt{d_k}$, which grows with head size.
+
+**Step 3.** Dividing by $\sqrt{d_k}$ rescales the score to
+$\text{Var}\big(q \cdot k / \sqrt{d_k}\big) = d_k / (\sqrt{d_k})^2 = 1$. Holding
+the variance at $1$ keeps the softmax in a sensitive regime: without the
+correction, large-$d_k$ scores would have large magnitude, pushing the softmax
+toward a near one-hot distribution with vanishing gradients. The scaling makes
+attention behave the same way across head sizes.
+
+</details>
+
+**Exercise 2 (code).** Reimplement one causal attention head in numpy (no
+learned projections; take `q`, `k`, `v` directly) and verify two structural
+facts on a small sequence: each row of the attention weights sums to $1$, and
+position $t$ places zero weight on any future position $> t$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def softmax(z, axis=-1):
+    z = z - z.max(axis=axis, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=axis, keepdims=True)
+
+def causal_head(q, k, v):
+    T, d = q.shape
+    wei = q @ k.T / np.sqrt(d)                  # (T, T) scaled scores
+    mask = np.tril(np.ones((T, T)))             # 1 on/below diagonal
+    wei = np.where(mask == 0, -np.inf, wei)     # block future positions
+    wei = softmax(wei, axis=-1)
+    return wei @ v, wei
+
+T, d = 5, 4
+q, k, v = rng.standard_normal((3, T, d))
+out, wei = causal_head(q, k, v)
+
+# Each query's weights form a distribution.
+assert np.allclose(wei.sum(axis=-1), 1.0)
+# Strictly-upper-triangular weights (future positions) are zero.
+upper = wei[np.triu_indices(T, k=1)]
+assert np.allclose(upper, 0.0)
+
+print("row sums:", np.round(wei.sum(axis=-1), 4))
+print("max future weight:", float(upper.max()))
+```
+
+The weight rows sum to $1$ and every future-position weight is zero, the two
+properties the `-inf` mask plus softmax enforce in the PyTorch head.
+
+</details>
+
+**Exercise 3 (code).** Demonstrate the sharpening effect from Exercise 1
+numerically. Take a fixed query and a set of keys, and compare the softmax of the
+raw scores against the softmax of the $1/\sqrt{d_k}$-scaled scores. Show that the
+scaled distribution is flatter (higher entropy), confirming why the scaling
+preserves gradient flow.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+
+def softmax(z):
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+def entropy(p):
+    nz = p[p > 0]
+    return -np.sum(nz * np.log2(nz))
+
+d = 64
+q = rng.standard_normal(d)
+keys = rng.standard_normal((6, d))
+
+raw = keys @ q                       # unscaled scores
+scaled = raw / np.sqrt(d)            # the head's scaling
+
+p_raw = softmax(raw)
+p_scaled = softmax(scaled)
+
+# Scaling lowers the score spread, so the softmax is flatter: higher entropy.
+assert entropy(p_scaled) > entropy(p_raw)
+
+print("entropy raw:   ", round(float(entropy(p_raw)), 4), "bits")
+print("entropy scaled:", round(float(entropy(p_scaled)), 4), "bits")
+```
+
+The scaled distribution carries more entropy than the raw one, so it sits away
+from the saturated near one-hot regime where softmax gradients collapse.
+
+</details>
 
 With one block correct, the [next lesson](train-tinyshakespeare) stacks several into a full
 model, adds the embedding and unembedding, and trains it.

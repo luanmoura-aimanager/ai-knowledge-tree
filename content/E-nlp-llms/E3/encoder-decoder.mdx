@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: encoder-decoder
 order: 7
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Add cross-attention between encoder and decoder stacks; frame every NLP task as text-to-text (T5) and see how BART adds denoising pretraining."
 prerequisites: ["decoder-only", "encoder-only"]
 ---
@@ -122,7 +122,98 @@ Cross-attention gives a direct pathway from source to target.
 
 **Decoder-only:** open-ended generation, few-shot prompting, instruction following.
 Simpler architecture, easier to scale, and with instruction tuning can perform all
-encoder-decoder tasks via prompting. Modern practice increasingly favors large decoder-only
+encoder-decoder tasks via prompting.
+
+## Exercises
+
+**Exercise 1.** In a decoder block, the masked self-attention uses a causal mask
+but the cross-attention does not. Explain why each choice is correct: what would
+break if the cross-attention were causally masked, and what would break if the
+self-attention were not?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Cross-attention reads the encoder output $\mathbf{h}^e$, the full
+source sequence, which is known in its entirety before decoding starts. There is
+no "future" to hide: every target position should be free to attend to every
+source position, so a causal mask here would needlessly cut the decoder off from
+the tail of the source (the end of a sentence being translated, say).
+
+**Step 2.** Self-attention runs over the target tokens, which are generated left
+to right. During training the whole target is present, so without a causal mask
+position $t$ would attend to target tokens $x_{>t}$ and the next-token objective
+would leak its own answer. The mask restores $p(x_t \mid x_{<t}, \mathbf{h}^e)$,
+the conditional that generation uses at inference.
+
+</details>
+
+**Exercise 2.** T5 frames sentiment classification as text-to-text, emitting the
+literal string `positive` or `negative` rather than a logit over two classes.
+Give one concrete advantage and one concrete cost of this choice compared to a
+BERT-style classification head on `[CLS]`.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Advantage: a single model and loss (next-token cross-entropy over the
+vocabulary) handles every task at once. Translation, summarization, and
+sentiment share weights and the decoder, so adding a task is a matter of phrasing
+its prompt, not bolting on a new head. This is what lets one T5 checkpoint do
+multitask learning.
+
+**Step 2.** Cost: the output is unconstrained text, so the model can emit a token
+sequence that is not one of the valid labels (a typo, a synonym, or a refusal),
+and decoding a multi-token label costs more than reading a single logit vector.
+A classification head over a fixed label set cannot produce an invalid answer and
+needs one forward pass, not autoregressive decoding.
+
+</details>
+
+**Exercise 3 (code).** Implement decoder-to-encoder cross-attention directly:
+queries from a length-$T$ decoder state, keys and values from a length-$S$
+encoder output, no causal mask. Verify the attention matrix has shape
+$T \times S$, each row is a distribution, and every decoder position attends to
+all $S$ encoder positions.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+rng = np.random.default_rng(0)
+T, S, d = 4, 7, 8          # 4 decoder positions, 7 encoder positions
+dec_state = rng.standard_normal((T, d))
+enc_out = rng.standard_normal((S, d))
+Wq = rng.standard_normal((d, d))
+Wk = rng.standard_normal((d, d))
+Wv = rng.standard_normal((d, d))
+
+Q = dec_state @ Wq          # queries from the decoder
+K = enc_out @ Wk            # keys and values from the (fixed) encoder output
+V = enc_out @ Wv
+alpha = softmax(Q @ K.T / np.sqrt(d))   # (T, S), no mask
+out = alpha @ V                          # (T, d)
+
+assert alpha.shape == (T, S)
+assert out.shape == (T, d)
+assert np.allclose(alpha.sum(axis=1), 1.0)   # each decoder row sums to 1
+assert np.all(alpha > 0)                     # attends to every source position
+print("cross-attention matrix:", alpha.shape, "-> output:", out.shape)
+```
+
+The matrix $\alpha \in \mathbb{R}^{T \times S}$ is the alignment between target
+and source positions, the direct source-to-target pathway that makes
+encoder-decoder strong for translation.
+
+</details>
+
+Modern practice increasingly favors large decoder-only
 models for both tasks.
 
 <Footnotes>

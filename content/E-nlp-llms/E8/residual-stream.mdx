@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: residual-stream
 order: 2
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "View a transformer as a residual stream that every attention head and MLP reads from and writes to additively, and use this linear-superposition picture as the substrate for circuit analysis."
 prerequisites: ["probing", "E3/transformer-block"]
 codeExempt: true
@@ -76,6 +76,89 @@ storing more features than dimensions by packing them into near-orthogonal direc
 [superposition](superposition), and it is the reason individual neurons are usually
 polysemantic. Sparse autoencoders, two lessons ahead, are the tool for pulling those
 overlapping directions back apart.
+
+## Exercises
+
+**Exercise 1.** Using the unrolled identity
+$x_L = x_0 + \sum_\ell \text{Attn}_\ell(\cdot) + \sum_\ell \text{MLP}_\ell(\cdot)$,
+argue why the **logit lens** (applying the unembedding to an intermediate $x_\ell$ rather
+than to $x_L$) is a meaningful operation, and state one concrete way it can mislead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Because every block adds to the stream rather than overwriting it, the
+intermediate state $x_\ell$ is literally a partial sum of the same terms that build $x_L$:
+the embedding plus the writes of all components up to layer $\ell$. It lives in the same
+$d$-dimensional space as $x_L$ and is read by the same downstream machinery.
+
+**Step 2.** The unembedding is linear, so applying it to $x_\ell$ projects that partial sum
+onto token directions exactly as it would the final state. The result is the model's
+"running guess": the prediction implied by the work done so far. This is well-defined
+precisely because no nonlinearity sits between the stream and the unembedding, and nothing
+has overwritten earlier contributions.
+
+**Step 3.** It can mislead because later layers can still add large terms that rotate the
+prediction. A component may write in a basis the unembedding has not yet been calibrated
+to (for example, before a final LayerNorm rescales the stream), so the intermediate
+projection can show a confident-looking but wrong token that later layers correct. The lens
+shows a contribution, not a commitment.
+
+</details>
+
+**Exercise 2.** Two attention heads, an early head $A$ and a later head $B$, do not
+interact in one model but do in another. In terms of read and write **subspaces** of the
+residual stream, state the precise condition under which $B$ can use what $A$ computed, and
+explain why making $A$'s output subspace orthogonal to $B$'s query-read subspace would
+sever the connection.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Head $A$ writes to the stream through its output projection, occupying some
+write subspace $\mathcal{W}_A$. Head $B$ forms its queries by reading the stream through
+its query projection, which is sensitive only to a read subspace $\mathcal{R}_B^Q$.
+
+**Step 2.** $B$'s query can depend on what $A$ wrote exactly when these overlap, that is
+when $\mathcal{W}_A \cap \mathcal{R}_B^Q \neq \{\mathbf{0}\}$. This is Q-composition: the
+component of $A$'s write that lies inside $B$'s query-read subspace is what $B$ actually
+sees. If the overlap is empty, $A$'s write is invisible to $B$'s query.
+
+**Step 3.** If $\mathcal{W}_A$ is orthogonal to $\mathcal{R}_B^Q$, then projecting $A$'s
+write onto $B$'s query-read directions yields zero, so $A$ contributes nothing to $B$'s
+query no matter how large its activation. The two heads share the same stream but write and
+read in non-overlapping directions, so the communication channel between them carries no
+signal and the circuit is cut.
+
+</details>
+
+**Exercise 3.** The residual stream has fixed width $d$, yet a model represents many more
+than $d$ distinct features. Explain the tension this creates, why it forces near-orthogonal
+(rather than exactly orthogonal) feature directions, and what this implies for the question
+"what does neuron 73 do?"
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A $d$-dimensional space holds at most $d$ mutually orthogonal directions. If
+the model needs to represent a number of features far larger than $d$, it cannot give each
+one its own orthogonal axis; there simply are not enough orthogonal directions to go
+around.
+
+**Step 2.** The resolution is to pack features into directions that are *almost* orthogonal
+but not exactly. Many more than $d$ vectors can be made pairwise near-orthogonal in $d$
+dimensions, so each feature gets a distinct direction at the price of a small, nonzero
+overlap (interference) with the others. The model tolerates this interference because
+features fire sparsely and rarely collide, which is the superposition picture.
+
+**Step 3.** Since features are spread-out directions rather than coordinate axes, an
+individual neuron (one coordinate of the stream) generically lies along a combination of
+many feature directions. So "what does neuron 73 do?" usually has no single answer: the
+neuron is polysemantic, participating in several unrelated features. The right unit of
+analysis is a direction in activation space, not a neuron, which is what motivates the
+decomposition tools later in this pillar.
+
+</details>
 
 With the stream as the substrate, the next lesson reads concrete
 [circuits](circuits) off of it: specific heads whose reads and writes compose into an

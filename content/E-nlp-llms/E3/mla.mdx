@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: mla
 order: 10
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Compress the KV cache by projecting keys and values through a shared low-rank latent, derive DeepSeek-V2's MLA, and contrast its memory and quality with GQA."
 prerequisites: ["gqa-moe"]
 ---
@@ -126,7 +126,97 @@ print("MLA vs GQA:", round(mla / gqa, 3))
 ```
 
 MLA lands well below the multi-head cache and competitive with GQA, while keeping
-per-head keys and values distinct. The next architectural axes, sparsity and recurrence,
+per-head keys and values distinct.
+
+## Exercises
+
+**Exercise 1.** At the V2-scale config ($n_h = 128$ heads, $d_h = 40$, GQA with
+$n_{kv} = 8$ KV groups, MLA latent $d_c = 512$, decoupled key $d^R_h = 64$),
+compute the per-token-per-layer cache in raw numbers for MHA, GQA, and MLA, and
+the MLA-vs-MHA reduction factor.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** MHA caches keys and values for all heads:
+$2 n_h d_h = 2 \cdot 128 \cdot 40 = 10240$ numbers.
+
+**Step 2.** GQA shares them across 8 KV groups:
+$2 n_{kv} d_h = 2 \cdot 8 \cdot 40 = 640$ numbers.
+
+**Step 3.** MLA caches the latent plus the decoupled RoPE key:
+$d_c + d^R_h = 512 + 64 = 576$ numbers.
+
+**Step 4.** The reduction over MHA is $10240 / 576 \approx 17.8\times$, a hair
+below GQA's 640 while every head still reconstructs its own distinct $k_t, v_t$
+rather than sharing one across eight heads.
+
+</details>
+
+**Exercise 2.** Rotary position embeddings block folding the up-projection
+$W^{UK}$ into the query projection. State the algebraic reason, and explain how
+the decoupled RoPE key restores the folding.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Folding works because $k_t = W^{UK} c_t$ is linear in the cached
+latent, so $q_t^\top k_t = q_t^\top W^{UK} c_t = (W^{UK\top} q_t)^\top c_t$: the
+up-projection moves onto the query and the score reads the latent directly.
+
+**Step 2.** RoPE inserts a position-dependent rotation, making the effective key
+$R_t k_t = R_t W^{UK} c_t$. Because $R_t$ sits between $q_t^\top$ and $W^{UK}$ and
+depends on position, it does not commute with $W^{UK}$, so $W^{UK}$ can no longer
+be absorbed into a position-independent query projection.
+
+**Step 3.** MLA splits the key into a content part (from the latent, no rotation,
+foldable) and a small decoupled part $k^R_t \in \mathbb{R}^{d^R_h}$ that carries
+the rotation and is cached separately. The score is
+$q^{C\top}_t k^C_s + q^{R\top}_t R_{t-s} k^R_s$: the first term keeps the fold,
+the second handles position on a tiny vector, so only $c_s$ plus $k^R_s$ is
+cached.
+
+</details>
+
+**Exercise 3 (code).** Verify the folding identity that makes MLA cheap: with
+$c_t = W^{DKV} h_t$ and $k_t = W^{UK} c_t$, the score $q_t^\top k_t$ equals
+$(W^{UK\top} q_t)^\top c_t$, so caching the latent $c_t$ suffices. Confirm the
+two scores match and that the latent is smaller than the reconstructed keys.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d = 16                       # model width
+n_h, d_h = 4, 4              # 4 heads, per-head dim 4  -> n_h*d_h = 16
+d_c = 6                      # latent dimension, smaller than n_h*d_h
+
+W_DKV = rng.standard_normal((d_c, d))          # down-projection
+W_UK = rng.standard_normal((n_h * d_h, d_c))   # up-projection to per-head keys
+
+h_t = rng.standard_normal(d)
+c_t = W_DKV @ h_t                              # the only thing cached
+k_t = W_UK @ c_t                               # reconstructed keys
+
+q = rng.standard_normal(n_h * d_h)
+score_direct = q @ k_t                          # score against full keys
+score_folded = (W_UK.T @ q) @ c_t               # up-proj folded into the query
+
+assert np.isclose(score_direct, score_folded)   # same score
+assert c_t.size < k_t.size                       # 6 cached vs 16 reconstructed
+print("cache latent:", c_t.size, "vs per-head keys:", k_t.size)
+```
+
+The folded score reads the cached latent directly, so the per-head keys are
+reconstructed only implicitly, never stored, which is where the memory saving
+comes from.
+
+</details>
+
+The next architectural axes, sparsity and recurrence,
 are covered by [mixture of experts](gqa-moe) and the
 [state space models](/pillar/D/D3/state-space-models) in pillar D.
 

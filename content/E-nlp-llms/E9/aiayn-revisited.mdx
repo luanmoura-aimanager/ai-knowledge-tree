@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: aiayn-revisited
 order: 6
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Re-read the original Transformer paper with a working implementation in hand, mapping every component in the paper to the code written across this capstone."
 prerequisites: ["rope-rmsnorm"]
 codeExempt: true
@@ -51,6 +51,87 @@ graph LR
   DE --> CA
   CA --> O["next-token logits"]
 ```
+
+## Exercises
+
+**Exercise 1.** The component map in §1 lists six paper elements and where each
+was implemented in the capstone. One row reads "omitted: this is decoder-only".
+Name the paper element that row refers to, and state the single architectural
+decision that makes it unnecessary.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The omitted row is the encoder-decoder structure with
+cross-attention. In the 2017 model the encoder reads the full source sentence
+and the decoder attends to it through a cross-attention sublayer.
+
+**Step 2.** The decision that removes it is choosing a decoder-only design. A
+decoder-only language model has a single stack that attends causally to its own
+prefix, so there is no separate source sequence to encode and nothing for
+cross-attention to bridge. The task is next-token prediction over one stream,
+not mapping a source stream to a target stream.
+
+</details>
+
+**Exercise 2.** §2 states that post-norm in the paper became pre-norm in the
+capstone. Explain, at the level of the residual stream, why pre-norm is the
+arrangement that trains stably at depth, and what specifically goes wrong with
+post-norm as the stack grows.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Pre-norm normalizes the input of each sublayer branch and adds the
+branch output back to the stream: $x \leftarrow x + \text{sublayer}(\text{norm}(x))$.
+The residual path itself is never normalized, so the identity connection passes
+the stream through unscaled from input to output.
+
+**Step 2.** Because that identity path is clean, the gradient of the loss with
+respect to an early layer flows back through an unbroken chain of additions. The
+gradient magnitude does not get repeatedly rescaled by a normalization Jacobian
+at every layer, so it neither vanishes nor explodes as depth grows.
+
+**Step 3.** Post-norm instead normalizes the sum: $x \leftarrow \text{norm}(x + \text{sublayer}(x))$.
+The normalization now sits on the main path, so every layer rescales both the
+forward activations and the backward gradient. Stacked over many layers these
+rescalings compound, and deep post-norm models need warmup and careful
+initialization to train at all. Pre-norm avoids the compounding by keeping the
+residual highway free of normalization.
+
+</details>
+
+**Exercise 3.** §3 lists pieces the capstone added after 2017 and claims "the
+attention mechanism at the center is unchanged; almost everything around it is
+new." Pick RoPE and the KV cache, and for each argue whether it changes the
+attention computation itself or only its surrounding machinery. Use the
+distinction to defend or qualify the lesson's claim.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Scaled dot-product attention computes scores $q \cdot k / \sqrt{d_k}$,
+masks, softmaxes, and reads a weighted sum of values. The "mechanism at the
+center" is this score-softmax-aggregate operation.
+
+**Step 2.** RoPE rotates each query and key by an angle proportional to its
+position before the dot product is taken. It changes the *inputs* to the score,
+making the score depend on the relative offset $m - n$, but the
+score-softmax-aggregate operation it feeds is identical. So RoPE modifies how
+position enters, not the attention operation itself. This qualifies the claim
+slightly: the operation is unchanged, but what is fed into it is not.
+
+**Step 3.** The KV cache stores past keys and values so that decoding the next
+token reuses them instead of recomputing the whole prefix. It changes nothing
+about the mathematical result of attention; it is an efficiency rearrangement of
+the same computation. This is the clean case of "machinery around it is new"
+while the mechanism is untouched.
+
+**Step 4.** The claim holds in its strong form for the KV cache and in a
+softened form for RoPE: the attention operation is the same, while its
+positional inputs and its execution schedule are what the post-2017 era changed.
+
+</details>
 
 ## 4. Where to go next
 

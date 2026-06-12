@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: ppo-rlhf
 order: 5
-estimatedMinutes: 25
+estimatedMinutes: 35
 goal: "Run the four-model RLHF training loop (policy, reference, reward, value), derive the PPO clipped surrogate objective, and see how the KL penalty prevents reward hacking."
 prerequisites: ["reward-modeling", "D1/dl-optimizers"]
 ---
@@ -152,6 +152,91 @@ graph LR
 - **Complexity:** requires four model instances simultaneously, substantial GPU memory.
 - **Instability:** PPO is sensitive to learning rate, KL coefficient, and advantage normalization.
 - **Value model:** requires training a separate value head, which adds a second optimization loop.
+
+## Exercises
+
+**Exercise 1.** With clip parameter $\epsilon = 0.2$, evaluate the PPO clipped objective
+$\min(\rho A, \text{clip}(\rho, 0.8, 1.2) A)$ for these cases: (a) $\rho = 1.5$, $A = +3$;
+(b) $\rho = 1.5$, $A = -3$; (c) $\rho = 0.5$, $A = +3$. Explain in each case whether the
+clip is active and what behavior it enforces.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) $\rho = 1.5$, $A > 0$. Unclipped: $1.5 \times 3 = 4.5$. Clipped:
+$\text{clip}(1.5, 0.8, 1.2) = 1.2$, giving $1.2 \times 3 = 3.6$. The min is $\min(4.5, 3.6) = 3.6$.
+The clip is active: for a good action the objective stops rewarding pushing $\rho$ above
+$1.2$, capping how far the policy moves.
+
+**Step 2.** (b) $\rho = 1.5$, $A < 0$. Unclipped: $1.5 \times (-3) = -4.5$. Clipped:
+$1.2 \times (-3) = -3.6$. The min is $\min(-4.5, -3.6) = -4.5$, the unclipped term. Here the
+clip does **not** protect the policy: a bad action that became more likely
+($\rho > 1$) keeps the full negative objective, so the update strongly discourages it.
+
+**Step 3.** (c) $\rho = 0.5$, $A > 0$. Unclipped: $0.5 \times 3 = 1.5$. Clipped:
+$\text{clip}(0.5, 0.8, 1.2) = 0.8$, giving $0.8 \times 3 = 2.4$. The min is $\min(1.5, 2.4) = 1.5$,
+the unclipped term. For a good action that became less likely, the objective uses the
+smaller unclipped value, letting the gradient pull $\rho$ back up.
+
+</details>
+
+**Exercise 2.** The per-token KL-modified reward at a non-terminal step is
+$\hat r_t = -\beta \log \frac{\pi_\theta(y_t \mid s_t)}{\pi_{\text{ref}}(y_t \mid s_t)}$.
+With $\beta = 0.1$, compute $\hat r_t$ when the policy makes a token (a) $e^2 \approx 7.39\times$
+more likely than the reference, and (b) equally likely. Explain the sign in each case.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** (a) The log-ratio is $\log(e^2) = 2$, so
+$\hat r_t = -0.1 \times 2 = -0.2$. The reward is negative: the policy is penalized for
+drifting above the reference on this token, which is the KL term pushing back toward the
+SFT distribution.
+
+**Step 2.** (b) Equally likely means $\pi_\theta = \pi_{\text{ref}}$, log-ratio $= \log 1 = 0$,
+so $\hat r_t = -0.1 \times 0 = 0$. No penalty where the policy agrees with the reference.
+
+**Step 3.** The per-token reward is zero exactly when the policy matches the reference and
+turns negative as the policy diverges, so summed over the response it is the negative KL
+divergence (times $\beta$); only the terminal step adds the actual task reward $r_\phi(x, y)$.
+
+</details>
+
+**Exercise 3 (code).** Implement the PPO clipped surrogate (per token) in numpy and verify
+the three cases from Exercise 1. Then confirm that for $A > 0$ the clipped objective never
+exceeds $(1 + \epsilon) A$, so the per-sample improvement is bounded.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def ppo_objective(ratio, adv, eps=0.2):
+    ratio = np.asarray(ratio, float)
+    adv   = np.asarray(adv, float)
+    unclipped = ratio * adv
+    clipped   = np.clip(ratio, 1 - eps, 1 + eps) * adv
+    return np.minimum(unclipped, clipped)
+
+# Exercise 1 cases (a), (b), (c).
+obj = ppo_objective([1.5, 1.5, 0.5], [3.0, -3.0, 3.0])
+assert np.allclose(obj, [3.6, -4.5, 1.5])
+
+# For A > 0 the objective is capped at (1 + eps) * A regardless of how large ratio gets.
+rng = np.random.default_rng(0)
+ratios = rng.uniform(0.1, 5.0, 1000)
+adv_pos = 2.0
+capped = ppo_objective(ratios, np.full_like(ratios, adv_pos))
+assert np.all(capped <= (1 + 0.2) * adv_pos + 1e-9)
+print("Ex.1 objectives:", np.round(obj, 4))
+```
+
+The objectives match $3.6, -4.5, 1.5$, and for positive advantage the clipped surrogate
+never rises above $(1 + \epsilon)A = 2.4$, the bound that keeps each PPO step from
+overshooting.
+
+</details>
 
 DPO (next lesson) eliminates the reward model and value model entirely by showing that the
 optimal policy under the KL-penalized RLHF objective can be expressed as a closed-form
