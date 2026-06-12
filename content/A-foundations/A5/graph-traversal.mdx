@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: graph-traversal
 order: 10
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Represent graphs and traverse them with breadth-first and depth-first search."
 prerequisites: ["arrays-hashing"]
 ---
@@ -155,8 +155,97 @@ print("triangle cycle?", has_cycle(cyclic))             # True
 
 BFS produces level-order vertices and shortest-path distances, DFS produces a
 depth-first walk and a topological sort, and the cycle detector flags a back edge in
-the triangle graph. The next lesson generalizes BFS to weighted edges with Dijkstra's
-algorithm.
+the triangle graph.
+
+## Exercises
+
+**Exercise 1.** Run BFS by hand from vertex A on the lesson's graph
+($A \to B, C$; $B \to D$; $C \to D, E$; $D \to F$; $E \to F$; $F$ has no edges),
+breaking ties by visiting neighbors in listed order. Give the visit order and the
+BFS distance of every vertex from A.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Start: visit A at distance 0, enqueue its neighbors B, C.
+
+**Step 2.** Dequeue B (distance 1), enqueue D. Dequeue C (distance 1), enqueue E
+(D already queued, skip the duplicate from C).
+
+**Step 3.** Dequeue D (distance 2), enqueue F. Dequeue E (distance 2), F already
+queued. Dequeue F (distance 3).
+
+Visit order: A, B, C, D, E, F. Distances: A 0, B 1, C 1, D 2, E 2, F 3. The
+distance is the BFS level at which each vertex is first reached.
+
+</details>
+
+**Exercise 2.** Prove that during a DFS of a directed graph, finding an edge
+$u \to v$ where $v$ is currently on the recursion stack (a "back edge") implies the
+graph contains a cycle. Then explain why no back edge can appear in a DFS of a DAG.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Say DFS is exploring $u$ and encounters $u \to v$ with $v$ still on the
+recursion stack. Being on the stack means $v$ was entered before $u$ and has not
+yet finished, so there is an active path of tree edges from $v$ down to $u$:
+$v \rightsquigarrow u$.
+
+**Step 2.** The edge $u \to v$ closes that path into a cycle
+$v \rightsquigarrow u \to v$. So a back edge witnesses a directed cycle.
+
+**Step 3.** A DAG is acyclic by definition, so no such cycle exists, hence no back
+edge can occur. Every edge in a DFS of a DAG points to a vertex either not yet
+discovered (tree edge) or already finished (forward or cross edge), never to one
+still on the stack. This is exactly why DFS cycle detection is a correct
+acyclicity test.
+
+</details>
+
+**Exercise 3 (code).** BFS computes shortest-path lengths in an *unweighted*
+graph. Build a small grid graph (each cell connected to its 4-neighbors), run BFS
+from one corner, and assert the distance to the opposite corner of an $r \times c$
+grid equals the Manhattan distance $(r-1) + (c-1)$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from collections import deque
+
+r, c = 4, 5
+def neighbors(cell):
+    i, j = cell
+    for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        ni, nj = i + di, j + dj
+        if 0 <= ni < r and 0 <= nj < c:
+            yield (ni, nj)
+
+def bfs_dist(start, goal):
+    dist = {start: 0}
+    q = deque([start])
+    while q:
+        u = q.popleft()
+        for v in neighbors(u):
+            if v not in dist:
+                dist[v] = dist[u] + 1
+                q.append(v)
+    return dist[goal]
+
+d = bfs_dist((0, 0), (r - 1, c - 1))
+assert d == (r - 1) + (c - 1)               # Manhattan distance on an open grid
+print("BFS distance corner to corner:", d)
+```
+
+On an obstacle-free grid every shortest path takes $(r-1)$ vertical and $(c-1)$
+horizontal steps, so BFS recovers the Manhattan distance, confirming it finds
+shortest paths when all edges have equal weight.
+
+</details>
+
+The next lesson generalizes BFS to weighted edges with Dijkstra's algorithm.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Breadth-first and depth-first search (§22.2, §22.3).</FNItem>

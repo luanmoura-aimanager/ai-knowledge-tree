@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: kl-cross-entropy
 order: 15
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define KL divergence, prove it is nonnegative, and connect cross-entropy to maximum likelihood."
 prerequisites: ["entropy", "mle"]
 ---
@@ -123,7 +123,93 @@ print("mean cross-entropy loss:", round(ce, 4))
 
 KL is nonnegative and zero only against itself, the cross-entropy minus entropy
 identity holds, the two KL directions disagree, and the classification loss is the
-mean negative log-likelihood. The next lesson uses KL to measure how much two
+mean negative log-likelihood.
+
+## Exercises
+
+**Exercise 1.** With $p = (0.5, 0.5)$ and $q = (0.25, 0.75)$, compute
+$D_{\mathrm{KL}}(p \,\|\, q)$ and $D_{\mathrm{KL}}(q \,\|\, p)$ in bits by hand, and
+confirm they differ.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Forward direction, $\sum_x p(x)\log_2 \frac{p(x)}{q(x)}$:
+
+$$
+D_{\mathrm{KL}}(p \,\|\, q) = 0.5 \log_2 \frac{0.5}{0.25} + 0.5 \log_2 \frac{0.5}{0.75}
+= 0.5 \cdot 1 + 0.5 \log_2 \tfrac{2}{3}.
+$$
+
+With $\log_2 \tfrac{2}{3} = 1 - \log_2 3 \approx 1 - 1.585 = -0.585$, this is
+$0.5 - 0.2925 \approx 0.2075$ bits.
+
+**Step 2.** Reverse direction, $\sum_x q(x)\log_2 \frac{q(x)}{p(x)}$:
+
+$$
+D_{\mathrm{KL}}(q \,\|\, p) = 0.25 \log_2 \frac{0.25}{0.5} + 0.75 \log_2 \frac{0.75}{0.5}
+= 0.25 \cdot (-1) + 0.75 \log_2 1.5.
+$$
+
+With $\log_2 1.5 \approx 0.585$, this is $-0.25 + 0.4387 \approx 0.1887$ bits.
+
+**Step 3.** Both are positive, as Gibbs' inequality requires, and
+$0.2075 \neq 0.1887$: KL is not symmetric.
+
+</details>
+
+**Exercise 2.** Show that the cross-entropy $H(p, q)$ is minimized over $q$ exactly
+when $q = p$, and that its minimum value is the entropy $H(p)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Use the identity from the lesson, $H(p, q) = H(p) + D_{\mathrm{KL}}(p \,\|\, q)$.
+The first term $H(p)$ does not depend on $q$, so minimizing $H(p, q)$ over $q$ is
+minimizing $D_{\mathrm{KL}}(p \,\|\, q)$.
+
+**Step 2.** By Gibbs' inequality, $D_{\mathrm{KL}}(p \,\|\, q) \ge 0$ with equality
+if and only if $q = p$. So the cross-entropy is minimized precisely at $q = p$.
+
+**Step 3.** At that minimizer the divergence term vanishes and
+$H(p, q) = H(p) + 0 = H(p)$. The best a model can do is match the true distribution,
+and then it pays only the irreducible cost $H(p)$.
+
+</details>
+
+**Exercise 3 (code).** Sample-estimate the cross-entropy $H(p, q)$ as the mean of
+$-\log q(X)$ over draws $X \sim p$, and confirm it equals
+$H(p) + D_{\mathrm{KL}}(p \,\|\, q)$ computed exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(15)
+
+p = np.array([0.5, 0.3, 0.2])
+q = np.array([0.4, 0.4, 0.2])
+
+# Monte Carlo cross-entropy: E_{X~p}[-log q(X)]
+X = rng.choice(3, size=2_000_000, p=p)
+ce_mc = -np.log(q[X]).mean()
+
+H_p = -(p * np.log(p)).sum()
+kl_pq = (p * np.log(p / q)).sum()
+ce_exact = H_p + kl_pq
+
+assert np.isclose(ce_mc, ce_exact, atol=2e-3)
+print("cross-entropy MC:", round(ce_mc, 4), " H(p)+KL:", round(ce_exact, 4))
+```
+
+The sampled cross-entropy matches $H(p) + D_{\mathrm{KL}}(p \,\|\, q)$, the
+decomposition the whole lesson rests on.
+
+</details>
+
+The next lesson uses KL to measure how much two
 variables tell you about each other: mutual information.
 
 <Footnotes>

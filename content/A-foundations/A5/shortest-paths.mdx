@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: shortest-paths
 order: 11
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Find shortest paths with Dijkstra's algorithm and understand where it breaks."
 prerequisites: ["graph-traversal", "heaps"]
 ---
@@ -135,8 +135,114 @@ print("Dijkstra dist[D] =", dist_neg["D"], "  true shortest = 0 via A->C->B->D")
 
 Dijkstra reports the correct distances and reconstructs the path on the
 nonnegative graph, and silently returns the wrong answer on the negative-edge
-example, illustrating the precondition. The next lesson finds the cheapest tree that
-connects every vertex: the minimum spanning tree.
+example, illustrating the precondition.
+
+## Exercises
+
+**Exercise 1.** Run Dijkstra by hand from source $A$ on the graph with edges
+$A \to B$ (weight 4), $A \to C$ (weight 1), $C \to B$ (weight 2),
+$C \to D$ (weight 5), $B \to D$ (weight 1). Give the order vertices are settled and
+the final distances.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Initialize $d[A] = 0$ and all others to $\infty$. The queue holds
+$(0, A)$.
+
+**Step 2.** Pop $A$ ($d = 0$), settle it. Relax its edges: $d[B] = 4$,
+$d[C] = 1$.
+
+**Step 3.** Pop the smallest, $C$ ($d = 1$), settle it. Relax: $A \to C \to B$
+gives $1 + 2 = 3 < 4$, so $d[B] = 3$; $C \to D$ gives $1 + 5 = 6$, so $d[D] = 6$.
+
+**Step 4.** Pop $B$ ($d = 3$), settle it. Relax $B \to D$: $3 + 1 = 4 < 6$, so
+$d[D] = 4$.
+
+**Step 5.** Pop $D$ ($d = 4$), settle it; no outgoing edges. Queue is drained of
+unsettled vertices.
+
+Settle order: $A, C, B, D$. Final distances: $d[A] = 0$, $d[C] = 1$, $d[B] = 3$,
+$d[D] = 4$.
+
+</details>
+
+**Exercise 2.** The correctness proof relies on $\text{dist}(s, v_i) \le \text{dist}(s, u)$ for a vertex $v_i$ on the shortest path to $u$. Show this step
+fails when one edge has negative weight, by giving a three-vertex graph where
+Dijkstra settles a vertex with the wrong distance.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take vertices $s, a, b$ with edges $s \to a$ (weight 2),
+$s \to b$ (weight 3), and $b \to a$ (weight $-2$).
+
+**Step 2.** Dijkstra pops $s$, relaxes to $d[a] = 2$ and $d[b] = 3$. It then pops
+$a$ (the smaller tentative distance, 2) and settles it as final.
+
+**Step 3.** But the true shortest path to $a$ is $s \to b \to a$ with weight
+$3 + (-2) = 1 < 2$. Dijkstra settled $a$ at 2 before exploring $b$, and never
+revisits a settled vertex, so it reports 2.
+
+**Step 4.** The failed proof step is exactly $\text{dist}(s, a) \le \text{dist}(s, b)$: here $\text{dist}(s, a) = 1$ but $\text{dist}(s, b) = 3$, so $a$'s true
+distance is not bounded by the order in which the queue pops vertices. The
+negative edge breaks the monotonicity the greedy argument needs.
+
+</details>
+
+**Exercise 3 (code).** Extend the Dijkstra implementation so that, alongside the
+distance, it returns the number of distinct shortest paths from the source to each
+vertex (paths of exactly the minimum weight). Assert the count on a small diamond
+graph.
+
+<details>
+<summary>Solution</summary>
+
+When relaxing an edge that strictly improves $d[v]$, the count is inherited from
+$d[u]$; when an edge ties the current best, the counts add. Counting only on the
+settled (final) distance avoids double counting from stale queue entries.
+
+```python
+import heapq
+
+def dijkstra_counts(graph, source):
+    dist = {u: float("inf") for u in graph}
+    ways = {u: 0 for u in graph}
+    dist[source] = 0
+    ways[source] = 1
+    pq = [(0, source)]
+    settled = set()
+    while pq:
+        d, u = heapq.heappop(pq)
+        if u in settled: continue
+        settled.add(u)
+        for v, w in graph[u]:
+            nd = d + w
+            if nd < dist[v]:
+                dist[v] = nd
+                ways[v] = ways[u]            # new strictly-better path
+                heapq.heappush(pq, (nd, v))
+            elif nd == dist[v]:
+                ways[v] += ways[u]           # another path of equal length
+    return dist, ways
+
+# Diamond: A->B and A->C both cost 1, B->D and C->D both cost 1.
+# Two shortest A->D paths (via B, via C), each of length 2.
+g = {
+    "A": [("B", 1), ("C", 1)],
+    "B": [("D", 1)],
+    "C": [("D", 1)],
+    "D": [],
+}
+dist, ways = dijkstra_counts(g, "A")
+assert dist["D"] == 2 and ways["D"] == 2
+print(dist["D"], ways["D"])
+```
+
+</details>
+
+The next lesson finds the cheapest tree that connects every vertex: the minimum
+spanning tree.
 
 <Footnotes>
   <FNItem n="1">**Dijkstra, E. W.** (1959). "A note on two problems in connexion with graphs". *Numerische Mathematik*, 1, 269-271. [doi:10.1007/BF01386390](https://doi.org/10.1007/BF01386390)</FNItem>

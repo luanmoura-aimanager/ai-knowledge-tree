@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: mutual-information
 order: 16
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define mutual information and read it as the KL divergence between the joint and the product of marginals."
 prerequisites: ["kl-cross-entropy"]
 ---
@@ -124,6 +124,105 @@ print("Cov(X, X^2):", round(cov, 4), " but MI:", round(mutual_info(joint), 4), "
 
 Independent variables score zero, $Y = X$ scores the full entropy, and the
 nonlinear $Y = X^2$ has zero covariance yet clearly positive mutual information.
+
+## Exercises
+
+**Exercise 1.** A joint distribution over $(X, Y)$ with $X, Y \in \{0, 1\}$ has
+$p(0,0) = p(1,1) = 0.4$ and $p(0,1) = p(1,0) = 0.1$. Compute $I(X; Y)$ in bits by
+hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The marginals are uniform: $p_X(0) = 0.4 + 0.1 = 0.5$ and likewise
+$p_X(1) = p_Y(0) = p_Y(1) = 0.5$. So every product $p(x)p(y) = 0.25$.
+
+**Step 2.** Plug into $I(X;Y) = \sum_{x,y} p(x,y)\log_2\frac{p(x,y)}{p(x)p(y)}$. The
+two diagonal cells contribute $0.4\log_2\frac{0.4}{0.25}$ each and the two
+off-diagonal cells $0.1\log_2\frac{0.1}{0.25}$ each:
+
+$$
+I = 2 \cdot 0.4\log_2 1.6 + 2 \cdot 0.1\log_2 0.4.
+$$
+
+**Step 3.** Evaluate: $\log_2 1.6 = 0.6781$ and $\log_2 0.4 = -1.3219$, so
+
+$$
+I = 0.8 \cdot 0.6781 + 0.2 \cdot (-1.3219) = 0.5425 - 0.2644 = 0.278 \text{ bits}.
+$$
+
+Positive and below the $1$-bit cap $\min(H(X), H(Y)) = 1$, as the bound requires.
+
+</details>
+
+**Exercise 2.** Prove that $I(X; Y) = 0$ when $X$ and $Y$ are independent, directly
+from the definition, without invoking the Gibbs inequality.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Independence means $p(x, y) = p(x)\,p(y)$ for every pair, so the ratio
+inside the log is
+
+$$
+\frac{p(x, y)}{p(x)\,p(y)} = \frac{p(x)\,p(y)}{p(x)\,p(y)} = 1.
+$$
+
+**Step 2.** Then $\log\frac{p(x,y)}{p(x)p(y)} = \log 1 = 0$ in every term, so the
+sum is
+
+$$
+I(X; Y) = \sum_{x, y} p(x, y) \cdot 0 = 0.
+$$
+
+Independence makes the joint equal to the product of marginals, the exact reference
+point mutual information measures distance from.
+
+</details>
+
+**Exercise 3 (code).** For a bivariate Gaussian with correlation $\rho$, the closed
+form is $I = -\tfrac12\log_2(1 - \rho^2)$ bits. Build a discretized joint table for
+$\rho = 0.5$ by binning samples and confirm the plug-in estimate approaches the
+closed form.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def mutual_info(joint):
+    joint = joint / joint.sum()
+    px = joint.sum(axis=1, keepdims=True)
+    py = joint.sum(axis=0, keepdims=True)
+    mask = joint > 0
+    return np.sum(joint[mask] * np.log2(joint[mask] / (px * py)[mask]))
+
+rng = np.random.default_rng(21)
+rho = 0.5
+N = 2_000_000
+z1 = rng.normal(size=N)
+z2 = rng.normal(size=N)
+x = z1
+y = rho * z1 + np.sqrt(1 - rho**2) * z2          # corr(x, y) = rho
+
+# Bin into a joint histogram; finer bins approach the continuous MI
+edges = np.linspace(-4, 4, 41)
+joint, _, _ = np.histogram2d(x, y, bins=[edges, edges])
+mi_est = mutual_info(joint)
+closed = -0.5 * np.log2(1 - rho**2)
+
+# Binning loses some information, so the estimate sits a bit below the truth
+assert abs(mi_est - closed) < 0.05
+print("MI estimate:", round(mi_est, 4), " closed form:", round(closed, 4))
+```
+
+The binned plug-in estimate lands within a few hundredths of the closed-form
+$-\tfrac12\log_2(1 - 0.25) = 0.2075$ bits; the small gap is the discretization
+discarding sub-bin structure.
+
+</details>
+
 The next lesson moves from static dependence to dependence over time: Markov chains.
 
 <Footnotes>

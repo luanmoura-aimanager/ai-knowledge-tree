@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: norms
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Define norms via their three axioms, meet the p-norms, and connect L1 and L2 to sparsity and Euclidean length."
 prerequisites: ["vector-spaces"]
 ---
@@ -140,6 +140,81 @@ print(f"L2 solution nonzeros: {np.sum(np.abs(x_l2) > 1e-8)}")  # likely 3 (full)
 
 The L2 solution typically uses all available coordinates; a proper L1 solve
 (requires a QP or LASSO solver not shown here) would produce a sparse vector.
+
+## Exercises
+
+**Exercise 1.** For $v = (3, -4, 12)$, compute $\lVert v\rVert_1$,
+$\lVert v\rVert_2$, and $\lVert v\rVert_\infty$ by hand, and check that the chain
+$\lVert v\rVert_\infty \le \lVert v\rVert_2 \le \lVert v\rVert_1$ holds.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sum of absolute values: $\lVert v\rVert_1 = 3 + 4 + 12 = 19$.
+
+**Step 2.** Euclidean length: $\lVert v\rVert_2 = \sqrt{9 + 16 + 144} = \sqrt{169} = 13$.
+
+**Step 3.** Largest magnitude: $\lVert v\rVert_\infty = \max(3, 4, 12) = 12$.
+
+The ordering $12 \le 13 \le 19$ holds, matching the general inequality
+$\lVert v\rVert_\infty \le \lVert v\rVert_2 \le \lVert v\rVert_1$.
+
+</details>
+
+**Exercise 2.** Prove the triangle inequality fails for the "norm"
+$N(v) = \left(\sum_i |v_i|^{1/2}\right)^2$ (the $p = 1/2$ case), so $\ell^p$ with
+$p$ below 1 is not a norm. Use $u = (1, 0)$ and $v = (0, 1)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute the two pieces separately. For $u = (1, 0)$,
+$N(u) = (|1|^{1/2})^2 = 1$, and likewise $N(v) = 1$, so $N(u) + N(v) = 2$.
+
+**Step 2.** Compute the combined vector $u + v = (1, 1)$:
+
+$$
+N(u + v) = \left(1^{1/2} + 1^{1/2}\right)^2 = (1 + 1)^2 = 4.
+$$
+
+**Step 3.** The triangle inequality demands $N(u + v) \le N(u) + N(v)$, that is
+$4 \le 2$, which is false. So $N$ violates axiom 3 and is not a norm; the exponent
+$p \ge 1$ in the lesson is what the triangle inequality (Minkowski) requires.
+
+</details>
+
+**Exercise 3 (code).** Generate 100000 random vectors in $\mathbb{R}^{10}$ and
+confirm the equivalence chain
+$\lVert v\rVert_\infty \le \lVert v\rVert_2 \le \lVert v\rVert_1 \le \sqrt{n}\,\lVert v\rVert_2$
+holds for every one of them.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 10
+V = rng.normal(size=(100_000, n))
+
+l1 = np.linalg.norm(V, ord=1, axis=1)
+l2 = np.linalg.norm(V, ord=2, axis=1)
+linf = np.linalg.norm(V, ord=np.inf, axis=1)
+
+tol = 1e-9
+assert np.all(linf <= l2 + tol)
+assert np.all(l2 <= l1 + tol)
+assert np.all(l1 <= np.sqrt(n) * l2 + tol)
+print("all", len(V), "vectors satisfy the equivalence chain")
+```
+
+Each inequality holds across all samples: the norms differ by bounded factors, the
+constants $1$ and $\sqrt{n}$ being the explicit equivalence constants for these
+three norms on $\mathbb{R}^n$.
+
+</details>
+
 With a norm in hand, the inner-products lesson adds the angle between two vectors.
 
 <Footnotes>

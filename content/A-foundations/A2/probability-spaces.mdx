@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: probability-spaces
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Set up a probability space from the three axioms and compute probabilities of compound events."
 prerequisites: []
 ---
@@ -129,8 +129,98 @@ print(f"P(not A)    = {(~A).mean():.4f}   1 - P(A) = {1 - pA:.4f}")
 ```
 
 The empirical frequencies match the counting probabilities, and inclusion-exclusion
-and the complement rule hold to sampling precision. With a probability space in
-place, the next lesson attaches numbers to outcomes through random variables.
+and the complement rule hold to sampling precision.
+
+## Exercises
+
+**Exercise 1.** A fair die is rolled once. Let $A = \{2, 4, 6\}$ (even) and
+$B = \{4, 5, 6\}$ (greater than 3). Compute $P(A \cup B)$ two ways: by counting the
+union directly, and by inclusion-exclusion.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By counting: $A \cup B = \{2, 4, 5, 6\}$ has 4 outcomes out of 6, so
+$P(A \cup B) = 4/6 = 2/3$.
+
+**Step 2.** By inclusion-exclusion: $P(A) = 3/6$, $P(B) = 3/6$, and the
+intersection $A \cap B = \{4, 6\}$ has $P(A \cap B) = 2/6$. Then
+
+$$
+P(A \cup B) = \frac{3}{6} + \frac{3}{6} - \frac{2}{6} = \frac{4}{6} = \frac{2}{3}.
+$$
+
+Both routes agree, as the inclusion-exclusion derivation guarantees.
+
+</details>
+
+**Exercise 2.** Prove **Boole's inequality** (the union bound) for two events:
+$P(A \cup B) \le P(A) + P(B)$, using only the axioms and the results derived in this
+lesson.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Inclusion-exclusion gives the exact identity
+
+$$
+P(A \cup B) = P(A) + P(B) - P(A \cap B).
+$$
+
+**Step 2.** By nonnegativity (axiom 1), $P(A \cap B) \ge 0$. Subtracting a
+nonnegative quantity can only decrease the right side:
+
+$$
+P(A) + P(B) - P(A \cap B) \le P(A) + P(B).
+$$
+
+**Step 3.** Chaining the two lines,
+
+$$
+P(A \cup B) \le P(A) + P(B),
+$$
+
+with equality exactly when $P(A \cap B) = 0$ (the events overlap on a
+probability-zero set). The bound trades the exact overlap correction for a one-sided
+estimate.
+
+</details>
+
+**Exercise 3 (code).** Simulate one million rolls of two fair dice. Estimate
+$P(A \cup B)$ for $A = \{\text{sum} = 8\}$ and $B = \{\text{at least one } 6\}$, and
+check that the Monte Carlo estimate matches the inclusion-exclusion value computed
+from the empirical pieces.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+N = 1_000_000
+d1 = rng.integers(1, 7, size=N)
+d2 = rng.integers(1, 7, size=N)
+
+A = (d1 + d2 == 8)              # sum is 8
+B = (d1 == 6) | (d2 == 6)       # at least one 6
+
+pA, pB, pAB = A.mean(), B.mean(), (A & B).mean()
+direct = (A | B).mean()
+incl_excl = pA + pB - pAB
+
+assert np.isclose(direct, incl_excl, atol=1e-12)
+print("P(A or B) direct:", round(direct, 4),
+      " incl-excl:", round(incl_excl, 4))
+```
+
+The direct union frequency and the inclusion-exclusion reconstruction agree
+exactly, since both are computed from the same simulated trials.
+
+</details>
+
+With a probability space in place, the next lesson attaches numbers to outcomes
+through random variables.
 
 <Footnotes>
   <FNItem n="1">**Wasserman, L.** (2004). *All of Statistics.* Springer. Ch. 1, sample spaces and the probability axioms. [doi:10.1007/978-0-387-21736-9](https://doi.org/10.1007/978-0-387-21736-9)</FNItem>

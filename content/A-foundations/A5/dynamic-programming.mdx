@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: dynamic-programming
 order: 8
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Recognize optimal substructure and overlapping subproblems, and build DP solutions."
 prerequisites: ["divide-and-conquer"]
 ---
@@ -143,9 +143,106 @@ print(f"LCS length={length}, sequence='{seq}'")     # 4, 'ittn'
 ```
 
 The memoized Fibonacci is orders of magnitude faster than the exponential naive
-version, and the LCS table both gives the length and reconstructs the sequence. The
-next lesson examines when a *greedy* strategy, no table needed, can also reach an
-optimum.
+version, and the LCS table both gives the length and reconstructs the sequence.
+
+## Exercises
+
+**Exercise 1.** Fill the LCS table for $X = $ "ABCBDAB" and $Y = $ "BDCAB" by
+hand using the recurrence, and read off the LCS length.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Index rows by $X$ (length 7) and columns by $Y$ (length 5), with row 0
+and column 0 all zeros. Apply $L(i,j) = L(i-1,j-1)+1$ when $x_i = y_j$, else
+$\max(L(i-1,j), L(i,j-1))$. The completed table (rows $i = 0..7$, columns
+$j = 0..5$):
+
+| | "" | B | D | C | A | B |
+|---|---|---|---|---|---|---|
+| "" | 0 | 0 | 0 | 0 | 0 | 0 |
+| A | 0 | 0 | 0 | 0 | 1 | 1 |
+| B | 0 | 1 | 1 | 1 | 1 | 2 |
+| C | 0 | 1 | 1 | 2 | 2 | 2 |
+| B | 0 | 1 | 1 | 2 | 2 | 3 |
+| D | 0 | 1 | 2 | 2 | 2 | 3 |
+| A | 0 | 1 | 2 | 2 | 3 | 3 |
+| B | 0 | 1 | 2 | 2 | 3 | 4 |
+
+**Step 2.** The bottom-right cell $L(7,5) = 4$ is the LCS length. One LCS is
+"BDAB" (also "BCAB"), of length 4.
+
+</details>
+
+**Exercise 2.** Explain why naive recursive Fibonacci is $\Theta(\phi^n)$ while it
+contains only $n$ distinct subproblems, and why memoization drops it to
+$\Theta(n)$. Count the number of calls to `fib_naive(0)` plus `fib_naive(1)` when
+computing $F(5)$ to make the redundancy concrete.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Without caching, $F(n)$ calls $F(n-1)$ and $F(n-2)$, which call their
+own predecessors. The number of leaf calls (those hitting the base cases) is
+exactly $F(n+1)$, and the total node count of the call tree grows like
+$\phi^n$ where $\phi = (1+\sqrt5)/2$. Each of the $n$ distinct values $F(0)..F(n)$
+is recomputed many times, once per path that reaches it.
+
+**Step 2.** Concretely for $F(5)$: the base-case calls number $F(6) = 8$. Counting
+by hand, `fib_naive(1)` is called 5 times and `fib_naive(0)` 3 times, totaling 8
+base hits to produce a single answer.
+
+**Step 3.** Memoization stores each $F(k)$ on first computation. There are $n$
+distinct subproblems, each solved once at $O(1)$ work, so the runtime is
+$\Theta(n)$. The exponential blowup was entirely repeated work, not distinct work.
+
+</details>
+
+**Exercise 3 (code).** Implement the 0/1 knapsack DP $K(i, w)$ = best value using
+items $1..i$ within weight budget $w$, with a back-pointer reconstruction of which
+items are chosen. Verify on weights $[1, 3, 4, 5]$, values $[1, 4, 5, 7]$, budget
+7, that the optimum is value 9 (items of weight 3 and 4).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+weights = [1, 3, 4, 5]
+values  = [1, 4, 5, 7]
+budget  = 7
+nI = len(weights)
+
+K = np.zeros((nI + 1, budget + 1), dtype=int)
+for i in range(1, nI + 1):
+    w, v = weights[i-1], values[i-1]
+    for c in range(budget + 1):
+        K[i][c] = K[i-1][c]                       # skip item i
+        if w <= c:                                # or take it
+            K[i][c] = max(K[i][c], K[i-1][c-w] + v)
+
+# Reconstruct: an item was taken when its row improved on the row above.
+chosen, c = [], budget
+for i in range(nI, 0, -1):
+    if K[i][c] != K[i-1][c]:
+        chosen.append(i - 1)
+        c -= weights[i-1]
+
+best = int(K[nI][budget])
+assert best == 9
+assert sorted(weights[j] for j in chosen) == [3, 4]
+print("optimum:", best, " items (0-indexed):", sorted(chosen))
+```
+
+The table's bottom-right cell holds the optimum 9, and walking the back-pointers
+recovers the weight-3 and weight-4 items, the pair the greedy value-per-weight
+rule would miss.
+
+</details>
+
+The next lesson examines when a *greedy* strategy, no table needed, can also reach
+an optimum.
 
 <Footnotes>
   <FNItem n="1">**Bellman, R.** (1957). *Dynamic Programming.* Princeton University Press. The original formulation of the principle of optimality.</FNItem>

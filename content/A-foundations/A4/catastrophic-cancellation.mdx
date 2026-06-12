@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: catastrophic-cancellation
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "See how subtracting near-equal numbers destroys precision, and reformulate to avoid it."
 prerequisites: ["floating-point"]
 ---
@@ -101,7 +101,88 @@ print("after shifting bulk out:", recovered)
 
 The naive quadratic formula loses ~7 digits on the cancelling root; the half-angle
 identity preserves precision while $1 - \cos$ collapses to zero; and shifting the
-bulk out of the data restores significance. The next lesson tackles the most common
+bulk out of the data restores significance.
+
+## Exercises
+
+**Exercise 1.** The numbers $a = 1.000000001$ and $b = 1.0$ are each known to relative
+error $\varepsilon = 10^{-16}$. Using the cancellation bound
+$\frac{|\Delta c|}{|c|} \approx \frac{2|a|}{|c|}\,\varepsilon$, estimate how many
+significant digits survive in $c = a - b$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The exact difference is $c = a - b = 10^{-9}$, while $|a| \approx 1$.
+
+**Step 2.** Substitute into the bound:
+
+$$
+\frac{|\Delta c|}{|c|} \approx \frac{2 \cdot 1}{10^{-9}} \cdot 10^{-16} = 2 \times 10^{-7}.
+$$
+
+**Step 3.** A relative error of $2 \times 10^{-7}$ means about $7$ correct digits
+remain. The subtraction itself is exact in IEEE-754, but the inherited input error of
+the operands, originally in the 16th digit, is now in the 7th digit of the much
+smaller result: roughly $9$ digits are lost, matching $|a|/|c| = 10^9$.
+
+</details>
+
+**Exercise 2.** Derive a cancellation-free form of $\sqrt{x + 1} - \sqrt{x}$ for large
+$x$, and explain why it is stable.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For large $x$ the two square roots are nearly equal, so subtracting them
+directly cancels. Multiply by the conjugate over itself:
+
+$$
+\sqrt{x + 1} - \sqrt{x} = \frac{(\sqrt{x + 1} - \sqrt{x})(\sqrt{x + 1} + \sqrt{x})}{\sqrt{x + 1} + \sqrt{x}} = \frac{(x + 1) - x}{\sqrt{x + 1} + \sqrt{x}}.
+$$
+
+**Step 2.** The numerator simplifies to $1$, giving
+
+$$
+\sqrt{x + 1} - \sqrt{x} = \frac{1}{\sqrt{x + 1} + \sqrt{x}}.
+$$
+
+**Step 3.** The rewritten form has no subtraction of near-equal numbers: it is a
+division of $1$ by a sum of two positive quantities. The cancellation of near-equal
+roots became an addition, which never loses significance, so every digit is retained.
+
+</details>
+
+**Exercise 3 (code).** Solve $x^2 + bx + c = 0$ with $b = 10^8$, $c = 1$. Compute the
+small root with the naive $(-b + \sqrt{b^2 - 4c})/2$ and with the Vieta form
+$x_2 = c / x_1$ where $x_1$ is the well-conditioned root. Show the naive root is wrong
+and the Vieta root agrees with $-c/b$ to full precision.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+b, c = 1e8, 1.0
+x1 = (-b - np.sqrt(b**2 - 4*c)) / 2     # well-conditioned root, ~ -1e8
+naive = (-b + np.sqrt(b**2 - 4*c)) / 2  # cancels
+vieta = c / x1                          # stable small root
+
+# For |b| huge and c = 1, the small root is approximately -c/b = -1e-8.
+approx = -c / b
+assert abs(vieta - approx) < 1e-20      # Vieta matches to full precision
+assert abs(naive - approx) > 1e-9       # naive root is far off
+print("naive +root:", naive, "  Vieta +root:", vieta, "  -c/b:", approx)
+```
+
+The naive root comes out near $-7.45 \times 10^{-9}$, off in the first digit, while
+the Vieta root is $-10^{-8}$ exactly, because the well-conditioned root carries no
+cancellation and the division inherits its precision.
+
+</details>
+
+The next lesson tackles the most common
 cancellation problem in machine learning: exponentials in softmax.
 
 <Footnotes>

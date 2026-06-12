@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: map-conjugate
 order: 13
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Add a prior, compute the posterior, and use conjugacy to keep it in closed form."
 prerequisites: ["bayes-rule", "mle"]
 ---
@@ -109,7 +109,89 @@ print("grid MAP:", round(q[np.argmax(post)], 3))
 
 The conjugate update gives a Beta posterior whose density matches the
 likelihood-times-prior computed on a grid, and the MAP mode pulls the estimate toward
-the prior on this small sample. The next lesson shifts from estimating distributions
+the prior on this small sample.
+
+## Exercises
+
+**Exercise 1.** Start from a $\text{Beta}(2, 2)$ prior on a coin's bias $q$. You
+observe $8$ heads in $10$ flips. Give the posterior distribution and compute its mean
+and MAP mode.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Beta-Bernoulli update adds successes to $\alpha$ and failures to
+$\beta$. With $\alpha = 2$, $\beta = 2$, $k = 8$, $n - k = 2$:
+
+$$
+p(q \mid \mathcal{D}) = \text{Beta}(\alpha + k,\ \beta + n - k) = \text{Beta}(10,\ 4).
+$$
+
+**Step 2.** Posterior mean $\frac{\alpha + k}{\alpha + \beta + n} = \frac{10}{14}
+= \frac{5}{7} \approx 0.714$.
+
+**Step 3.** MAP mode $\frac{\alpha + k - 1}{\alpha + \beta + n - 2} = \frac{9}{12}
+= 0.75$. Both sit below the MLE $k/n = 0.8$, pulled toward the prior mean $0.5$.
+
+</details>
+
+**Exercise 2.** Show that with a flat $\text{Beta}(1, 1)$ prior, the MAP mode equals
+the MLE $k/n$, and explain why this is the prior that adds no information.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The MAP mode formula is
+$\hat q_{\text{MAP}} = \frac{\alpha + k - 1}{\alpha + \beta + n - 2}$. Substitute
+$\alpha = \beta = 1$:
+
+$$
+\hat q_{\text{MAP}} = \frac{1 + k - 1}{1 + 1 + n - 2} = \frac{k}{n},
+$$
+
+which is the MLE.
+
+**Step 2.** The prior parameters act as pseudo-counts: $\text{Beta}(1, 1)$ adds
+$\alpha - 1 = 0$ prior successes and $\beta - 1 = 0$ prior failures. With zero
+pseudo-counts the prior contributes nothing to the mode, and $\text{Beta}(1, 1)$ is
+the uniform density on $[0, 1]$, flat over all biases.
+
+</details>
+
+**Exercise 3 (code).** Confirm the conjugate update numerically. Compute the
+normalized likelihood-times-prior on a grid for the Exercise 1 setting, and check that
+its mode matches the closed-form MAP $0.75$ and its mean matches $5/7$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+alpha0, beta0 = 2.0, 2.0
+k, n = 8, 10
+
+q = np.linspace(1e-4, 1 - 1e-4, 200_000)
+dq = q[1] - q[0]
+prior = q**(alpha0 - 1) * (1 - q)**(beta0 - 1)
+like = q**k * (1 - q)**(n - k)
+post = prior * like
+post /= post.sum() * dq                    # normalize (Riemann sum)
+
+grid_mode = q[np.argmax(post)]
+grid_mean = (q * post).sum() * dq
+
+assert np.isclose(grid_mode, 0.75, atol=1e-3)
+assert np.isclose(grid_mean, 5 / 7, atol=1e-3)
+print("grid MAP:", round(grid_mode, 4), " grid mean:", round(grid_mean, 4))
+```
+
+The grid posterior peaks at $0.75$ and averages to $5/7 \approx 0.7143$, matching the
+closed-form Beta($10$, $4$) mode and mean.
+
+</details>
+
+The next lesson shifts from estimating distributions
 to quantifying their information content, starting with entropy.
 
 <Footnotes>

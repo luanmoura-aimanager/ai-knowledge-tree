@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: log-sum-exp
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Derive the log-sum-exp shift and use it to compute softmax and log-likelihoods without overflow."
 prerequisites: ["catastrophic-cancellation"]
 ---
@@ -111,7 +111,93 @@ print("matches np.exp normalization:", np.allclose(softmax_stable(x_big), softma
 
 The naive computations break in both extremes while the shifted versions return
 finite, correct answers. Shifting by the max is the entire fix, and the cost is one
-extra pass over the array. The next lesson moves from elementwise numerics to solving
+extra pass over the array.
+
+## Exercises
+
+**Exercise 1.** Use the shift identity with $c = \max_i x_i$ to compute
+$\log(e^{1000} + e^{1001} + e^{1002})$ by hand, expressing the answer as
+$1002 + \log(e^{-2} + e^{-1} + 1)$ and giving its numerical value.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The maximum is $c = 1002$. The identity
+$\log \sum_i e^{x_i} = c + \log \sum_i e^{x_i - c}$ gives
+
+$$
+\log(e^{1000} + e^{1001} + e^{1002}) = 1002 + \log\!\left(e^{-2} + e^{-1} + e^{0}\right).
+$$
+
+**Step 2.** Evaluate the shifted sum: $e^{-2} \approx 0.1353$,
+$e^{-1} \approx 0.3679$, $e^{0} = 1$, so the sum is $\approx 1.5032$ and
+$\log(1.5032) \approx 0.4076$.
+
+**Step 3.** The result is $1002 + 0.4076 = 1002.4076$. Every shifted exponent is
+$\le 0$, so no term overflows, and the term for $i$ at the maximum equals $1$,
+keeping the sum away from underflow.
+
+</details>
+
+**Exercise 2.** Prove the bound $\max_i x_i \le \log \sum_i e^{x_i} \le \max_i x_i + \log n$
+for $n$ terms. This is why log-sum-exp is sometimes called a smooth maximum.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $c = \max_i x_i$. Every term $e^{x_i} > 0$, and one term equals
+$e^c$, so $\sum_i e^{x_i} \ge e^c$. Taking logs, $\log \sum_i e^{x_i} \ge c$, the
+lower bound.
+
+**Step 2.** Each term satisfies $e^{x_i} \le e^c$, so
+$\sum_i e^{x_i} \le n\, e^c$. Taking logs,
+$\log \sum_i e^{x_i} \le \log(n\, e^c) = c + \log n$, the upper bound.
+
+**Step 3.** Together, $c \le \log \sum_i e^{x_i} \le c + \log n$: log-sum-exp returns
+the maximum plus a slack that never exceeds $\log n$, and the slack vanishes when one
+term dominates the rest.
+
+</details>
+
+**Exercise 3 (code).** Implement stable `log_softmax` directly as
+$(x_y - c) - \log \sum_i e^{x_i - c}$ with $c = \max_i x_i$. Verify it agrees with the
+two-step $\log(\text{softmax}(x))$ on moderate inputs and stays finite on inputs that
+make the two-step route return $-\infty$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def log_softmax_stable(x):
+    c = x.max()
+    shifted = x - c
+    return shifted - np.log(np.sum(np.exp(shifted)))
+
+def log_softmax_twostep(x):
+    e = np.exp(x)
+    return np.log(e / e.sum())          # underflows then logs zero
+
+# Moderate inputs: both routes agree
+x = np.array([1.0, 2.0, 3.0])
+assert np.allclose(log_softmax_stable(x), log_softmax_twostep(x))
+
+# Large inputs: two-step route produces -inf, stable route stays finite
+x_big = np.array([1000.0, 1001.0, 1002.0])
+ls = log_softmax_stable(x_big)
+assert np.all(np.isfinite(ls))
+assert not np.all(np.isfinite(log_softmax_twostep(x_big)))
+print("stable log_softmax:", ls)
+```
+
+The direct form subtracts the max before exponentiating, so it never overflows;
+fusing the log into the subtraction also avoids the $\log 0 = -\infty$ the two-step
+route hits once a class probability underflows.
+
+</details>
+
+The next lesson moves from elementwise numerics to solving
 systems by repeated approximation.
 
 <Footnotes>

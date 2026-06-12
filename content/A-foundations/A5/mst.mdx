@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: mst
 order: 12
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Build minimum spanning trees with Kruskal and Prim, and prove the cut property."
 prerequisites: ["shortest-paths"]
 ---
@@ -157,8 +157,135 @@ print("equal totals:", cost == cost_p)
 ```
 
 Both algorithms find spanning trees of the same total weight, the cut property
-guaranteeing they reach the same optimal cost. The final A5 lesson trades exactness
-for memory: probabilistic data structures.
+guaranteeing they reach the same optimal cost.
+
+## Exercises
+
+**Exercise 1.** Run Kruskal's algorithm by hand on the graph with vertices
+$\{0, 1, 2, 3\}$ and edges (weight, endpoints): $(1, 0, 1)$, $(2, 1, 2)$,
+$(2, 0, 2)$, $(3, 2, 3)$, $(4, 0, 3)$. List the edges added in order and the total
+weight.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sort edges by weight: $(1, 0, 1)$, $(2, 1, 2)$, $(2, 0, 2)$,
+$(3, 2, 3)$, $(4, 0, 3)$.
+
+**Step 2.** Process in order, adding an edge only if its endpoints are in
+different components.
+
+- $(1, 0, 1)$: components $\{0\}, \{1\}$ differ. Add it. Components: $\{0, 1\}$.
+- $(2, 1, 2)$: $1$ and $2$ differ. Add it. Components: $\{0, 1, 2\}$.
+- $(2, 0, 2)$: $0$ and $2$ are already joined. Skip (would form a cycle).
+- $(3, 2, 3)$: $2$ and $3$ differ. Add it. Components: $\{0, 1, 2, 3\}$.
+- $(4, 0, 3)$: all joined; the tree has $V - 1 = 3$ edges. Stop.
+
+**Step 3.** Edges added: $(0,1)$, $(1,2)$, $(2,3)$. Total weight
+$1 + 2 + 3 = 6$.
+
+</details>
+
+**Exercise 2.** Using the cut property, prove that if every edge weight is
+distinct, the MST is unique.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Suppose, for contradiction, that two distinct MSTs $T_1$ and $T_2$
+exist. Since they differ, some edge is in one but not the other; let $e$ be the
+minimum-weight edge among all edges in exactly one of $T_1, T_2$. Say
+$e \in T_1 \setminus T_2$.
+
+**Step 2.** Removing $e$ from $T_1$ splits it into two components, defining a cut
+$(S, V \setminus S)$ with $e$ crossing it. Adding $e$ to $T_2$ creates a cycle;
+that cycle must contain another edge $e'$ crossing the same cut, with
+$e' \in T_2 \setminus T_1$.
+
+**Step 3.** Both $e$ and $e'$ cross the cut. By the choice of $e$ as the minimum
+differing edge, $w(e) < w(e')$ (weights are distinct, so the inequality is
+strict). Then $T_2 \setminus \{e'\} \cup \{e\}$ is a spanning tree of strictly
+smaller weight than $T_2$, contradicting that $T_2$ is an MST. Hence no two
+distinct MSTs exist.
+
+</details>
+
+**Exercise 3 (code).** Verify on a random graph that Kruskal and Prim return the
+same total weight, and that the MST has exactly $V - 1$ edges and is connected.
+Use the implementations from the lesson.
+
+<details>
+<summary>Solution</summary>
+
+Equal totals confirm both greedy strategies reach the optimum; the edge count and
+a union-find connectivity check confirm the result is a spanning tree.
+
+```python
+import heapq, random
+
+class UF:
+    def __init__(self, n):
+        self.parent = list(range(n)); self.rank = [0] * n
+    def find(self, x):
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+    def union(self, x, y):
+        rx, ry = self.find(x), self.find(y)
+        if rx == ry: return False
+        if self.rank[rx] < self.rank[ry]: rx, ry = ry, rx
+        self.parent[ry] = rx
+        if self.rank[rx] == self.rank[ry]: self.rank[rx] += 1
+        return True
+
+def kruskal(n, edges):
+    uf = UF(n); mst, cost = [], 0
+    for w, u, v in sorted(edges):
+        if uf.union(u, v):
+            mst.append((u, v, w)); cost += w
+            if len(mst) == n - 1: break
+    return mst, cost
+
+def prim(n, adj, start=0):
+    in_tree = [False] * n
+    pq = [(0, start, -1)]; mst, cost = [], 0
+    while pq and len(mst) < n - 1:
+        w, u, p = heapq.heappop(pq)
+        if in_tree[u]: continue
+        in_tree[u] = True
+        if p != -1: mst.append((p, u, w)); cost += w
+        for v, wv in adj[u]:
+            if not in_tree[v]: heapq.heappush(pq, (wv, v, u))
+    return mst, cost
+
+rng = random.Random(0)
+n = 12
+# Build a connected graph: a random spanning path plus extra random edges.
+edges = [(rng.randint(1, 20), i, i + 1) for i in range(n - 1)]
+for _ in range(20):
+    u, v = rng.randrange(n), rng.randrange(n)
+    if u != v: edges.append((rng.randint(1, 20), u, v))
+
+mst_k, cost_k = kruskal(n, edges)
+adj = {i: [] for i in range(n)}
+for w, u, v in edges:
+    adj[u].append((v, w)); adj[v].append((u, w))
+mst_p, cost_p = prim(n, adj)
+
+# Same optimal cost from both algorithms.
+assert cost_k == cost_p
+# Exactly V - 1 edges, and they connect all vertices.
+assert len(mst_k) == n - 1
+uf = UF(n)
+for u, v, w in mst_k: uf.union(u, v)
+assert len({uf.find(i) for i in range(n)}) == 1
+print(cost_k, cost_p, len(mst_k))
+```
+
+</details>
+
+The final A5 lesson trades exactness for memory: probabilistic data structures.
 
 <Footnotes>
   <FNItem n="1">**Kruskal, J. B.** (1956). "On the shortest spanning subtree of a graph and the traveling salesman problem". *Proceedings of the AMS*, 7, 48-50. [doi:10.1090/S0002-9939-1956-0078686-7](https://doi.org/10.1090/S0002-9939-1956-0078686-7)</FNItem>

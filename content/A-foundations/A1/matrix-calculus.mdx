@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: matrix-calculus
 order: 16
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Fix a layout convention, derive the gradients of the linear, quadratic, and affine forms, and compose them into a matrix-level chain rule."
 prerequisites: ["linear-maps-matrices"]
 ---
@@ -241,6 +241,98 @@ print("backprop dW1 error:", np.max(np.abs(grad_W1 - grad_W1_fd)))  # ~1e-9
 
 Finite differences confirm the analytic gradients, including the backpropagated
 $\nabla_{W_1} L$, to near-float precision.
+
+## Exercises
+
+**Exercise 1.** Compute $\nabla_x f$ for $f(x) = a^\top x + x^\top A x$ with $A$
+symmetric, using the linear and quadratic gradients derived above.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The gradient is linear, so differentiate each term separately:
+$\nabla_x(a^\top x + x^\top A x) = \nabla_x(a^\top x) + \nabla_x(x^\top A x)$.
+
+**Step 2.** Substitute the two results from the lesson, $\nabla_x(a^\top x) = a$
+and $\nabla_x(x^\top A x) = 2Ax$ (the latter using $A = A^\top$):
+
+$$
+\nabla_x f = a + 2Ax.
+$$
+
+Setting this to zero gives the stationary point $x = -\tfrac12 A^{-1}a$ when $A$ is
+invertible, the standard solution of an unconstrained quadratic.
+
+</details>
+
+**Exercise 2.** For $A$ **not** symmetric, derive $\nabla_x(x^\top A x)$ from the
+index expansion and show the result is $(A + A^\top)x$. Confirm it reduces to $2Ax$
+when $A$ is symmetric.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expand $f = \sum_{i,j} a_{ij} x_i x_j$ and differentiate with respect
+to $x_k$. The variable $x_k$ appears in the first index ($i = k$) and the second
+($j = k$):
+
+$$
+\frac{\partial f}{\partial x_k} = \sum_j a_{kj} x_j + \sum_i a_{ik} x_i
+= (Ax)_k + (A^\top x)_k.
+$$
+
+**Step 2.** Stack over $k$ to get the gradient vector:
+
+$$
+\nabla_x(x^\top A x) = Ax + A^\top x = (A + A^\top)x.
+$$
+
+**Step 3.** If $A = A^\top$, then $A + A^\top = 2A$, recovering $2Ax$. Only the
+symmetric part of $A$ ever affects a quadratic form, which is why the symmetry
+assumption is harmless.
+
+</details>
+
+**Exercise 3 (code).** Verify the chain-rule result $\nabla_x L = A^\top \nabla_y L$
+for $L = \tfrac12\lVert y\rVert^2$ with $y = Ax + b$, by checking the analytic
+gradient against finite differences.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+A = rng.normal(size=(5, 3))
+b = rng.normal(size=5)
+x = rng.normal(size=3)
+
+def L(x):
+    y = A @ x + b
+    return 0.5 * y @ y
+
+# Analytic: dL/dy = y, and dL/dx = A^T (dL/dy).
+y = A @ x + b
+grad_analytic = A.T @ y
+
+# Finite differences over each coordinate of x.
+eps = 1e-6
+grad_fd = np.zeros_like(x)
+for i in range(len(x)):
+    xp = x.copy(); xp[i] += eps
+    xm = x.copy(); xm[i] -= eps
+    grad_fd[i] = (L(xp) - L(xm)) / (2 * eps)
+
+assert np.allclose(grad_analytic, grad_fd, atol=1e-6)
+print("max gradient error:", float(np.max(np.abs(grad_analytic - grad_fd))))
+```
+
+The Jacobian transpose $A^\top$ carries the upstream gradient $y = \nabla_y L$ back
+to the input, matching finite differences to near-float precision.
+
+</details>
+
 The final lesson generalizes this calculus to higher-order arrays (tensors) and
 the Einstein summation notation that batch computations in deep learning rely on.
 

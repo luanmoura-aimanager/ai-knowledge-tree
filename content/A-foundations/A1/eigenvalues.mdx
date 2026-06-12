@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: eigenvalues
 order: 9
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define eigenpairs, find them through the characteristic polynomial, and interpret them as invariant scaling directions."
 prerequisites: ["determinants"]
 ---
@@ -114,7 +114,87 @@ print("triangular eigenvalues:", np.sort(lams)[::-1], "diagonal:", [3, 7, -1])
 ```
 
 The residuals $Av - \lambda v$ are near zero; trace and determinant match the
-eigenvalue sums and products. When a symmetric matrix enters the picture, its
+eigenvalue sums and products.
+
+## Exercises
+
+**Exercise 1.** Find the eigenvalues and a corresponding eigenvector for each, of
+$A = \begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix}$, working entirely by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form the characteristic polynomial $\det(A - \lambda I) = 0$:
+
+$$
+\det\begin{pmatrix} 2 - \lambda & 1 \\ 1 & 2 - \lambda \end{pmatrix}
+= (2 - \lambda)^2 - 1 = 0.
+$$
+
+**Step 2.** Expand: $(2 - \lambda)^2 = 1$, so $2 - \lambda = \pm 1$, giving
+$\lambda_1 = 1$ and $\lambda_2 = 3$. (Check against trace and determinant:
+$\lambda_1 + \lambda_2 = 4 = \operatorname{tr} A$, and
+$\lambda_1 \lambda_2 = 3 = \det A$.)
+
+**Step 3.** For $\lambda_1 = 1$, solve $(A - I)v = 0$: the rows both read
+$v_1 + v_2 = 0$, so $v = (1, -1)$. For $\lambda_2 = 3$, solve $(A - 3I)v = 0$:
+the rows read $-v_1 + v_2 = 0$, so $v = (1, 1)$. The two eigenvectors are
+orthogonal, the symmetry of $A$ foreshadowing the spectral theorem.
+
+</details>
+
+**Exercise 2.** Prove that if $\lambda$ is an eigenvalue of an invertible matrix
+$A$, then $1/\lambda$ is an eigenvalue of $A^{-1}$, with the same eigenvector.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Start from the eigenpair relation $Av = \lambda v$ with $v \neq 0$.
+Since $A$ is invertible, $\lambda \neq 0$ (a zero eigenvalue would mean a nonzero
+$v$ in $\ker A$, contradicting invertibility).
+
+**Step 2.** Apply $A^{-1}$ to both sides: $A^{-1} A v = A^{-1}(\lambda v)$, i.e.
+$v = \lambda\, A^{-1} v$.
+
+**Step 3.** Divide by $\lambda \neq 0$: $A^{-1} v = \tfrac{1}{\lambda} v$. So $v$
+is an eigenvector of $A^{-1}$ with eigenvalue $1/\lambda$.
+
+</details>
+
+**Exercise 3 (code).** A real matrix can have complex eigenvalues in conjugate
+pairs. Build the rotation matrix $R_\theta$ for $\theta = 30^\circ$, confirm its
+eigenvalues are $e^{\pm i\theta}$, and check the trace/determinant relations hold
+over the complex eigenvalues.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+theta = np.deg2rad(30.0)
+R = np.array([[np.cos(theta), -np.sin(theta)],
+              [np.sin(theta),  np.cos(theta)]])
+
+eigvals = np.linalg.eigvals(R)
+expected = np.array([np.exp(1j * theta), np.exp(-1j * theta)])
+
+# Eigenvalues are e^{+/- i theta} (order may differ, so compare sorted).
+assert np.allclose(np.sort_complex(eigvals), np.sort_complex(expected))
+
+# Trace = sum of eigenvalues, det = product (both real for a real matrix).
+assert np.isclose(eigvals.sum().real, np.trace(R))
+assert np.isclose(eigvals.prod().real, np.linalg.det(R))
+print("eigenvalues:", np.round(eigvals, 4))
+```
+
+The eigenvalues land on the unit circle at angle $\pm\theta$, their sum equals
+$\operatorname{tr} R = 2\cos\theta$, and their product equals $\det R = 1$: a pure
+rotation scales nothing.
+
+</details>
+
+When a symmetric matrix enters the picture, its
 eigenvalues are always real and its eigenvectors always orthogonal: the spectral
 theorem, the subject of the next lesson.
 

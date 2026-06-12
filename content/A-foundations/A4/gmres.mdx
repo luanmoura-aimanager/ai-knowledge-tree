@@ -4,7 +4,7 @@ pillar: A
 subId: A4
 lessonId: gmres
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Extend Krylov-subspace solving to nonsymmetric systems with GMRES."
 prerequisites: ["conjugate-gradient"]
 ---
@@ -124,7 +124,118 @@ print(f"residual monotone decrease: {all(residuals[i] >= residuals[i+1] for i in
 ```
 
 GMRES drives the residual down monotonically and converges in well under the
-ambient dimension. The final A4 lesson turns from algorithms to the precision they
+ambient dimension.
+
+## Exercises
+
+**Exercise 1.** Explain why the GMRES residual norm is monotonically nonincreasing
+across iterations (within a single run, no restart), using the nested structure of
+the Krylov subspaces.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** GMRES picks $x_k$ to minimize $\lVert b - A x\rVert_2$ over the affine
+space $x_0 + \mathcal{K}_k$, where $\mathcal{K}_k = \operatorname{span}\{r_0, A r_0, \dots, A^{k-1} r_0\}$.
+
+**Step 2.** The Krylov subspaces are nested: $\mathcal{K}_k \subseteq \mathcal{K}_{k+1}$,
+since every generator of $\mathcal{K}_k$ is also a generator of $\mathcal{K}_{k+1}$.
+So $x_0 + \mathcal{K}_k \subseteq x_0 + \mathcal{K}_{k+1}$.
+
+**Step 3.** Minimizing the same residual norm over a larger set cannot increase the
+minimum: the previous minimizer $x_k$ is still a candidate at step $k+1$. Hence
+
+$$
+\lVert b - A x_{k+1}\rVert_2 = \min_{x \in x_0 + \mathcal{K}_{k+1}} \lVert b - A x\rVert_2 \le \lVert b - A x_k\rVert_2.
+$$
+
+The residual norm never rises. Restarting breaks this, because it discards the
+accumulated subspace and starts a fresh minimization from $x_0' = x_{\text{current}}$.
+
+</details>
+
+**Exercise 2.** The Arnoldi relation is $A Q_k = Q_{k+1} \tilde H_k$ with $Q_{k+1}$
+having orthonormal columns. Show that minimizing $\lVert b - A x\rVert_2$ over
+$x = x_0 + Q_k y$ reduces to the small least-squares problem
+$\min_y \lVert \beta e_1 - \tilde H_k y\rVert_2$ with $\beta = \lVert r_0\rVert$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the residual at $x = x_0 + Q_k y$:
+$b - A x = r_0 - A Q_k y$, since $r_0 = b - A x_0$.
+
+**Step 2.** Substitute the Arnoldi relation $A Q_k = Q_{k+1} \tilde H_k$. Also write
+$r_0 = \beta q_1 = Q_{k+1} (\beta e_1)$, because $q_1 = r_0/\beta$ is the first column
+of $Q_{k+1}$ and $e_1$ is the first standard basis vector. Then
+
+$$
+b - A x = Q_{k+1}(\beta e_1) - Q_{k+1}\tilde H_k y = Q_{k+1}\left(\beta e_1 - \tilde H_k y\right).
+$$
+
+**Step 3.** Orthonormal columns preserve the 2-norm: $\lVert Q_{k+1} z\rVert_2 = \lVert z\rVert_2$
+for any $z$. Therefore
+
+$$
+\lVert b - A x\rVert_2 = \lVert \beta e_1 - \tilde H_k y\rVert_2.
+$$
+
+The $m$-dimensional residual minimization collapses to a least-squares problem in the
+$(k+1) \times k$ Hessenberg matrix $\tilde H_k$, which is cheap to solve by Givens
+rotations.
+
+</details>
+
+**Exercise 3 (code).** Run GMRES on a nonsymmetric system and confirm both that the
+residual norms are monotonically nonincreasing and that the solution matches a direct
+solve.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 50
+A = rng.normal(size=(n, n)) + 2 * np.eye(n)   # nonsymmetric, well-separated spectrum
+b = rng.normal(size=n)
+
+m = len(b)
+Q = np.zeros((m, m + 1))
+H = np.zeros((m + 1, m))
+r0 = b.copy()                                  # x0 = 0
+beta = np.linalg.norm(r0)
+Q[:, 0] = r0 / beta
+residuals = [beta]
+x = np.zeros(m)
+for k in range(m):
+    v = A @ Q[:, k]
+    for j in range(k + 1):
+        H[j, k] = Q[:, j] @ v
+        v = v - H[j, k] * Q[:, j]
+    H[k + 1, k] = np.linalg.norm(v)
+    if H[k + 1, k] < 1e-14:
+        break
+    Q[:, k + 1] = v / H[k + 1, k]
+    e1 = np.zeros(k + 2); e1[0] = beta
+    y, *_ = np.linalg.lstsq(H[:k + 2, :k + 1], e1, rcond=None)
+    x = Q[:, :k + 1] @ y
+    residuals.append(np.linalg.norm(b - A @ x))
+
+residuals = np.array(residuals)
+assert np.all(np.diff(residuals) <= 1e-10)     # monotone nonincreasing
+assert np.linalg.norm(x - np.linalg.solve(A, b)) < 1e-6
+print("residual decreased monotonically over", len(residuals) - 1, "iterations")
+```
+
+Each iteration minimizes over a strictly larger Krylov subspace, so the residual
+norms form a nonincreasing sequence, and the final solution agrees with the direct
+solve to full working precision.
+
+</details>
+
+The final A4 lesson turns from algorithms to the precision they
 run in: mixed-precision arithmetic.
 
 <Footnotes>

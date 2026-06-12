@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: information-geometry
 order: 18
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Define the Fisher information, see it as the curvature of the log-likelihood, and meet the natural gradient."
 prerequisites: ["mle", "kl-cross-entropy"]
 ---
@@ -153,7 +153,101 @@ print("KL(N(0,1)||N(d,1)):", round(kl_exact, 6), " ~ 0.5 d I d:", round(0.5 * d 
 The score averages to zero, its variance recovers the Fisher information of 1 (and
 $1/\sigma^2$ for the sharp and broad models, a factor of 100 apart), the
 MLE variance sits at the Cramer-Rao bound, and the KL between nearby Gaussians equals
-the Fisher quadratic form. This closes the A2 probability and information-theory
+the Fisher quadratic form.
+
+## Exercises
+
+**Exercise 1.** A single Bernoulli($q$) observation has log-likelihood
+$\log p(x \mid q) = x \log q + (1 - x)\log(1 - q)$. Use the curvature form
+$\mathcal{I}(q) = -\mathbb{E}[\partial_q^2 \log p]$ to show that the Fisher
+information is $\mathcal{I}(q) = \frac{1}{q(1 - q)}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate the log-likelihood once in $q$:
+
+$$
+\partial_q \log p(x \mid q) = \frac{x}{q} - \frac{1 - x}{1 - q}.
+$$
+
+**Step 2.** Differentiate again:
+
+$$
+\partial_q^2 \log p(x \mid q) = -\frac{x}{q^2} - \frac{1 - x}{(1 - q)^2}.
+$$
+
+**Step 3.** Take the negative expectation, using $\mathbb{E}[x] = q$:
+
+$$
+\mathcal{I}(q) = \frac{\mathbb{E}[x]}{q^2} + \frac{1 - \mathbb{E}[x]}{(1 - q)^2}
+= \frac{q}{q^2} + \frac{1 - q}{(1 - q)^2} = \frac{1}{q} + \frac{1}{1 - q}.
+$$
+
+**Step 4.** Combine over a common denominator:
+$\frac{1}{q} + \frac{1}{1 - q} = \frac{(1 - q) + q}{q(1 - q)} = \frac{1}{q(1 - q)}$.
+The information blows up near $q = 0$ or $q = 1$, where a single flip pins down a
+near-deterministic coin sharply, and is smallest at $q = 1/2$.
+
+</details>
+
+**Exercise 2.** For the Gaussian mean model with known variance $\sigma^2$, a single
+observation carries Fisher information $\mathcal{I} = 1/\sigma^2$. Show that $n$
+i.i.d. observations carry $n/\sigma^2$, and read off the Cramer-Rao bound on the
+variance of any unbiased estimator of the mean.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For independent observations the joint log-likelihood is the sum
+$\log p(x_1, \dots, x_n \mid \theta) = \sum_{i=1}^n \log p(x_i \mid \theta)$, so the
+score of the sample is the sum of per-observation scores.
+
+**Step 2.** Fisher information is the variance of the score. The scores
+$s_i(\theta) = (x_i - \theta)/\sigma^2$ are independent, so their variances add:
+
+$$
+\mathcal{I}_n(\theta) = \operatorname{Var}\!\left(\sum_{i=1}^n s_i\right)
+= \sum_{i=1}^n \operatorname{Var}(s_i) = n \cdot \frac{1}{\sigma^2} = \frac{n}{\sigma^2}.
+$$
+
+**Step 3.** The Cramer-Rao bound gives
+$\operatorname{Var}(\hat\theta) \ge \mathcal{I}_n(\theta)^{-1} = \sigma^2/n$. The
+sample mean has variance exactly $\sigma^2/n$, so it attains the bound: the sample
+mean is efficient.
+
+</details>
+
+**Exercise 3 (code).** Estimate the Fisher information of a Bernoulli($q$) model by
+Monte Carlo, using the score-variance form, and confirm it matches the closed form
+$1/(q(1-q))$ from Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+N = 4_000_000
+
+for q in [0.3, 0.5, 0.7]:
+    x = (rng.random(N) < q).astype(float)
+    # score of a single Bernoulli obs: x/q - (1-x)/(1-q)
+    score = x / q - (1 - x) / (1 - q)
+    fisher_mc = score.var()
+    fisher_exact = 1.0 / (q * (1 - q))
+    print(f"q={q}: Fisher MC = {fisher_mc:.4f}  exact = {fisher_exact:.4f}")
+    assert np.isclose(score.mean(), 0.0, atol=2e-3)   # zero-mean score
+    assert np.isclose(fisher_mc, fisher_exact, rtol=2e-3)
+```
+
+The score averages to zero and its variance matches $1/(q(1-q))$: $4.7619$ at
+$q = 0.3$, $4.0$ at $q = 0.5$ (the minimum), and $4.7619$ at $q = 0.7$.
+
+</details>
+
+This closes the A2 probability and information-theory
 track; the optimization pillar (A3) builds on these gradients and curvatures to
 actually minimize losses.
 

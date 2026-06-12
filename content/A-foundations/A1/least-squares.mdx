@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: least-squares
 order: 15
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the normal equations from the residual, interpret the solution as a projection, and build the pseudo-inverse from the SVD."
 prerequisites: ["svd", "factorizations"]
 ---
@@ -146,7 +146,107 @@ print("A^T r (should be ~0):", np.round(A.T @ r, 8))
 ```
 
 All four routes agree on the solution; the residual is orthogonal to every column
-of $A$. With overdetermined systems handled, the next lesson builds the calculus
+of $A$.
+
+## Exercises
+
+**Exercise 1.** Solve the least-squares problem with
+$A = \begin{pmatrix} 1 \\ 1 \\ 1 \end{pmatrix}$ and
+$b = \begin{pmatrix} 2 \\ 4 \\ 6 \end{pmatrix}$ by the normal equations, and state
+what the scalar $\hat{x}$ represents geometrically.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form the normal equation $A^\top A\,\hat{x} = A^\top b$. Here
+$A^\top A = 1 + 1 + 1 = 3$ and $A^\top b = 2 + 4 + 6 = 12$.
+
+**Step 2.** Solve the scalar equation:
+
+$$
+3\hat{x} = 12 \implies \hat{x} = 4.
+$$
+
+**Step 3.** Since the single column of $A$ is the all-ones vector, $A\hat{x}$ is
+the constant vector closest to $b$. Projecting onto the all-ones direction returns
+the **mean** of the entries of $b$, and indeed $(2 + 4 + 6)/3 = 4$. The
+least-squares fit of a constant to data is the sample mean.
+
+</details>
+
+**Exercise 2.** Show directly from the definition that the projection matrix
+$P = A(A^\top A)^{-1}A^\top$ (with $A$ of full column rank) is idempotent
+($P^2 = P$) and symmetric ($P^\top = P$).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (idempotent).** Multiply $P$ by itself and cancel the inner
+$(A^\top A)(A^\top A)^{-1} = I$:
+
+$$
+P^2 = A(A^\top A)^{-1}\underbrace{A^\top A(A^\top A)^{-1}}_{=\,I}A^\top
+    = A(A^\top A)^{-1}A^\top = P.
+$$
+
+**Step 2 (symmetric).** Transpose, using $(XYZ)^\top = Z^\top Y^\top X^\top$ and
+the fact that $A^\top A$ is symmetric, so its inverse is too:
+
+$$
+P^\top = \left(A(A^\top A)^{-1}A^\top\right)^\top
+       = A\left((A^\top A)^{-1}\right)^\top A^\top
+       = A(A^\top A)^{-1}A^\top = P.
+$$
+
+Both properties hold, so $P$ is an orthogonal projection: applying it once lands
+in $\operatorname{col}(A)$, and applying it again changes nothing.
+
+</details>
+
+**Exercise 3 (code).** Build a rank-deficient $A$ (repeat a column so the column
+rank is below the number of columns). The normal equations are then singular.
+Verify that the SVD pseudo-inverse $A^+ b$ still returns a least-squares solution
+and that, among all minimizers, it has the smallest $\ell^2$ norm.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(3)
+m = 30
+c = rng.normal(size=m)
+A = np.column_stack([c, 2 * c, rng.normal(size=m)])   # col 2 = 2*col 1: rank 2
+b = rng.normal(size=m)
+
+# Pseudo-inverse via SVD (drops the zero singular value).
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+tol = 1e-10
+s_inv = np.where(s > tol, 1.0 / s, 0.0)
+A_plus = Vt.T @ np.diag(s_inv) @ U.T
+x_pinv = A_plus @ b
+
+# It minimizes the residual: the residual is orthogonal to col(A).
+r = b - A @ x_pinv
+assert np.allclose(A.T @ r, 0.0, atol=1e-8)
+
+# Any other minimizer adds a null-space vector; that only grows the norm.
+null = Vt[-1]                       # right singular vector with sigma ~ 0
+x_other = x_pinv + 0.7 * null
+assert np.allclose(A @ x_other, A @ x_pinv, atol=1e-8)   # same fit
+assert np.linalg.norm(x_pinv) < np.linalg.norm(x_other)  # pinv is minimum-norm
+print("pinv norm:", round(float(np.linalg.norm(x_pinv)), 4),
+      "other:", round(float(np.linalg.norm(x_other)), 4))
+```
+
+Adding any multiple of the null-space direction leaves the fit $A\hat{x}$ untouched
+but strictly increases $\lVert x\rVert_2$, so the pseudo-inverse solution is the
+unique minimum-norm minimizer.
+
+</details>
+
+With overdetermined systems handled, the next lesson builds the calculus
 for differentiating expressions involving matrices, the prerequisite for
 understanding backpropagation.
 

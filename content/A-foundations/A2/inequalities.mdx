@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: inequalities
 order: 10
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Bound tail probabilities and relate E[f(X)] to f(E[X]) with the basic inequalities."
 prerequisites: ["variance-moments"]
 ---
@@ -96,7 +96,95 @@ print("phi(E[X]) =", round(X.mean()**2, 4), "<= E[phi(X)] =", round((X**2).mean(
 ```
 
 Every empirical tail probability sits below its Markov or Chebyshev bound, and
-Jensen's inequality holds for the square. These bounds make the next lesson's
+Jensen's inequality holds for the square.
+
+## Exercises
+
+**Exercise 1.** A nonnegative random variable has mean $\mathbb{E}[X] = 5$. Use
+Markov's inequality to bound $P(X \ge 20)$, then $P(X \ge 10)$. State why the
+second bound is weaker as a guarantee.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Markov's inequality gives $P(X \ge a) \le \mathbb{E}[X]/a$. With
+$\mathbb{E}[X] = 5$:
+
+$$
+P(X \ge 20) \le \frac{5}{20} = 0.25, \qquad P(X \ge 10) \le \frac{5}{10} = 0.5.
+$$
+
+**Step 2.** The bound $0.5$ for $a = 10$ is larger, so it constrains the tail
+less. As the threshold $a$ drops toward the mean, $\mathbb{E}[X]/a$ rises toward 1
+and eventually says nothing (for $a \le 5$ the bound exceeds or equals 1, which any
+probability already satisfies). Markov is informative only far out in the tail.
+
+</details>
+
+**Exercise 2.** Show that Chebyshev's inequality gives the "at least 75% within
+two standard deviations" claim, and find the smallest $c$ for which Chebyshev
+guarantees at least 90% of the mass lies within $c$ standard deviations of the mean.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Chebyshev in standard-deviation units is
+$P(|X - \mu| \ge c\sigma) \le 1/c^2$. The complementary event, mass *within*
+$c\sigma$, satisfies
+
+$$
+P(|X - \mu| < c\sigma) \ge 1 - \frac{1}{c^2}.
+$$
+
+At $c = 2$ this is $1 - 1/4 = 0.75$, the 75% claim.
+
+**Step 2.** Require $1 - 1/c^2 \ge 0.90$, i.e. $1/c^2 \le 0.10$, so $c^2 \ge 10$ and
+
+$$
+c \ge \sqrt{10} \approx 3.1623.
+$$
+
+The smallest such $c$ is $\sqrt{10}$: any distribution puts at least 90% of its
+mass within $\sqrt{10}$ standard deviations of its mean, whatever its shape.
+
+</details>
+
+**Exercise 3 (code).** Pick a convex function $\varphi(x) = e^x$ and a random
+variable, and verify Jensen's inequality $\varphi(\mathbb{E}[X]) \le \mathbb{E}[\varphi(X)]$.
+Then check the gap vanishes for an affine (both convex and concave) function.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N = 2_000_000
+
+X = rng.normal(0.0, 1.0, N)
+
+# Convex phi(x) = e^x: Jensen says phi(E[X]) <= E[phi(X)]
+lhs = np.exp(X.mean())
+rhs = np.exp(X).mean()
+print("phi(E[X]) =", round(lhs, 4), "<= E[phi(X)] =", round(rhs, 4))
+assert lhs <= rhs
+
+# Affine psi(x) = 3x + 1 is both convex and concave: Jensen holds with equality
+psi = lambda x: 3 * x + 1
+print("psi(E[X]) =", round(psi(X.mean()), 4),
+      " E[psi(X)] =", round(psi(X).mean(), 4))
+assert np.isclose(psi(X.mean()), psi(X).mean(), atol=1e-3)
+```
+
+For the convex exponential the strict gap appears (here $e^{\mathbb{E}[X]} \approx 1$
+against $\mathbb{E}[e^X] \approx e^{1/2} \approx 1.65$, the log-normal mean), while
+the affine map turns Jensen into an equality, the boundary case where the chord
+sits on the graph.
+
+</details>
+
+These bounds make the next lesson's
 limit theorems precise: as samples accumulate, the average concentrates on the mean.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: change-of-variables
 order: 9
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Push a distribution through a function with the change-of-variables formula."
 prerequisites: ["common-distributions"]
 ---
@@ -109,6 +109,101 @@ print("max |hist - theory|:", round(np.max(np.abs(hist - f_theory)), 4))
 
 Inverse-CDF sampling reproduces the exponential mean, and the analytic density of
 $X^2$ (with the Jacobian factor and both roots accounted for) matches its histogram.
+
+## Exercises
+
+**Exercise 1.** Let $X \sim \text{Uniform}(0, 1)$ and $Y = -\log X$. Use the 1D
+change-of-variables formula to find the density $f_Y(y)$ and name the resulting
+distribution.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The map $g(x) = -\log x$ is strictly decreasing on $(0, 1)$, with
+inverse $x = g^{-1}(y) = e^{-y}$ for $y > 0$. Its derivative is
+$\frac{d}{dy}g^{-1}(y) = -e^{-y}$.
+
+**Step 2.** Apply $f_Y(y) = f_X(g^{-1}(y))\,\left|\frac{d}{dy}g^{-1}(y)\right|$. On
+$(0,1)$ the uniform density is $f_X(x) = 1$, so
+
+$$
+f_Y(y) = 1 \cdot \left|-e^{-y}\right| = e^{-y}, \qquad y > 0.
+$$
+
+This is the **Exponential(1)** density. Taking the negative log of a uniform is
+the inverse-CDF recipe for the rate-1 exponential, matching
+$X = -\frac{1}{\lambda}\log(1-U)$ from the lesson at $\lambda = 1$ (with $U$ and
+$1-U$ both uniform on $(0,1)$).
+
+</details>
+
+**Exercise 2.** Let $X$ have density $f_X$ and let $Y = aX + b$ with $a \ne 0$, an
+affine transform. Derive $f_Y(y)$ and confirm it specializes correctly: a
+Gaussian $X \sim \mathcal{N}(\mu, \sigma^2)$ maps to $\mathcal{N}(a\mu + b, a^2\sigma^2)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Invert: $x = g^{-1}(y) = (y - b)/a$, with constant derivative
+$\frac{d}{dy}g^{-1}(y) = 1/a$. The formula gives
+
+$$
+f_Y(y) = f_X\!\left(\frac{y - b}{a}\right)\,\frac{1}{|a|}.
+$$
+
+The $1/|a|$ is the Jacobian: stretching the axis by $|a|$ thins the density by the
+same factor so total mass stays one.
+
+**Step 2.** Substitute the Gaussian density. With $x = (y-b)/a$,
+
+$$
+f_Y(y) = \frac{1}{|a|\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{((y-b)/a - \mu)^2}{2\sigma^2}\right).
+$$
+
+**Step 3.** Rewrite the exponent. Since $(y-b)/a - \mu = (y - (a\mu + b))/a$, its
+square over $2\sigma^2$ is $(y - (a\mu+b))^2 / (2a^2\sigma^2)$, and the prefactor
+$|a|\sqrt{2\pi\sigma^2} = \sqrt{2\pi a^2\sigma^2}$. So
+
+$$
+f_Y(y) = \frac{1}{\sqrt{2\pi a^2\sigma^2}}\exp\!\left(-\frac{(y - (a\mu+b))^2}{2a^2\sigma^2}\right),
+$$
+
+the density of $\mathcal{N}(a\mu + b,\, a^2\sigma^2)$.
+
+</details>
+
+**Exercise 3 (code).** Verify Exercise 1 numerically: transform a million uniform
+samples by $Y = -\log X$ and confirm the empirical histogram matches the
+Exponential(1) density $e^{-y}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N = 1_000_000
+
+X = rng.random(N)
+Y = -np.log(X)
+
+hist, edges = np.histogram(Y, bins=200, range=(0.0, 6.0), density=True)
+centers = 0.5 * (edges[:-1] + edges[1:])
+f_theory = np.exp(-centers)        # Exponential(1) density
+
+max_err = np.max(np.abs(hist - f_theory))
+print("mean of Y:", round(Y.mean(), 4), " exact 1.0")
+print("max |hist - theory|:", round(max_err, 4))
+assert np.isclose(Y.mean(), 1.0, atol=1e-2)
+assert max_err < 0.02
+```
+
+The transformed samples have mean near 1 (the Exponential(1) mean) and their
+histogram tracks $e^{-y}$, confirming the derived density.
+
+</details>
+
 The next lesson steps back from exact distributions to bounds that hold for all of
 them: the basic probability inequalities.
 

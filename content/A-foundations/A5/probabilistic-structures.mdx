@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: probabilistic-structures
 order: 13
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Trade exactness for space with Bloom filters and cardinality sketches."
 prerequisites: ["arrays-hashing", "A2/common-distributions"]
 ---
@@ -165,8 +165,103 @@ print(f"HLL estimate: {est:.0f}  truth: {truth}  rel error {abs(est-truth)/truth
 
 The Bloom filter has zero false negatives and a false-positive rate within
 prediction, and HyperLogLog estimates 200,000 distinct items within a few percent
-using a few kilobytes. This closes the A5 data-structures track and pillar A as a
-whole: the next pillar (C, on calculus and analysis) builds on this foundation.
+using a few kilobytes.
+
+## Exercises
+
+**Exercise 1.** You want a Bloom filter holding $n = 10^6$ items with a target
+false-positive rate of $1\%$. Using $p_{\text{fp}} \approx (0.6185)^{m/n}$,
+estimate the bits per item $m/n$ and the total size $m$ in megabytes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set $(0.6185)^{m/n} = 0.01$ and solve for $m/n$. Take logs:
+
+$$
+\frac{m}{n} = \frac{\ln 0.01}{\ln 0.6185} = \frac{-4.605}{-0.4805} \approx 9.58.
+$$
+
+So about 9.6 bits per item, which rounds up to 10 in practice (the rule of thumb
+"10 bits per item gives about 1%").
+
+**Step 2.** Total bits $m = (m/n)\cdot n \approx 9.58 \times 10^6 \approx 9.6$
+million bits. Dividing by $8 \times 10^6$ bits per megabyte gives about
+$1.2$ MB, far below the cost of storing $10^6$ full items.
+
+</details>
+
+**Exercise 2.** Explain why a Bloom filter can never produce a false negative,
+while it can produce a false positive. Frame it in terms of which bits an insert
+sets and what a query reads.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Inserting $x$ sets every one of the $k$ bits at positions
+$h_i(x) \bmod m$ to 1, and bits are never cleared. So after $x$ is inserted, all
+$k$ of its bits are permanently 1.
+
+**Step 2.** A query for $x$ returns "yes" only if all $k$ of those same positions
+read 1. Since the insert guaranteed they are 1 and nothing resets them, a genuine
+member always reads "yes". A false negative (a present item reading "no") is
+therefore impossible.
+
+**Step 3.** A false positive happens when $x$ was never inserted, yet all $k$ of
+its bit positions were set by other items' inserts. With many items sharing one
+bit array, that collision has nonzero probability, which is exactly the
+$p_{\text{fp}}$ the lesson computes. The asymmetry comes from bits only ever moving
+from 0 to 1: it can fabricate membership but never erase it.
+
+</details>
+
+**Exercise 3 (code).** Empirically check the Bloom false-positive formula. Build a
+filter with $m/n = 8$ bits per item and the optimal $k = (m/n)\ln 2$, insert $n$
+items, query $n$ never-inserted items, and assert the measured rate is close to
+$(0.6185)^{8}$.
+
+<details>
+<summary>Solution</summary>
+
+The measured rate fluctuates around the predicted $(0.6185)^{8} \approx 0.0214$,
+so the assertion uses a tolerance band rather than exact equality.
+
+```python
+import math, hashlib
+
+class BloomFilter:
+    def __init__(self, m, k):
+        self.m = m; self.k = k
+        self.bits = bytearray(m // 8 + 1)
+    def _hashes(self, x):
+        d = hashlib.sha256(str(x).encode()).digest()
+        h1 = int.from_bytes(d[:8], "big")
+        h2 = int.from_bytes(d[8:16], "big")
+        return [(h1 + i * h2) % self.m for i in range(self.k)]
+    def add(self, x):
+        for h in self._hashes(x):
+            self.bits[h // 8] |= 1 << (h % 8)
+    def __contains__(self, x):
+        return all((self.bits[h // 8] >> (h % 8)) & 1 for h in self._hashes(x))
+
+n = 20_000
+m_per_n = 8
+m = m_per_n * n
+k = max(1, round(m_per_n * math.log(2)))
+bf = BloomFilter(m, k)
+for i in range(n): bf.add(f"item-{i}")
+
+fp = sum(1 for i in range(n) if f"miss-{i}" in bf)
+rate = fp / n
+predicted = 0.6185 ** m_per_n
+assert abs(rate - predicted) < 0.01      # within 1 percentage point
+print(round(rate, 4), round(predicted, 4))
+```
+
+</details>
+
+This closes the A5 data-structures track and pillar A as a whole: the next pillar
+(C, on calculus and analysis) builds on this foundation.
 
 <Footnotes>
   <FNItem n="1">**Bloom, B. H.** (1970). "Space/time trade-offs in hash coding with allowable errors". *Communications of the ACM*, 13(7), 422-426. [doi:10.1145/362686.362692](https://doi.org/10.1145/362686.362692)</FNItem>

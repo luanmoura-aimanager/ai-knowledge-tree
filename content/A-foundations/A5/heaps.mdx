@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: heaps
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Implement a binary heap and use it for priority queues and heapsort."
 prerequisites: ["trees-bst"]
 ---
@@ -146,9 +146,97 @@ print("heapq peek:", heap[0], " min:", min(data))
 ```
 
 Popping from the heap yields the sorted order, heapsort matches `sorted()`, and
-`heapq.heapify` confirms the linear-time build. The next lesson examines comparison-
-based sorting more carefully, including the lower bound that makes $n \log n$ the
-limit of what is possible.
+`heapq.heapify` confirms the linear-time build.
+
+## Exercises
+
+**Exercise 1.** Insert the keys $5, 3, 8, 1, 9, 2$ one at a time into an initially
+empty min-heap, using the array layout and sift-up. Give the final array and
+verify the heap property at every parent.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Insert 5: `[5]`. Insert 3 at index 1; parent index $\lfloor (1-1)/2
+\rfloor = 0$ holds 5 > 3, so swap: `[3, 5]`.
+
+**Step 2.** Insert 8 at index 2; parent index 0 holds $3 \le 8$, no swap: `[3, 5,
+8]`. Insert 1 at index 3; parent index 1 holds $5 > 1$, swap to `[3, 1, 8, 5]`;
+new index 1, parent index 0 holds $3 > 1$, swap: `[1, 3, 8, 5]`.
+
+**Step 3.** Insert 9 at index 4; parent index 1 holds $3 \le 9$, no swap: `[1, 3,
+8, 5, 9]`. Insert 2 at index 5; parent index $\lfloor (5-1)/2 \rfloor = 2$ holds
+$8 > 2$, swap to `[1, 3, 2, 5, 9, 8]`; new index 2, parent index 0 holds
+$1 \le 2$, stop.
+
+Final array: `[1, 3, 2, 5, 9, 8]`. Check parents: index 0 ($1 \le$ children 3, 2);
+index 1 ($3 \le$ children 5, 9); index 2 ($2 \le$ child 8). The heap property
+holds everywhere, and the minimum 1 is at the root.
+
+</details>
+
+**Exercise 2.** Prove that building a heap by sifting down from the last non-leaf
+up to the root costs $O(n)$, not $O(n \log n)$. Use the fact that a complete tree
+of $n$ nodes has at most $\lceil n / 2^{h+1} \rceil$ nodes at height $h$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sift-down on a node at height $h$ costs $O(h)$, since it can descend at
+most $h$ levels. Summing over all nodes, the total work is bounded by
+$\sum_{h=0}^{\lfloor \log_2 n \rfloor} (\text{nodes at height } h) \cdot O(h)$.
+
+**Step 2.** Substitute the node count bound $\lceil n / 2^{h+1} \rceil$:
+
+$$
+\sum_{h=0}^{\lfloor \log_2 n \rfloor} \frac{n}{2^{h+1}} \cdot h
+= \frac{n}{2} \sum_{h=0}^{\infty} \frac{h}{2^{h}}.
+$$
+
+**Step 3.** The series $\sum_{h=0}^{\infty} h / 2^{h}$ converges to 2 (a standard
+arithmetico-geometric sum). So the total work is at most $\frac{n}{2} \cdot 2 = n$,
+giving $O(n)$. Most nodes sit near the leaves where $h$ is small, so the cheap
+sift-downs dominate the count and the expensive root-level ones are too few to
+matter.
+
+</details>
+
+**Exercise 3 (code).** A min-heap gives a streaming "top-$k$ largest" selector:
+keep a heap of size $k$, and for each new value, push it and pop the minimum once
+the heap exceeds $k$. Implement this over a stream and assert it returns the same
+set as sorting the whole stream and taking the last $k$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+import heapq
+
+rng = np.random.default_rng(0)
+stream = rng.integers(0, 1000, size=500).tolist()
+k = 10
+
+heap = []                                  # min-heap of the k largest so far
+for x in stream:
+    heapq.heappush(heap, x)
+    if len(heap) > k:
+        heapq.heappop(heap)                # drop the smallest, keep top-k
+
+top_k = sorted(heap)
+expected = sorted(stream)[-k:]
+assert top_k == expected
+print("top-k via heap:", top_k)
+```
+
+The size-$k$ min-heap always holds the $k$ largest values seen, because its root is
+the smallest of those and any new value beating it evicts the root, matching the
+top-$k$ slice of the fully sorted stream at $O(n \log k)$ instead of $O(n \log n)$.
+
+</details>
+
+The next lesson examines comparison-based sorting more carefully, including the
+lower bound that makes $n \log n$ the limit of what is possible.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Binary heaps, heapify, and heap operations (§6.1, §6.2, §6.3).</FNItem>

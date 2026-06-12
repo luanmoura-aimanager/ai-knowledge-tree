@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: bayesian-optimization
 order: 15
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Optimize an expensive black-box function with a Gaussian-process surrogate and an acquisition function."
 prerequisites: ["A2/map-conjugate"]
 ---
@@ -145,9 +145,100 @@ print("evaluations used:", len(X))
 ```
 
 Bayesian optimization locates the minimum to within grid resolution using only about
-a dozen evaluations, guided by expected improvement. This closes the A3 optimization
-track; the next subsection, A4, examines the finite-precision arithmetic these
-algorithms actually run in.
+a dozen evaluations, guided by expected improvement.
+
+## Exercises
+
+**Exercise 1.** With current best $f^\star = 0$, compute the expected improvement at
+a candidate with posterior mean $\mu = -0.5$ and standard deviation $s = 0.1$. Use
+$\Phi(5) \approx 1$ and $\phi(5) \approx 1.5 \times 10^{-6}$. Confirm the lesson's
+claim that EI here is essentially the mean improvement.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Form the standardized gap
+$z = (f^\star - \mu)/s = (0 - (-0.5))/0.1 = 0.5/0.1 = 5$.
+
+**Step 2.** Substitute into
+$\text{EI} = (f^\star - \mu)\,\Phi(z) + s\,\phi(z)$:
+
+$$
+\text{EI} = 0.5 \cdot \Phi(5) + 0.1 \cdot \phi(5)
+          \approx 0.5 \cdot 1 + 0.1 \cdot (1.5 \times 10^{-6}).
+$$
+
+**Step 3.** The first term is $0.5$; the second is about $1.5 \times 10^{-7}$,
+negligible. So $\text{EI} \approx 0.5$, the mean improvement $f^\star - \mu$. When
+the model is confident the point beats the best ($z$ large and positive), the
+exploration term vanishes and EI reduces to the locked-in gain.
+
+</details>
+
+**Exercise 2.** Take two candidates with the same posterior mean $\mu = 0.5$ (above
+the best $f^\star = 0$, so unpromising on the mean) but different uncertainties
+$s = 0.1$ and $s = 1.0$. Argue from the EI formula why the high-uncertainty point is
+preferred.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Here $f^\star - \mu = -0.5 < 0$, so $z = -0.5/s$ is negative for both.
+The first term $(f^\star - \mu)\Phi(z) = -0.5\,\Phi(z)$ is negative, and the second
+term $s\,\phi(z)$ is positive.
+
+**Step 2.** For $s = 0.1$: $z = -5$, so $\Phi(-5) \approx 0$ and
+$\phi(-5) \approx 1.5\times 10^{-6}$. Both terms are essentially zero, so
+$\text{EI} \approx 0$. The model is sure the point is worse, nothing to gain.
+
+**Step 3.** For $s = 1.0$: $z = -0.5$, so $\Phi(-0.5) \approx 0.31$ and
+$\phi(-0.5) \approx 0.35$. The positive exploration term $1.0 \cdot 0.35 = 0.35$
+outweighs the negative $-0.5 \cdot 0.31 \approx -0.155$, giving a clearly positive
+EI of about $0.2$.
+
+**Step 4.** Same mean, opposite verdicts. The wide posterior puts enough mass below
+$f^\star$ that the upside tail is worth a query; the narrow one does not. EI prefers
+the uncertain point because it scores expected improvement, not the mean.
+
+</details>
+
+**Exercise 3 (code).** Implement the EI formula and verify both hand results:
+$\text{EI} \approx 0.5$ at $(\mu, s) = (-0.5, 0.1)$, and that the $s = 1.0$ point at
+$\mu = 0.5$ has strictly larger EI than the $s = 0.1$ point at the same mean.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+import math
+
+_erf = np.vectorize(math.erf)
+Phi = lambda z: 0.5 * (1 + _erf(np.asarray(z, float) / np.sqrt(2)))
+phi = lambda z: np.exp(-np.asarray(z, float)**2 / 2) / np.sqrt(2 * np.pi)
+
+def ei(mu, s, f_best=0.0):
+    z = (f_best - mu) / s
+    return (f_best - mu) * Phi(z) + s * phi(z)
+
+ei_exploit = ei(-0.5, 0.1)            # confident improvement
+ei_narrow = ei(0.5, 0.1)             # unpromising, certain
+ei_wide = ei(0.5, 1.0)              # unpromising mean, uncertain
+
+assert np.isclose(ei_exploit, 0.5, atol=1e-3)
+assert ei_wide > ei_narrow
+print("EI(-0.5, 0.1):", round(float(ei_exploit), 4))
+print("EI(0.5, 0.1):", round(float(ei_narrow), 6),
+      " EI(0.5, 1.0):", round(float(ei_wide), 4))
+```
+
+The confident point scores its full mean improvement of $0.5$, and the wide-posterior
+point outscores the narrow one at the same mean, the exploration term doing the work.
+
+</details>
+
+This closes the A3 optimization track; the next subsection, A4, examines the
+finite-precision arithmetic these algorithms actually run in.
 
 <Footnotes>
   <FNItem n="1">**Rasmussen, C. E., & Williams, C. K. I.** (2006). *Gaussian Processes for Machine Learning*, §2.2. MIT Press. The GP posterior mean and variance for regression.</FNItem>

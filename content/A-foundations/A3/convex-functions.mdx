@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: convex-functions
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define convex functions and test convexity with the first- and second-order conditions."
 prerequisites: ["convex-sets", "A1/quadratic-forms"]
 ---
@@ -113,8 +113,109 @@ print("eig(A_indef):", np.linalg.eigvalsh(A_indef), "-> mixed -> not convex")
 ```
 
 The chord test confirms the square and exponential are convex while the cosine is
-not, and the Hessian eigenvalue signs agree. The next lesson uses these convexity
-guarantees to analyze the first optimization algorithm: gradient descent.
+not, and the Hessian eigenvalue signs agree.
+
+## Exercises
+
+**Exercise 1.** Use the second-order condition to decide whether
+$f(x, y) = 2x^2 + 3y^2 + 2xy$ is convex. Compute the Hessian and check its
+eigenvalues by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Hessian of a quadratic
+$f = \tfrac12 z^\top H z$ is constant. Here the second partials are
+$f_{xx} = 4$, $f_{yy} = 6$, $f_{xy} = 2$, so
+
+$$
+\nabla^2 f = \begin{bmatrix} 4 & 2 \\ 2 & 6 \end{bmatrix}.
+$$
+
+**Step 2.** Check positive semidefiniteness by the eigenvalues, the roots of
+$\det(\nabla^2 f - \lambda I) = (4 - \lambda)(6 - \lambda) - 4 = 0$, that is
+$\lambda^2 - 10\lambda + 20 = 0$:
+
+$$
+\lambda = \frac{10 \pm \sqrt{100 - 80}}{2} = 5 \pm \sqrt 5 \approx 7.236,\ 2.764.
+$$
+
+**Step 3.** Both eigenvalues are positive, so $\nabla^2 f \succ 0$ everywhere.
+The function is strictly convex. (A faster route: a $2\times 2$ symmetric matrix is
+positive definite when the diagonal entries and the determinant are positive; here
+$4 > 0$, $6 > 0$, and $\det = 24 - 4 = 20 > 0$.)
+
+</details>
+
+**Exercise 2.** Prove that a nonnegative weighted sum of convex functions is convex:
+if $f, g$ are convex and $\alpha, \beta \ge 0$, then $h = \alpha f + \beta g$ is
+convex. Use the chord definition.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Fix $x, y$ and $\theta \in [0, 1]$. Apply the convexity inequality to
+$f$ and to $g$ separately:
+
+$$
+f(\theta x + (1-\theta)y) \le \theta f(x) + (1-\theta)f(y), \qquad
+g(\theta x + (1-\theta)y) \le \theta g(x) + (1-\theta)g(y).
+$$
+
+**Step 2.** Multiply the first by $\alpha \ge 0$ and the second by $\beta \ge 0$.
+The inequality directions are preserved because the multipliers are nonnegative.
+Add the two:
+
+$$
+\alpha f(\cdot) + \beta g(\cdot)
+\le \theta(\alpha f(x) + \beta g(x)) + (1-\theta)(\alpha f(y) + \beta g(y)).
+$$
+
+**Step 3.** The left side is $h(\theta x + (1-\theta)y)$ and the right side is
+$\theta h(x) + (1-\theta)h(y)$, the chord condition for $h$. So $h$ is convex.
+Nonnegativity of $\alpha, \beta$ is essential: a negative weight flips an inequality
+and can destroy convexity.
+
+</details>
+
+**Exercise 3 (code).** The softplus $f(x) = \log(1 + e^x)$ is claimed convex. Verify
+it two ways in numpy: the chord test on random pairs, and a finite-difference second
+derivative that stays nonnegative on a grid.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+softplus = lambda x: np.log1p(np.exp(x))
+
+# Chord test on random scalar pairs
+x = rng.normal(size=200_000)
+y = rng.normal(size=200_000)
+th = rng.random(200_000)
+lhs = softplus(th * x + (1 - th) * y)
+rhs = th * softplus(x) + (1 - th) * softplus(y)
+assert np.all(lhs <= rhs + 1e-9)
+
+# Finite-difference second derivative on a grid: f'' >= 0 means convex
+g = np.linspace(-8, 8, 4001)
+h = g[1] - g[0]
+f2 = (softplus(g[2:]) - 2 * softplus(g[1:-1]) + softplus(g[:-2])) / h**2
+assert f2.min() >= -1e-8
+print("min finite-diff f'':", round(f2.min(), 8),
+      " (sigmoid(0) =", round(float(1 / (1 + np.exp(0))) * (1 - 1/(1+np.exp(0))), 4), ")")
+```
+
+The chord never rises above the function and the numerical second derivative stays
+at or above zero, the curvature signature of a convex function. (Its true second
+derivative is the sigmoid times one minus the sigmoid, peaking at $0.25$ at $x = 0$.)
+
+</details>
+
+The next lesson uses these convexity guarantees to analyze the first optimization
+algorithm: gradient descent.
 
 <Footnotes>
   <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §3.1. Cambridge University Press. The definition of a convex function and the epigraph characterization.</FNItem>

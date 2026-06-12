@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: factorizations
 order: 14
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "See how LU, QR, and Cholesky each solve linear systems by exploiting structure, and why factoring is numerically preferable to inverting."
 prerequisites: ["gram-schmidt", "quadratic-forms"]
 ---
@@ -158,7 +158,91 @@ print("cond(A):", np.linalg.cond(A))       # moderate -> solving is fine
 ```
 
 All three paths give the same solution; the Cholesky factorization halves the
-arithmetic. The next lesson uses QR and the SVD together to handle the case where
+arithmetic.
+
+## Exercises
+
+**Exercise 1.** Solve the lower-triangular system $Lx = b$ by hand using forward
+substitution, with
+$L = \begin{pmatrix} 2 & 0 & 0 \\ 1 & 3 & 0 \\ 4 & 1 & 2 \end{pmatrix}$ and
+$b = (4, 7, 9)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Forward substitution solves top to bottom. Row $1$: $2 x_1 = 4$, so
+$x_1 = 2$.
+
+**Step 2.** Row $2$: $1\cdot x_1 + 3 x_2 = 7$, so $3 x_2 = 7 - 2 = 5$ and
+$x_2 = 5/3$.
+
+**Step 3.** Row $3$: $4 x_1 + 1\cdot x_2 + 2 x_3 = 9$, so
+$2 x_3 = 9 - 8 - 5/3 = -5/3$, giving $x_3 = -5/6$. The solution is
+$x = (2,\ 5/3,\ -5/6)$.
+
+</details>
+
+**Exercise 2.** Compute the Cholesky factor $L$ of
+$A = \begin{pmatrix} 4 & 2 \\ 2 & 5 \end{pmatrix}$ by hand, and use it to
+confirm $A$ is positive definite.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the column formula. For $j = 1$:
+$l_{11} = \sqrt{a_{11}} = \sqrt{4} = 2$, and
+$l_{21} = a_{21}/l_{11} = 2/2 = 1$.
+
+**Step 2.** For $j = 2$:
+$l_{22} = \sqrt{a_{22} - l_{21}^2} = \sqrt{5 - 1} = 2$. So
+$L = \begin{pmatrix} 2 & 0 \\ 1 & 2 \end{pmatrix}$.
+
+**Step 3.** The square roots were both of strictly positive numbers ($4$ and
+$4$), so Cholesky succeeds and $A$ is positive definite. Verify
+$LL^\top = \begin{pmatrix} 4 & 2 \\ 2 & 5 \end{pmatrix} = A$.
+
+</details>
+
+**Exercise 3 (code).** For a random symmetric positive definite $A$, solve
+$Ax = b$ three ways (LU via `np.linalg.solve`, QR, and Cholesky) and assert all
+three solutions agree. Then confirm that the product of the squared Cholesky
+diagonal entries equals $\det A$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+M = rng.normal(size=(4, 4))
+A = M @ M.T + 4 * np.eye(4)        # symmetric positive definite
+b = rng.normal(size=4)
+
+x_lu = np.linalg.solve(A, b)       # LU with pivoting under the hood
+
+Q, R = np.linalg.qr(A)
+x_qr = np.linalg.solve(R, Q.T @ b) # Rx = Q^T b
+
+L = np.linalg.cholesky(A)          # A = L L^T
+y = np.linalg.solve(L, b)
+x_chol = np.linalg.solve(L.T, y)
+
+assert np.allclose(x_lu, x_qr)
+assert np.allclose(x_lu, x_chol)
+
+# det A = product of l_ii^2, since det A = det L * det L^T = (prod l_ii)^2.
+assert np.isclose(np.prod(np.diag(L)**2), np.linalg.det(A))
+print("solution:", np.round(x_lu, 6))
+```
+
+The three factorizations land on the same solution, and the squared product of
+the Cholesky diagonal reproduces $\det A$ because $\det A = (\det L)^2$ and $L$ is
+triangular.
+
+</details>
+
+The next lesson uses QR and the SVD together to handle the case where
 $Ax = b$ has no exact solution.
 
 <Footnotes>

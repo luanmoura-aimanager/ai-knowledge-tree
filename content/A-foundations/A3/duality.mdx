@@ -4,7 +4,7 @@ pillar: A
 subId: A3
 lessonId: duality
 order: 10
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Form the dual problem, prove weak duality, and state when strong duality holds."
 prerequisites: ["constrained-optimization", "convex-functions"]
 ---
@@ -122,8 +122,106 @@ for lam in [0.05, 0.1, 0.2, 0.5]:
 ```
 
 The dual and primal optima coincide (zero gap, strong duality via Slater), and every
-nonnegative multiplier yields a lower bound below the primal optimum. The next lesson
-collects the optimality conditions linking primal and dual: the KKT conditions.
+nonnegative multiplier yields a lower bound below the primal optimum.
+
+## Exercises
+
+**Exercise 1.** For the problem $\min_x \tfrac12 x^\top x$ subject to
+$a^\top x \ge 1$ (so $g(x) = 1 - a^\top x \le 0$) with $a = (1, 2)$, derive the dual
+function $\mathcal{D}(\lambda)$ in closed form and find $d^\star$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the Lagrangian for $\lambda \ge 0$:
+
+$$
+\mathcal{L}(x, \lambda) = \tfrac12 x^\top x + \lambda(1 - a^\top x).
+$$
+
+**Step 2.** Minimize over $x$. Setting $\nabla_x \mathcal{L} = x - \lambda a = 0$
+gives the inner minimizer $x = \lambda a$.
+
+**Step 3.** Substitute back, using $a^\top a = \lVert a\rVert^2$:
+
+$$
+\mathcal{D}(\lambda) = \tfrac12 \lambda^2 \lVert a\rVert^2 + \lambda\big(1 - \lambda\lVert a\rVert^2\big) = \lambda - \tfrac12 \lambda^2 \lVert a\rVert^2.
+$$
+
+**Step 4.** Maximize the concave $\mathcal{D}$ over $\lambda \ge 0$. The derivative
+$1 - \lambda\lVert a\rVert^2 = 0$ gives $\lambda^\star = 1/\lVert a\rVert^2$, which is
+nonnegative. With $\lVert a\rVert^2 = 1 + 4 = 5$, $\lambda^\star = 1/5$ and
+
+$$
+d^\star = \tfrac{1}{\lVert a\rVert^2} - \tfrac12 \cdot \tfrac{1}{\lVert a\rVert^4}\lVert a\rVert^2 = \tfrac{1}{2\lVert a\rVert^2} = \tfrac{1}{10} = 0.1.
+$$
+
+</details>
+
+**Exercise 2.** Prove weak duality in the form: for the primal optimum $p^\star$ and
+any dual-feasible $(\lambda, \nu)$ with $\lambda \ge 0$, the value
+$\mathcal{D}(\lambda, \nu)$ is a lower bound on $f$ at every primal-feasible point.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $x$ be primal-feasible, so $g_i(x) \le 0$ and $h_j(x) = 0$. Because
+$\lambda_i \ge 0$ and $g_i(x) \le 0$, each product $\lambda_i g_i(x) \le 0$, and the
+equality terms vanish: $\nu_j h_j(x) = 0$.
+
+**Step 2.** Therefore
+
+$$
+\mathcal{L}(x, \lambda, \nu) = f(x) + \sum_i \lambda_i g_i(x) + \sum_j \nu_j h_j(x) \le f(x).
+$$
+
+**Step 3.** The dual function minimizes the Lagrangian over all $x$, so it is no
+larger than this particular value:
+
+$$
+\mathcal{D}(\lambda, \nu) = \min_{x'} \mathcal{L}(x', \lambda, \nu) \le \mathcal{L}(x, \lambda, \nu) \le f(x).
+$$
+
+This holds for every primal-feasible $x$, so $\mathcal{D}(\lambda, \nu) \le p^\star$.
+
+</details>
+
+**Exercise 3 (code).** For a linear program $\min_x c^\top x$ subject to $Ax \ge b$,
+the dual is $\max_{y \ge 0} b^\top y$ subject to $A^\top y = c$. Take
+$c = (1, 1)$, $A = I_2$, $b = (2, 3)$. Solve the primal directly (the constraint
+$x \ge b$ forces $x = b$ since $c > 0$), construct the dual point $y = c$, and
+verify weak duality holds with zero gap.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+c = np.array([1.0, 1.0])
+A = np.eye(2)
+b = np.array([2.0, 3.0])
+
+# Primal: minimize c^T x s.t. x >= b. With c > 0, push x down to the bound.
+x_star = b.copy()
+p_star = c @ x_star
+
+# Dual: max b^T y s.t. A^T y = c, y >= 0. Here A^T = I so y = c, and c >= 0.
+y = np.linalg.solve(A.T, c)
+assert np.all(y >= 0)            # dual feasibility
+d_star = b @ y
+
+assert np.isclose(p_star, d_star)   # zero duality gap
+print("p* =", p_star, " d* =", d_star, " gap =", p_star - d_star)
+```
+
+The primal optimum $p^\star = 5$ and the dual optimum $d^\star = b^\top c = 5$
+coincide, so the duality gap is zero, as strong duality predicts for a feasible LP.
+
+</details>
+
+The next lesson collects the optimality conditions linking primal and dual: the KKT
+conditions.
 
 <Footnotes>
   <FNItem n="1">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*, §5.1-5.2. Cambridge University Press. The Lagrange dual function and weak duality.</FNItem>

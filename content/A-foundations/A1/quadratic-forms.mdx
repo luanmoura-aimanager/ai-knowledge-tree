@@ -4,7 +4,7 @@ pillar: A
 subId: A1
 lessonId: quadratic-forms
 order: 11
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Read a quadratic form through the spectrum of its matrix, and use eigenvalue signs to test positive (semi)definiteness."
 prerequisites: ["spectral-theorem"]
 ---
@@ -124,7 +124,94 @@ except np.linalg.LinAlgError:
 ```
 
 The PD matrix's quadratic form stays positive; the indefinite one has both signs.
-Cholesky succeeds only for PD. The spectral decomposition of a rectangular matrix,
+Cholesky succeeds only for PD.
+
+## Exercises
+
+**Exercise 1.** Classify $A = \begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix}$ by
+computing its eigenvalues, then confirm the classification with Sylvester's
+criterion.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Solve $\det(A - \lambda I) = 0$. The characteristic polynomial is
+$(2 - \lambda)^2 - 1 = 0$, so $2 - \lambda = \pm 1$, giving $\lambda = 3$ and
+$\lambda = 1$. Both eigenvalues are positive, so $A$ is **positive definite**.
+
+**Step 2.** Check the leading principal minors. The first is
+$\Delta_1 = a_{11} = 2 > 0$; the second is
+$\Delta_2 = \det A = 2\cdot 2 - 1\cdot 1 = 3 > 0$. Both are positive, so Sylvester's
+criterion confirms positive definiteness.
+
+The two tests agree: the eigenvalue signs and the positivity of the leading minors
+both certify a bowl that opens upward in every direction.
+
+</details>
+
+**Exercise 2.** Prove that if $A$ is positive definite then $A$ is invertible, and
+that $A^{-1}$ is also positive definite.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (invertible).** By the spectral theorem $A = Q\Lambda Q^\top$ with all
+$\lambda_i > 0$. The determinant is $\det A = \prod_i \lambda_i > 0$, so $A$ is
+invertible. (Equivalently, $Ax = 0$ would give $x^\top A x = 0$, forcing $x = 0$ by
+definiteness, so the null space is trivial.)
+
+**Step 2 (inverse is PD).** Invert the spectral form:
+$A^{-1} = Q\Lambda^{-1}Q^\top$, where $\Lambda^{-1}$ has diagonal entries
+$1/\lambda_i$. Since each $\lambda_i > 0$, each $1/\lambda_i > 0$, so $A^{-1}$ has
+all-positive eigenvalues and is positive definite.
+
+A PD matrix and its inverse share eigenvectors and have reciprocal, still-positive,
+eigenvalues.
+
+</details>
+
+**Exercise 3 (code).** Generate a random symmetric matrix, shift it by $\mu I$
+until it becomes positive definite, and confirm that Cholesky succeeds exactly when
+the smallest eigenvalue turns positive.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(5)
+M = rng.normal(size=(6, 6))
+S = (M + M.T) / 2                    # symmetric, generally indefinite
+
+eigs = np.linalg.eigvalsh(S)
+lam_min = eigs.min()
+
+def is_pd(A):
+    try:
+        np.linalg.cholesky(A)
+        return True
+    except np.linalg.LinAlgError:
+        return False
+
+# Shift just below and just above the threshold -lam_min.
+I = np.eye(6)
+below = S + (-lam_min - 0.01) * I    # smallest eigenvalue still negative
+above = S + (-lam_min + 0.01) * I    # smallest eigenvalue now positive
+
+assert not is_pd(below)
+assert is_pd(above)
+print("min eigenvalue of S:", round(float(lam_min), 4),
+      "-> PD once shifted past", round(float(-lam_min), 4))
+```
+
+Cholesky fails while the shifted matrix still has a negative eigenvalue and
+succeeds the moment the shift makes every eigenvalue positive, which is the
+spectral characterization of positive definiteness at work.
+
+</details>
+
+The spectral decomposition of a rectangular matrix,
 where the same geometry extends to non-square transforms, is the SVD of the next
 lesson.
 

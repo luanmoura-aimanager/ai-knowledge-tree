@@ -4,7 +4,7 @@ pillar: A
 subId: A2
 lessonId: exponential-family
 order: 8
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Write distributions in exponential-family form and read off sufficient statistics and natural parameters."
 prerequisites: ["common-distributions"]
 ---
@@ -115,7 +115,100 @@ print("same sum -> same loglik:",
 
 The first and second derivatives of the log-partition reproduce the Bernoulli mean
 and variance, and two datasets with the same success count give identical
-likelihoods. The next lesson handles a different transformation question: what
+likelihoods.
+
+## Exercises
+
+**Exercise 1.** Write the Poisson PMF
+$p(x \mid \lambda) = \frac{\lambda^x e^{-\lambda}}{x!}$ in canonical exponential
+form. Identify $T(x)$, the natural parameter $\eta$, the base measure $h(x)$, and
+the log-partition $A(\eta)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Take the log inside an exponential:
+
+$$
+p(x \mid \lambda) = \frac{1}{x!}\exp\!\big(x\log\lambda - \lambda\big).
+$$
+
+**Step 2.** Match the template
+$h(x)\exp(\eta\, T(x) - A(\eta))$. The factor outside the exponential is the base
+measure $h(x) = 1/x!$, the term multiplying $x$ is the natural parameter, and the
+remaining $\lambda$ is the normalizer:
+
+$$
+T(x) = x, \qquad \eta = \log\lambda, \qquad h(x) = \frac{1}{x!}, \qquad A(\eta) = \lambda = e^{\eta}.
+$$
+
+The substitution $\lambda = e^\eta$ rewrites $A$ as a function of $\eta$ alone, as
+the canonical form requires.
+
+</details>
+
+**Exercise 2.** For the Poisson of Exercise 1, confirm that the log-partition
+generates the moments: show $A'(\eta) = \mathbb{E}[X]$ and
+$A''(\eta) = \operatorname{Var}(X)$, recovering the Poisson's equal mean and
+variance.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** From Exercise 1, $A(\eta) = e^{\eta}$. Differentiate once:
+
+$$
+A'(\eta) = e^{\eta} = \lambda.
+$$
+
+By the moment identity $A'(\eta) = \mathbb{E}[T(X)] = \mathbb{E}[X]$, this gives
+$\mathbb{E}[X] = \lambda$, the known Poisson mean.
+
+**Step 2.** Differentiate again:
+
+$$
+A''(\eta) = e^{\eta} = \lambda.
+$$
+
+By $A''(\eta) = \operatorname{Var}(T(X)) = \operatorname{Var}(X)$, this gives
+$\operatorname{Var}(X) = \lambda$. The same exponential reappears at every
+derivative, so mean and variance coincide: the equal-mean-and-variance fact is the
+log-partition being its own derivative.
+
+</details>
+
+**Exercise 3 (code).** Verify Exercise 2 numerically: sample from a Poisson, set
+$\eta = \log\lambda$, and confirm $A'(\eta)$ and $A''(\eta)$ match the empirical
+mean and variance.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N = 2_000_000
+
+lam = 4.0
+X = rng.poisson(lam, size=N)
+
+eta = np.log(lam)
+A_prime = np.exp(eta)          # A'(eta) = e^eta
+A_double = np.exp(eta)         # A''(eta) = e^eta
+
+print("A'(eta) =", round(A_prime, 4), " E[X] =", round(X.mean(), 4))
+print("A''(eta) =", round(A_double, 4), " Var(X) =", round(X.var(), 4))
+assert np.isclose(A_prime, X.mean(), atol=1e-2)
+assert np.isclose(A_double, X.var(), atol=2e-2)
+```
+
+Both derivatives equal $\lambda = 4$, and the sampled mean and variance both land
+near 4, confirming the Poisson's defining equality through the log-partition.
+
+</details>
+
+The next lesson handles a different transformation question: what
 happens to a distribution when you pass the variable through a function.
 
 <Footnotes>

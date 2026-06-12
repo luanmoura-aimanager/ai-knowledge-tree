@@ -4,7 +4,7 @@ pillar: A
 subId: A5
 lessonId: linked-stacks-queues
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Build the linear structures and know when a linked layout beats a contiguous array."
 prerequisites: ["complexity-analysis"]
 ---
@@ -135,8 +135,100 @@ print(f"linked prepends x{N}: {time.perf_counter() - t0:.3f}s")
 
 Prepending to an array is dramatically slower than to a linked list because every
 existing element shifts; the linked list's per-node allocation is cheap by
-comparison. The next lesson moves from linear to hierarchical structures with binary
-search trees.
+comparison.
+
+## Exercises
+
+**Exercise 1.** A singly linked list of $n$ nodes has only a `head` pointer (no
+`tail`). State the worst-case cost of `prepend`, `append`, and indexed access
+`list[i]`, and justify each in one sentence.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** `prepend` is $O(1)$: allocate a node, point its `next` at the old
+head, and reassign `head`. No traversal is needed.
+
+**Step 2.** `append` is $O(n)$: with no `tail` pointer, reaching the last node
+means walking the whole chain from the head, which is $n$ link follows.
+
+**Step 3.** Indexed access `list[i]` is $O(n)$: a linked list has no random
+access, so reaching position $i$ requires $i$ link follows from the head, which
+is $O(n)$ in the worst case ($i = n - 1$).
+
+</details>
+
+**Exercise 2.** A queue is built on a dynamic array where `enqueue` appends at
+the end and `dequeue` removes from index 0 by shifting every remaining element
+left. Show that performing $n$ `dequeue` operations on a queue of size $n$ costs
+$O(n^2)$ total, and name the structure that fixes it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A `dequeue` that removes index 0 must move the other elements down by
+one slot. With $k$ elements remaining, that shift touches $k - 1$ elements, so it
+costs $\Theta(k)$.
+
+**Step 2.** Dequeuing all $n$ elements one by one shifts $n - 1$, then $n - 2$,
+down to $0$ elements. The total is
+
+$$
+\sum_{k=1}^{n} (k - 1) = \frac{n(n-1)}{2} = \Theta(n^2).
+$$
+
+**Step 3.** A circular buffer fixes it: head and tail indices wrap around a fixed
+array, so each `dequeue` is $O(1)$ (advance the head index) and the $n$ removals
+cost $O(n)$ total. Python's `collections.deque` uses this idea.
+
+</details>
+
+**Exercise 3 (code).** A singly linked list cannot be walked backwards. Write a
+function that reverses one in place by re-pointing each node's `next`, in $O(n)$
+time and $O(1)$ extra space, then assert it produces the reversed value sequence.
+
+<details>
+<summary>Solution</summary>
+
+The trick is to carry three pointers (`prev`, `cur`, `nxt`) and flip one link per
+step, so the reversal touches each node once with no auxiliary array.
+
+```python
+class Node:
+    __slots__ = ("val", "next")
+    def __init__(self, val, nxt=None): self.val = val; self.next = nxt
+
+def build(values):
+    head = None
+    for v in reversed(values):
+        head = Node(v, head)
+    return head
+
+def to_list(head):
+    out = []
+    while head: out.append(head.val); head = head.next
+    return out
+
+def reverse(head):
+    prev = None
+    cur = head
+    while cur is not None:
+        nxt = cur.next          # save the rest of the list
+        cur.next = prev         # flip this link
+        prev = cur              # advance prev and cur
+        cur = nxt
+    return prev                 # new head is the old tail
+
+head = build([1, 2, 3, 4, 5])
+rev = reverse(head)
+assert to_list(rev) == [5, 4, 3, 2, 1]
+print(to_list(rev))
+```
+
+</details>
+
+The next lesson moves from linear to hierarchical structures with binary search
+trees.
 
 <Footnotes>
   <FNItem n="1">**Cormen, T. H., Leiserson, C. E., Rivest, R. L., & Stein, C.** (2009). *Introduction to Algorithms* (3rd ed.). MIT Press. Stacks, queues, and linked lists (§10.1, §10.2).</FNItem>
