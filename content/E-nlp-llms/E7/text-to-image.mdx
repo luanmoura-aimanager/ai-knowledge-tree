@@ -4,7 +4,7 @@ pillar: E
 subId: E7
 lessonId: text-to-image
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Condition a diffusion model on a CLIP text embedding; contrast DALL-E 2 (CLIP prior + decoder), Stable Diffusion (latent diffusion + cross-attention), and classifier-free guidance."
 prerequisites: ["clip", "D4/diffusion"]
 codeExempt: true
@@ -138,6 +138,91 @@ graph LR
 All three systems score high on CLIP and FID but differ substantially on human preference
 and compositional accuracy. Text rendering (letters in images) remains an active challenge,
 partially addressed by SD 3 and DALL-E 3.
+
+## Exercises
+
+**Exercise 1.** At a denoising step the unconditional noise prediction is
+$\epsilon(x_t, \emptyset) = 0.4$ and the conditional prediction is $\epsilon(x_t, y) = 0.9$
+(for one coordinate). Compute the classifier-free guided prediction $\hat{\epsilon}$ for
+guidance scales $w = 1$, $w = 7.5$, and $w = 0$. Interpret what each value means for the
+generated sample.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The CFG formula is
+$\hat{\epsilon} = \epsilon(x_t, \emptyset) + w\,[\epsilon(x_t, y) - \epsilon(x_t, \emptyset)]$.
+The bracket is the conditioning direction, here $0.9 - 0.4 = 0.5$.
+
+**Step 2.** Substitute each scale:
+
+$$
+\begin{aligned}
+w = 1: &\quad 0.4 + 1 \cdot 0.5 = 0.9, \\
+w = 7.5: &\quad 0.4 + 7.5 \cdot 0.5 = 4.15, \\
+w = 0: &\quad 0.4 + 0 \cdot 0.5 = 0.4.
+\end{aligned}
+$$
+
+**Step 3.** At $w = 1$ the guided prediction equals the plain conditional one, standard
+text-conditioned generation. At $w = 0$ it collapses to the unconditional prediction, the
+text is ignored. At $w = 7.5$ the prediction is pushed far past the conditional value,
+amplifying text alignment at the cost of diversity and, if pushed further, realism. CFG is
+an extrapolation along the conditioning direction, not an interpolation.
+
+</details>
+
+**Exercise 2.** Stable Diffusion runs diffusion on $z \in \mathbb{R}^{H/8 \times W/8 \times 4}$
+instead of pixels $x \in \mathbb{R}^{H \times W \times 3}$. For a $512 \times 512$ image,
+compute the spatial grid the U-Net operates on, the factor by which the number of spatial
+positions shrinks, and the ratio of total tensor elements (latent vs pixel). Explain why the
+lesson quotes a "64x" reduction rather than the element ratio.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The latent grid is $512/8 \times 512/8 = 64 \times 64$ spatial positions, versus
+$512 \times 512$ pixels.
+
+**Step 2.** Spatial positions shrink by $\frac{512 \times 512}{64 \times 64} = \frac{262144}{4096} = 64$.
+The self-attention and convolution cost scales with the number of spatial positions, so this
+$64\times$ is the figure that governs compute.
+
+**Step 3.** Counting channels too, total elements go from $512 \times 512 \times 3 = 786{,}432$
+to $64 \times 64 \times 4 = 16{,}384$, a ratio of $48$. The element ratio is smaller because
+the latent adds a channel (3 to 4). The lesson quotes $64\times$ because compute and memory
+in the spatial attention scale with spatial positions, not channel count.
+
+</details>
+
+**Exercise 3.** DALL-E 2 uses a two-stage pipeline (a CLIP prior mapping text embedding to a
+CLIP image embedding, then an unCLIP decoder to pixels), while Stable Diffusion conditions a
+single latent-diffusion U-Net directly on the text embedding via cross-attention. Give one
+capability the DALL-E 2 design buys from the intermediate CLIP image embedding, and one
+practical advantage Stable Diffusion's design has.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** DALL-E 2's intermediate $\mathbf{c}_{\text{img}}$ is a full CLIP image embedding.
+Holding the text fixed and resampling the prior produces different image embeddings, hence
+semantically equivalent but visually varied outputs (different style, lighting, composition).
+The embedding also supports image variations and embedding arithmetic, capabilities that come
+directly from operating in CLIP's image space.
+
+**Step 2.** Stable Diffusion's single-stage latent design is simpler and cheaper: there is no
+separate prior model to train or run, and diffusion happens in an 8x-compressed latent, so
+training fits on consumer GPUs and inference takes seconds. One model, conditioned by
+cross-attention, end to end.
+
+**Step 3.** The trade-off is modularity and embedding-level control (DALL-E 2) versus
+simplicity and efficiency (Stable Diffusion); both reach high CLIP and FID scores, so the
+choice is driven by these system properties rather than raw quality.
+
+</details>
+
+The same latent-diffusion and DiT machinery, with cross-attention text conditioning, extends
+in the next lesson from a single image to temporally coherent video.
 
 <Footnotes>
   <FNItem n="1">**Ramesh, A., et al.** (2021). "Zero-shot text-to-image generation (DALL-E)". *ICML*. [arXiv:2102.12092](https://arxiv.org/abs/2102.12092)</FNItem>

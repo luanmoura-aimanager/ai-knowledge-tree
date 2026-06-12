@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: test-time-compute
 order: 7
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Scale inference compute by searching over reasoning paths with process reward models (PRMs); understand how o1 and DeepSeek-R1 use this to outperform training-only scaling."
 prerequisites: ["react-agents", "E4/grpo"]
 codeExempt: true
@@ -123,6 +123,89 @@ verifiable math and code rewards. Key insights:
 | PRM + beam search | Medium (PRM training) | Medium | Step-by-step math |
 | MCTS | Low | High | Complex reasoning |
 | o1-style (GRPO + long CoT) | Medium (RL) | Very high | Math, code, science |
+
+## Exercises
+
+**Exercise 1.** A model solves a problem correctly with probability $0.4$ per
+independent attempt, and a perfect verifier can always identify a correct solution when
+one is present. Under best-of-N (return any correct attempt the verifier finds), compute
+the success probability for $N = 1, 4, 16$. Why does this argument require a verifier,
+and how would the picture change if instead you used a majority vote?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Best-of-N with a perfect verifier succeeds if at least one of the $N$
+attempts is correct. The failure probability is $(1 - 0.4)^N = 0.6^N$, so
+$P(\text{success}) = 1 - 0.6^N$.
+
+**Step 2.** Evaluate:
+
+$$
+N = 1: 1 - 0.6 = 0.40, \quad N = 4: 1 - 0.6^4 = 1 - 0.1296 = 0.8704, \quad N = 16: 1 - 0.6^{16} \approx 0.9997.
+$$
+
+**Step 3.** The verifier is what lets a single correct attempt win even when it is the
+minority, so accuracy climbs toward 1 as $N$ grows. Majority vote has no such guarantee:
+with per-attempt accuracy $0.4 < 0.5$, the wrong answers form the majority, so voting
+drives accuracy *down* as $N$ grows. Best-of-N needs a verifier precisely because it
+must recognize a rare correct answer rather than count votes.
+
+</details>
+
+**Exercise 2.** A reasoning model is offered two ways to spend extra inference compute on
+a 200-token base solution: (a) best-of-16 sampling, generating 16 independent length-200
+chains; (b) one single chain extended to 3200 tokens. Both spend the same token budget.
+Express each budget in forward passes and state what each approach buys, referencing why
+a verifier matters for (a).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Token cost is roughly one forward pass per generated token. Best-of-16 over
+length-200 chains costs $16 \times 200 = 3200$ forward passes. The single extended chain
+costs $3200$ forward passes. The budgets match.
+
+**Step 2.** Best-of-16 spends the budget on breadth: 16 independent attempts that a
+verifier or vote selects among, raising the chance that at least one lands correctly. It
+needs a verifier (or a reliable vote) to pick the winner, otherwise the extra samples
+are wasted.
+
+**Step 3.** The single long chain spends the budget on depth: more reasoning steps within
+one trajectory, allocating more computation to a single line of thought. It needs no
+selector but cannot recover if that one trajectory commits an early error. The two
+approaches trade breadth against depth at equal cost, and the better choice depends on
+whether a verifier is available and whether errors are better escaped by resampling or by
+more deliberation.
+
+</details>
+
+**Exercise 3.** Using the compute-allocation table in this lesson, recommend an approach
+for each setting and justify it from the training-versus-inference compute split: (a) a
+math-competition assistant where a checker can verify final answers and latency is not
+critical; (b) a high-volume autocomplete feature serving millions of requests per day
+where per-token latency must stay low.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Setting (a): a verifiable task that tolerates latency. Best-of-N sampling (or
+PRM-guided search) fits: low training compute, medium-to-high inference compute, and the
+available checker is what makes the extra samples pay off. Snell et al.'s compute-matched
+result says a small model with best-of-N can match a much larger trained model here, as
+long as the verifier exists.
+
+**Step 2.** Setting (b): high volume, latency-sensitive, no per-request verifier budget.
+A larger pretrained model fits: high training compute paid once, but low inference
+compute per token. Spending inference compute on search at this volume would multiply
+latency and serving cost on every request, which the autocomplete budget cannot absorb.
+
+**Step 3.** The split is the deciding axis: test-time scaling moves cost from a one-time
+training bill to a recurring per-query bill, which is worth it when queries are rare,
+verifiable, and quality-critical, and a poor trade when queries are cheap, frequent, and
+latency-bound.
+
+</details>
 
 Snell et al. (2024) show that compute-matched comparisons favor test-time scaling for
 math: a small model with best-of-N can match a large model trained with much more compute,

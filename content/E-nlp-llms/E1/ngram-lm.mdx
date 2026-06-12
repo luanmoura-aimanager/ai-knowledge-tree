@@ -4,7 +4,7 @@ pillar: E
 subId: E1
 lessonId: ngram-lm
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Derive the Markov n-gram approximation, build an MLE bigram table by counting, and compute sentence probabilities."
 prerequisites: []
 ---
@@ -156,7 +156,92 @@ print(f"log p = {log_prob:.3f}, perplexity = {ppl:.2f}")
 ```
 
 The zero-probability problem is immediate: any unseen bigram sends log probability to $-\infty$.
-The next lesson introduces smoothing to fix this.
+
+## Exercises
+
+**Exercise 1.** Using the toy corpus $\mathcal{C} = \{\text{I am Sam},\ \text{Sam I am},\ \text{I do not like green eggs}\}$ with $\langle\text{bos}\rangle$ and $\langle\text{eos}\rangle$ markers, compute the bigram MLE probability of the sentence "I am Sam" by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Collect the needed counts. The contexts that matter: $c(\langle\text{bos}\rangle) = 3$ (three sentences), $c(\text{I}) = 3$ (I appears three times as a left token in a bigram: bos-I twice, Sam-I once gives the I tokens, and I is followed by am, am, do), $c(\text{am}) = 2$, $c(\text{Sam}) = 2$.
+
+**Step 2.** Read off the four bigram probabilities for the path $\langle\text{bos}\rangle \to \text{I} \to \text{am} \to \text{Sam} \to \langle\text{eos}\rangle$:
+
+$$
+\hat{p}(\text{I} \mid \langle\text{bos}\rangle) = \tfrac{2}{3}, \quad
+\hat{p}(\text{am} \mid \text{I}) = \tfrac{2}{3}, \quad
+\hat{p}(\text{Sam} \mid \text{am}) = \tfrac{1}{2}, \quad
+\hat{p}(\langle\text{eos}\rangle \mid \text{Sam}) = \tfrac{1}{2}.
+$$
+
+The bigram $(\text{am}, \text{Sam})$ occurs once out of two am tokens; Sam ends one sentence ("I am Sam") out of its two occurrences.
+
+**Step 3.** Multiply:
+
+$$
+p = \tfrac{2}{3} \cdot \tfrac{2}{3} \cdot \tfrac{1}{2} \cdot \tfrac{1}{2} = \tfrac{4}{36} = \tfrac{1}{9}.
+$$
+
+</details>
+
+**Exercise 2.** A bigram model with vocabulary size $V$ has at most $V^2$ free parameters. Show that the bigram rows are not all independent: how many genuinely free numbers does the model carry, given that each row $\hat{p}(\cdot \mid a)$ must sum to 1?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** There are $V$ possible context tokens $a$, so $V$ conditional rows, each a distribution over the $V$ next tokens. Naively that is $V \cdot V = V^2$ numbers.
+
+**Step 2.** Each row is a probability distribution, so its $V$ entries are constrained by $\sum_b \hat{p}(b \mid a) = 1$. That one linear constraint removes one degree of freedom per row: a row over $V$ outcomes has only $V - 1$ free numbers.
+
+**Step 3.** With $V$ rows each carrying $V - 1$ free numbers, the model has
+
+$$
+V (V - 1) = V^2 - V
+$$
+
+free parameters. The count is still $O(V^2)$, which is the parameter-explosion limit: the normalization constraint shaves off only a lower-order $V$ term.
+
+</details>
+
+**Exercise 3 (code).** Build a bigram model from the toy corpus and verify that every context row sums to 1 (a valid conditional distribution), and that $\hat{p}(\text{am} \mid \text{I}) = 2/3$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from collections import Counter, defaultdict
+
+corpus = [
+    ["<bos>", "I", "am", "Sam", "<eos>"],
+    ["<bos>", "Sam", "I", "am", "<eos>"],
+    ["<bos>", "I", "do", "not", "like", "green", "eggs", "<eos>"],
+]
+
+unigrams = Counter(w for sent in corpus for w in sent)
+bigrams = Counter((a, b) for sent in corpus for a, b in zip(sent, sent[1:]))
+
+# Group next-token probabilities by context
+rows = defaultdict(dict)
+for (a, b), c in bigrams.items():
+    rows[a][b] = c / unigrams[a]
+
+# Every context that starts a bigram must define a proper distribution.
+# <eos> never starts a bigram, so it has no row.
+for a, dist in rows.items():
+    total = sum(dist.values())
+    assert np.isclose(total, 1.0), (a, total)
+
+assert np.isclose(rows["I"]["am"], 2 / 3)
+print("rows valid; p(am | I) =", round(rows["I"]["am"], 4))
+```
+
+Each context row normalizes to 1 because its bigram counts sum to the context's count as a left token, and "am" follows "I" in two of the three I-contexts.
+
+</details>
+
+The next lesson introduces smoothing to fix the zero-probability problem.
 
 <Footnotes>
   <FNItem n="1">**Jurafsky, D., & Martin, J. H.** (2024). *Speech and Language Processing* (3rd ed. draft). N-gram language models, the Markov assumption, and perplexity.</FNItem>

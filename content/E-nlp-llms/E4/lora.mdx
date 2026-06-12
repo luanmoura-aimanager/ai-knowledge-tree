@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: lora
 order: 9
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Freeze the pretrained weights, inject low-rank adapter matrices A and B, and train only their product delta W = BA; extend to 4-bit QLoRA and magnitude-direction DoRA."
 prerequisites: ["sft"]
 ---
@@ -166,6 +166,104 @@ $$
 No runtime overhead during inference -- the merged weight is identical in shape to $W_0$.
 Multiple LoRA adapters (for different tasks) can be merged independently or combined
 with task weights (LoRAHub).
+
+## Exercises
+
+**Exercise 1.** A transformer applies LoRA to all four attention projections
+($W^Q, W^K, W^V, W^O$), each of shape $4096 \times 4096$, across 32 layers, with rank
+$r = 8$. Count the trainable LoRA parameters and compare against full fine-tuning of just
+those projections.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** One LoRA-adapted matrix $W_0 \in \mathbb{R}^{m \times n}$ has parameters
+$r(m + n)$ from $B \in \mathbb{R}^{m \times r}$ and $A \in \mathbb{R}^{r \times n}$. Here
+$m = n = 4096$, $r = 8$, so $8 \times (4096 + 4096) = 8 \times 8192 = 65{,}536$ per matrix.
+
+**Step 2.** There are $4$ projections per layer and $32$ layers, so $4 \times 32 = 128$
+adapted matrices. Total LoRA parameters:
+
+$$
+128 \times 65{,}536 = 8{,}388{,}608 \approx 8.39\text{M}.
+$$
+
+**Step 3.** Full fine-tuning of the same matrices costs $mn = 4096^2 = 16{,}777{,}216$ each,
+so $128 \times 16{,}777{,}216 = 2{,}147{,}483{,}648 \approx 2.15\text{B}$ parameters.
+
+**Step 4.** The ratio is $r(m+n)/mn = 8 \times 8192 / 4096^2 = 1/256 \approx 0.39\%$, matching
+the lesson's $r/n$ estimate for $m \approx n$.
+
+</details>
+
+**Exercise 2.** At initialization $A \sim \mathcal{N}(0, \sigma^2)$ and $B = 0$, so
+$\Delta W = BA = 0$ and the model reproduces the pretrained outputs. Show that the
+gradient of a scalar loss $\ell$ with respect to $A$ is **zero** at this initialization,
+while the gradient with respect to $B$ is generally nonzero. Use $\Delta W = BA$ and the
+chain rule with $G = \partial \ell / \partial \Delta W$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $\Delta W = BA$, the matrix chain rule gives
+$\partial \ell / \partial A = B^\top G$ and $\partial \ell / \partial B = G A^\top$, where
+$G = \partial \ell / \partial \Delta W$ has the shape of $\Delta W$.
+
+**Step 2.** At initialization $B = 0$, so $\partial \ell / \partial A = B^\top G = 0$.
+The $A$ adapter gets no gradient on the first step.
+
+**Step 3.** The $B$ gradient is $G A^\top$, with $A$ drawn from $\mathcal{N}(0, \sigma^2)$,
+generally nonzero. So $B$ moves off zero first; once $B \neq 0$, the $A$ gradient
+$B^\top G$ becomes nonzero and both adapters train. This is why $A$ is initialized random
+(not zero): if both were zero, $G A^\top = 0$ too and neither adapter would ever move.
+
+</details>
+
+**Exercise 3 (code).** Implement the LoRA forward pass with the $\alpha/r$ scaling in
+numpy and verify two facts: at initialization ($B = 0$) the output equals the frozen
+base output, and after setting $B$ to a nonzero value the merged weight
+$W_0 + (\alpha/r) BA$ reproduces the adapted forward pass exactly.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+m, n, r, alpha = 64, 32, 4, 8.0
+W0 = rng.normal(0, 0.02, (m, n))
+A  = rng.normal(0, 0.02, (r, n))     # trainable
+B  = np.zeros((m, r))                # init to 0
+scale = alpha / r
+
+x = rng.normal(0, 1, (10, n))        # 10 tokens
+
+def forward(x, W0, A, B, scale):
+    base  = x @ W0.T
+    delta = (x @ A.T @ B.T) * scale
+    return base + delta
+
+# At init B = 0 -> output equals the frozen base path.
+out_init = forward(x, W0, A, B, scale)
+assert np.allclose(out_init, x @ W0.T)
+
+# After training B becomes nonzero; the merged weight matches the adapter forward.
+B = rng.normal(0, 0.1, (m, r))
+W_merged = W0 + scale * (B @ A)
+assert np.allclose(forward(x, W0, A, B, scale), x @ W_merged.T)
+print("merged-weight max abs error:",
+      np.abs(forward(x, W0, A, B, scale) - x @ W_merged.T).max())
+```
+
+The init check confirms $\Delta W = 0$ at $B = 0$, and the merge check confirms folding
+$(\alpha/r)BA$ into $W_0$ gives byte-equal outputs, so merging adds no inference overhead.
+
+</details>
+
+After fine-tuning, the adapter folds into the base weights and the model is ready to serve;
+the next lessons turn from parameter-efficiency to the preference signal that fine-tuning
+optimizes, starting with reward modeling.
 
 <Footnotes>
   <FNItem n="1">**Ouyang, L., et al.** (2022). "Training language models to follow instructions with human feedback (InstructGPT)".

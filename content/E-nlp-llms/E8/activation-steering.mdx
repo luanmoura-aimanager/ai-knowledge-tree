@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: activation-steering
 order: 6
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Intervene on model behavior by patching activations from a clean run into a corrupted run (causal tracing); then steer generation by adding a direction vector to residual stream activations."
 prerequisites: ["circuits"]
 ---
@@ -150,6 +150,98 @@ SAEs extract monosemantic feature directions. Representation engineering steers 
 any linear direction in activation space. The two complement each other:
 - SAEs identify which direction corresponds to a concept.
 - Representation engineering uses that direction to control behavior.
+
+## Exercises
+
+**Exercise 1.** Activation addition writes $h \leftarrow h + \alpha\hat{\mathbf{d}}$ at one
+layer, where $\hat{\mathbf{d}}$ is a unit direction. A downstream readout produces the
+target logit as the inner product $z = \mathbf{w}^\top h$ for a fixed row $\mathbf{w}$ of the
+unembedding. Express the change in $z$ caused by steering, and explain why the effect on the
+logit is exactly linear in $\alpha$ even though the model as a whole is nonlinear.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute the steered residual into the readout:
+$z(\alpha) = \mathbf{w}^\top(h + \alpha\hat{\mathbf{d}}) = \mathbf{w}^\top h + \alpha\,\mathbf{w}^\top\hat{\mathbf{d}}$.
+
+**Step 2.** The first term is the unsteered logit; the second is linear in $\alpha$ with slope
+$\mathbf{w}^\top\hat{\mathbf{d}}$, the projection of the readout onto the steering direction.
+
+$$
+\frac{\partial z}{\partial \alpha} = \mathbf{w}^\top\hat{\mathbf{d}}.
+$$
+
+**Step 3.** Linearity holds because the unembedding is an affine map and steering is applied
+after the layer's nonlinearity, so no $\tanh$ or softmax sits between $h$ and the readout. The
+slope is positive when the readout aligns with the direction (steering toward the concept) and
+negative when it opposes it, which is why $\alpha < 0$ steers away.
+
+</details>
+
+**Exercise 2.** A direction is built as $\mathbf{d} = \mu_{\text{honest}} - \mu_{\text{dishonest}}$
+from two sets of activations. Suppose the dishonest set is collected with a constant offset
+$\mathbf{b}$ accidentally added to every activation (a logging bug). Show that the difference
+direction is corrupted by exactly $-\mathbf{b}$, and explain why a contrastive pair built from
+the same prompt template with only the concept word swapped is more robust to this kind of
+nuisance shift.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With the bug, the dishonest mean becomes $\mu_{\text{dishonest}} + \mathbf{b}$, so
+
+$$
+\mathbf{d}_{\text{buggy}} = \mu_{\text{honest}} - (\mu_{\text{dishonest}} + \mathbf{b})
+  = \mathbf{d} - \mathbf{b}.
+$$
+
+The direction is shifted by $-\mathbf{b}$, and after normalization it points somewhere between
+the true honesty axis and $-\mathbf{b}$.
+
+**Step 2.** A matched contrastive pair differs only on the concept word, so any nuisance offset
+shared by both prompts (formatting, position, a logging bug applied to both) cancels in the
+difference. The subtraction isolates the concept axis and removes shared structure, which is
+why difference-of-means on tightly matched pairs is the standard recipe.
+
+</details>
+
+**Exercise 3 (code).** Implement activation addition directly. Build a residual vector $h$, an
+unembedding $W_{\text{out}}$, and a unit steering direction from a difference of class means.
+Pick the target token whose unembedding row aligns most with the direction, then verify that
+its logit rises monotonically as $\alpha$ goes from $-2$ to $0$ to $+2$, with the increase
+equal to $2\,(\mathbf{w}^\top\hat{\mathbf{d}})$ per the previous exercise.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d, V = 4, 5
+W_out = rng.normal(0, 1, (V, d))          # unembedding: rows are token readouts
+h = rng.normal(0, 1, d)                   # residual at the steered layer
+
+pos = rng.normal(0.6, 0.1, (10, d))
+neg = rng.normal(-0.6, 0.1, (10, d))
+direction = pos.mean(0) - neg.mean(0)     # difference of class means
+d_hat = direction / np.linalg.norm(direction)
+
+target = int(np.argmax(W_out @ d_hat))    # token most aligned with the direction
+slope = float(W_out[target] @ d_hat)      # exact logit change per unit alpha
+assert slope > 0                          # adding the direction raises the target logit
+
+logits = [(W_out @ (h + alpha * d_hat))[target] for alpha in (-2.0, 0.0, 2.0)]
+assert logits[0] < logits[1] < logits[2]                  # monotone in alpha
+assert np.isclose(logits[2] - logits[1], 2.0 * slope)     # linear effect
+print("target logit at alpha -2,0,+2:", [round(x, 3) for x in logits])
+```
+
+The logit moves in equal steps of $2\,\text{slope}$ as $\alpha$ increments by $2$, the linear
+behavior derived in Exercise 1.
+
+</details>
 
 This combined toolkit (identify a feature with SAE → steer with RepE) is the foundation
 of **activation-level model editing** without retraining the model.

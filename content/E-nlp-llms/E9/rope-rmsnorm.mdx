@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: rope-rmsnorm
 order: 4
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Swap learned positional embeddings for rotary embeddings and LayerNorm for RMSNorm, the two changes that bring the toy model in line with current LLM architectures."
 prerequisites: ["train-tinyshakespeare", "E3/positional-encodings"]
 ---
@@ -86,6 +86,119 @@ Both changes remove parameters and operations. RMSNorm drops the mean subtractio
 bias; RoPE removes the learned position table and the $T \times d$ addition, replacing them
 with a fixed, parameter-free rotation. The model gets smaller and generalizes to longer
 contexts than it trained on, while the [training loop](nanogpt-setup) is unchanged.
+
+## Exercises
+
+**Exercise 1.** RMSNorm drops LayerNorm's mean subtraction. Show that RMSNorm is
+invariant to scaling its input by a positive constant: $\text{RMSNorm}(cx) = \text{RMSNorm}(x)$
+for any $c > 0$ (ignoring the $\varepsilon$ guard). Then explain why LayerNorm,
+which subtracts the mean, is *not* invariant to adding a constant to every
+coordinate in the same way, contrasting the two normalizers' symmetries.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the RMS of $cx$. With $\text{RMS}(x) = \sqrt{\tfrac{1}{d}\sum_i x_i^2}$,
+scaling pulls $c$ out: $\text{RMS}(cx) = \sqrt{\tfrac{1}{d}\sum_i c^2 x_i^2} = |c|\,\text{RMS}(x) = c\,\text{RMS}(x)$
+since $c > 0$.
+
+**Step 2.** Then $\text{RMSNorm}(cx) = \dfrac{cx}{c\,\text{RMS}(x)} \odot g = \dfrac{x}{\text{RMS}(x)} \odot g = \text{RMSNorm}(x)$.
+The $c$ cancels, so RMSNorm is scale-invariant.
+
+**Step 3.** LayerNorm subtracts the mean first, then divides by the standard
+deviation. Subtracting the mean makes it invariant to *shifts*: adding the same
+constant $b$ to every coordinate leaves $x - \bar{x}$ unchanged. RMSNorm has no
+mean subtraction, so it is not shift-invariant; it is scale-invariant instead.
+The two normalizers therefore protect different symmetries: LayerNorm removes a
+shift degree of freedom, RMSNorm removes only a scale degree of freedom and
+keeps the cheaper operation.
+
+</details>
+
+**Exercise 2 (code).** Implement RMSNorm in numpy and verify both its definition
+and the scale-invariance from Exercise 1 on a random vector. Use a unit gain so
+the output is the pure normalizer.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def rmsnorm(x, gain, eps=1e-5):
+    rms = np.sqrt((x ** 2).mean(axis=-1, keepdims=True) + eps)
+    return x / rms * gain
+
+d = 8
+x = rng.standard_normal(d)
+gain = np.ones(d)
+
+y = rmsnorm(x, gain)
+
+# Definition: each coordinate is x_i divided by the root-mean-square of x.
+rms = np.sqrt((x ** 2).mean())
+assert np.allclose(y, x / rms, atol=1e-4)
+
+# Scale-invariance: scaling the input by c > 0 leaves the output fixed.
+y_scaled = rmsnorm(3.0 * x, gain)
+assert np.allclose(y, y_scaled, atol=1e-4)
+
+print("rms of x:", round(float(rms), 4))
+print("max |y - y_scaled|:", float(np.abs(y - y_scaled).max()))
+```
+
+The output matches $x / \text{RMS}(x)$ and is unchanged when the input is tripled,
+confirming the normalizer and its scale-invariance.
+
+</details>
+
+**Exercise 3 (code).** The point of RoPE is that the dot product of a rotated
+query at position $m$ and a rotated key at position $n$ depends only on the
+relative offset $m - n$. Verify this in numpy: rotate the same query and key
+vectors by two different absolute-position pairs that share an offset, and check
+the dot products agree. Use a single pair of head dimensions (one rotation
+angle) for clarity.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+
+def rotate(v, angle):
+    # rotate a 2D vector (one RoPE pair) by `angle` radians
+    c, s = np.cos(angle), np.sin(angle)
+    R = np.array([[c, -s], [s, c]])
+    return R @ v
+
+theta = 0.7                      # the per-pair frequency
+q = rng.standard_normal(2)
+k = rng.standard_normal(2)
+
+def rope_score(q, k, m, n):
+    return rotate(q, m * theta) @ rotate(k, n * theta)
+
+# Two absolute-position pairs with the same offset m - n = 2.
+s1 = rope_score(q, k, m=5, n=3)
+s2 = rope_score(q, k, m=9, n=7)
+assert np.isclose(s1, s2)
+
+# A different offset gives a different score.
+s3 = rope_score(q, k, m=5, n=4)   # offset 1
+assert not np.isclose(s1, s3)
+
+print("offset-2 scores:", round(float(s1), 4), round(float(s2), 4))
+print("offset-1 score:", round(float(s3), 4))
+```
+
+The two offset-2 scores match while the offset-1 score differs, which is the
+relative-position property that gives RoPE its length-generalization behavior.
+
+</details>
 
 The architecture is now current. The [next lesson](mini-rlhf-dpo) takes this pretrained base
 and runs a minimal preference-tuning pass, the alignment step from E4 at toy scale.

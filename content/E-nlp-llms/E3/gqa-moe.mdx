@@ -4,7 +4,7 @@ pillar: E
 subId: E3
 lessonId: gqa-moe
 order: 8
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Reduce KV-cache memory with grouped-query and multi-query attention; then sparsify depth with mixture-of-experts routing (top-k gating)."
 prerequisites: ["decoder-only"]
 ---
@@ -153,6 +153,103 @@ gating probability assigned to expert $e$. This loss encourages uniform routing.
 DeepSeek-V3 uses **expert specialization** (each expert tends to handle specific types
 of tokens) and **shared experts** (2 experts always active, 6 routed) -- a refinement
 that improves learning stability.
+
+## Exercises
+
+**Exercise 1.** A model has $h = 64$ query heads with per-head dimension
+$d_k = 128$, across $n_\ell = 80$ layers, serving a context of $T = 4096$ tokens
+in fp16 (2 bytes per number). Compute the KV-cache size for full MHA and for GQA
+with $g = 8$ KV heads, and state the reduction factor.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cache holds both keys and values, so per token per layer MHA
+stores $2 h\, d_k = 2 \cdot 64 \cdot 128 = 16384$ numbers. Over all layers and
+tokens: $16384 \cdot 80 \cdot 4096 = 5{,}368{,}709{,}120$ numbers. At 2 bytes
+each that is $10.74$ GB.
+
+**Step 2.** GQA replaces $h$ KV heads with $g = 8$: per token per layer
+$2 g\, d_k = 2 \cdot 8 \cdot 128 = 2048$ numbers, so the total is
+$2048 \cdot 80 \cdot 4096 = 671{,}088{,}640$ numbers, $1.34$ GB.
+
+**Step 3.** The ratio is $h / g = 64 / 8 = 8$. GQA cuts the cache $8\times$, from
+$10.74$ GB to $1.34$ GB, the headroom that lets the same hardware serve longer
+contexts or more concurrent users.
+
+</details>
+
+**Exercise 2.** A Mixtral-style block has $E = 8$ experts and routes each token
+to $k = 2$ of them. The dense FFN it replaces costs $C$ FLOPs per token. Ignoring
+the small gating cost, what is the per-token FFN compute of the MoE block, and
+what fraction of the total expert parameters does each token touch?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each expert is a full FFN costing $C$ FLOPs per token. Top-$k$ routing
+evaluates only the $k = 2$ selected experts, so the per-token compute is
+$k \cdot C = 2C$. The other six experts receive weight zero and are never run.
+
+**Step 2.** The block stores $E = 8$ experts' worth of parameters but each token
+activates $k = 2$, a fraction $k / E = 2 / 8 = 25\%$. This is the MoE lever:
+$8\times$ the FFN parameters (capacity) at a fixed small multiple of the dense
+compute per token.
+
+</details>
+
+**Exercise 3 (code).** Implement GQA routing for $h = 8$ query heads sharing
+$g = 2$ KV heads. Verify that the heads partition into two contiguous groups of
+four, and that two query heads in the same group fed an identical query produce
+an identical output (they share one $K, V$ pair).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+def gqa_attention(Q, K, V, n_kv_heads):
+    h, T, dk = Q.shape
+    group_size = h // n_kv_heads
+    out = np.zeros((h, T, V.shape[-1]))
+    groups = np.zeros(h, dtype=int)
+    for i in range(h):
+        j = i // group_size                 # head i borrows KV pair of group j
+        groups[i] = j
+        scores = Q[i] @ K[j].T / np.sqrt(dk)
+        scores[np.triu(np.ones((T, T), dtype=bool), k=1)] = -1e9
+        out[i] = softmax(scores) @ V[j]
+    return out, groups
+
+rng = np.random.default_rng(0)
+h, g, T, dk = 8, 2, 5, 4
+Q = rng.standard_normal((h, T, dk))
+K = rng.standard_normal((g, T, dk))
+V = rng.standard_normal((g, T, dk))
+
+out, groups = gqa_attention(Q, K, V, g)
+assert np.array_equal(groups, np.array([0, 0, 0, 0, 1, 1, 1, 1]))
+
+Q[1] = Q[0]                                  # heads 0 and 1 both in group 0
+out, _ = gqa_attention(Q, K, V, g)
+assert np.allclose(out[0], out[1])           # same query + same KV -> same output
+print("KV group of each head:", groups)
+```
+
+Heads in a group are distinguished only by their queries, since they read the
+same cached keys and values, which is exactly how GQA shrinks the cache without
+collapsing every head into one.
+
+</details>
+
+The next lesson pushes cache compression further with multi-head latent
+attention, which caches a single low-rank latent per token rather than shared KV
+heads.
 
 <Footnotes>
   <FNItem n="1">**Shazeer, N.** (2019). "Fast transformer decoding: one write-head is

@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: function-calling
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Teach an LLM to emit structured JSON tool calls, parse tool outputs, and continue the conversation; implement a minimal tool-use loop with a calculator and search tool."
 prerequisites: ["E3/decoder-only"]
 ---
@@ -164,6 +164,103 @@ schema) or post-hoc validation with retry.
 
 Libraries: Outlines, Instructor, Guidance -- constrain LLM output to schemas, types, or
 Pydantic models.
+
+## Exercises
+
+**Exercise 1.** A user asks: "How many days passed between the release of Python (1991)
+and today (2024), and what is that span squared?" Trace the tool-use loop for an agent
+with a `calculator` tool. List the message turns in order and say how many model turns
+the loop takes if the agent issues one tool call per turn.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Turn 1 (model): the agent reads the user message and emits a tool call,
+arguments `expression = "2024 - 1991"`.
+
+**Step 2.** Turn 2 (tool): the application runs the calculator and returns `33` as a
+`tool_result`.
+
+**Step 3.** Turn 3 (model): the agent reads `33`, then needs the square, so it emits a
+second tool call, arguments `expression = "33**2"`.
+
+**Step 4.** Turn 4 (tool): the calculator returns `1089`.
+
+**Step 5.** Turn 5 (model): the agent reads `1089` and emits the final natural-language
+answer with no tool call, ending the loop.
+
+The loop takes three model turns (turns 1, 3, 5); the two tool turns are executed by the
+application, not the model. Sequential calls are needed here because the second
+expression depends on the first result.
+
+</details>
+
+**Exercise 2.** The two calls in the parallel-function-calling example, computing
+`2024 - 1991` and searching "Python creator", are independent. Compare the total
+latency of running them in parallel versus sequentially, given that one model round-trip
+costs $r = 400$ ms and each tool costs $t = 100$ ms. Assume the parallel case issues
+both calls in one model turn.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sequential: each tool needs its own model turn to request it and another to
+consume its result. Two calls cost roughly $2$ requesting turns, $2$ tool executions,
+and a final answering turn: $3r + 2t = 3(400) + 2(100) = 1400$ ms.
+
+**Step 2.** Parallel: one model turn emits both calls, the two tools run concurrently
+(cost $\max(t, t) = 100$ ms, not the sum), and one model turn produces the answer:
+$2r + t = 2(400) + 100 = 900$ ms.
+
+**Step 3.** Parallel calling saves $1400 - 900 = 500$ ms here. The win grows with the
+number of independent tools, since their executions overlap instead of stacking and the
+extra request round-trips collapse into one turn.
+
+</details>
+
+**Exercise 3 (code).** Implement the calculator tool and a deterministic two-step
+tool-use loop for Exercise 1 (compute `2024 - 1991`, then square it). Drive it with a
+scripted model function and assert the final answer is 1089.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def calculator(expression):
+    return eval(expression, {"__builtins__": {}}, {})
+
+def tool_use_loop(model_fn, max_turns=5):
+    state = {"results": []}
+    for _ in range(max_turns):
+        call = model_fn(state)            # returns dict or None (final)
+        if call is None:
+            return state["results"][-1]   # final numeric answer
+        result = calculator(call["expression"])
+        state["results"].append(result)
+    raise RuntimeError("max turns reached")
+
+# Scripted model: first subtract, then square the previous result, then stop.
+def model_fn(state):
+    n = len(state["results"])
+    if n == 0:
+        return {"expression": "2024 - 1991"}
+    if n == 1:
+        prev = state["results"][-1]
+        return {"expression": f"{prev}**2"}
+    return None                            # done
+
+answer = tool_use_loop(model_fn)
+print("final answer:", answer)
+assert answer == 1089
+assert np.isclose(answer, (2024 - 1991) ** 2)
+```
+
+The loop chains two calculator calls, feeding the first result (33) into the second
+expression, and lands on $33^2 = 1089$.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Schick, T., et al.** (2023). "Toolformer: language models can teach themselves to use tools". *NeurIPS*. [arXiv:2302.04761](https://arxiv.org/abs/2302.04761). Shows an LLM can learn to emit API calls, splice in the results, and continue generating.</FNItem>

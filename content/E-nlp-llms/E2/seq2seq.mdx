@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: seq2seq
 order: 6
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Build an encoder-decoder seq2seq model and add the Bahdanau additive attention mechanism; visualize the attention matrix on a toy translation."
 prerequisites: ["lstm-gru"]
 ---
@@ -163,6 +163,105 @@ graph LR
 3. **Enables longer sequences:** BLEU on long translations improved dramatically.
 4. **Inspired self-attention:** in the Transformer, queries, keys, and values all come from
    the same sequence. Bahdanau attention between encoder and decoder becomes **cross-attention** in the Transformer decoder.
+
+## Exercises
+
+**Exercise 1.** Three encoder states $h_1 = (1, 0)$, $h_2 = (0, 1)$, $h_3 = (1, 1)$
+receive alignment scores $e = (1.0, 2.0, 0.0)$. Compute the attention weights
+$\alpha = \mathrm{softmax}(e)$ and the context vector
+$c = \sum_j \alpha_j h_j$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Exponentiate the scores: $e^{1.0} = 2.7183$, $e^{2.0} = 7.3891$,
+$e^{0.0} = 1.0$. The normalizer is $Z = 2.7183 + 7.3891 + 1.0 = 11.1074$.
+
+**Step 2.** Divide each by $Z$:
+
+$$
+\alpha = \left(\tfrac{2.7183}{11.1074}, \tfrac{7.3891}{11.1074}, \tfrac{1.0}{11.1074}\right) = (0.2447,\ 0.6652,\ 0.0900),
+$$
+
+which sums to $1$ as a probability distribution must.
+
+**Step 3.** Take the weighted sum of the encoder states:
+
+$$
+c = 0.2447\,(1,0) + 0.6652\,(0,1) + 0.0900\,(1,1) = (0.3348,\ 0.7553).
+$$
+
+Most mass sits on $h_2$, so the context leans toward its $(0,1)$ direction; this is
+the source position the decoder attends to most at this step.
+
+</details>
+
+**Exercise 2.** The bottleneck of basic seq2seq is one fixed-size context vector
+$c = h_S^e$. Argue, using the additive attention equations
+$e_{tj} = v_a^\top \tanh(W_s s_{t-1} + W_h h_j^e)$ and
+$c_t = \sum_j \alpha_{tj} h_j^e$, why attention removes this bottleneck and why the
+gradient to early encoder states is shorter.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In basic seq2seq the only path from the source to decoder step $t$ runs
+through the single vector $c = h_S^e$, so every source token must be compressed into
+$h_S^e$ and re-extracted; capacity is fixed regardless of source length.
+
+**Step 2.** With attention, $c_t = \sum_{j=1}^{S} \alpha_{tj} h_j^e$ is a direct
+weighted sum over all encoder states. Each $h_j^e$ contributes to $c_t$ with weight
+$\alpha_{tj}$, so the decoder reads any source position directly rather than through
+a single summary.
+
+**Step 3.** The gradient $\partial c_t / \partial h_j^e$ includes the term
+$\alpha_{tj} I$, a direct edge from the loss at step $t$ to encoder state $j$. This
+path does not traverse the $S - j$ encoder recurrence steps, so it avoids the
+repeated $W_h$ multiplications that shrink the gradient, shortening the route to
+early source tokens.
+
+</details>
+
+**Exercise 3 (code).** Compute softmax attention over $5$ encoder positions for a
+peaked score vector and a flat one. Verify each weight row sums to $1$, that the
+peaked row concentrates more than $90\%$ of its mass on one position, and that its
+context vector lands near that position's encoder state.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+rng = np.random.default_rng(0)
+S = 5
+h_enc = rng.normal(0, 1, (S, 3))         # encoder states
+
+e_peak = np.array([0.1, 0.1, 4.0, 0.1, 0.1])   # strongly favors position 2
+e_flat = np.array([0.1, 0.2, 0.15, 0.1, 0.05])  # nearly uniform
+a_peak = softmax(e_peak)
+a_flat = softmax(e_flat)
+
+assert np.isclose(a_peak.sum(), 1.0)
+assert np.isclose(a_flat.sum(), 1.0)
+assert a_peak.max() > 0.9                 # peaked row concentrates mass
+assert a_peak.max() > a_flat.max()        # flatter row spreads it out
+
+c_peak = a_peak @ h_enc                    # context for the peaked row
+assert np.linalg.norm(c_peak - h_enc[2]) < 0.3   # close to the attended state
+print("peak max:", round(a_peak.max(), 4),
+      " flat max:", round(a_flat.max(), 4))
+```
+
+The peaked row puts $0.925$ of its weight on position $2$, so its context is within
+$0.2$ of $h_2$; the flat row spreads weight near $1/5 = 0.2$ each and produces a blur
+of all five states. Only the score spread differs.
+
+</details>
 
 The next subsection builds the full Transformer by replacing RNNs with self-attention,
 making the sequence-parallel computation that enables training at LLM scale.

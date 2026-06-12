@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: rnn-lm
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Unroll an RNN as a computational graph, derive backpropagation through time (BPTT), and quantify the vanishing-gradient problem."
 prerequisites: ["word2vec", "D1/backprop"]
 ---
@@ -162,6 +162,86 @@ model = VanillaRNN(V, d, m)
 ids   = [0, 1, 2, 3, 2, 1, 0]  # toy token sequence
 print(f"Loss: {next_token_loss(model, ids, V):.3f}")
 ```
+
+## Exercises
+
+**Exercise 1.** A language model assigns probabilities $0.5$, $0.25$, $0.1$ to the
+three actual next tokens of a sequence. Compute the average cross-entropy loss (in
+nats) and the per-token **perplexity** $\mathrm{PP} = e^{\mathcal{L}}$ by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cross-entropy on each token is $-\log p$. The three negative
+log-probabilities (natural log) are $-\log 0.5 = 0.6931$,
+$-\log 0.25 = 1.3863$, $-\log 0.1 = 2.3026$.
+
+**Step 2.** Average over the three tokens:
+
+$$
+\mathcal{L} = \frac{0.6931 + 1.3863 + 2.3026}{3} = \frac{4.3820}{3} = 1.4607 \text{ nats}.
+$$
+
+**Step 3.** Exponentiate to get perplexity:
+$\mathrm{PP} = e^{1.4607} = 4.31$. Perplexity reads as the effective branching
+factor: this model is as uncertain as a uniform choice among about $4.3$ equally
+likely tokens at each step.
+
+</details>
+
+**Exercise 2.** Using the bound $\|\partial \mathcal{L}_T / \partial h_t\| \le
+\rho^{\,T-t}$ from the vanishing-gradient analysis, compute the factor $\rho^{\,T-t}$
+for a $20$-step dependency ($T - t = 20$) at $\rho = 0.8$ and at $\rho = 1.05$, and
+say which case clipping addresses.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Contractive case $\rho = 0.8$: $0.8^{20} = 0.0115$. The early token
+receives about $1.15\%$ of the gradient signal; this is the vanishing case, and
+clipping does nothing for it because there is almost no signal to rescale.
+
+**Step 2.** Expansive case $\rho = 1.05$: $1.05^{20} = 2.653$. The gradient grows
+by a factor of about $2.65$ over $20$ steps; this is the exploding case, which
+gradient clipping $\nabla \leftarrow \nabla \cdot \min(1, \tau / \|\nabla\|)$ caps
+directly.
+
+**Step 3.** Clipping addresses only the $\rho > 1$ (exploding) case. The $\rho < 1$
+vanishing case is the harder structural problem, the one LSTM and GRU solve with
+additive gated updates.
+
+</details>
+
+**Exercise 3 (code).** The vanishing/exploding behavior comes from the repeated
+factor $W_h^\top$. For a diagonal $W_h$ with every diagonal entry equal to $\rho$,
+verify that the gradient-norm ratio after $50$ steps equals $\rho^{50}$ exactly, and
+that it is monotone increasing in $\rho$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+m, n = 4, 50
+ratios = []
+for rho in [0.9, 1.0, 1.1]:
+    W = np.diag(np.full(m, rho))          # spectral radius = rho
+    g = np.ones(m)                        # incoming gradient at step T
+    prop = np.linalg.matrix_power(W.T, n) @ g
+    ratios.append(np.linalg.norm(prop) / np.linalg.norm(g))
+
+assert np.isclose(ratios[0], 0.9 ** 50)   # 0.00515: vanishes
+assert np.isclose(ratios[1], 1.0)         # boundary: preserved
+assert ratios[0] < ratios[1] < ratios[2]  # monotone in rho
+print("ratios:", [round(r, 4) for r in ratios])
+```
+
+The ratio is $0.9^{50} \approx 0.0052$ when contractive, exactly $1$ at the
+boundary, and $1.1^{50} \approx 117$ when expansive, matching the closed-form factor
+and confirming the exponential dependence on the spectral radius.
+
+</details>
 
 Vanilla RNNs are historical: they motivate the gated architectures that actually work.
 The next lesson derives LSTM's cell state, which maintains a direct gradient path

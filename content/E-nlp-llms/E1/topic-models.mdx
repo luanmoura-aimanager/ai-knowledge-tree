@@ -4,7 +4,7 @@ pillar: E
 subId: E1
 lessonId: topic-models
 order: 6
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Build LDA's plate model, understand Gibbs sampling as the inference engine, and use NMF as a deterministic matrix-factorization alternative."
 prerequisites: []
 ---
@@ -163,6 +163,85 @@ for k in range(3):
 | Interpretability | Principled uncertainty | Simpler, faster |
 | Topic coherence | Often better | Comparable on short docs |
 | Scalability | Slower | Faster |
+
+## Exercises
+
+**Exercise 1.** In collapsed Gibbs sampling, the unnormalized resampling weight for assigning word $w$ in document $d$ to topic $k$ is the product of a document-topic affinity and a topic-word affinity. A corpus has $K = 2$ topics, $V = 5$ vocabulary words, hyperparameters $\alpha = 0.1$, $\beta = 0.1$. Excluding the current word, document $d$ has counts $n_{d,0}^{-dn} = 4$, $n_{d,1}^{-dn} = 0$ (so $n_d^{-dn} = 4$); the current word $w$ has topic counts $n_{0,w}^{-dn} = 3$, $n_{1,w}^{-dn} = 0$, with topic totals $n_0^{-dn} = 20$, $n_1^{-dn} = 20$. Compute the unnormalized weight for each topic and the resulting probability of topic 0.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the formula $\frac{n_{dk}^{-dn} + \alpha}{n_d^{-dn} + K\alpha} \cdot \frac{n_{kw}^{-dn} + \beta}{n_k^{-dn} + V\beta}$ for topic 0. Document term: $\frac{4 + 0.1}{4 + 2(0.1)} = \frac{4.1}{4.2}$. Word term: $\frac{3 + 0.1}{20 + 5(0.1)} = \frac{3.1}{20.5}$.
+
+$$
+\text{weight}_0 = \frac{4.1}{4.2} \cdot \frac{3.1}{20.5} = 0.9762 \cdot 0.1512 = 0.1476.
+$$
+
+**Step 2.** For topic 1: document term $\frac{0 + 0.1}{4.2} = \frac{0.1}{4.2}$, word term $\frac{0 + 0.1}{20 + 0.5} = \frac{0.1}{20.5}$.
+
+$$
+\text{weight}_1 = \frac{0.1}{4.2} \cdot \frac{0.1}{20.5} = 0.02381 \cdot 0.004878 = 0.0001161.
+$$
+
+**Step 3.** Normalize:
+
+$$
+p(z = 0) = \frac{0.1476}{0.1476 + 0.0001161} \approx 0.99921.
+$$
+
+The word is almost certainly assigned to topic 0: both the document (already dominated by topic 0) and the topic-word counts (the word has been seen in topic 0, never in topic 1) pull the same way, and the small $\alpha, \beta$ priors leave only a vanishing chance for topic 1.
+
+</details>
+
+**Exercise 2.** NMF minimizes $\|\mathbf{X} - \mathbf{W}\mathbf{H}\|_F^2$ with the multiplicative update $\mathbf{H} \leftarrow \mathbf{H} \odot \frac{\mathbf{W}^\top \mathbf{X}}{\mathbf{W}^\top \mathbf{W} \mathbf{H}}$. Show that if $\mathbf{X}$, $\mathbf{W}$, and $\mathbf{H}$ start non-negative, the update keeps $\mathbf{H}$ non-negative, and that a fixed point of the update satisfies the stationarity condition $(\mathbf{W}^\top \mathbf{X})_{kj} = (\mathbf{W}^\top \mathbf{W} \mathbf{H})_{kj}$ wherever $\mathbf{H}_{kj} > 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The update multiplies each entry $\mathbf{H}_{kj}$ by the ratio $\frac{(\mathbf{W}^\top \mathbf{X})_{kj}}{(\mathbf{W}^\top \mathbf{W} \mathbf{H})_{kj}}$. With $\mathbf{X} \ge 0$ and $\mathbf{W} \ge 0$, the numerator $\mathbf{W}^\top \mathbf{X}$ is a product of non-negative matrices, so it is non-negative; likewise the denominator $\mathbf{W}^\top \mathbf{W} \mathbf{H} \ge 0$. A non-negative $\mathbf{H}_{kj}$ times a non-negative ratio stays non-negative, so non-negativity is preserved at every iteration.
+
+**Step 2.** At a fixed point, the update leaves $\mathbf{H}$ unchanged: $\mathbf{H}_{kj} = \mathbf{H}_{kj} \cdot \frac{(\mathbf{W}^\top \mathbf{X})_{kj}}{(\mathbf{W}^\top \mathbf{W} \mathbf{H})_{kj}}$.
+
+**Step 3.** Wherever $\mathbf{H}_{kj} > 0$, divide both sides by $\mathbf{H}_{kj}$ to get $1 = \frac{(\mathbf{W}^\top \mathbf{X})_{kj}}{(\mathbf{W}^\top \mathbf{W} \mathbf{H})_{kj}}$, i.e. $(\mathbf{W}^\top \mathbf{X})_{kj} = (\mathbf{W}^\top \mathbf{W} \mathbf{H})_{kj}$. This is exactly the first-order stationarity (KKT) condition: the gradient of the Frobenius objective with respect to $\mathbf{H}_{kj}$ is $-2(\mathbf{W}^\top \mathbf{X} - \mathbf{W}^\top \mathbf{W}\mathbf{H})_{kj}$, which vanishes on the support of $\mathbf{H}$ at a fixed point.
+
+</details>
+
+**Exercise 3 (code).** Implement NMF with the multiplicative updates in pure numpy on a small non-negative document-term matrix. Run 200 iterations and confirm the factors stay non-negative and the Frobenius reconstruction error decreases monotonically.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+D, V, K = 6, 8, 3
+# A non-negative document-term matrix built from latent parts so structure exists
+W_true = rng.random((D, K))
+H_true = rng.random((K, V))
+X = W_true @ H_true
+
+W = rng.random((D, K)) + 1e-3
+H = rng.random((K, V)) + 1e-3
+eps = 1e-9
+
+errors = []
+for _ in range(200):
+    H = H * (W.T @ X) / (W.T @ W @ H + eps)
+    W = W * (X @ H.T) / (W @ H @ H.T + eps)
+    errors.append(np.linalg.norm(X - W @ H))
+
+errors = np.array(errors)
+assert (W >= 0).all() and (H >= 0).all()         # non-negativity preserved
+# Error is non-increasing (allow a tiny numerical slack from the eps guard)
+assert (np.diff(errors) <= 1e-6).all()
+assert errors[-1] < errors[0]
+print("start err:", round(errors[0], 4), " end err:", round(errors[-1], 6))
+```
+
+The multiplicative updates keep both factors in the non-negative orthant and drive the reconstruction error down step by step, the empirical face of the monotone-decrease guarantee.
+
+</details>
 
 Both produce interpretable topics when $K$ is in the range 10-100 and documents are
 reasonably long. Modern LLMs have largely replaced topic models for semantic search

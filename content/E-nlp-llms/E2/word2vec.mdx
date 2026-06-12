@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: word2vec
 order: 1
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Train word vectors with the skip-gram negative-sampling objective; see why nearby tokens share embedding space and how analogies emerge."
 prerequisites: ["E1/ngram-lm"]
 ---
@@ -143,6 +143,108 @@ print("\nNearest to 'cat':", [vocab[i] for i in top5])
 ```
 
 ![word2vec encodes relations as directions: the man→woman vector is nearly parallel to king→queen, so king − man + woman lands next to queen: analogy by arithmetic.](/figures/E2/word2vec.svg)
+
+## Exercises
+
+**Exercise 1.** For a single positive (center, context) pair, the skip-gram
+objective is $\mathcal{L} = \log \sigma(\mathbf{v}_w \cdot \mathbf{u}_c)$.
+Derive $\partial \mathcal{L} / \partial \mathbf{v}_w$ by hand, then evaluate it
+for $\mathbf{v}_w = (0.5, -0.2, 0.3)$ and $\mathbf{u}_c = (0.1, 0.4, -0.1)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $z = \mathbf{v}_w \cdot \mathbf{u}_c$. Then
+$\mathcal{L} = \log \sigma(z)$ and by the chain rule
+$\frac{\partial \mathcal{L}}{\partial z} = \frac{\sigma'(z)}{\sigma(z)}$.
+
+**Step 2.** Use the sigmoid identity $\sigma'(z) = \sigma(z)(1 - \sigma(z))$, so
+$\frac{\partial \mathcal{L}}{\partial z} = 1 - \sigma(z)$.
+
+**Step 3.** Since $z = \mathbf{v}_w \cdot \mathbf{u}_c$, the gradient
+$\partial z / \partial \mathbf{v}_w = \mathbf{u}_c$, giving
+
+$$
+\frac{\partial \mathcal{L}}{\partial \mathbf{v}_w} = (1 - \sigma(z))\,\mathbf{u}_c.
+$$
+
+**Step 4.** Numerically, $z = 0.5(0.1) + (-0.2)(0.4) + 0.3(-0.1) = -0.06$, so
+$\sigma(z) = 0.485$ and $1 - \sigma(z) = 0.515$. The gradient is
+$0.515 \cdot (0.1, 0.4, -0.1) = (0.0515, 0.2060, -0.0515)$. The update
+$\mathbf{v}_w \leftarrow \mathbf{v}_w + \eta (1 - \sigma(z))\,\mathbf{u}_c$
+pushes the center vector toward its context vector, raising the dot product.
+
+</details>
+
+**Exercise 2.** The noise distribution is $P_n(w) \propto f(w)^{3/4}$. Take a
+two-word vocabulary with unigram frequencies $f(a) = 0.9$, $f(b) = 0.1$. Compute
+$P_n(a)$ and $P_n(b)$, and compare with the raw unigram probabilities. Which word
+does the $3/4$ power favor as a negative sample?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Raise each frequency to the $3/4$ power:
+$0.9^{0.75} = 0.9240$ and $0.1^{0.75} = 0.1778$.
+
+**Step 2.** Normalize so the two sum to 1. The total is
+$0.9240 + 0.1778 = 1.1018$, so $P_n(a) = 0.9240 / 1.1018 = 0.8386$ and
+$P_n(b) = 0.1778 / 1.1018 = 0.1614$.
+
+**Step 3.** Compare with the raw probabilities $(0.9, 0.1)$. The rare word $b$
+went from $0.10$ to $0.16$ and the common word $a$ dropped from $0.90$ to $0.84$.
+The $3/4$ power flattens the distribution toward the rare word, so rare words are
+sampled as negatives more often than their raw frequency would dictate.
+
+</details>
+
+**Exercise 3 (code).** The skip-gram negative-sampling gradient is hand-derived
+in the implementation above. Verify the full gradient with respect to
+$\mathbf{v}_w$ (one positive context plus $K$ negatives) against a finite-
+difference estimate of the objective.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+rng = np.random.default_rng(0)
+d, K = 5, 4
+v_w = rng.normal(0, 1, d)
+u_c = rng.normal(0, 1, d)
+U_neg = rng.normal(0, 1, (K, d))      # K negative context vectors
+
+def objective(v):
+    pos = np.log(sigmoid(v @ u_c))
+    neg = np.sum(np.log(sigmoid(-(U_neg @ v))))
+    return pos + neg
+
+# Analytic gradient wrt v_w:
+#   d/dv [log sigma(v.u_c)]      = (1 - sigma(v.u_c)) u_c
+#   d/dv [log sigma(-v.u_k)]     = -(1 - sigma(-v.u_k)) u_k
+g = (1 - sigmoid(v_w @ u_c)) * u_c
+g -= np.sum((1 - sigmoid(-(U_neg @ v_w)))[:, None] * U_neg, axis=0)
+
+# Central finite differences
+eps = 1e-6
+g_fd = np.zeros(d)
+for i in range(d):
+    e = np.zeros(d); e[i] = eps
+    g_fd[i] = (objective(v_w + e) - objective(v_w - e)) / (2 * eps)
+
+assert np.allclose(g, g_fd, atol=1e-5)
+print("max abs diff:", np.abs(g - g_fd).max())
+```
+
+The analytic gradient matches the numerical one to within $10^{-5}$: the positive
+term pulls $\mathbf{v}_w$ toward $\mathbf{u}_c$ while each negative term pushes it
+away from $\mathbf{u}_k$.
+
+</details>
 
 ## What word2vec captures (and misses)
 

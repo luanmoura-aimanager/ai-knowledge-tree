@@ -4,7 +4,7 @@ pillar: E
 subId: E7
 lessonId: audio-llms
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Encode audio as log-mel spectrograms, pretrain with masked prediction (Wav2Vec 2.0) or multitask supervised fine-tuning (Whisper), and decode to text."
 prerequisites: ["E3/encoder-only"]
 ---
@@ -151,9 +151,86 @@ audio directly by predicting **discrete audio tokens** rather than text tokens.
   audio output (not just text), enabling real-time voice conversation.
 
 The architecture mirrors LLaVA: a frozen audio encoder, a projection to the LLM's
-token space, and a decoder-only LLM that generates text (or audio tokens)<FN n="2" />. The key
-difference from VLMs: audio is sequential and temporal, so timing and streaming are
-first-class concerns.
+token space, and a decoder-only LLM that generates text (or audio tokens)<FN n="2" />.
+
+## Exercises
+
+**Exercise 1.** A neural audio codec emits 75 tokens per second per codebook level. A
+30-second clip is encoded with 8 codebook levels. How many discrete audio tokens does the
+sequence contain? Compare that to the roughly 60 text tokens a transcript of the same clip
+would use, and state the consequence for the LLM's context window.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Tokens per second across all levels: $75 \times 8 = 600$ tokens/s.
+
+**Step 2.** Over 30 seconds: $600 \times 30 = 18{,}000$ audio tokens.
+
+**Step 3.** That is $18{,}000 / 60 = 300$ times more tokens than the 60-token transcript.
+Generating audio directly is far more context-hungry than emitting text, which is why
+speech LLMs need long-context decoders or coarser codebooks (fewer levels) and why timing
+and streaming, not just accuracy, drive their design.
+
+</details>
+
+**Exercise 2.** The lesson's STFT slides a 400-sample window with a 160-sample hop and
+keeps only window starts $s$ with $s < n - 400$, where $n$ is the number of samples. Derive
+a formula for the number of frames, then evaluate it for 1 second of 16 kHz audio.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The valid starts are $s = 0, 160, 320, \dots$ up to but not including
+$n - 400$. The count is the number of multiples of the hop strictly below $n - 400$:
+
+$$
+T_{\text{frames}} = \left\lceil \frac{n - 400}{160} \right\rceil.
+$$
+
+**Step 2.** For 1 second at 16 kHz, $n = 16{,}000$:
+
+$$
+T_{\text{frames}} = \left\lceil \frac{16{,}000 - 400}{160} \right\rceil
+= \left\lceil \frac{15{,}600}{160} \right\rceil = \lceil 97.5 \rceil = 98.
+$$
+
+So one second becomes a roughly $98 \times 80$ log-mel image, the input the audio encoder
+consumes.
+
+</details>
+
+**Exercise 3 (code).** Implement the frame-count formula in numpy and confirm it matches the
+explicit window-start loop for both 1 second and 30 seconds of 16 kHz audio.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def num_frames_loop(n_samples, n_fft=400, hop=160):
+    # the same iteration the lesson's stft() uses
+    return len(range(0, n_samples - n_fft, hop))
+
+def num_frames_formula(n_samples, n_fft=400, hop=160):
+    return int(np.ceil((n_samples - n_fft) / hop))
+
+for seconds, expected in [(1, 98), (30, 2998)]:
+    n = 16000 * seconds
+    assert num_frames_loop(n) == num_frames_formula(n) == expected
+
+print(num_frames_formula(16000), num_frames_formula(16000 * 30))  # 98 2998
+```
+
+The ceiling formula reproduces the loop exactly, so the spectrogram length is predictable
+from the clip duration alone.
+
+</details>
+
+The key difference from VLMs follows from this token budget: audio is sequential and
+temporal, so timing and streaming are first-class concerns the next pillar's deployment
+lessons must handle.
 
 <Footnotes>
   <FNItem n="1">**Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I.** (2023). "Robust speech recognition via large-scale weak supervision (Whisper)". *ICML*. [arXiv:2212.04356](https://arxiv.org/abs/2212.04356)</FNItem>

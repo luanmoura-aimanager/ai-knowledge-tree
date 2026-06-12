@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: kv-cache
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Cache key and value tensors for all previous tokens so each new token incurs only one new attention row, reducing per-token cost from O(T^2) to O(T)."
 prerequisites: ["decoding"]
 ---
@@ -159,6 +159,106 @@ for i in range(3):
 With Grouped-Query Attention (GQA), only $g$ key/value heads are stored instead of $h$
 query heads. The KV cache memory is reduced by $h/g$ -- the primary motivation for GQA
 in production models<FN n="2" />.
+
+## Exercises
+
+**Exercise 1.** A model has $L = 32$ layers, $h = 32$ attention heads, head
+dimension $d_h = 128$, and stores the KV cache in bf16 (2 bytes), without GQA.
+Compute the KV cache size, in bytes per token, then in gigabytes for a sequence of
+$T = 8192$ tokens.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The per-token size is $2 \times L \times h \times d_h \times 2$ bytes,
+where the leading $2$ counts keys and values and the trailing $2$ is bytes per bf16
+number:
+
+$$
+2 \times 32 \times 32 \times 128 \times 2 = 1{,}048{,}576 \text{ bytes} = 1 \text{ MiB per token}.
+$$
+
+**Step 2.** For $T = 8192$ tokens, multiply by $T$:
+
+$$
+1{,}048{,}576 \times 8192 = 8{,}589{,}934{,}592 \text{ bytes} = 8 \text{ GiB}.
+$$
+
+A single 8K-token request already costs $8$ GiB of KV cache at full multi-head
+attention, which is why the cache, not the weights, often caps the batch size.
+
+</details>
+
+**Exercise 2.** Take the model of Exercise 1 and switch to GQA with $g = 8$
+key/value heads (the 32 query heads share them in groups of 4). By what factor does
+the KV cache shrink, and what is the new per-token size?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Only the key/value head count changes, from $h = 32$ to $g = 8$, so the
+cache shrinks by $h/g = 32/8 = 4\times$.
+
+**Step 2.** The new per-token size replaces $h$ with $g$:
+
+$$
+2 \times 32 \times 8 \times 128 \times 2 = 262{,}144 \text{ bytes} = 0.25 \text{ MiB per token},
+$$
+
+one quarter of the $1$ MiB from Exercise 1. GQA trades a small amount of model
+quality for a $4\times$ smaller cache, which directly raises the achievable batch
+size and context length.
+
+</details>
+
+**Exercise 3 (code).** Show that the cached decode path computes the same attention
+output as a from-scratch full-attention pass over the whole sequence. Build a tiny
+attention layer in numpy, prefill a prompt, decode one token with the cache, and
+assert the cached output matches recomputing attention over all tokens at once.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d = 16
+Wk = rng.normal(0, 0.1, (d, d))
+Wv = rng.normal(0, 0.1, (d, d))
+Wq = rng.normal(0, 0.1, (d, d))
+
+def attend(q, K, V):
+    scores = q @ K.T / np.sqrt(d)
+    a = np.exp(scores - scores.max(-1, keepdims=True))
+    a /= a.sum(-1, keepdims=True)
+    return a @ V
+
+X = rng.normal(0, 1, (5, d))          # 4-token prompt + 1 new token
+prompt, new = X[:4], X[4:5]
+
+# Cached path: K,V for the prompt are reused, only the new token is appended.
+K_cache = prompt @ Wk
+V_cache = prompt @ Wv
+k_new, v_new = new @ Wk, new @ Wv
+K_full = np.vstack([K_cache, k_new])
+V_full = np.vstack([V_cache, v_new])
+out_cached = attend(new @ Wq, K_full, V_full)
+
+# Recompute from scratch over all 5 tokens, take the last query row.
+out_scratch = attend(X @ Wq, X @ Wk, X @ Wv)[4:5]
+
+assert np.allclose(out_cached, out_scratch, atol=1e-12)
+print("max abs diff:", np.abs(out_cached - out_scratch).max())
+```
+
+The cached output equals the full recomputation to floating-point precision: reusing
+the prompt's keys and values changes the cost, not the result.
+
+</details>
+
+The next lesson uses one target-model pass to verify several draft tokens at once,
+turning the memory-bound decode step into a near-parallel one.
 
 <Footnotes>
   <FNItem n="1">**Pope, R., et al.** (2023). "Efficiently scaling transformer inference".

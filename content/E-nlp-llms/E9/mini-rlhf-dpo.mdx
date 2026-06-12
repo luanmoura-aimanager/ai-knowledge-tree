@@ -4,7 +4,7 @@ pillar: E
 subId: E9
 lessonId: mini-rlhf-dpo
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Take the pretrained tiny GPT, build a small preference dataset, and run one DPO step to shift its outputs, a scaled-down version of the alignment pipeline from E4."
 prerequisites: ["train-tinyshakespeare", "E4/dpo"]
 ---
@@ -102,6 +102,110 @@ After a few steps on the synthetic pairs, sample again and compare to the refere
 policy shifts toward the preferred property while staying fluent, because the reference
 ratio penalizes drifting away from the pretrained distribution. This is the entire shape of
 preference tuning, minus the scale and the human labels.
+
+## Exercises
+
+**Exercise 1.** At the start of training the policy equals the reference, so the
+implicit reward $r_\theta(x, y) = \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)}$
+is zero for every completion. Compute the DPO loss in that initial state, and
+explain why this value is the natural baseline that any successful preference
+step must drive the loss below.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** When $\pi_\theta = \pi_{\text{ref}}$, both implicit rewards vanish:
+$r_\theta(x, y_w) = 0$ and $r_\theta(x, y_l) = 0$. The argument of the logistic
+is $\beta(0 - 0) = 0$.
+
+**Step 2.** The loss is $-\log \sigma(0)$. Since $\sigma(0) = \tfrac12$, this is
+$-\log \tfrac12 = \log 2 \approx 0.693$ nats.
+
+**Step 3.** This is the baseline: the loss the model starts at before it has
+expressed any preference. Lowering the loss below $\log 2$ requires
+$\sigma(\beta(r_w - r_l)) > \tfrac12$, which means $r_w > r_l$: the policy must
+raise the winner's log-ratio above the loser's. A step that fails to separate
+the two leaves the loss at or above $\log 2$, so $\log 2$ is the threshold that
+marks the onset of actual preference learning.
+
+</details>
+
+**Exercise 2 (code).** Implement the DPO loss in numpy from sequence
+log-probabilities (skip the network and feed the log-probs directly). Verify the
+$\log 2$ baseline from Exercise 1, and confirm that increasing the winner's
+policy log-prob while holding everything else fixed lowers the loss.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def logsigmoid(z):
+    # numerically stable log-sigmoid
+    return -np.logaddexp(0.0, -z)
+
+def dpo_loss(pi_w, pi_l, ref_w, ref_l, beta=0.1):
+    r_w = pi_w - ref_w          # implicit reward for the winner
+    r_l = pi_l - ref_l          # implicit reward for the loser
+    z = beta * (r_w - r_l)
+    return -logsigmoid(z).mean()
+
+# At init the policy equals the reference: all log-ratios are zero.
+ref_w = np.array([-3.0, -4.0])
+ref_l = np.array([-5.0, -6.0])
+pi_w0, pi_l0 = ref_w.copy(), ref_l.copy()
+base = dpo_loss(pi_w0, pi_l0, ref_w, ref_l, beta=0.1)
+assert np.isclose(base, np.log(2.0))
+
+# Raise the winner's policy log-prob; the loss must drop below the baseline.
+pi_w1 = ref_w + 2.0             # policy now prefers the winner
+better = dpo_loss(pi_w1, pi_l0, ref_w, ref_l, beta=0.1)
+assert better < base
+
+print("baseline loss:", round(float(base), 4), "(log 2)")
+print("after preferring winner:", round(float(better), 4))
+```
+
+The loss starts exactly at $\log 2$ and falls once the policy assigns the winner
+a higher log-ratio than the loser, which is the separation DPO optimizes for.
+
+</details>
+
+**Exercise 3 (code).** The $\beta$ term is the KL-control knob: small $\beta$
+keeps the policy near the reference, large $\beta$ lets the preference dominate.
+Show numerically that for a fixed reward gap $r_w - r_l > 0$, the loss decreases
+as $\beta$ grows, and explain what that means for how far the policy is pushed.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def logsigmoid(z):
+    return -np.logaddexp(0.0, -z)
+
+# Fix a positive reward gap (winner already favored by the implicit reward).
+gap = 1.5                       # r_w - r_l
+betas = np.array([0.05, 0.1, 0.5, 1.0])
+losses = np.array([-logsigmoid(b * gap) for b in betas])
+
+# Larger beta -> smaller loss for a fixed positive gap.
+assert np.all(np.diff(losses) < 0)
+
+print("betas:  ", betas)
+print("losses: ", np.round(losses, 4))
+```
+
+For a fixed positive reward gap the loss is monotonically decreasing in $\beta$,
+so a larger $\beta$ rewards the same separation more strongly. In training this
+means a large $\beta$ produces steeper gradients toward the preferred completion
+and lets the policy drift further from the reference, while a small $\beta$
+tolerates only a gentle move, the same KL-control tradeoff the PPO route
+enforces with an explicit penalty.
+
+</details>
 
 The model has now been pretrained, modernized, and aligned. The
 [final lesson](aiayn-revisited) closes the loop by re-reading the original Transformer paper

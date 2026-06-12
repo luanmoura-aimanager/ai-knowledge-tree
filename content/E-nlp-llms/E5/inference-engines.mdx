@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: inference-engines
 order: 6
-estimatedMinutes: 15
+estimatedMinutes: 25
 goal: "Survey the architecture of production inference servers: how vLLM, TGI, and SGLang implement PagedAttention, speculative decoding, and structured output scheduling."
 prerequisites: ["paged-attention", "speculative-decoding"]
 codeExempt: true
@@ -116,6 +116,83 @@ heavy structured output requirements.
 
 **TensorRT-LLM:** preferred for maximum throughput on NVIDIA hardware in production at scale,
 where the engineering overhead of compilation is justified.
+
+## Exercises
+
+**Exercise 1.** A team serves an agent framework whose every call begins with the same
+large block of tool definitions and few-shot examples, followed by a short per-call
+query. Which prefix-caching mechanism, vLLM's full-prompt prefix caching or SGLang's
+RadixAttention, reuses more KV cache here, and why?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** vLLM's prefix caching detects and shares a prefix when requests share the
+same leading tokens. If every call's prompt starts with the identical tool-definition
+block, that common head is shared, but any difference earlier in the prompt (a
+per-call system field, a reordered example) breaks the match for everything after it.
+
+**Step 2.** RadixAttention stores all active prompts in a radix tree keyed by token
+sequence, so it shares *any* common prefix branch, not just a single full-prompt
+prefix, and it does so automatically as prompts fork. With many calls that share tool
+definitions and few-shot examples but diverge at the query, the radix tree keeps the
+shared branch resident once and grows only the divergent leaves.
+
+**Step 3.** RadixAttention reuses more cache here. The workload (heavy shared
+context, short divergent tails, many concurrent calls) is exactly the structured-program
+case SGLang targets, which is why it is the recommended engine for agent and
+tree-of-thought pipelines.
+
+</details>
+
+**Exercise 2.** From the feature comparison, a deployment needs speculative decoding,
+native JSON-schema-constrained output, and prefix sharing across many few-shot calls.
+Walk through which of vLLM, TGI, and SGLang satisfy all three, and name the single
+disqualifying gap for each that fails.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Requirement-check TGI: it has continuous batching and paged attention,
+but the comparison lists speculative decoding as "No" and structured output as
+"Limited". TGI fails on speculative decoding (and structured output).
+
+**Step 2.** Check vLLM: speculative decoding "Yes", prefix caching "Yes", but
+structured output is "Via Outlines", an add-on rather than native scheduling. It can
+do all three functionally, with constrained decoding bolted on rather than integrated
+into the scheduler.
+
+**Step 3.** Check SGLang: speculative decoding "Yes (EAGLE)", structured output
+"Native", prefix caching "Yes (radix tree)". It satisfies all three first-class.
+SGLang is the fit; vLLM is workable with the Outlines caveat; TGI is disqualified by
+the missing speculative decoding.
+
+</details>
+
+**Exercise 3.** TensorRT-LLM compiles the model graph to GPU-specific kernels ahead
+of time, while vLLM runs a flexible Python-level engine. Describe one workload where
+the compilation overhead pays off and one where vLLM's flexibility is worth more, and
+state the underlying tradeoff.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compilation pays off for a stable, high-volume production endpoint: a
+fixed model on H100/H200 serving millions of requests, where the one-time cost of
+compiling fused, architecture-tuned kernels is amortized over enormous throughput, and
+TensorRT-LLM's per-GPU kernel optimization extracts the most tokens per second.
+
+**Step 2.** vLLM's flexibility wins during experimentation and frequent model churn:
+swapping in new Hugging Face checkpoints, trying quantization schemes, or changing
+decoding strategies, where recompiling for every change is prohibitive and the
+Python-level engine adapts immediately.
+
+**Step 3.** The tradeoff is peak throughput versus iteration speed. Ahead-of-time
+compilation buys maximal hardware utilization at the cost of rigidity; a flexible
+runtime buys fast change at the cost of leaving some throughput on the table. The
+right choice tracks how stable the deployment is.
+
+</details>
 
 The inference engine is invisible to end users but determines the cost and latency of
 every API call. The throughput these engines extract rests on the partitioning and

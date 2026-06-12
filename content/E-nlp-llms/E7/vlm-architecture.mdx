@@ -4,7 +4,7 @@ pillar: E
 subId: E7
 lessonId: vlm-architecture
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Bridge a frozen image encoder to an LLM with a learnable projection layer (LLaVA) or a Q-Former bottleneck (BLIP-2); trace a visual question-answering forward pass."
 prerequisites: ["clip"]
 ---
@@ -128,6 +128,96 @@ def llava_forward(image, question, clip_model, projection, llm_model, llm_tokeni
 
 **Trend:** more recent models (LLaVA-NeXT, InternVL, Qwen-VL) use higher-resolution image
 tiles, dynamic resolution encoding, and larger LLMs. GPT-4V and Claude 3 are proprietary.
+
+## Exercises
+
+**Exercise 1.** LLaVA prepends 256 projected patch tokens to the text tokens. LLaVA-1.5 uses
+a $336 \times 336$ image with a patch size of $14 \times 14$. How many patches does that
+image produce, and how does it compare to the 256 of the lower-resolution model? Then count
+how many visual tokens BLIP-2's Q-Former would emit for the same image.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A $14 \times 14$ patch tiles a $336 \times 336$ image into a grid of
+$336 / 14 = 24$ patches per side, so $24 \times 24 = 576$ patches. This matches the "576"
+in the comparison table for LLaVA-1.5.
+
+**Step 2.** The lower-resolution model used a $224 \times 224$ image:
+$224 / 14 = 16$ per side, $16 \times 16 = 256$ patches. So raising resolution from 224 to
+336 multiplies visual tokens by $576 / 256 = 2.25$.
+
+**Step 3.** The Q-Former is a fixed bottleneck: it always outputs its 32 learned query
+tokens regardless of input resolution. So BLIP-2 emits 32 visual tokens for this image,
+$576 / 32 = 18$ times fewer than LLaVA-1.5, which is why its LLM context cost is nearly
+resolution-independent.
+
+</details>
+
+**Exercise 2.** LLaVA's linear projection $W$ maps each CLIP patch embedding of dimension
+$d_{\text{CLIP}} = 1024$ to the LLM dimension $d_{\text{LLM}} = 4096$. How many parameters
+does $W$ have (ignore the bias)? If LLaVA-1.5 replaces it with a 2-layer MLP
+$1024 \to 4096 \to 4096$ with GELU between, how many weight parameters does the bridge now
+hold?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A linear map from 1024 to 4096 is a $4096 \times 1024$ matrix:
+$4096 \times 1024 = 4{,}194{,}304 \approx 4.19$M parameters.
+
+**Step 2.** The 2-layer MLP stacks two such matrices: $4096 \times 1024$ for the first layer
+and $4096 \times 4096$ for the second.
+
+$$
+4096 \times 1024 + 4096 \times 4096 = 4{,}194{,}304 + 16{,}777{,}216 = 20{,}971{,}520 \approx 21\text{M}.
+$$
+
+The MLP bridge is about 5 times larger, still tiny next to the multi-billion-parameter LLM
+it feeds, which is why the projection is cheap to train in stage 1.
+
+</details>
+
+**Exercise 3 (code).** Implement the LLaVA bridge in numpy: project a stack of patch
+embeddings through $W$, prepend them to text token embeddings, and confirm the combined
+sequence length and the projection's parameter count.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n_patches, d_clip, d_llm = 256, 8, 16   # small stand-in dims (real: 1024 -> 4096)
+
+patches = rng.standard_normal((n_patches, d_clip))
+W = rng.standard_normal((d_llm, d_clip))            # projection (d_llm x d_clip)
+
+# Project each patch to the LLM dimension: (n_patches, d_llm)
+visual_tokens = np.einsum("nd,kd->nk", patches, W)
+assert visual_tokens.shape == (n_patches, d_llm)
+
+# Prepend the visual tokens to T text token embeddings
+T = 40
+text_tokens = rng.standard_normal((T, d_llm))
+combined = np.concatenate([visual_tokens, text_tokens], axis=0)
+assert combined.shape == (n_patches + T, d_llm) == (296, d_llm)
+
+# Real LLaVA projection parameter count (1024 -> 4096, no bias)
+proj_params = 4096 * 1024
+assert proj_params == 4_194_304
+
+print(combined.shape[0], "tokens;", proj_params, "projection params")
+```
+
+The LLM then runs self-attention over all 296 tokens jointly, exactly as the forward pass
+describes.
+
+</details>
+
+The next lesson takes this two-stage, freeze-then-unfreeze bridge and asks what data and
+schedule turn a feature-aligned VLM into one that follows visual instructions.
 
 <Footnotes>
   <FNItem n="1">**Liu, H., Li, C., Wu, Q., & Lee, Y. J.** (2023). "Visual instruction tuning (LLaVA)". *NeurIPS*. [arXiv:2304.08485](https://arxiv.org/abs/2304.08485)</FNItem>

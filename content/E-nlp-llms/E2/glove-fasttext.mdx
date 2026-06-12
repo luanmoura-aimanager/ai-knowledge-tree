@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: glove-fasttext
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Derive GloVe's log-bilinear objective from the co-occurrence ratio, and add fastText's subword composition to handle morphology and OOV."
 prerequisites: ["word2vec"]
 ---
@@ -177,6 +177,106 @@ graph LR
 | Morphology | None | None | Implicit via n-gram sharing |
 | Training speed | Fast (streaming) | Slower (matrix factorization) | Fast |
 | Typical use | General embeddings | General embeddings | Languages with rich morphology; OOV handling |
+
+## Exercises
+
+**Exercise 1.** The GloVe weighting is
+$f(x) = \min\!\left((x / x_{\max})^{0.75},\, 1\right)$ with $x_{\max} = 100$.
+Compute $f(x)$ by hand for co-occurrence counts $x \in \{1, 10, 100, 500\}$, and
+state in one sentence what the weighting does to the contributions of a count-1
+pair versus a count-100 pair.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For $x = 1$: $(1/100)^{0.75} = 0.01^{0.75} = 0.0316$, below the cap, so
+$f(1) = 0.0316$.
+
+**Step 2.** For $x = 10$: $(10/100)^{0.75} = 0.1^{0.75} = 0.1778$, so $f(10) = 0.1778$.
+
+**Step 3.** For $x = 100$: $(100/100)^{0.75} = 1^{0.75} = 1$, at the cap, so $f(100) = 1$.
+
+**Step 4.** For $x = 500$: $(500/100)^{0.75} = 5^{0.75} = 3.34 > 1$, so the
+$\min$ clamps it to $f(500) = 1$.
+
+The rare count-1 pair contributes with weight $0.0316$, about $32$ times less than
+the count-100 pair at weight $1$; counts at or above $x_{\max} = 100$ all share the
+same cap of $1$, so very frequent pairs do not dominate the fit.
+
+</details>
+
+**Exercise 2.** A word $w$ and its plural $w\text{s}$ differ by one character. Using
+fastText's decomposition
+$\mathbf{v}_w = \mathbf{v}_{[w]} + \sum_{g \in \mathcal{G}_w} \mathbf{z}_g$,
+explain why their vectors are close even if $w\text{s}$ was never seen in training,
+and contrast this with what word2vec or GloVe would produce for an unseen $w\text{s}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Enumerate the n-grams. With boundary markers, "play" yields n-grams
+like `<pl`, `pla`, `lay`, `ay>` (plus longer ones and the whole-word token), while
+"plays" yields `<pl`, `pla`, `lay`, `ays`, `ys>`. The two share `<pl`, `pla`, `lay`,
+the entire stem.
+
+**Step 2.** Since $\mathbf{v}_w$ sums shared n-gram embeddings $\mathbf{z}_g$, the
+two word vectors share most of their summands and differ only in the few n-grams
+touching the final `s`. Their difference is small, so the vectors are close by
+construction.
+
+**Step 3.** If "plays" is out of vocabulary, fastText still composes a vector from
+its in-vocabulary n-grams, so the unseen word gets a meaningful, stem-aligned vector.
+Word2vec and GloVe assign one atomic vector per word type with no subword structure,
+so an unseen "plays" has no embedding at all: it falls back to a zero or generic
+unknown-token vector with no link to "play".
+
+</details>
+
+**Exercise 3 (code).** The GloVe update in the implementation above uses
+$\nabla = 2 f(X_{ik})\, (\mathbf{v}_i \cdot \mathbf{u}_k + b_i + b_k - \log X_{ik})$.
+Verify the analytic gradients of one squared term with respect to $\mathbf{v}_i$ and
+$b_i$ against finite differences.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d = 6
+v_i = rng.normal(0, 1, d)
+u_k = rng.normal(0, 1, d)
+b_i, b_k = 0.3, -0.2
+X_ik, x_max = 12.0, 100.0
+w = min((X_ik / x_max) ** 0.75, 1.0)
+
+def term(v_i, u_k, b_i, b_k):
+    diff = v_i @ u_k + b_i + b_k - np.log(X_ik)
+    return w * diff ** 2
+
+diff = v_i @ u_k + b_i + b_k - np.log(X_ik)
+g_vi = 2 * w * diff * u_k          # analytic: d term / d v_i
+g_bi = 2 * w * diff                # analytic: d term / d b_i
+
+eps = 1e-6
+g_vi_fd = np.zeros(d)
+for j in range(d):
+    e = np.zeros(d); e[j] = eps
+    g_vi_fd[j] = (term(v_i + e, u_k, b_i, b_k)
+                  - term(v_i - e, u_k, b_i, b_k)) / (2 * eps)
+g_bi_fd = (term(v_i, u_k, b_i + eps, b_k)
+           - term(v_i, u_k, b_i - eps, b_k)) / (2 * eps)
+
+assert np.allclose(g_vi, g_vi_fd, atol=1e-5)
+assert np.isclose(g_bi, g_bi_fd, atol=1e-5)
+print("v_i grad max diff:", np.abs(g_vi - g_vi_fd).max())
+```
+
+Both analytic gradients match the finite-difference estimates to within $10^{-5}$,
+confirming the weighted least-squares update used in the training loop.
+
+</details>
 
 All three produce **static** embeddings -- one vector per word type. The next lesson
 introduces RNNs, which produce a hidden state that reads the entire sequence and can be

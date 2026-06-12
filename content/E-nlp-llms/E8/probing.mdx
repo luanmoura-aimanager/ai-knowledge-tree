@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: probing
 order: 1
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Train linear probes on frozen LLM activations to test which layer encodes part-of-speech, syntax, or factual knowledge; interpret probe accuracy as evidence (not proof) of representation."
 prerequisites: ["E3/encoder-only"]
 ---
@@ -133,6 +133,124 @@ layers. Meng et al. (2022, ROME) found that in GPT-style models:
 
 This finding motivates **model editing** -- surgically modifying factual representations
 without full retraining.
+
+## Exercises
+
+**Exercise 1.** A binary linear probe is trained on frozen activations and reaches
+$92\%$ accuracy. A **control probe**, trained on the same activations but with the
+labels randomly shuffled, reaches $78\%$ accuracy. The metric of interest is
+**selectivity**, defined as real-task accuracy minus control accuracy. Compute the
+selectivity, and explain what a small selectivity would have told you even if the
+real-task accuracy were high.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Selectivity is the gap between the two accuracies:
+
+$$
+\text{selectivity} = 92\% - 78\% = 14 \text{ percentage points}.
+$$
+
+**Step 2.** The control probe measures how much accuracy comes from the probe's own
+capacity to memorize an arbitrary label assignment, rather than from structure in the
+representation. With shuffled labels the only signal is whatever the classifier can
+fit by brute force.
+
+**Step 3.** A small selectivity (control accuracy close to real accuracy) would mean
+the probe can fit nearly anything, so a high real-task number is not evidence that the
+property is encoded. Here the $14$-point gap says the representation carries genuine
+task-relevant structure the random baseline cannot reach. Selectivity, not raw
+accuracy, is the load-bearing quantity.
+
+</details>
+
+**Exercise 2.** Layer-wise probe accuracies for part-of-speech are $0.71, 0.86, 0.90,
+0.84, 0.79$ at layers $0, 3, 6, 9, 11$. A colleague concludes "layer 6 is where the
+model stores POS." State two distinct reasons this conclusion is unjustified, drawing
+on the probing critique in this lesson.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** First reason: probing is correlational. High decodability at layer 6 shows
+POS is linearly *present* there, not that the model *uses* it for any downstream
+computation. The information could be an incidental byproduct that no later component
+reads. Establishing use requires a causal intervention (activation patching), not a
+probe.
+
+**Step 2.** Second reason: a probe with enough capacity can recover a property that is
+only weakly or redundantly encoded, and the peak layer can shift with the probe's
+regularization, the amount of training data, or whether a control task was run. Without
+a selectivity baseline, the $0.90$ at layer 6 versus $0.86$ at layer 3 is not a reliable
+ranking. The information may be smeared across layers rather than localized to one.
+
+**Step 3.** Both objections point the same way: a single accuracy curve identifies where
+a property is *decodable*, which is necessary but not sufficient for the claim that the
+model *stores and uses* it at that depth.
+
+</details>
+
+**Exercise 3 (code).** Implement a linear probe from scratch in numpy (no sklearn).
+Build a synthetic dataset where the label is linearly decodable from the activations,
+fit a probe by least squares, and verify it generalizes on held-out data well above
+chance. Then verify a **control probe** on shuffled labels does not.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, d = 600, 16
+
+# A ground-truth direction encodes a binary label linearly in the activations.
+w_true = rng.normal(0, 1, d)
+X = rng.normal(0, 1, (N, d))
+score = X @ w_true
+y = (score > 0).astype(float)   # balanced binary label (score is mean-zero)
+
+# Split into train / test.
+tr, te = slice(0, 500), slice(500, N)
+
+def fit_probe(Xtr, ytr):
+    # Ridge least squares on centered targets, w = (X^T X + eps I)^{-1} X^T (y - mean).
+    A = Xtr.T @ Xtr + 1e-3 * np.eye(Xtr.shape[1])
+    return np.linalg.solve(A, Xtr.T @ (ytr - ytr.mean()))
+
+def accuracy(w, Xte, yte):
+    pred = (Xte @ w > 0).astype(float)   # boundary at 0, targets were centered
+    return (pred == yte).mean()
+
+# Real probe.
+w = fit_probe(X[tr], y[tr])
+real_acc = accuracy(w, X[te], y[te])
+
+# Control probe: shuffle the training labels, refit.
+y_shuf = rng.permutation(y[tr])
+w_ctrl = fit_probe(X[tr], y_shuf)
+ctrl_acc = accuracy(w_ctrl, X[te], y[te])
+
+print(f"real probe test accuracy:    {real_acc:.3f}")
+print(f"control probe test accuracy: {ctrl_acc:.3f}")
+print(f"selectivity:                 {real_acc - ctrl_acc:.3f}")
+
+# The real probe decodes the planted direction; the control cannot generalize.
+assert real_acc > 0.85
+assert ctrl_acc < 0.65
+assert real_acc - ctrl_acc > 0.20
+```
+
+The real probe recovers the planted linear direction and generalizes far above the
+$0.5$ chance rate, while the control probe trained on shuffled labels collapses toward
+chance. The large selectivity is what licenses the claim that the property is genuinely
+encoded.
+
+</details>
+
+The next lesson moves from correlation to causation: instead of reading activations
+with a probe, it edits them and watches the output change.
 
 <Footnotes>
   <FNItem n="1">**Alain, G., & Bengio, Y.** (2017). "Understanding intermediate layers using linear classifier probes". *ICLR Workshop*. [arXiv:1610.01644](https://arxiv.org/abs/1610.01644). Introduces the linear-probe methodology used here.</FNItem>

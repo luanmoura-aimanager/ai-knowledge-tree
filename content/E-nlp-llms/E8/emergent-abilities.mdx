@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: emergent-abilities
 order: 9
-estimatedMinutes: 15
+estimatedMinutes: 25
 goal: "State the claim that some capabilities appear abruptly with scale, weigh the counterargument that emergence is partly a metric artifact, and separate what scales smoothly from what does not."
 prerequisites: ["E4/scaling-laws"]
 codeExempt: true
@@ -61,6 +61,82 @@ over a smooth loss produces them for free. Three honest takeaways:
   identified transition in a smooth quantity, not a metric artifact.
 - "Emergence" is therefore better treated as a statement about measurement and about
   in-distribution extrapolation than as a law of nature.
+
+## Exercises
+
+**Exercise 1.** A task requires all $k = 10$ tokens correct under exact-match. Suppose per-token
+correctness improves smoothly with scale, taking values $p = 0.5$, $0.7$, and $0.9$ at three
+model sizes. Compute exact-match accuracy $p^{10}$ at each size, and use the numbers to explain
+why a smoothly rising $p$ produces an accuracy curve that looks flat near zero and then sharp.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Exact-match needs every token right, so accuracy is $p^{10}$:
+
+$$
+0.5^{10} \approx 0.001, \qquad 0.7^{10} \approx 0.028, \qquad 0.9^{10} \approx 0.349.
+$$
+
+**Step 2.** Equal increments in $p$ ($0.5 \to 0.7 \to 0.9$) map to wildly unequal jumps in
+accuracy: roughly $0.001 \to 0.028$ (about a $29\times$ relative move off a near-zero base) then
+$0.028 \to 0.349$ (an absolute jump of $0.32$). The power $p^{10}$ keeps accuracy pinned near
+zero while $p$ is moderate, then lets it climb steeply once $p$ approaches $1$.
+
+**Step 3.** Plotted against scale, that is a flat-then-sharp curve manufactured entirely by the
+metric. The underlying $p$ never jumps; the discontinuous-looking emergence is the power-and-
+threshold transform acting on a smooth quantity.
+
+</details>
+
+**Exercise 2.** Take the same task and same three values of $p$, but score it with a continuous
+metric: expected fraction of correct tokens, which equals $p$ itself. Tabulate this metric
+against the exact-match accuracy from Exercise 1, and state what the comparison shows about the
+emergence claim.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The continuous metric is $p$, so its values are $0.5$, $0.7$, $0.9$, three evenly
+spaced points: a straight, smooth rise.
+
+**Step 2.** Side by side:
+
+| metric | size 1 | size 2 | size 3 |
+|--------|--------|--------|--------|
+| token fraction ($p$) | 0.50 | 0.70 | 0.90 |
+| exact-match ($p^{10}$) | 0.001 | 0.028 | 0.349 |
+
+**Step 3.** The same runs look smooth under the linear metric and abrupt under exact-match. The
+discontinuity lives in the choice of metric, not in the model, which is the core of the
+metric-artifact rebuttal: swapping to a metric that tracks the smooth loss dissolves the
+apparent jump.
+
+</details>
+
+**Exercise 3.** The lesson cites the abrupt formation of induction heads during training as a
+phenomenon that is *not* a metric artifact. Explain what distinguishes that case from the
+exact-match curves above, and why this matters for whether "emergence" should be treated as a
+real phase transition or a measurement effect. (Conceptual; no computation.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The exact-match jumps arise from a discontinuous metric applied to a smooth internal
+quantity (the loss): change the metric and the jump disappears. The phenomenon is in the ruler,
+not the model.
+
+**Step 2.** The induction-head transition is a change in the *internal mechanism* itself: a
+specific circuit forms over a narrow window of training, visible as a bump in the smooth loss
+and confirmed by direct mechanistic inspection, not by a brittle threshold metric. Smoothing the
+metric does not remove it.
+
+**Step 3.** So "emergence" splits into two claims. A genuine internal phase change (a circuit
+appearing) is a real transition; an abrupt benchmark number is weak evidence on its own because
+a discontinuous metric over a smooth loss produces it for free. The right posture is to demand
+mechanistic or smooth-metric evidence before calling a benchmark jump a phase transition.
+
+</details>
 
 The practical posture is the same one [scaling laws](/pillar/E/E4/scaling-laws) recommend: forecast with
 smooth predictors, and treat surprising benchmark jumps as a prompt to check the metric

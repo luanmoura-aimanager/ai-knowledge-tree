@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: multi-agent
 order: 8
-estimatedMinutes: 15
+estimatedMinutes: 25
 goal: "Decompose complex tasks across specialized agents with defined roles and communication protocols; contrast AutoGen's two-agent chat with CrewAI's role-based orchestration."
 prerequisites: ["react-agents"]
 codeExempt: true
@@ -148,6 +148,89 @@ worker agents; reviews their outputs and decides when to stop or retry.
 
 **Debate:** two agents argue opposing positions; a judge agent synthesizes the best answer.
 Improves factual accuracy by forcing claims to be defended.
+
+## Exercises
+
+**Exercise 1.** A generator agent produces correct output with probability $0.7$. A
+separate verifier agent catches an incorrect output with probability $0.8$ and never
+flags a correct output as wrong (no false positives). The system accepts an output only
+if the verifier passes it. Compute the probability that an accepted output is actually
+correct.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** An output is accepted in two cases: it is correct (probability $0.7$, always
+passed since there are no false positives), or it is incorrect (probability $0.3$) and
+the verifier misses the error (probability $1 - 0.8 = 0.2$).
+
+**Step 2.** The probability of accepting an incorrect output is
+$0.3 \times 0.2 = 0.06$. The probability of accepting a correct output is $0.7$. The
+total acceptance probability is $0.7 + 0.06 = 0.76$.
+
+**Step 3.** By the conditional probability of correctness given acceptance:
+
+$$
+P(\text{correct} \mid \text{accepted}) = \frac{0.7}{0.76} \approx 0.921.
+$$
+
+The verifier raises the trustworthiness of accepted outputs from $0.7$ to about $0.92$,
+which is the mutual-validation gain that motivates a separate reviewer agent.
+
+</details>
+
+**Exercise 2.** Compare shared message history against structured handoffs as the
+communication protocol for a 6-agent pipeline running a long task. Give one concrete
+advantage of each, and explain why context accumulation pushes long-running production
+systems toward structured handoffs or a blackboard.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Shared message history lets every agent see the full conversation, so no
+coordination logic is needed and any agent can pick up context another produced. Its
+weakness is that the transcript grows with every turn, so a downstream agent in a long
+task pays to re-read the entire history each call.
+
+**Step 2.** Structured handoffs pass a typed artifact (JSON or markdown) from one agent
+to the next, so each agent receives only the relevant slice. This is modular and easy to
+validate, but it requires defining the artifact schema and an explicit routing order.
+
+**Step 3.** With 6 agents over a long task, shared history makes each agent's context,
+and therefore its token cost and latency, grow without bound, and "lost in the middle"
+degrades attention over the bloated transcript. Structured handoffs (or a blackboard
+store read on demand) bound each agent's context to what it needs, which is why durable
+production systems prefer them.
+
+</details>
+
+**Exercise 3.** Design a multi-agent system that writes and ships a small code change:
+it must implement, review, and test the change, retry on failure, and stop cleanly.
+Specify the agent roles, the communication protocol, and two safeguards against the
+reliability failures named in the lesson (looping, error propagation).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Roles: a supervisor that decomposes the task and decides when to stop; a
+coder that writes the change; a reviewer that inspects it for bugs; an executor that
+runs the test suite and reports pass or fail. This is the supervisor-worker hierarchy
+with specialization.
+
+**Step 2.** Protocol: structured handoffs. The coder emits a diff artifact, the reviewer
+emits an annotated approve/reject artifact, and the executor emits a typed test report.
+Typed artifacts keep each agent's context bounded and make every step validatable, which
+also limits error propagation because a malformed artifact is caught at the handoff
+boundary rather than silently consumed.
+
+**Step 3.** Safeguard against looping: a hard cap on retry rounds (for example, three
+implement-review-test cycles) enforced by the supervisor, plus a per-agent timeout, so a
+stuck agent cannot spin forever. Safeguard against error propagation: a validation
+checkpoint after the reviewer, so the change only reaches the executor once it passes
+review, and the executor's pass/fail gate, so a failing change is sent back to the coder
+with the failure report rather than shipped.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Wu, Q., et al.** (2023). "AutoGen: enabling next-gen LLM applications via multi-agent conversation". [arXiv:2308.08155](https://arxiv.org/abs/2308.08155). The conversational multi-agent framework described here.</FNItem>

@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: circuits
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Decompose a transformer into a graph of attention heads and MLP neurons that implement algorithmic sub-tasks; reproduce the indirect object identification circuit on a small model."
 prerequisites: ["probing"]
 ---
@@ -150,6 +150,93 @@ components back from the original run and measure whether the output recovers.
 If patching head $h$ restores the correct answer, that head is causally necessary for
 the behavior. This is the key experiment that distinguishes mechanistic interpretation
 from probing (which only shows correlation).
+
+## Exercises
+
+**Exercise 1.** The residual stream update is $x \leftarrow x + \text{Attn}(x) + \text{MLP}(x)$,
+applied once per layer. Starting from an input embedding $x_0$, write the residual stream after
+$L$ layers as an explicit sum of component contributions, and explain why this additive
+structure is what lets you attribute a logit to individual heads.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Unroll the recurrence. Writing $a_\ell = \text{Attn}_\ell(x_{\ell-1})$ and
+$m_\ell = \text{MLP}_\ell(x_{\ell-1})$ for the layer-$\ell$ contributions,
+
+$$
+x_L = x_0 + \sum_{\ell=1}^{L} \big( a_\ell + m_\ell \big).
+$$
+
+**Step 2.** The attention term itself splits over heads, $a_\ell = \sum_h a_\ell^{(h)}$, so the
+final residual is a flat sum over the embedding, every head, and every MLP.
+
+**Step 3.** The output logit for token $v$ is the linear readout $\mathbf{u}_v^\top x_L$. By
+linearity of the inner product it distributes over the sum: each component contributes an
+additive, independently measurable term $\mathbf{u}_v^\top(\cdot)$ to the logit. That is what
+makes per-component attribution well defined; a multiplicative mixing of contributions would
+not decompose this way.
+
+</details>
+
+**Exercise 2.** In the IOI circuit, name-mover heads boost the indirect object while
+S-inhibition heads suppress the repeated subject. Consider raw name-mover logits
+$\ell_{\text{Mary}} = 2.0$ and $\ell_{\text{John}} = 2.3$ over the two candidate names. The
+S-inhibition mechanism subtracts a penalty $\rho$ from the repeated subject "John". Find the
+smallest $\rho$ that makes "Mary" the argmax, and explain in circuit terms why the model needs
+suppression rather than relying on the name-mover heads alone.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Without suppression the argmax is "John" since $2.3 > 2.0$, the wrong answer. After
+suppression the John logit is $2.3 - \rho$, and "Mary" wins once
+
+$$
+2.3 - \rho < 2.0 \quad\Longrightarrow\quad \rho > 0.3.
+$$
+
+The smallest penalty is any $\rho$ just above $0.3$.
+
+**Step 2.** The name-mover heads copy whatever name is salient; because "John" appears twice it
+is more salient and gets the larger raw logit, so name movers alone point at the wrong token.
+The S-inhibition heads, fed by the duplicate-token heads, remove exactly the salience advantage
+of the repeated name, letting the name movers land on the indirect object. Suppression and
+copying are separate sub-tasks handled by separate head families.
+
+</details>
+
+**Exercise 3 (code).** Reproduce the suppression step as a small circuit. Start from name-mover
+logits where the repeated subject wrongly wins, apply an S-inhibition penalty, and assert that
+the argmax flips to the indirect object. Report the resulting probabilities.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+# Candidates: 0 = Mary (indirect object), 1 = John (repeated subject).
+base = np.array([2.0, 2.3])        # name-mover heads: John wrongly favored
+assert np.argmax(base) == 1        # without suppression the circuit errs
+
+penalty = 1.0                      # S-inhibition subtracts from the repeated name
+inhibited = base.copy()
+inhibited[1] -= penalty
+probs = softmax(inhibited)
+
+assert np.argmax(inhibited) == 0   # Mary now wins (penalty > 0.3 threshold)
+print("P(Mary) =", round(probs[0], 4), " P(John) =", round(probs[1], 4))
+```
+
+With $\rho = 1.0 > 0.3$ the argmax flips to "Mary" and the softmax assigns it the larger
+probability, the suppression step the exercise above derives.
+
+</details>
 
 The next lesson focuses on **induction heads**, the specific head type that implements
 in-context learning.

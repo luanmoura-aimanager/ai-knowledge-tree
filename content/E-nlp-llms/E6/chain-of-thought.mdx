@@ -4,7 +4,7 @@ pillar: E
 subId: E6
 lessonId: chain-of-thought
 order: 5
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Elicit multi-step reasoning with few-shot CoT prompting; then sample multiple reasoning paths and majority-vote the final answer (self-consistency)."
 prerequisites: []
 ---
@@ -148,6 +148,83 @@ errors.
 **Tree-of-thought (ToT):** explore multiple reasoning paths simultaneously as a tree
 (using BFS or DFS), evaluating intermediate states and pruning unpromising branches.
 Generalization of self-consistency to structured search.
+
+## Exercises
+
+**Exercise 1.** A self-consistency run samples 7 reasoning chains. Their extracted
+final answers are $3, 5, 3, 3, 5, 3, 7$. What does the majority vote return, and how
+many votes does the winning answer hold? State the rule that breaks the tie if two
+answers had been level.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Tally the answers: $3$ appears four times, $5$ appears twice, $7$ appears
+once.
+
+**Step 2.** Majority vote returns the most frequent answer, so it returns $3$ with
+$4$ of the $7$ votes.
+
+**Step 3.** With a tie, `Counter.most_common` returns the answer that was inserted
+first (first-seen order), so the chain that produced that answer earliest would win.
+A robust implementation breaks ties deterministically rather than relying on sampling
+order.
+
+</details>
+
+**Exercise 2.** Each reasoning chain in a self-consistency run is correct
+independently with probability $p = 0.6$. With $n = 3$ chains and a majority vote,
+compute the probability the vote is correct. Compare it to a single chain and explain
+why diversity helps.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A 3-way majority is correct when at least 2 of the 3 chains are correct.
+The number correct is $\text{Binomial}(3, 0.6)$.
+
+**Step 2.** Sum the two favorable cases:
+
+$$
+P(\ge 2) = \binom{3}{2}(0.6)^2(0.4) + \binom{3}{3}(0.6)^3 = 3(0.36)(0.4) + 0.216 = 0.432 + 0.216 = 0.648.
+$$
+
+**Step 3.** A single chain is correct with probability $0.6$, so voting lifts accuracy
+to $0.648$. The gain comes from independence: wrong chains spread their errors across
+different answers, while correct chains concentrate on one, so the mode tracks the
+correct answer more often than any single draw.
+
+</details>
+
+**Exercise 3 (code).** Implement majority voting and confirm the closed-form number
+from Exercise 2 by simulating many self-consistency runs of $n = 3$ chains at
+$p = 0.6$, where a correct chain returns the true answer and a wrong chain returns one
+of two distinct distractors.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n_runs, n_chains, p = 200_000, 3, 0.6
+
+# A majority vote is correct exactly when more than half the chains are correct,
+# i.e. at least 2 of 3 here (wrong chains can scatter, so they never form a
+# stricter majority than the correct ones once the correct ones are in the majority).
+correct_counts = (rng.random((n_runs, n_chains)) < p).sum(axis=1)
+acc = np.mean(correct_counts >= 2)
+
+print(f"simulated vote accuracy: {acc:.4f}  (closed form 0.648)")
+assert np.isclose(acc, 0.648, atol=0.01)
+assert acc > p          # voting beats a single chain
+```
+
+The simulated accuracy lands near $0.648$, matching the binomial calculation and
+beating the single-chain rate of $0.6$.
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Wei, J., et al.** (2022). "Chain-of-thought prompting elicits reasoning in large language models". *NeurIPS*. [arXiv:2201.11903](https://arxiv.org/abs/2201.11903). The few-shot CoT exemplar format used here.</FNItem>

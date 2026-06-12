@@ -4,7 +4,7 @@ pillar: E
 subId: E2
 lessonId: lstm-gru
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Build an LSTM cell gate-by-gate; show how the constant error carousel defeats vanishing gradients; then simplify to the GRU."
 prerequisites: ["rnn-lm"]
 ---
@@ -175,6 +175,89 @@ graph LR
 | Memory | $h_t$ only | $h_t$ only | $h_t$ + $c_t$ |
 | Long-range gradients | Vanishes | Good | Excellent |
 | Speed | Fastest | Fast | Slower |
+
+## Exercises
+
+**Exercise 1.** Take a one-dimensional LSTM ($m = 1$) at a single step with gate
+values $f_t = 0.9$, $i_t = 0.2$, $g_t = 0.5$, $o_t = 0.8$ and previous cell state
+$c_{t-1} = 1.0$. Compute $c_t$ and $h_t$ by hand using
+$c_t = f_t c_{t-1} + i_t g_t$ and $h_t = o_t \tanh(c_t)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Update the cell state:
+$c_t = 0.9 \cdot 1.0 + 0.2 \cdot 0.5 = 0.9 + 0.1 = 1.0$. The forget gate keeps
+$0.9$ of the old cell, the input gate writes $0.1$ of the candidate.
+
+**Step 2.** Squash the cell state: $\tanh(1.0) = 0.7616$.
+
+**Step 3.** Apply the output gate:
+$h_t = o_t \tanh(c_t) = 0.8 \cdot 0.7616 = 0.6093$. The hidden state is a gated,
+bounded readout of the cell, while the cell itself accumulated additively.
+
+</details>
+
+**Exercise 2.** The gradient of the cell state across one step is
+$\partial c_t / \partial c_{t-1} = \mathrm{diag}(f_t)$. Show that the gradient
+carried across $T$ steps is $\prod_{k=1}^{T} f_k$ (elementwise), and contrast its
+decay with the vanilla RNN's $\prod_k W_h^\top \mathrm{diag}(1 - h_k^2)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the chain rule along the cell-state path. Because each step
+contributes the diagonal factor $\mathrm{diag}(f_k)$,
+
+$$
+\frac{\partial c_T}{\partial c_0} = \prod_{k=1}^{T} \mathrm{diag}(f_k) = \mathrm{diag}\!\left(\prod_{k=1}^{T} f_k\right),
+$$
+
+a product of diagonal matrices, which is elementwise multiplication of the forget
+gates.
+
+**Step 2.** No $W_h$ appears in this product. When $f_k \approx 1$ for all $k$, the
+product stays near $1$ and the gradient is preserved across the whole sequence, the
+constant error carousel.
+
+**Step 3.** The vanilla RNN instead multiplies by full matrices
+$W_h^\top \mathrm{diag}(1 - h_k^2)$ at every step, whose norm shrinks like
+$\rho(W_h)^T$ (with the $\tanh$ derivative $1 - h_k^2 < 1$ shrinking it further).
+The LSTM replaces that contractive matrix product with a near-identity scalar
+product, which is why long-range gradients survive.
+
+</details>
+
+**Exercise 3 (code).** Implement the cell-state gradient path
+$\partial c_T / \partial c_0 = \prod_k f_k$ for a constant forget gate, and confirm
+that $f = 0.95$ preserves far more gradient over $30$ steps than $f = 0.5$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+m, T = 5, 30
+
+def carousel_grad(f_value):
+    forgets = np.full((T, m), f_value)   # forget gate at each step
+    return np.prod(forgets, axis=0)      # dc_T/dc_0 = elementwise product
+
+g_open = carousel_grad(0.95)             # gate near 1: memory persists
+g_half = carousel_grad(0.50)             # gate at 0.5: memory decays fast
+
+assert np.allclose(g_open, 0.95 ** T)    # exact product
+assert np.all(g_half < g_open)           # smaller forget gate vanishes faster
+print("f=0.95 ->", round(g_open[0], 4),
+      "   f=0.50 ->", round(g_half[0], 12))
+```
+
+With $f = 0.95$ the surviving gradient is $0.95^{30} \approx 0.215$, while $f = 0.5$
+collapses to $0.5^{30} \approx 9.3 \times 10^{-10}$: an open forget gate carries
+signal across the sequence, a half-open one destroys it.
+
+</details>
 
 GRU matches LSTM on most benchmarks with fewer parameters; LSTM tends to win on very
 long sequences where the separate cell state helps. Both are superseded by Transformers

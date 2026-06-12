@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: scaling-laws
 order: 2
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Read Kaplan et al.'s power-law fits (loss vs parameters and tokens), then Chinchilla's correction: for a fixed compute budget, model size and token count should scale equally."
 prerequisites: ["pretraining-data"]
 codeExempt: true
@@ -120,6 +120,86 @@ Scaling laws for pretraining don't directly apply to fine-tuning:
 
 The practical lesson: spend most of the compute budget on pretraining (where scaling laws
 give predictable returns), then fine-tune efficiently with smaller datasets.
+
+## Exercises
+
+**Exercise 1.** Using the Chinchilla rule of thumb $D \approx 20N$ and the FLOP count
+$C \approx 6ND$, find the compute-optimal token count and total training FLOPs for a
+$13\text{B}$-parameter model.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the rule of thumb: $D \approx 20N = 20 \times 13\text{B} = 260\text{B}$
+tokens.
+
+**Step 2.** Substitute into $C \approx 6ND$ with $N = 13 \times 10^9$ and
+$D = 260 \times 10^9$:
+
+$$
+C \approx 6 \times (13 \times 10^9) \times (260 \times 10^9) = 6 \times 3380 \times 10^{18}
+  = 2.028 \times 10^{22} \text{ FLOPs}.
+$$
+
+So a compute-optimal $13\text{B}$ model trains on about $260\text{B}$ tokens for roughly
+$2.0 \times 10^{22}$ FLOPs.
+
+</details>
+
+**Exercise 2.** A team has a fixed compute budget $C = 6 \times 10^{23}$ FLOPs and wants
+the Chinchilla-optimal allocation. Using $D = 20N$ and $C = 6ND$, solve for $N$ and $D$.
+Then compare the final loss qualitatively against spending the same budget on a $175\text{B}$
+model in the Kaplan style.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute $D = 20N$ into $C = 6ND$: $C = 6N(20N) = 120 N^2$, so
+
+$$
+N = \sqrt{C / 120} = \sqrt{6 \times 10^{23} / 120} = \sqrt{5 \times 10^{21}}
+  \approx 7.07 \times 10^{10} \approx 71\text{B}.
+$$
+
+**Step 2.** Then $D = 20N \approx 20 \times 71\text{B} = 1.42\text{T}$ tokens, the
+Chinchilla 70B/1.4T point, as expected since $C \approx 5.9 \times 10^{23}$ matches that run.
+
+**Step 3.** Compare allocations. A $175\text{B}$ model at the same budget has
+$D = C/(6N) = 6\times10^{23} / (6 \times 175\times10^9) \approx 5.7 \times 10^{11} = 0.57\text{T}$
+tokens, only $D/N \approx 3.3\times$, far below the optimal $20\times$. It is undertrained,
+so its final loss is higher than the $71\text{B}/1.4\text{T}$ allocation. This is the GPT-3
+vs Chinchilla result: at fixed compute, moving budget from parameters into tokens lowers the
+loss.
+
+</details>
+
+**Exercise 3.** "Compute-optimal" minimizes loss for a single training run. Argue when a
+team should deliberately overtrain (the LLaMA-2/3 choice), and quantify the trade-off using
+the LLaMA-3 70B figure of $D/N \approx 214$ versus the optimal $20$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** State what compute-optimal ignores. The Chinchilla optimum counts only training
+FLOPs. It does not count inference, which for a deployed model is paid per request across
+potentially billions of calls.
+
+**Step 2.** Reframe the objective. The relevant cost is training plus lifetime inference. A
+smaller model with the same final loss is cheaper to serve (fewer FLOPs per token at
+inference), so for a heavily-served model it pays to reach that loss with fewer parameters,
+even at a worse training-compute efficiency.
+
+**Step 3.** Quantify. LLaMA-3 70B trains on $D/N \approx 214$ tokens per parameter versus
+the optimal $20$, about $11\times$ more tokens (and roughly $11\times$ the training compute
+of the Chinchilla-optimal 70B run reaching a similar loss). The team spends that extra
+training compute once to keep the parameter count at $70\text{B}$ rather than growing the
+model, trading a one-time training overspend for a permanently cheaper inference cost. The
+break-even favors overtraining precisely when expected inference volume is large.
+
+</details>
+
+The scaling-laws view sets the model size and token budget; the next stage is turning that
+pretrained base into an instruction follower through supervised fine-tuning.
 
 <Footnotes>
   <FNItem n="1">**Kaplan, J., et al.** (2020). "Scaling laws for neural language models".

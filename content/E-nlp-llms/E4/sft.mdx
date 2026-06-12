@@ -4,7 +4,7 @@ pillar: E
 subId: E4
 lessonId: sft
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Convert a pretrained LLM into an instruction follower by fine-tuning on human-written (prompt, completion) pairs using a cross-entropy objective."
 prerequisites: ["pretraining-data"]
 ---
@@ -126,6 +126,110 @@ args    = TrainingArguments(output_dir="sft_out", num_train_epochs=3, learning_r
 trainer = Trainer(model=model, args=args, train_dataset=dataset)
 trainer.train()
 ```
+
+## Exercises
+
+**Exercise 1.** An SFT example has a prompt of 12 tokens and a response of 8 tokens.
+The cross-entropy loss is averaged over the positions that contribute to the loss.
+The model assigns probability $0.5$ to each of the 8 response tokens (and whatever it
+likes to the prompt tokens). Compute the per-example SFT loss in nats, and state how
+many positions enter the average.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Only response tokens enter the SFT loss; the 12 prompt positions are masked
+out. So 8 positions contribute.
+
+**Step 2.** Each contributing position has loss $-\log p(x_t \mid x_{<t}) = -\log 0.5$.
+With natural log, $-\log 0.5 = \log 2 \approx 0.6931$ nats.
+
+**Step 3.** The averaged loss is the mean over the 8 response positions, each equal to
+$0.6931$:
+
+$$
+\mathcal{L} = \frac{1}{8} \sum_{t=1}^{8} 0.6931 = 0.6931 \text{ nats}.
+$$
+
+The average is unchanged because every contributing position has the same loss; the
+12 prompt positions never appear in the sum.
+
+</details>
+
+**Exercise 2.** Two SFT runs use the same data and model. Run A averages the loss over
+**all** tokens (prompt + response); run B averages over response tokens only (the
+correct masking). For a batch where prompts are on average 3 times longer than responses,
+and the model already predicts prompt tokens well (low loss $\approx 0.2$ nats there) but
+predicts response tokens poorly (loss $\approx 2.0$ nats there), compute both reported
+losses and explain which run trains the response behavior harder.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let the response have $n$ tokens, so the prompt has $3n$ tokens, total $4n$.
+
+**Step 2.** Run B (masked, correct) averages only over the $n$ response positions:
+
+$$
+\mathcal{L}_B = \frac{1}{n}\sum_{\text{response}} 2.0 = 2.0 \text{ nats}.
+$$
+
+**Step 3.** Run A averages over all $4n$ positions: $3n$ prompt positions at $0.2$ and
+$n$ response positions at $2.0$:
+
+$$
+\mathcal{L}_A = \frac{3n \cdot 0.2 + n \cdot 2.0}{4n} = \frac{0.6 + 2.0}{4} = 0.65 \text{ nats}.
+$$
+
+**Step 4.** The gradient magnitude on response tokens is diluted in run A: the well-predicted
+prompt tokens contribute most of the positions and pull the reported loss down to $0.65$,
+so each response position's gradient is weighted by $1/(4n)$ instead of $1/n$. Run B places
+full weight on response tokens and trains the assistant behavior harder, which is why SFT
+masks the prompt.
+
+</details>
+
+**Exercise 3 (code).** Implement the masked SFT loss in numpy. Given per-position
+next-token log-probabilities and a boolean mask marking response positions, compute the
+mean cross-entropy over response positions only. Verify on the Exercise 1 numbers that
+prompt positions do not change the result.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def sft_loss(token_logprobs, response_mask):
+    """token_logprobs: (T,) log p assigned to the realized next token at each position.
+       response_mask: (T,) bool, True where the position is a response token."""
+    token_logprobs = np.asarray(token_logprobs, float)
+    response_mask  = np.asarray(response_mask, bool)
+    nll = -token_logprobs                       # per-position cross-entropy
+    return nll[response_mask].mean()            # average over response positions only
+
+# 12 prompt tokens + 8 response tokens. Response tokens each get log p = log 0.5.
+T_prompt, T_resp = 12, 8
+logp = np.concatenate([
+    np.full(T_prompt, np.log(0.9)),             # prompt positions, arbitrary
+    np.full(T_resp,  np.log(0.5)),              # response positions
+])
+mask = np.concatenate([np.zeros(T_prompt, bool), np.ones(T_resp, bool)])
+
+loss = sft_loss(logp, mask)
+assert np.isclose(loss, -np.log(0.5))           # = log 2 ~ 0.6931, independent of prompt
+
+# Changing the prompt log-probs must not move the masked loss.
+logp2 = logp.copy()
+logp2[:T_prompt] = np.log(0.01)
+assert np.isclose(sft_loss(logp2, mask), loss)
+print("masked SFT loss:", round(loss, 4), "nats")
+```
+
+The masked loss equals $\log 2 \approx 0.6931$ nats and is invariant to the prompt
+log-probabilities, confirming the prompt positions are excluded from the objective.
+
+</details>
 
 SFT is the first of three stages in RLHF<FN n="2" />. The SFT model is the starting point for reward
 modeling and policy optimization, which the next lessons derive.

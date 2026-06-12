@@ -4,7 +4,7 @@ pillar: E
 subId: E8
 lessonId: induction-heads
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Identify the two-head induction circuit (previous-token head + induction head) that implements in-context learning; show how ablating it destroys few-shot performance."
 prerequisites: ["circuits"]
 ---
@@ -140,6 +140,95 @@ This generalizes far beyond literal token copying:
 
 These generalized forms involve more complex circuits built on top of the basic induction
 primitive.
+
+## Exercises
+
+**Exercise 1.** Run a length-$8$ sequence of repeated tokens $[A][B][C][D][A][B][C][D]$ through
+a perfect induction head. For each query position $t$ in the second half, state which key
+position the head attends to and which token it therefore predicts as the next token. Verify the
+predictions reconstruct the second copy of the pattern.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With period $4$, the induction head at position $t$ in the second half attends to
+$t - 4$, the previous occurrence of the current token, and reads the token that followed it,
+namely the token at $t - 4 + 1 = t - 3$.
+
+**Step 2.** Tabulate (positions $0$-indexed, tokens $A,B,C,D$ at $0,1,2,3$ then repeated):
+
+| query $t$ | token at $t$ | attends to $t-4$ | predicts token at $t-3$ |
+|-----------|--------------|------------------|--------------------------|
+| 4 | $A$ | 0 | $B$ |
+| 5 | $B$ | 1 | $C$ |
+| 6 | $C$ | 2 | $D$ |
+
+**Step 3.** The predictions $B, C, D$ at positions $4, 5, 6$ are exactly the continuations
+$[B][C][D]$ of the second copy, so the induction head reconstructs the repeated pattern from the
+shifted-back attention plus a read of the following token.
+
+</details>
+
+**Exercise 2.** The two-head circuit needs the previous-token head in layer $\ell$ and the
+induction head in layer $\ell' > \ell$. Explain why the ordering is forced: what does the
+induction head read that only exists because the previous-token head ran first, and what would
+break if both lived in the same layer?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The induction head matches the current token $A$ against positions whose *previous*
+token was also $A$. That match key (the identity of the preceding token) is not present in a raw
+position's residual; the previous-token head is what writes "the token before me was $X$" into
+each position.
+
+**Step 2.** The induction head's query-key matching therefore depends on a feature produced by
+the earlier head. If both sat in the same layer they read the same input residual, so the
+induction head would query against positions that do not yet carry the previous-token
+information, and the prefix match would fail. The strict layer ordering is what lets the second
+head compose on the first head's output, the K-composition the circuits framework names.
+
+</details>
+
+**Exercise 3 (code).** Implement the two-head induction prediction directly. Build a repeated
+random pattern of period $4$, give the induction head an attention pattern that sends each
+second-half query back one period, and assert that reading the token after each attended
+position reproduces the true continuation.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x, axis=-1):
+    e = np.exp(x - x.max(axis=axis, keepdims=True))
+    return e / e.sum(axis=axis, keepdims=True)
+
+rng = np.random.default_rng(0)
+half = 4
+seq = rng.integers(0, 20, size=half)        # random pattern A B C D
+tokens = np.concatenate([seq, seq])          # repeat it: length 8
+T = len(tokens)
+
+# Induction head: each second-half query t attends to position t - half.
+logits = np.full((T, T), -10.0)
+for t in range(half, T):
+    logits[t, t - half] = 8.0
+attn = softmax(logits)
+
+# Predict the token AFTER the attended-to previous occurrence.
+preds = [tokens[int(np.argmax(attn[t])) + 1] for t in range(half, T - 1)]
+truth = list(tokens[half + 1:])              # actual continuation of the 2nd copy
+
+assert preds == truth
+print("induction predictions:", preds, "== truth", truth)
+```
+
+The head reproduces the continuation because the shifted-back attention plus a one-step read
+recovers "the token that followed the previous occurrence."
+
+</details>
 
 <Footnotes>
   <FNItem n="1">**Olsson, C., et al.** (2022). "In-context learning and induction heads". *Transformer Circuits Thread*. [transformer-circuits.pub](https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html). The phase-transition and ablation results cited here.</FNItem>

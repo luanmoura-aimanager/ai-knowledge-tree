@@ -4,7 +4,7 @@ pillar: E
 subId: E5
 lessonId: decoding
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Implement greedy, beam search, top-k sampling, nucleus (top-p) sampling, and temperature scaling; understand the quality-diversity tradeoff each controls."
 prerequisites: ["E3/decoder-only"]
 ---
@@ -169,6 +169,107 @@ forbidding reuse of common words.
 cumulative probability cutoff, filter out any token whose probability falls below
 $p_{\text{min}} \times p_{\text{top}}$ (a fraction of the top token's probability).
 This adapts the cutoff to both the distribution shape and the top token's confidence.
+
+## Exercises
+
+**Exercise 1.** Logits over a 3-token vocabulary are $l = (2, 1, 0)$. Compute the
+softmax probabilities at temperature $\tau = 1$ and at $\tau = 0.5$ by hand, and
+confirm that lowering the temperature sharpens the distribution toward the top token.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $\tau = 1$ the unnormalized weights are $e^2, e^1, e^0 =
+7.389, 2.718, 1$, summing to $11.107$. The probabilities are
+
+$$
+p = (0.665,\ 0.245,\ 0.090).
+$$
+
+**Step 2.** At $\tau = 0.5$ each logit is divided by $0.5$, i.e. doubled, to
+$(4, 2, 0)$. The weights are $e^4, e^2, e^0 = 54.598, 7.389, 1$, summing to
+$62.987$, giving
+
+$$
+p = (0.867,\ 0.117,\ 0.016).
+$$
+
+**Step 3.** The top token's mass rose from $0.665$ to $0.867$ and the tail shrank.
+Dividing logits by $\tau < 1$ widens the gaps between them, so the softmax
+concentrates on the largest logit, the limit being greedy as $\tau \to 0$.
+
+</details>
+
+**Exercise 2.** A model assigns next-token probabilities (already sorted)
+$p = (0.4, 0.3, 0.15, 0.1, 0.05)$. For top-p sampling with $p = 0.8$, find the
+nucleus set, then write the renormalized sampling probabilities over that set.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Accumulate from the largest until the cumulative probability first
+reaches $0.8$: $0.4$, then $0.4 + 0.3 = 0.7$, then $0.7 + 0.15 = 0.85 \ge 0.8$.
+The smallest set crossing $0.8$ is the first three tokens, so $\mathcal{N}_p =
+\{1, 2, 3\}$ with total mass $0.85$.
+
+**Step 2.** Renormalize over the nucleus by dividing each kept probability by
+$0.85$:
+
+$$
+\left(\tfrac{0.40}{0.85},\ \tfrac{0.30}{0.85},\ \tfrac{0.15}{0.85}\right)
+= (0.471,\ 0.353,\ 0.176).
+$$
+
+The last two tokens (mass $0.15$) are excluded; the nucleus adapts to where the
+probability mass actually sits rather than to a fixed count.
+
+</details>
+
+**Exercise 3 (code).** Implement temperature scaling and top-p filtering in numpy
+and verify two facts on the logits $l = (2, 1, 0)$: temperature $\tau = 0.5$ raises
+the top token's probability above its $\tau = 1$ value, and top-p with $p = 0.8$
+keeps exactly the first three tokens of the sorted distribution in Exercise 2.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+def top_p_keep(probs, p):
+    order = np.argsort(probs)[::-1]
+    sorted_p = probs[order]
+    cumsum = np.cumsum(sorted_p)
+    # include the token that crosses p: a token is kept if the mass before it < p
+    keep_sorted = (cumsum - sorted_p) < p
+    keep = np.zeros_like(probs, dtype=bool)
+    keep[order[keep_sorted]] = True
+    return keep
+
+logits = np.array([2.0, 1.0, 0.0])
+p_t1   = softmax(logits)
+p_thalf = softmax(logits / 0.5)
+assert p_thalf[0] > p_t1[0]                 # lower temperature sharpens the top token
+assert np.isclose(p_t1[0], 0.6652, atol=1e-3)
+assert np.isclose(p_thalf[0], 0.8668, atol=1e-3)
+
+probs = np.array([0.4, 0.3, 0.15, 0.1, 0.05])
+keep  = top_p_keep(probs, 0.8)
+assert keep.tolist() == [True, True, True, False, False]
+print(p_t1.round(3), p_thalf.round(3), keep)
+```
+
+The asserted probabilities match the hand computation, and the nucleus mask keeps
+the first three tokens, the smallest prefix whose mass reaches $0.8$.
+
+</details>
+
+The next lesson removes the dominant per-token cost of all these strategies by
+caching the keys and values of every token already generated.
 
 <Footnotes>
   <FNItem n="1">**Holtzman, A., Buys, J., Du, L., Forbes, M., & Choi, Y.** (2020). "The curious case of neural text degeneration".
