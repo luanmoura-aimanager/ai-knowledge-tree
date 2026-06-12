@@ -4,7 +4,7 @@ pillar: H
 subId: H1
 lessonId: dynamic-programming
 order: 3
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Solve a known MDP exactly with policy evaluation, policy improvement, and value iteration, and prove each is a contraction that converges to the optimal value function."
 prerequisites: ["bellman-equations"]
 ---
@@ -165,6 +165,102 @@ print("optimality residual:", float(np.max(np.abs(V_vi - greedy_values(V_vi).max
 
 The two algorithms land on the same value vector, and that vector leaves a
 near-zero residual in the Bellman optimality equation, so both have found $V^*$.
+
+## Exercises
+
+**Exercise 1.** A deterministic two-state MDP with $\gamma = 0.5$. State $s_0$ has
+two actions: "go" pays reward $2$ and moves to $s_1$; "stay" pays reward $0$ and
+remains at $s_0$. State $s_1$ has one action paying reward $1$ and moving to
+$s_0$. Starting from $V_0 = (0, 0)$, compute one value-iteration sweep
+$V_1 = T^* V_0$ by hand, then a second sweep $V_2 = T^* V_1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply $T^*$ at $s_0$, taking the max over its two actions with
+$V_0 = (0,0)$:
+
+$$
+V_1(s_0) = \max\big(2 + 0.5 \cdot V_0(s_1),\ 0 + 0.5 \cdot V_0(s_0)\big) = \max(2, 0) = 2.
+$$
+
+At $s_1$ there is one action: $V_1(s_1) = 1 + 0.5 \cdot V_0(s_0) = 1$. So
+$V_1 = (2, 1)$.
+
+**Step 2.** Sweep again with $V_1 = (2, 1)$:
+
+$$
+V_2(s_0) = \max\big(2 + 0.5 \cdot 1,\ 0 + 0.5 \cdot 2\big) = \max(2.5, 1) = 2.5,
+$$
+
+and $V_2(s_1) = 1 + 0.5 \cdot 2 = 2$. So $V_2 = (2.5, 2)$. Each sweep propagates
+value one step further back, and "go" stays the better action at $s_0$.
+
+</details>
+
+**Exercise 2.** Value iteration shrinks the error by a factor $\gamma$ per sweep.
+For $\gamma = 0.95$, how many sweeps reduce the initial error
+$\lVert V_0 - V^*\rVert_\infty$ by a factor of $10^{-3}$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** After $k$ sweeps the error is at most $\gamma^k$ times the initial
+error. Require $\gamma^k \le 10^{-3}$:
+
+$$
+0.95^k \le 10^{-3} \;\Longrightarrow\; k \ge \frac{\ln 10^{-3}}{\ln 0.95} = \frac{-6.908}{-0.0513} \approx 134.7.
+$$
+
+**Step 2.** Round up: $k = 135$ sweeps. This is the convergence tax of a high
+discount; at $\gamma = 0.9$ the same target needs only about $66$ sweeps.
+
+</details>
+
+**Exercise 3 (code).** Build a random known MDP and confirm value iteration and
+policy iteration converge to the same optimal value vector, and that this vector
+leaves a near-zero residual in the Bellman optimality equation.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(8)
+nS, nA, gamma = 4, 3, 0.9
+P = rng.dirichlet(np.ones(nS), size=(nS, nA))      # P[s,a] over s'
+R = rng.normal(size=(nS, nA))
+
+def greedy_values(V):
+    return R + gamma * np.einsum("sap,p->sa", P, V)  # Q[s,a]
+
+V = np.zeros(nS)                                    # value iteration
+for _ in range(2000):
+    V_new = greedy_values(V).max(axis=1)
+    if np.max(np.abs(V_new - V)) < 1e-12:
+        break
+    V = V_new
+V_vi = V
+
+pi = np.zeros(nS, dtype=int)                        # policy iteration
+for _ in range(100):
+    r_pi, P_pi = R[np.arange(nS), pi], P[np.arange(nS), pi]
+    V_pi = np.linalg.solve(np.eye(nS) - gamma * P_pi, r_pi)
+    pi_new = greedy_values(V_pi).argmax(axis=1)
+    if np.array_equal(pi_new, pi):
+        break
+    pi = pi_new
+
+assert np.allclose(V_vi, V_pi, atol=1e-6)
+assert np.max(np.abs(V_vi - greedy_values(V_vi).max(axis=1))) < 1e-8
+print("V*:", np.round(V_vi, 3))
+```
+
+Both algorithms reach the same vector, and that vector is its own optimality
+backup, so it is $V^*$.
+
+</details>
 
 These methods need the full model $(P, R)$. The rest of the pillar drops that
 assumption: the next lesson estimates value functions from sampled episodes when

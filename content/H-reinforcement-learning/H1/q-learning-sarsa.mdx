@@ -4,7 +4,7 @@ pillar: H
 subId: H1
 lessonId: q-learning-sarsa
 order: 6
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Derive the off-policy Q-learning and on-policy SARSA control updates, contrast their targets, and understand when each converges to the optimal action-value function."
 prerequisites: ["temporal-difference"]
 ---
@@ -126,6 +126,114 @@ print("steps taken:", len(path) - 1, " shortest possible:", (H - 1) + (W - 1))
 The greedy policy reaches the goal in exactly $(H-1)+(W-1) = 6$ steps, the
 Manhattan shortest path, confirming Q-learning converged to the optimal
 action-values from reward signal alone.
+
+## Exercises
+
+**Exercise 1.** The agent is at $(S_t, A_t)$ with $Q(S_t, A_t) = 2$. It observes
+reward $r_{t+1} = 1$ and lands in $S_{t+1}$, where the action-values are
+$Q(S_{t+1}, a_1) = 5$ and $Q(S_{t+1}, a_2) = 3$. With $\gamma = 0.9$ and
+$\alpha = 0.5$, compute the Q-learning update to $Q(S_t, A_t)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Q-learning target uses the greedy (max) next action,
+$\max_{a'} Q(S_{t+1}, a') = \max(5, 3) = 5$:
+
+$$
+\text{target} = r_{t+1} + \gamma \max_{a'} Q(S_{t+1}, a') = 1 + 0.9 \cdot 5 = 5.5.
+$$
+
+**Step 2.** Move $Q(S_t, A_t)$ a fraction $\alpha$ of the way to the target:
+
+$$
+Q(S_t, A_t) \leftarrow 2 + 0.5(5.5 - 2) = 2 + 1.75 = 3.75.
+$$
+
+</details>
+
+**Exercise 2.** Same transition as Exercise 1, but now the agent's
+$\varepsilon$-greedy behavior policy chose the *next* action $A_{t+1} = a_2$
+(an exploratory move). Compute the SARSA update, and explain why it differs from
+the Q-learning result.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** SARSA evaluates the target at the action actually taken,
+$Q(S_{t+1}, A_{t+1}) = Q(S_{t+1}, a_2) = 3$, not the max:
+
+$$
+\text{target} = r_{t+1} + \gamma\, Q(S_{t+1}, A_{t+1}) = 1 + 0.9 \cdot 3 = 3.7.
+$$
+
+**Step 2.** Update toward that lower target:
+
+$$
+Q(S_t, A_t) \leftarrow 2 + 0.5(3.7 - 2) = 2 + 0.85 = 2.85.
+$$
+
+**Step 3.** SARSA's new value $2.85$ is below Q-learning's $3.75$ because the
+exploratory action $a_2$ was worse than the greedy $a_1$. SARSA folds the cost of
+that exploratory step into its estimate (on-policy), while Q-learning ignores it
+and assumes greedy continuation (off-policy).
+
+</details>
+
+**Exercise 3 (code).** Run on-policy SARSA on a small deterministic gridworld with
+a goal reward, then verify its greedy policy reaches the goal in the Manhattan
+shortest-path number of steps.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(15)
+H, W, goal = 4, 4, (3, 3)
+moves = {0: (-1, 0), 1: (1, 0), 2: (0, -1), 3: (0, 1)}
+
+def step(s, a):
+    r, c = divmod(s, W)
+    dr, dc = moves[a]
+    nr, nc = min(max(r + dr, 0), H - 1), min(max(c + dc, 0), W - 1)
+    ns, done = nr * W + nc, (nr, nc) == goal
+    return ns, (0.0 if done else -1.0), done
+
+Q = np.zeros((H * W, 4))
+alpha, gamma, eps = 0.5, 0.95, 0.2
+
+def act(s):
+    return rng.integers(4) if rng.random() < eps else int(np.argmax(Q[s]))
+
+for ep in range(5000):
+    s, a = 0, act(0)
+    for _ in range(100):
+        ns, r, done = step(s, a)
+        na = act(ns)
+        target = r + (0.0 if done else gamma * Q[ns, na])   # SARSA: actual next action
+        Q[s, a] += alpha * (target - Q[s, a])
+        s, a = ns, na
+        if done:
+            break
+
+s, path = 0, [0]                                    # greedy rollout
+for _ in range(50):
+    s, _, done = step(s, int(np.argmax(Q[s])))
+    path.append(s)
+    if done:
+        break
+
+assert len(path) - 1 == (H - 1) + (W - 1)
+print("steps:", len(path) - 1, " shortest:", (H - 1) + (W - 1))
+```
+
+On a grid with no cliff to avoid, SARSA and Q-learning agree: the greedy policy
+walks the Manhattan shortest path. Their behaviors diverge only when exploration
+near a penalty makes the safe and optimal paths differ.
+
+</details>
 
 Tabular Q-learning stores one number per state-action pair, which is impossible
 when states are images or continuous vectors. The next subsection replaces the

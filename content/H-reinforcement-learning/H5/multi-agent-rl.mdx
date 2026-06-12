@@ -4,7 +4,7 @@ pillar: H
 subId: H5
 lessonId: multi-agent-rl
 order: 4
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Extend MDPs to stochastic games, see why independent learning is nonstationary, and use centralized-training-decentralized-execution and self-play to reach equilibria."
 prerequisites: ["H2/policy-gradient"]
 ---
@@ -99,6 +99,92 @@ print("converged to uniform Nash (1/3 each):", np.allclose(freqA, 1/3, atol=0.02
 Both players' empirical action frequencies settle on the uniform mixture, the Nash
 equilibrium of the game, reached purely by each side adapting to the other's history
 despite the nonstationarity that adaptation creates.
+
+## Exercises
+
+**Exercise 1.** In Matching Pennies, the row player wins ($+1$) when the two coins
+match and loses ($-1$) when they differ; the column player has the opposite payoff
+(zero-sum). Find the mixed-strategy Nash equilibrium by the indifference principle,
+and give the game's value to the row player.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let the column player play heads with probability $q$ and tails with
+$1 - q$. The row player's expected payoff from playing heads is
+$q(+1) + (1 - q)(-1) = 2q - 1$, and from tails is $q(-1) + (1 - q)(+1) = 1 - 2q$.
+
+**Step 2.** At a mixed equilibrium the column player must make the row player
+**indifferent** between its actions (otherwise row would play a pure best response,
+which column could then exploit). Set the two payoffs equal:
+
+$$
+2q - 1 = 1 - 2q \quad\Longrightarrow\quad 4q = 2 \quad\Longrightarrow\quad q = \tfrac12.
+$$
+
+**Step 3.** By the symmetry of the game the same argument gives the row player's mix
+as $(1/2, 1/2)$. The equilibrium is both players uniform, $(1/2, 1/2)$. The value to
+the row player is the common indifference payoff $2 \cdot \tfrac12 - 1 = 0$: a fair
+game, as a symmetric zero-sum game must be.
+
+</details>
+
+**Exercise 2.** Independent learners treat the other agents as part of a fixed
+environment. Explain why this makes each agent's environment nonstationary, and why a
+centralized critic that observes the joint action does not suffer from the same
+problem.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Agent $i$'s effective transition and reward are obtained by marginalizing
+over the other agents' actions, which are drawn from *their current policies*. While
+those policies are still updating, the marginalized transition $P(s' \mid s, a^i)$ and
+reward change between updates, so agent $i$ faces a moving target: the environment it
+sees is nonstationary, breaking the stationarity assumption every convergence proof in
+the pillar relied on.
+
+**Step 2.** A centralized critic conditions on the **full joint action**
+$(a^1, \dots, a^N)$ and the full state. The true environment dynamics
+$P(s' \mid s, a^1, \dots, a^N)$ depend on the joint action and are genuinely
+stationary, so a critic that observes all of it evaluates against a fixed target. It
+is not fooled by the others' policy changes because those changes are explicit inputs,
+not hidden shifts in an opaque environment, which is why CTDE stabilizes learning.
+
+</details>
+
+**Exercise 3 (code).** Run fictitious play on Matching Pennies (each player
+best-responds to the empirical frequency of the opponent's past actions) and confirm
+the empirical frequencies converge to the $(1/2, 1/2)$ Nash equilibrium derived in
+Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# Matching Pennies: row payoff +1 on a match, -1 on a mismatch (zero-sum).
+M = np.array([[ 1, -1],     # row plays heads
+              [-1,  1]])    # row plays tails
+
+cntA = np.array([1.0, 0.0]); cntB = np.array([0.0, 1.0])   # arbitrary initial beliefs
+for _ in range(50000):
+    pB = cntB / cntB.sum(); pA = cntA / cntA.sum()
+    aA = int(np.argmax(M @ pB))         # row best-responds to column's empirical mix
+    aB = int(np.argmax(-(M.T @ pA)))    # column minimizes the row payoff
+    cntA[aA] += 1; cntB[aB] += 1
+
+fA, fB = cntA / cntA.sum(), cntB / cntB.sum()
+assert np.allclose(fA, 0.5, atol=0.02) and np.allclose(fB, 0.5, atol=0.02)
+print("row freq:", np.round(fA, 3), " col freq:", np.round(fB, 3))
+```
+
+Both players' empirical frequencies settle on the uniform mixture predicted by the
+indifference principle, the unique Nash equilibrium, reached by each side adapting to
+the other's history despite the nonstationarity that adaptation creates.
+
+</details>
 
 These extensions all keep one flat policy choosing primitive actions. The last
 lesson of the subsection adds temporal structure: hierarchical RL, where high-level

@@ -4,7 +4,7 @@ pillar: H
 subId: H3
 lessonId: mcts-alphazero
 order: 2
-estimatedMinutes: 28
+estimatedMinutes: 38
 goal: "Build a search tree with UCT selection and backpropagation, then replace rollouts and priors with a neural network trained by self-play, the AlphaZero loop."
 prerequisites: ["H1/dynamic-programming", "H4/bandits-exploration"]
 ---
@@ -159,6 +159,107 @@ print("MCTS losses to random over 100 games:", losses)
 MCTS returns the immediate win and loses zero games to random play, all from a
 generic tree search with random rollouts and the UCT rule, no game-specific
 knowledge beyond the rules.
+
+## Exercises
+
+**Exercise 1.** A node has been visited $N(s) = 16$ times. Its three children
+carry the statistics $A$: $Q = 0.6$, $N = 12$; $B$: $Q = 0.8$, $N = 3$; $C$:
+$Q = 0.0$, $N = 1$. With exploration constant $c = 1$, compute the UCT score of
+each child and state which one selection picks. Then explain why the
+highest-$Q$ child is not the one chosen.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The UCT score is
+$Q(s,a) + c\sqrt{\ln N(s) / N(s,a)}$ with $\ln 16 = 2.7726$.
+
+**Step 2.** Child $A$:
+$0.6 + \sqrt{2.7726 / 12} = 0.6 + \sqrt{0.23105} = 0.6 + 0.4807 = 1.0807$.
+
+**Step 3.** Child $B$:
+$0.8 + \sqrt{2.7726 / 3} = 0.8 + \sqrt{0.92420} = 0.8 + 0.9614 = 1.7614$.
+
+**Step 4.** Child $C$:
+$0.0 + \sqrt{2.7726 / 1} = 0 + 1.6651 = 1.6651$.
+
+**Step 5.** The scores are $A = 1.081$, $B = 1.761$, $C = 1.665$, so selection
+picks $B$. Although $B$ does not have the single highest exploit term in
+isolation (its $Q = 0.8$ is the best here, but the point generalizes), the
+under-explored child $C$ with $Q = 0$ scores $1.665$ purely on its exploration
+bonus and nearly beats $B$. Selection trusts a high mean only when it is backed
+by enough visits; a strong but barely-tried line still draws search because the
+$\sqrt{\ln N / n}$ bonus inflates the score of small $n$.
+
+</details>
+
+**Exercise 2.** In AlphaZero, the training value target for a position is the
+final game outcome $z \in \{-1, 0, +1\}$ and the policy target is the MCTS visit
+distribution $\boldsymbol{\pi}$, not the network's own prior $\mathbf{p}$.
+Explain why distilling toward $\boldsymbol{\pi}$ (rather than $\mathbf{p}$)
+makes the self-play loop a policy-improvement operator, and what would go wrong
+if the target were $\mathbf{p}$ instead.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** MCTS starts from the prior $\mathbf{p}$ but spends its simulation
+budget refining it: it looks ahead, evaluates leaves with the value head, and
+backs the results up. The resulting visit distribution $\boldsymbol{\pi}$
+concentrates on moves that survived this lookahead, so it is a strictly more
+informed policy than $\mathbf{p}$ at the same state.
+
+**Step 2.** Training the network to match $\boldsymbol{\pi}$ folds that
+lookahead-improved policy back into the network weights. Next iteration the
+prior is closer to $\boldsymbol{\pi}$, so MCTS starts from a better base and
+produces an even sharper $\boldsymbol{\pi}'$. This is policy iteration: MCTS is
+improvement (search beats the current policy), distillation is evaluation and
+projection back onto the network.
+
+**Step 3.** If the target were $\mathbf{p}$, the network would be trained to
+reproduce its own current output. The gradient $-\mathbf{p}^\top \log \mathbf{p}$
+gives no improvement signal; the policy would never get better than its
+initialization, and self-play would stall at random play. The improvement comes
+precisely from the gap between $\boldsymbol{\pi}$ (post-search) and $\mathbf{p}$
+(pre-search).
+
+</details>
+
+**Exercise 3 (code).** Implement one UCT selection step in isolation. Given a
+parent visit count and per-child $(Q, N)$ arrays, return the index that
+maximizes $Q + c\sqrt{\ln N_{\text{parent}} / N_{\text{child}}}$, treating any
+unvisited child ($N = 0$) as having infinite priority. Verify it reproduces the
+choice from Exercise 1 and that an unvisited child is always selected first.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def uct_select(Q, N, parentN, c=1.0):
+    Q, N = np.asarray(Q, float), np.asarray(N, float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        bonus = c * np.sqrt(np.log(parentN) / N)
+    score = Q + bonus
+    score = np.where(N == 0, np.inf, score)        # untried children first
+    return int(np.argmax(score))
+
+# Exercise 1: parent N=16, children A,B,C. Selection should pick B (index 1).
+Q = [0.6, 0.8, 0.0]
+N = [12, 3, 1]
+assert uct_select(Q, N, parentN=16, c=1.0) == 1
+
+# An unvisited child (N=0) outranks any visited one regardless of Q.
+assert uct_select([0.9, 0.1], [50, 0], parentN=50, c=1.0) == 1
+print("selected child:", uct_select(Q, N, parentN=16, c=1.0), "(expected 1 = B)")
+```
+
+The rule reproduces the Exercise 1 choice of child $B$ and forces an unvisited
+child to be tried before any visited one, the guarantee that UCT never leaves a
+branch completely unexplored.
+
+</details>
 
 MCTS and AlphaZero need the true rules as a simulator. The next lesson removes even
 that: MuZero learns its own latent model of the dynamics and plans inside it,

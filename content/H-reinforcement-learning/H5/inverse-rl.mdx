@@ -4,7 +4,7 @@ pillar: H
 subId: H5
 lessonId: inverse-rl
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Recover a reward that explains expert behavior with maximum-entropy IRL, and connect the result to GAIL, which matches occupancy measures with a GAN-style discriminator."
 prerequisites: ["imitation-learning", "A2/entropy"]
 ---
@@ -111,6 +111,98 @@ print("recovered policy:", np.round(pi_rec, 3))
 The recovered reward weights induce a policy whose feature expectations and action
 probabilities match the expert's, recovering the behavior from feature statistics
 alone, the maximum-entropy resolution of the reward ambiguity.
+
+## Exercises
+
+**Exercise 1.** The reward-ambiguity problem says many rewards make the same
+expert trajectories optimal. Show concretely that the reward $r \equiv 0$ makes
+every policy optimal, and explain in one sentence why max-entropy IRL does not
+return it even though it fits the "expert is optimal" constraint.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Under $r \equiv 0$ every trajectory has return $\sum_t r(s_t) = 0$, so
+the value of every state is $0$ under every policy. No policy can do better than any
+other, so every policy (the expert's included) is optimal. The constraint "the
+expert is optimal" is satisfied vacuously.
+
+**Step 2.** Max-entropy IRL adds the feature-matching constraint: the recovered
+reward must reproduce the expert's expected features $\phi_{\text{expert}}$. The zero
+reward induces a uniform trajectory distribution whose feature expectation is the
+unweighted average over all behavior, which does not equal $\phi_{\text{expert}}$
+unless the expert is itself uniform, so the zero reward violates feature matching and
+is rejected.
+
+</details>
+
+**Exercise 2.** Maximum-likelihood fitting of the max-ent model gives the gradient
+$\nabla_\theta \mathcal{L} = \phi_{\text{expert}} - \mathbb{E}_{p_\theta}[\phi]$.
+Argue from this expression what is true at a stationary point, and why the recovered
+reward then reproduces the expert's feature expectations.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A stationary point of the log-likelihood has zero gradient:
+
+$$
+\phi_{\text{expert}} - \mathbb{E}_{p_\theta}[\phi] = 0
+\quad\Longrightarrow\quad
+\mathbb{E}_{p_\theta}[\phi] = \phi_{\text{expert}}.
+$$
+
+**Step 2.** The model's expected features under the fitted reward equal the expert's
+empirical feature average. Since the max-ent distribution is fully determined by the
+reward weights $\theta$ acting through the features, matching the feature
+expectations means the recovered reward induces behavior with the same feature
+statistics as the expert, which is the sense in which IRL "explains" the
+demonstrations.
+
+**Step 3.** The log-likelihood of the exponential-family model is concave in
+$\theta$, so this stationary point is the global maximum: feature matching is not
+just necessary but achievable.
+
+</details>
+
+**Exercise 3 (code).** For a one-step soft-optimal expert with linear reward
+$\theta^\top \phi(a)$, verify two facts: the feature-matching gradient
+$f_{\text{expert}} - \mathbb{E}_\pi[\phi]$ vanishes at the true $\theta$, and adding a
+constant to every action's reward leaves the soft-optimal policy unchanged (a face of
+the reward ambiguity).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(1)
+
+K, d = 5, 2
+F = rng.normal(size=(K, d))                 # feature vector phi(a) per action
+theta_true = np.array([1.0, -0.5])
+def softmax(u): e = np.exp(u - u.max()); return e / e.sum()
+
+pi_e = softmax(F @ theta_true)              # soft-optimal expert
+f_e = pi_e @ F                              # expert feature expectation
+
+# Fact 1: the feature-matching gradient is zero at the true theta.
+grad = f_e - softmax(F @ theta_true) @ F
+assert np.linalg.norm(grad) < 1e-9
+
+# Fact 2: shifting every action's reward by a constant leaves the policy unchanged.
+pi_shift = softmax(F @ theta_true + 3.7)
+assert np.allclose(pi_shift, pi_e)
+print("grad norm:", round(float(np.linalg.norm(grad)), 8),
+      " policy invariant under shift:", np.allclose(pi_shift, pi_e))
+```
+
+The gradient vanishes exactly where the model's features match the expert's, and the
+softmax cancels any constant added to all logits, the invariance that makes a bare
+"expert is optimal" objective underdetermined and forces the max-entropy principle to
+pin down a unique reward.
+
+</details>
 
 Imitation and IRL both assume an interactive environment or an online expert.
 Often neither is available: there is only a fixed, logged dataset and no way to

@@ -4,7 +4,7 @@ pillar: H
 subId: H2
 lessonId: actor-critic
 order: 5
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Replace the Monte Carlo return in REINFORCE with a learned critic, derive the advantage actor-critic update, and trade bias for variance with GAE(lambda)."
 prerequisites: ["policy-gradient", "function-approximation"]
 ---
@@ -130,6 +130,107 @@ print("GAE(lambda=1) == Monte Carlo advantage G - V:", np.allclose(gae(1.0), mc_
 At $\lambda = 0$ the GAE advantages equal the one-step TD errors and at
 $\lambda = 1$ they equal the full Monte Carlo advantages, the two endpoints the
 $\lambda$ dial slides between.
+
+## Exercises
+
+**Exercise 1.** A critic estimates $V_\phi(s_t) = 3$ and $V_\phi(s_{t+1}) = 5$.
+The agent takes action $a_t$, receives reward $r_{t+1} = 1$, and uses
+$\gamma = 0.9$. Compute the TD error $\delta_t$, which is the one-step advantage,
+and state whether the actor should make $a_t$ more or less likely.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The one-step advantage is the TD error
+$\delta_t = r_{t+1} + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$:
+
+$$
+\delta_t = 1 + 0.9 \cdot 5 - 3 = 1 + 4.5 - 3 = 2.5.
+$$
+
+**Step 2.** The actor update is
+$\theta \leftarrow \theta + \alpha_\theta\, \delta_t\, \nabla_\theta \log \pi_\theta(a_t \mid s_t)$.
+With $\delta_t = 2.5 > 0$, the action did better than the critic's baseline value
+of $s_t$, so the update raises $\log \pi_\theta(a_t \mid s_t)$: make $a_t$ more
+likely. The same $\delta_t$ drives the critic toward the higher target $3 + 2.5 = 5.5$.
+
+</details>
+
+**Exercise 2.** Prove the $\lambda = 1$ limit of GAE telescopes to the Monte Carlo
+advantage $G_t - V(s_t)$, where $G_t = \sum_{l \ge 0} \gamma^l r_{t+l+1}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $\lambda = 1$ the weights are $\gamma^l$, so
+
+$$
+A^{\text{GAE}(\gamma, 1)}_t = \sum_{l=0}^{\infty} \gamma^l \delta_{t+l}, \qquad \delta_{t+l} = r_{t+l+1} + \gamma V(s_{t+l+1}) - V(s_{t+l}).
+$$
+
+**Step 2.** Split each $\delta_{t+l}$ and group the value terms. The reward part
+sums to $\sum_l \gamma^l r_{t+l+1} = G_t$. The value part is
+
+$$
+\sum_{l=0}^{\infty} \gamma^l \big(\gamma V(s_{t+l+1}) - V(s_{t+l})\big) = \sum_{l=0}^{\infty} \gamma^{l+1} V(s_{t+l+1}) - \sum_{l=0}^{\infty} \gamma^l V(s_{t+l}).
+$$
+
+**Step 3.** Reindex the first sum with $m = l + 1$: it becomes
+$\sum_{m=1}^{\infty} \gamma^m V(s_{t+m})$. The second sum is
+$\sum_{l=0}^{\infty} \gamma^l V(s_{t+l})$. They cancel term by term for all
+$m = l \ge 1$, leaving only the $l = 0$ term of the second sum, $-V(s_t)$.
+
+**Step 4.** Adding the reward part back:
+
+$$
+A^{\text{GAE}(\gamma, 1)}_t = G_t - V(s_t),
+$$
+
+the Monte Carlo advantage. The intermediate value estimates telescope away, which
+is why $\lambda = 1$ trusts only sampled rewards (unbiased, high variance).
+
+</details>
+
+**Exercise 3 (code).** Implement GAE by the backward recursion
+$A_t = \delta_t + \gamma\lambda A_{t+1}$ and verify two endpoints on a random
+trajectory: at $\lambda = 0$ it equals the TD errors, and at $\lambda = 0.5$ each
+advantage equals the explicit finite-horizon sum $\sum_l (\gamma\lambda)^l \delta_{t+l}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(3)
+
+T, gamma = 6, 0.95
+delta = rng.normal(size=T)                  # arbitrary TD errors
+
+def gae_recursion(lam):
+    A, acc = np.zeros(T), 0.0
+    for t in reversed(range(T)):
+        acc = delta[t] + gamma * lam * acc
+        A[t] = acc
+    return A
+
+def gae_explicit(lam):                       # direct sum sum_l (gl)^l delta_{t+l}
+    A = np.zeros(T)
+    for t in range(T):
+        A[t] = sum((gamma * lam) ** l * delta[t + l] for l in range(T - t))
+    return A
+
+assert np.allclose(gae_recursion(0.0), delta)            # lambda=0 -> TD error
+assert np.allclose(gae_recursion(0.5), gae_explicit(0.5))  # recursion == sum
+print("lambda=0 equals TD error:", np.allclose(gae_recursion(0.0), delta))
+print("recursion matches explicit sum at lambda=0.5:",
+      np.allclose(gae_recursion(0.5), gae_explicit(0.5)))
+```
+
+The backward recursion reproduces the TD errors at $\lambda = 0$ and matches the
+explicit exponentially-weighted sum at intermediate $\lambda$, so the one-pass
+recursion computes the full GAE without ever forming the sum directly.
+
+</details>
 
 Actor-critic with GAE gives a low-variance gradient, but nothing stops a single
 update from changing the policy so much that performance collapses. The next lesson

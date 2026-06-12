@@ -4,7 +4,7 @@ pillar: H
 subId: H5
 lessonId: imitation-learning
 order: 1
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Frame imitation as supervised learning on expert state-action pairs, diagnose the compounding-error problem from distribution shift, and fix it with the DAgger interactive correction loop."
 prerequisites: ["H2/policy-gradient"]
 ---
@@ -110,6 +110,98 @@ print("DAgger doubling ratios (-> ~2, linear):", round(d[1]/d[0], 2), round(d[2]
 BC's mistake count roughly quadruples each time the horizon doubles while DAgger's
 merely doubles, the quadratic-versus-linear split that distribution shift forces and
 that relabeling the learner's own states removes.
+
+## Exercises
+
+**Exercise 1.** A behavioral-cloning policy has per-step error rate
+$\epsilon = 0.01$ on its training distribution. Using the linear bound for ordinary
+supervised prediction and the quadratic bound for the sequential setting, estimate
+the expected number of mistakes over a horizon of $T = 200$ steps in each regime.
+By what factor does the sequential setting cost more here?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Supervised prediction over $T$ independent inputs makes about
+$\epsilon T$ mistakes, since each input errs independently with probability
+$\epsilon$:
+
+$$
+\epsilon T = 0.01 \cdot 200 = 2 \text{ mistakes}.
+$$
+
+**Step 2.** In the sequential setting a single error throws the agent
+off-distribution for the rest of the episode, giving the quadratic bound
+$\epsilon T^2$:
+
+$$
+\epsilon T^2 = 0.01 \cdot 200^2 = 0.01 \cdot 40000 = 400 \text{ mistakes}.
+$$
+
+**Step 3.** The ratio is $\epsilon T^2 / (\epsilon T) = T = 200$. The sequential
+cost is a factor of $T$ worse, which is why long-horizon cloning fails even when the
+per-step error rate looks small.
+
+</details>
+
+**Exercise 2.** DAgger restores the linear $\epsilon T$ error rate but requires an
+**interactive** expert. State precisely what the expert must be able to do that a
+fixed log of demonstrations cannot provide, and explain why behavioral cloning
+cannot make the same demand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** DAgger's loop runs the current policy $\pi$, collects the states $\pi$
+actually visits (including off-path states the expert never entered), and asks the
+expert for the correct action $a^*$ at *each of those states*. The expert must be
+queryable on **arbitrary states**, not only the states in its own trajectories.
+
+**Step 2.** A fixed log only contains $(s, a^*)$ pairs for states the expert chose to
+visit. The off-distribution states that break behavioral cloning are precisely the
+ones absent from that log, so a static dataset cannot supply their labels.
+
+**Step 3.** Behavioral cloning consumes the log once and never generates new states
+to label, so it never needs the interactive query. That is also its limitation: it
+can only learn the expert's own state distribution, leaving the learner's drifted
+states unlabeled, which is the gap DAgger's interactive expert closes.
+
+</details>
+
+**Exercise 3 (code).** Generate toy expert data where the expert action is
+$\mathbb{1}[w^\star \cdot s > 0]$ for a fixed $w^\star$, then clone it by fitting a
+logistic policy with gradient ascent on the log-likelihood
+$\sum_i \log \pi_\theta(a^\star_i \mid s_i)$. Verify the cloned policy reaches above
+$98\%$ accuracy on the training states.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+N, d = 400, 3
+S = rng.normal(size=(N, d))                 # expert states
+w_star = np.array([2.0, -1.0, 0.5])
+a = (S @ w_star > 0).astype(float)          # expert action labels in {0, 1}
+
+# Behavioral cloning: maximize sum_i log pi(a_i | s_i) for a logistic policy.
+w = np.zeros(d)
+for _ in range(2000):
+    p = 1.0 / (1.0 + np.exp(-(S @ w)))      # pi(action = 1 | s)
+    w += 0.1 * (S.T @ (a - p)) / N          # gradient of the mean log-likelihood
+acc = ((S @ w > 0).astype(float) == a).mean()
+
+assert acc > 0.98
+print("clone train accuracy:", round(acc, 4))
+```
+
+The maximum-likelihood fit recovers the expert's decision boundary on the training
+states, the regime where behavioral cloning works; the failure only appears once the
+cloned policy drives the state distribution off this support.
+
+</details>
 
 Imitation learning copies the expert's actions. A deeper goal is to recover *why*
 the expert acts as it does, the reward function behind the behavior. The next lesson

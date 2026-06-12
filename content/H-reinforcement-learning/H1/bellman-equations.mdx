@@ -4,7 +4,7 @@ pillar: H
 subId: H1
 lessonId: bellman-equations
 order: 2
-estimatedMinutes: 26
+estimatedMinutes: 36
 goal: "Derive the Bellman expectation equations from the recursive structure of the return, and state the Bellman optimality equations that characterize the optimal value function."
 prerequisites: ["mdp-formulation"]
 ---
@@ -167,6 +167,95 @@ print("max |residual| for bogus V:", float(np.max(np.abs(bogus - rhs_bogus))))
 The residual for the solved $V^\pi$ is at the level of floating-point noise while
 the bogus vector leaves a residual of order one, confirming the Bellman
 expectation equation is an identity satisfied by $V^\pi$ and by nothing else.
+
+## Exercises
+
+**Exercise 1.** A two-state cycle with $\gamma = 0.8$ under a fixed policy: state
+$A$ pays reward $2$ and always moves to $B$; state $B$ pays reward $1$ and always
+moves back to $A$. Solve the Bellman expectation equations for $V_A$ and $V_B$ by
+hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the two coupled equations. Each state's value is its immediate
+reward plus the discounted value of where it lands:
+
+$$
+V_A = 2 + 0.8\, V_B, \qquad V_B = 1 + 0.8\, V_A.
+$$
+
+**Step 2.** Substitute the second into the first and solve for $V_A$:
+
+$$
+V_A = 2 + 0.8(1 + 0.8\, V_A) = 2.8 + 0.64\, V_A \;\Longrightarrow\; V_A = \frac{2.8}{1 - 0.64} = \frac{2.8}{0.36} \approx 7.778.
+$$
+
+**Step 3.** Back-substitute: $V_B = 1 + 0.8 \cdot 7.778 \approx 7.222$. State $A$
+is worth more because it collects its larger reward one step sooner, and the
+discount makes that earlier payout count for more.
+
+</details>
+
+**Exercise 2.** A single state $s_0$ has two actions under $\gamma = 0.9$. Action
+"stay" pays reward $1$ and returns to $s_0$; action "leave" pays reward $3$ and
+ends the episode (the terminal state has value $0$). Use the Bellman optimality
+equation to find $V^*(s_0)$ and the optimal action.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the optimality equation as a max over the two actions. The
+"stay" branch loops back to $s_0$ itself, so its value references $V^*(s_0)$:
+
+$$
+V^*(s_0) = \max\Big(\underbrace{1 + 0.9\, V^*(s_0)}_{\text{stay}},\ \underbrace{3 + 0.9 \cdot 0}_{\text{leave}}\Big).
+$$
+
+**Step 2.** Suppose "stay" is optimal. Then $V^*(s_0) = 1 + 0.9\, V^*(s_0)$, giving
+$V^*(s_0) = 1/(1 - 0.9) = 10$.
+
+**Step 3.** Check consistency: with $V^*(s_0) = 10$ the stay backup is
+$1 + 0.9 \cdot 10 = 10$ while leave gives $3$, so the max picks "stay" and the
+guess is self-consistent. The optimal action is to stay, harvesting the $1$
+forever, worth more than the one-time $3$.
+
+</details>
+
+**Exercise 3 (code).** The optimality operator
+$(T^*V)(s) = \max_a [R(s,a) + \gamma \sum_{s'} P(s'\mid s,a) V(s')]$ is a
+$\gamma$-contraction in the max-norm. On a random MDP, verify
+$\lVert T^*U - T^*V\rVert_\infty \le \gamma \lVert U - V\rVert_\infty$ for two
+random value vectors, and that iterating $T^*$ reaches a fixed point.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+nS, nA, gamma = 4, 3, 0.85
+P = rng.dirichlet(np.ones(nS), size=(nS, nA))      # P[s,a] over s'
+R = rng.normal(size=(nS, nA))
+
+def T_star(V):
+    return (R + gamma * np.einsum("sap,p->sa", P, V)).max(axis=1)
+
+U, V = rng.normal(size=nS), rng.normal(size=nS)
+assert np.max(np.abs(T_star(U) - T_star(V))) <= gamma * np.max(np.abs(U - V)) + 1e-12
+
+W = np.zeros(nS)                                    # iterate to the fixed point
+for _ in range(500):
+    W = T_star(W)
+assert np.allclose(W, T_star(W), atol=1e-8)         # W = T* W, so W is V*
+print("V*:", np.round(W, 3))
+```
+
+The contraction bound holds for the random pair, and iterating $T^*$ lands on a
+vector left unchanged by another backup, which is the optimal value function.
+
+</details>
 
 With the equations in hand, the next lesson turns them into algorithms: policy
 iteration and value iteration, each a contraction that converges to the optimal

@@ -4,7 +4,7 @@ pillar: H
 subId: H1
 lessonId: temporal-difference
 order: 5
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Derive the TD(0) update from the Bellman expectation equation, understand bootstrapping as sampled dynamic programming, and place TD between Monte Carlo and DP on the bias-variance axis."
 prerequisites: ["monte-carlo", "dynamic-programming"]
 ---
@@ -147,6 +147,91 @@ print("TD max error:", round(np.max(np.abs(V_td[1:6] - true_V[1:6])), 3))
 Both estimates track the exact line $V^\pi(s) = s/6$, with TD reaching it from
 purely one-step bootstrapped updates that never waited for, nor summed, a full
 return.
+
+## Exercises
+
+**Exercise 1.** The current estimates are $V(S_t) = 0.5$ and $V(S_{t+1}) = 0.8$.
+The agent observes a transition with reward $r_{t+1} = 1$. With $\gamma = 0.9$ and
+step size $\alpha = 0.1$, compute the TD error $\delta_t$ and the updated
+$V(S_t)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The TD error is target minus current estimate, with the target
+bootstrapping off $V(S_{t+1})$:
+
+$$
+\delta_t = r_{t+1} + \gamma\, V(S_{t+1}) - V(S_t) = 1 + 0.9 \cdot 0.8 - 0.5 = 1.72 - 0.5 = 1.22.
+$$
+
+**Step 2.** Nudge the estimate by $\alpha\, \delta_t$:
+
+$$
+V(S_t) \leftarrow 0.5 + 0.1 \cdot 1.22 = 0.622.
+$$
+
+The positive error moved $V(S_t)$ up toward the higher target, a single
+stochastic-approximation step.
+
+</details>
+
+**Exercise 2.** Explain why the Monte Carlo target $G_t$ is unbiased but high
+variance, while the TD target $r_{t+1} + \gamma V(S_{t+1})$ is biased (while $V$ is
+wrong) but low variance. Tie each property to where the randomness enters.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Unbiasedness of MC: by definition $\mathbb{E}[G_t \mid S_t] = V^\pi(S_t)$,
+so averaging full returns targets the right quantity with no systematic offset. Its
+variance is high because $G_t$ accumulates the randomness of every reward and
+transition across the whole episode, and these add up.
+
+**Step 2.** The TD target replaces the random tail $\gamma G_{t+1}$ with
+$\gamma V(S_{t+1})$. While $V \neq V^\pi$ this substitution makes the target
+biased, since it injects the current estimate's error. But it depends on only one
+step of randomness ($r_{t+1}$ and $S_{t+1}$), so its variance is far lower.
+
+**Step 3.** The trade is bias for variance. Lower variance usually wins in
+practice, which is why TD often learns faster than MC, and the bias vanishes as
+$V \to V^\pi$.
+
+</details>
+
+**Exercise 3 (code).** Apply TD(0) as policy evaluation on a fixed three-state
+Markov reward process (a continuing task, no terminal state). Compare the TD
+estimate against the analytic value $V = (I - \gamma P)^{-1} r$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(14)
+gamma = 0.9
+P = np.array([[0.1, 0.7, 0.2],
+              [0.3, 0.3, 0.4],
+              [0.5, 0.1, 0.4]])
+r = np.array([1.0, -0.5, 2.0])                      # expected reward per state
+V_true = np.linalg.solve(np.eye(3) - gamma * P, r)  # analytic ground truth
+
+V, alpha, s = np.zeros(3), 0.01, 0
+for _ in range(300_000):
+    s_next = rng.choice(3, p=P[s])
+    V[s] += alpha * (r[s] + gamma * V[s_next] - V[s])  # TD(0) update
+    s = s_next
+
+assert np.max(np.abs(V - V_true)) < 0.1
+print("TD V:", np.round(V, 3), " analytic:", np.round(V_true, 3))
+```
+
+TD(0) reaches the analytic value from one-step bootstrapped updates on a
+never-terminating stream, where Monte Carlo could not run at all because no
+episode ever ends.
+
+</details>
 
 TD(0) as written evaluates a *fixed* policy. The next lesson turns it into control
 by learning action-values: Q-learning and SARSA bootstrap the same way but over

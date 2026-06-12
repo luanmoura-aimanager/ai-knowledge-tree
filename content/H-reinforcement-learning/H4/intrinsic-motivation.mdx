@@ -4,7 +4,7 @@ pillar: H
 subId: H4
 lessonId: intrinsic-motivation
 order: 2
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Drive exploration in sparse-reward MDPs with intrinsic bonuses from prediction error and count-based novelty, and implement random network distillation."
 prerequisites: ["bandits-exploration", "H2/dqn"]
 ---
@@ -107,6 +107,124 @@ print("novelty bonus is much larger on unseen states:", b_novel > 20 * b_visited
 The predictor drives its error to zero on the visited states while the novel states
 keep a large bonus, so an agent maximizing this intrinsic reward is pulled toward
 exactly the states it has not yet explored.
+
+## Exercises
+
+**Exercise 1.** The count-based bonus is $r^i(s) = 1/\sqrt{N(s)}$. A gridworld
+agent has visited state $X$ exactly $4$ times and state $Y$ exactly $100$ times.
+Compute the intrinsic bonus for each, and the ratio. Then, with combination
+weight $\beta = 0.5$ and an extrinsic reward of $r^e = 0$ at both states,
+compute the total reward $r = r^e + \beta r^i$ the agent sees at each. Which
+state does the bonus steer the agent toward?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bonus at $X$: $1/\sqrt{4} = 1/2 = 0.5$. Bonus at $Y$:
+$1/\sqrt{100} = 1/10 = 0.1$.
+
+**Step 2.** Ratio $r^i(X)/r^i(Y) = 0.5/0.1 = 5$. The rarely-visited state
+carries five times the novelty bonus of the well-visited one.
+
+**Step 3.** With $\beta = 0.5$ and $r^e = 0$: total at $X$ is
+$0 + 0.5 \cdot 0.5 = 0.25$; total at $Y$ is $0 + 0.5 \cdot 0.1 = 0.05$.
+
+**Step 4.** The agent sees $0.25$ at $X$ versus $0.05$ at $Y$, so maximizing
+return steers it toward the less-visited state $X$. As $N(X)$ grows its bonus
+decays like $1/\sqrt{N}$, eventually falling below other states' and shifting the
+pull elsewhere, the self-extinguishing exploration the count bonus inherits from
+the UCB $\sqrt{\ln t / n}$ form.
+
+</details>
+
+**Exercise 2.** The noisy-TV problem breaks forward-dynamics curiosity: a screen
+of random static keeps prediction error high forever, so the agent fixates on it.
+Random network distillation uses a *fixed deterministic* random target $f^*(s)$
+instead. Explain precisely why this design makes the RND bonus collapse on a
+repeatedly-visited noisy state, where forward-dynamics curiosity does not.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Forward-dynamics curiosity predicts the *next state* from the
+current state and action, and uses its prediction error as the bonus. For a
+genuinely stochastic transition (static, a random number generator), the next
+state is unpredictable in principle: no model can drive that error to zero,
+because the target itself is random. The bonus stays high forever and the agent
+fixates.
+
+**Step 2.** RND's target $f^*(s)$ is a fixed function of the *current* state
+only, with frozen random weights. It is deterministic: the same state always
+maps to the same target vector. There is no stochastic next-state to predict.
+
+**Step 3.** The predictor $\hat{f}$ is trained by gradient descent to match
+$f^*$ on visited states. Revisiting the same noisy state repeatedly gives the
+predictor the same input-output pair again and again, so it learns to reproduce
+$f^*(s)$ and the error
+$\lVert \hat{f}(s) - f^*(s) \rVert^2$ drives to zero.
+
+**Step 4.** So environment stochasticity cannot inflate the RND bonus: the bonus
+depends only on how often a state has been *seen*, not on how predictable its
+dynamics are. That is what let RND explore Montezuma's Revenge where
+forward-dynamics curiosity stalled on noise.
+
+</details>
+
+**Exercise 3 (code).** Implement count-based and RND novelty bonuses side by
+side on a small discrete state space. Visit a subset of states many times, leave
+the rest unvisited, and verify that both bonuses are near zero on visited states
+and large on unvisited ones, and that revisiting a state monotonically lowers its
+count-based bonus.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+n_states = 12
+visited = np.arange(6)                          # states 0..5 get explored
+
+# --- count-based bonus 1/sqrt(N(s)) ---
+counts = np.zeros(n_states)
+for _ in range(2000):
+    counts[rng.choice(visited)] += 1
+count_bonus = 1.0 / np.sqrt(np.maximum(counts, 1e-9))
+
+# revisiting a state lowers its bonus monotonically
+b1 = 1.0 / np.sqrt(10)
+b2 = 1.0 / np.sqrt(50)
+assert b2 < b1                                  # more visits -> smaller bonus
+
+# --- RND bonus: distill a fixed random target on visited states only ---
+D = 32
+Wf = rng.normal(size=D); bf = rng.uniform(0, 2*np.pi, size=D)
+a_star = rng.normal(size=D)
+def phi(s): return np.cos(Wf * (s / 4.0) + bf)
+def target(s): return a_star @ phi(s)
+a, lr = np.zeros(D), 0.05
+for _ in range(4000):
+    s = rng.choice(visited)
+    a += lr * (target(s) - a @ phi(s)) * phi(s)
+def rnd_bonus(s): return float((a @ phi(s) - target(s))**2)
+
+rnd_visited = np.mean([rnd_bonus(s) for s in range(6)])
+rnd_novel   = np.mean([rnd_bonus(s) for s in range(6, 12)])
+cb_visited  = count_bonus[:6].mean()
+cb_novel    = count_bonus[6:].mean()
+
+assert cb_novel > 10 * cb_visited               # count bonus large on unseen
+assert rnd_novel > 10 * rnd_visited             # RND bonus large on unseen
+print("count bonus  visited/novel:", round(cb_visited, 4), round(cb_novel, 4))
+print("RND   bonus  visited/novel:", round(rnd_visited, 4), round(rnd_novel, 4))
+```
+
+Both novelty signals are near zero on the explored states and large on the unseen
+ones, and the count bonus shrinks monotonically with visits, so an agent
+maximizing either is drawn toward the states it has not yet reached.
+
+</details>
 
 This closes the exploration subsection. The next subsection broadens the problem
 itself: learning when the reward is not given at all but must be inferred from
