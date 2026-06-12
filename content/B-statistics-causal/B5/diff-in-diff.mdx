@@ -35,6 +35,22 @@ where $\bar Y_{w,t}$ is the mean outcome for group $w$ in period $t$.
 that changed for everyone). The second difference (subtracting the control trend)
 removes common time effects.
 
+A concrete 2x2 makes the two subtractions visible and shows why the naive
+before-after number misleads. Take the Card-Krueger setting: full-time-equivalent
+employment per fast-food store, with New Jersey (treated, it raised the minimum
+wage) and Pennsylvania (control, it did not).
+
+- **Treated, pre:** $\bar Y_{1,0} = 20.0$ FTE. **Treated, post:** $\bar Y_{1,1} = 21.0$.
+- **Control, pre:** $\bar Y_{0,0} = 23.0$. **Control, post:** $\bar Y_{0,1} = 22.0$.
+
+A naive analyst looks only at the treated group and reports a $+1.0$ change, then
+worries the minimum wage barely moved employment. But control employment fell by
+$1.0$ over the same window, a common shock (a regional downturn) that would have
+hit New Jersey too. The DiD nets it out: $\hat\tau_{\mathrm{DiD}} = (21.0 - 20.0) -
+(22.0 - 23.0) = 1.0 - (-1.0) = 2.0$. The treatment added 2.0 FTE relative to the
+shared trend, double the naive figure, because the naive figure silently charged
+the regional downturn against the policy.
+
 ## OLS implementation
 
 DiD is equivalent to OLS with an interaction term:

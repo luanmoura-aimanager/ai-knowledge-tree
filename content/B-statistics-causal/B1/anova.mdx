@@ -64,6 +64,16 @@ $$
 Under $H_1$, $\mathrm{MSB}$ is inflated (it captures real group differences), so
 large $F$ values provide evidence against $H_0$.
 
+$F$ is a signal-to-noise ratio, and the cleanest way to feel its scale is to hold
+the noise fixed and vary only the separation between group means. Take the three
+groups in the code block below: means near 4.8, 6.6, and 5.8 with common spread
+$\sigma = 1.5$. They give $\mathrm{SSW} = 182.3$ and $F = 11.56$. Now collapse the
+means so all three groups share the same target while keeping the identical
+within-group noise (the same draws): $\mathrm{SSW}$ is unchanged at $182.3$, but
+$\mathrm{SSB}$ falls from $48.5$ to $5.8$, and $F$ drops to $1.37$. Under $H_0$ both
+$\mathrm{MSB}$ and $\mathrm{MSW}$ estimate $\sigma^2$, so $F$ hovers near 1; the
+jump to 11.56 is the between-group signal showing through the same noise floor.
+
 **Connection to the t-test.** For $k=2$, the $F$ statistic equals $T^2$ from the
 two-sample t-test, and $F_{1, N-2} = t_{N-2}^2$. ANOVA is a generalization of the
 t-test, not a separate tool.

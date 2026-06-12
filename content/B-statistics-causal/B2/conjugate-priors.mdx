@@ -76,6 +76,23 @@ $$
 In words: the posterior precision is the sum of prior precision and data precision.
 The posterior mean is a precision-weighted average of the prior mean and the sample mean.
 
+The weights make this concrete. With prior variance $\tau_0^2 = 4$ (so prior
+precision $1/\tau_0^2 = 0.25$) and known $\sigma^2 = 1$, the data precision is
+$n/\sigma^2 = n$, so the weight the posterior mean puts on the sample mean is
+$n / (n + 0.25)$:
+
+- **One observation** ($n = 1$): weight $1/1.25 = 0.80$ on the data. A single point
+  already outvotes this diffuse prior 4-to-1.
+- **Five observations** ($n = 5$): weight $5/5.25 = 0.952$. The prior is nearly gone.
+- **Fifty observations** ($n = 50$): weight $50/50.25 = 0.995$. The prior mean
+  contributes half a percent.
+
+The same numbers read in reverse for a tight prior: shrink $\tau_0^2$ to $0.01$
+(prior precision 100) and at $n = 50$ the data weight falls to $50/150 = 0.333$, so
+the posterior sits a third of the way from the prior mean to the sample mean rather
+than on top of it. The prior variance, not the prior mean, decides how stubborn the
+prior is.
+
 As $n \to \infty$, $\mu_n \to \bar x$ (the MLE) and $\tau_n^2 \to 0$: the data
 swamp the prior.
 

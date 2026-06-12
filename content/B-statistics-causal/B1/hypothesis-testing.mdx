@@ -35,6 +35,26 @@ A small p-value ($p < \alpha$) is evidence against $H_0$. The significance level
 $\alpha$ (typically 0.05) is the tolerated Type I error rate: the probability of
 rejecting a true null.
 
+To calibrate what small means, take a two-sided z-test and read the p-value off the
+observed standardized statistic $z = (\bar X_n - \mu_0)/(\sigma/\sqrt n)$:
+
+- $z = 1$ (one standard error off): $p = 0.317$. A third of true nulls land at least
+  this far out; the data are unremarkable.
+- $z = 1.96$: $p = 0.05$. The conventional boundary, where $1$ in $20$ true nulls
+  reaches.
+- $z = 2.58$: $p = 0.0099$. Roughly $1$ in $100$.
+- $z = 3$: $p = 0.0027$. About $1$ in $370$, the territory particle physics calls a
+  "$3\sigma$" hint.
+
+A confusion worth naming: the p-value is **not** the probability that $H_0$ is true.
+$p = 0.05$ does not mean $H_0$ has a $5\%$ chance of holding; it means data this
+extreme occur $5\%$ of the time *when $H_0$ is true*. The two diverge sharply when
+$H_0$ is rarely true to begin with: testing many no-effect hypotheses at $\alpha =
+0.05$, a $p = 0.04$ "discovery" can still be a false positive most of the time,
+because most of the nulls were true and produced their share of small p-values by
+chance. The p-value scores surprise under $H_0$; it does not, on its own, give the
+posterior on $H_0$.
+
 Two types of error<FN n="2" />:
 - **Type I (false positive):** reject $H_0$ when it is true. Rate $\le \alpha$.
 - **Type II (false negative):** fail to reject $H_0$ when it is false. Rate $\beta$; power $= 1-\beta$.
