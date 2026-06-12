@@ -4,7 +4,7 @@ pillar: I
 subId: I3
 lessonId: quantization
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Map floating-point weights to low-bit integers with an affine scale and zero-point, dequantize back, and bound the rounding error that buys memory and bandwidth."
 prerequisites: ["A4/floating-point", "E5/quantization"]
 ---
@@ -128,9 +128,109 @@ print(f"memory: fp32 {w.nbytes} B -> int8 {q.nbytes} B  ({w.nbytes // q.nbytes}x
 ```
 
 Every reconstructed weight lands within half a step of the original, exactly the
-bound, and the tensor shrinks fourfold from fp32 to int8. Quantization shrinks each
-weight; the next lesson shrinks the *number* of weights and the model's depth, with
-[distillation and pruning](distillation-pruning).
+bound, and the tensor shrinks fourfold from fp32 to int8.
+
+## Exercises
+
+**Exercise 1.** A weight tensor spans $[\beta_{\min}, \beta_{\max}] = [-0.3, 0.5]$
+and is quantized to $b = 8$ bits. Compute the scale $s$, the zero-point $z$, and the
+worst-case reconstruction error $s/2$. Verify that the code for $x = 0$ is exactly
+$z$ and lands back on $0$ after dequantization.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The integer range is $2^8 - 1 = 255$, so the scale is
+
+$$
+s = \frac{0.5 - (-0.3)}{255} = \frac{0.8}{255} \approx 3.137 \times 10^{-3}.
+$$
+
+**Step 2.** The zero-point is $z = -\operatorname{round}(\beta_{\min}/s)$:
+
+$$
+\beta_{\min}/s = -0.3 / 3.137\times10^{-3} \approx -95.625,
+\quad z = -\operatorname{round}(-95.625) = 96.
+$$
+
+**Step 3.** The worst-case error is half a step:
+
+$$
+s/2 \approx 1.57 \times 10^{-3}.
+$$
+
+**Step 4.** Quantizing $x = 0$: $\operatorname{round}(0/s) + z = 0 + 96 = 96 = z$.
+Dequantizing: $s(96 - 96) = 0$. The float $0$ maps to code $z$ and back to $0$
+exactly, which is why the zero-point is named for it.
+
+</details>
+
+**Exercise 2.** Two tensors share the same true range $[-0.2, 0.2]$, but one has a
+single outlier weight at $2.0$ added to it, stretching its range to $[-0.2, 2.0]$.
+Both are quantized to $8$ bits. Compute the worst-case error $s/2$ for each and the
+ratio between them. Explain in one sentence why outliers hurt every weight.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Clean range $0.4$ wide: $s_1 = 0.4 / 255 \approx 1.569 \times 10^{-3}$,
+so $s_1/2 \approx 7.84 \times 10^{-4}$.
+
+**Step 2.** Outlier range $2.2$ wide: $s_2 = 2.2 / 255 \approx 8.627 \times 10^{-3}$,
+so $s_2/2 \approx 4.31 \times 10^{-3}$.
+
+**Step 3.** The ratio is $s_2 / s_1 = 2.2 / 0.4 = 5.5$.
+
+The outlier widens the range by $5.5\times$, inflating the step and the worst-case
+error on every weight by the same factor, because one global scale must cover the
+whole range, so a single extreme value spends precision that the bulk of the
+weights never use.
+
+</details>
+
+**Exercise 3 (code).** Quantize a tensor of $20{,}000$ fp32 weights drawn from
+$\mathcal{N}(0, 0.1)$ to both int8 and int4 with the affine map. Report the
+max error and the half-step bound for each, and confirm the int4 step (and so its
+error bound) is larger than int8 by the factor $(2^8-1)/(2^4-1) = 17$ given the
+same range.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+rng = np.random.default_rng(0)
+
+w = rng.normal(0, 0.1, size=20_000).astype(np.float32)
+beta_min, beta_max = float(w.min()), float(w.max())
+
+def affine_quant(w, bits):
+    qmin, qmax = 0, 2**bits - 1
+    scale = (beta_max - beta_min) / (qmax - qmin)        # one step
+    zero_point = qmin - round(beta_min / scale)          # code for 0.0
+    q = np.clip(np.round(w / scale) + zero_point, qmin, qmax)
+    deq = (q - zero_point) * scale                       # invert the map
+    return scale, np.abs(w - deq).max()
+
+s8, err8 = affine_quant(w, 8)
+s4, err4 = affine_quant(w, 4)
+print(f"int8: step {s8:.2e}, max err {err8:.2e}, bound {s8/2:.2e}")
+print(f"int4: step {s4:.2e}, max err {err4:.2e}, bound {s4/2:.2e}")
+print(f"step ratio int4/int8 = {s4/s8:.2f}")
+
+assert err8 <= s8 / 2 + 1e-9                  # half-step bound holds at 8 bits
+assert err4 <= s4 / 2 + 1e-9                  # and at 4 bits
+assert np.isclose(s4 / s8, (2**8 - 1) / (2**4 - 1), rtol=1e-6)   # 255/15 = 17
+```
+
+The same range split into $15$ codes (int4) instead of $255$ (int8) makes each step
+$255/15 = 17$ times larger, so dropping four bits multiplies the worst-case error by
+$17$, the concrete cost of the smaller bit budget.
+
+</details>
+
+Quantization shrinks each weight; the next lesson shrinks the *number* of weights
+and the model's depth, with [distillation and pruning](distillation-pruning).
 
 <Footnotes>
   <FNItem n="1">**Jacob, B., et al.** (2018). "Quantization and training of neural networks for efficient integer-arithmetic-only inference". *CVPR*. [arXiv:1712.05877](https://arxiv.org/abs/1712.05877) Introduces the affine scale/zero-point integer scheme used here.</FNItem>

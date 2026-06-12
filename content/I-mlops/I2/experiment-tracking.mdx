@@ -4,7 +4,7 @@ pillar: I
 subId: I2
 lessonId: experiment-tracking
 order: 1
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Log the inputs (code, data, config, seed) and outputs (metrics, artifacts) of every run so results are comparable and reproducible, and see why fixing the seed alone is not enough."
 prerequisites: ["I1/data-versioning", "A3/sgd"]
 ---
@@ -100,8 +100,113 @@ print("metric reproducible from full lineage:", train(42, data_v1) == m_v1)
 
 The two runs share a seed yet land on different metrics because they ran on
 different data versions, which is exactly why a tracker logs the data hash beside
-the seed. With runs now individually reproducible, the next question is how to
-*choose* the config in the first place, the [hyperparameter search](hyperparameter-search)
+the seed.
+
+## Exercises
+
+**Exercise 1.** A teammate reports that two of their runs disagree by a few
+percent on validation accuracy and insists "the seed was the same in both, so
+this is a real effect". List the inputs from the lineage tuple that could each,
+on their own, explain the gap while the seed is held fixed, and name the minimal
+change to their logging that would let them rule each one out.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The metric is a function of the whole input tuple
+(code, data, config, seed, environment), not the seed alone. Holding the seed
+fixed pins only the *random number sequence*; everything that sequence acts on
+can still differ.
+
+**Step 2.** Each non-seed input is a candidate explanation:
+
+- **Code:** a different Git commit changes the model or the loss, so the same
+  draws drive a different computation.
+- **Data:** a different dataset version means the same draws shuffle and learn
+  from different rows.
+- **Config:** a different learning rate or batch size reshapes the update even
+  with identical draws.
+- **Environment:** different library or hardware versions change numerics, which
+  can shift the metric.
+
+**Step 3.** The minimal fix is to log the full lineage tuple per run (Git commit,
+data content hash, config dict, seed, library/hardware versions). Then comparing
+the two runs' records isolates the one field that differs, turning "a real
+effect" into "they ran on different data" or whichever input actually changed.
+
+</details>
+
+**Exercise 2.** Define two runs as **comparable** when they differ in exactly the
+one input under study and agree on every other input. You want to measure the
+effect of learning rate, sweeping it over $3$ values. Your tracker logs $5$
+independent inputs. How many of those input fields must be held fixed for the
+sweep to be a controlled comparison, and why does logging all $5$, rather than
+just the learning rate, make the claim checkable rather than assumed?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** One input (learning rate) is the variable under study. The other
+$5 - 1 = 4$ inputs must be held fixed for the three runs to be comparable, so a
+difference in the metric is attributable to the learning rate and nothing else.
+
+**Step 2.** Logging only the learning rate records the variable you changed but
+leaves the other four fields unrecorded. If one of them silently drifted (a new
+data snapshot, a library bump), the comparison is confounded and you cannot
+detect it.
+
+**Step 3.** Logging all $5$ fields per run lets you read the records back and
+verify that the four control inputs are byte-identical across the three runs.
+The controlled-comparison claim becomes a check against the logs, not an
+assumption, which is the entire reason a tracker logs every input rather than
+only the swept one.
+
+</details>
+
+**Exercise 3 (code).** Demonstrate the confounding directly. Build a `train(seed,
+data, lr)` whose output depends on all three inputs. Show that a learning-rate
+sweep run on a *fixed* data version cleanly attributes the metric change to `lr`,
+but the same sweep where the data version silently changes between runs produces
+a metric difference that is **not** attributable to `lr` alone.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def train(seed, data, lr):
+    rng = np.random.default_rng(seed)
+    noise = rng.normal(0, 0.1, size=data.size)
+    return float(np.mean(data + noise) + lr)   # depends on seed, data, AND lr
+
+data_v1 = np.arange(100, dtype=np.float64)
+data_v2 = data_v1.copy(); data_v2[0] = 999.0   # silently different data version
+
+# Controlled sweep: vary lr only, hold seed and data fixed.
+m_lo = train(0, data_v1, lr=0.01)
+m_hi = train(0, data_v1, lr=0.05)
+controlled_gap = m_hi - m_lo
+assert np.isclose(controlled_gap, 0.04)        # exactly the lr difference, nothing else
+
+# Confounded sweep: lr changes AND data version changes between the two runs.
+c_lo = train(0, data_v1, lr=0.01)
+c_hi = train(0, data_v2, lr=0.05)              # data quietly swapped to v2
+confounded_gap = c_hi - c_lo
+assert not np.isclose(confounded_gap, 0.04)    # gap is NOT the lr effect alone
+print(f"controlled gap = {controlled_gap:.4f} (= lr change)")
+print(f"confounded gap = {confounded_gap:.4f} (lr change + data change)")
+```
+
+The controlled sweep recovers the learning-rate change exactly because every
+other input was pinned, while the confounded sweep reports a gap that mixes the
+learning rate with the unlogged data change, which is the failure logging the
+full lineage tuple is designed to catch.
+
+</details>
+
+With runs now individually reproducible, the next question is how to *choose* the
+config in the first place, the [hyperparameter search](hyperparameter-search)
 problem.
 
 <Footnotes>

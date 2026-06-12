@@ -4,7 +4,7 @@ pillar: I
 subId: I4
 lessonId: safety-evals-red-teaming
 order: 4
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Measure how often adversarial prompts break a model with an attack success rate, put a Wilson interval on it, and decide whether two models differ given finite, noisy trials."
 prerequisites: ["llm-evaluation"]
 ---
@@ -109,7 +109,94 @@ assert asrB < asrA and p_value < 0.05
 
 The Wilson intervals overlap slightly, which the naive eyeball test would call
 inconclusive, yet the two-proportion test returns $p \approx 0.04$: model B's lower
-ASR is real, not noise. Capability and safety both cost money to run and to serve;
+ASR is real, not noise.
+
+## Exercises
+
+**Exercise 1.** A red-team suite of $250$ attacks produces $20$ successes against a
+model. Compute the attack success rate, and explain why reporting it as "$0.08$"
+alone is misleading for a safety claim.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The ASR is the success fraction:
+
+$$
+\text{ASR} = \frac{20}{250} = 0.08.
+$$
+
+So $8\%$ of adversarial prompts got through.
+
+**Step 2.** A bare $0.08$ hides two things. First, it is a sample proportion over
+$250$ noisy trials, so it carries sampling error; the true rate could be meaningfully
+higher or lower, and without an interval you cannot tell. Second, the number is only
+as strong as the attack suite: $0.08$ against weak or stale attacks understates real
+risk, since a stronger or more diverse red team would find more failures. A
+defensible safety claim needs both a confidence interval and a description of the
+attack suite's strength.
+
+</details>
+
+**Exercise 2.** Two safety-tuned candidates are each hit with $n$ attacks and show
+the same point ASRs, but candidate X used $n = 100$ attacks and candidate Y used
+$n = 1000$. Without computing the full intervals, explain which candidate's ASR
+estimate is tighter and why, referring to how the Wilson half-width scales with $n$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The Wilson half-width is dominated by the $\sqrt{\hat p(1-\hat p)/n}$
+term, which shrinks as $1/\sqrt{n}$. Holding $\hat p$ fixed, going from $n = 100$ to
+$n = 1000$ multiplies $n$ by $10$ and so shrinks that dominant term by a factor of
+$\sqrt{10} \approx 3.16$.
+
+**Step 2.** Candidate Y, with $n = 1000$, has the tighter interval: roughly three
+times narrower than candidate X's. Same point estimate, far less uncertainty. This
+is why a low ASR from a handful of attacks is weak evidence of safety: the interval
+is wide enough to include alarming true rates. More attacks buy a sharper claim, but
+only as $\sqrt{n}$, so quadrupling the suite halves the half-width.
+
+</details>
+
+**Exercise 3 (code).** Model A scores $24$ successes in $300$ attacks; model B
+scores $12$ in $300$. Implement the two-proportion z-test from scratch (with a
+hand-coded normal CDF via `math.erf`) and decide at $\alpha = 0.05$ whether B is
+significantly safer.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from math import erf, sqrt
+
+def normal_cdf(z):
+    return 0.5 * (1 + erf(z / sqrt(2)))           # standard normal CDF, no scipy
+
+nA, xA = 300, 24
+nB, xB = 300, 12
+asrA, asrB = xA / nA, xB / nB
+
+p_pool = (xA + xB) / (nA + nB)                     # pooled rate under H0
+se = sqrt(p_pool * (1 - p_pool) * (1/nA + 1/nB))
+z = (asrA - asrB) / se
+p_value = 2 * (1 - normal_cdf(abs(z)))
+
+print(f"ASR A = {asrA:.3f}, ASR B = {asrB:.3f}")
+print(f"z = {z:.2f}, p-value = {p_value:.3f}")
+
+assert asrB < asrA and p_value < 0.05
+```
+
+ASR A is $0.08$ and ASR B is $0.04$. The pooled rate is $0.06$, the z-statistic is
+about $2.06$, and the two-sided p-value is about $0.039$, below $0.05$. The gap is
+larger than sampling noise would plausibly produce, so B is genuinely safer rather
+than luckier.
+
+</details>
+
+Capability and safety both cost money to run and to serve;
 the final lesson closes the loop by monitoring that cost itself, in
 [cost monitoring and token economics](cost-monitoring).
 

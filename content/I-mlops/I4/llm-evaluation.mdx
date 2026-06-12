@@ -4,7 +4,7 @@ pillar: I
 subId: I4
 lessonId: llm-evaluation
 order: 3
-estimatedMinutes: 24
+estimatedMinutes: 34
 goal: "Estimate functional accuracy from sampled generations with the unbiased pass@k estimator, put a confidence interval on a benchmark score, and guard against test-set contamination."
 prerequisites: ["slos-and-error-budgets", "B4/ab-testing"]
 ---
@@ -125,6 +125,84 @@ lo, hi = wilson(82, 100)
 print(f"\nbenchmark 82/100 -> 95% Wilson CI [{lo:.3f}, {hi:.3f}]")
 assert lo < 0.82 < hi
 ```
+
+## Exercises
+
+**Exercise 1.** A single generation is correct with probability $\theta = 0.25$.
+Compute the true pass@$1$, pass@$2$, and pass@$4$ from $1 - (1-\theta)^k$, and
+explain in one sentence why pass@$k$ rises with $k$ but with diminishing returns.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $1 - \theta = 0.75$:
+
+$$
+\text{pass@}1 = 1 - 0.75 = 0.25, \qquad
+\text{pass@}2 = 1 - 0.75^2 = 1 - 0.5625 = 0.4375,
+$$
+
+$$
+\text{pass@}4 = 1 - 0.75^4 = 1 - 0.3164 = 0.6836.
+$$
+
+**Step 2.** Each extra sample multiplies the all-fail probability by another factor
+of $0.75$, so the failure probability decays geometrically toward zero and pass@$k$
+rises toward $1$. The increments shrink ($+0.1875$ from $k{=}1$ to $k{=}2$, but only
+$+0.246$ spread across $k{=}2$ to $k{=}4$) because each added sample removes a
+smaller absolute slice of an already-shrinking failure mass.
+
+</details>
+
+**Exercise 2.** Explain why the naive plug-in $1 - (1 - c/n)^k$ is a biased
+estimator of pass@$k$, naming the inequality responsible. State the direction of
+the bias for this convex-in-$\theta$ failure term and why.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The estimator applies a nonlinear function $f(\theta) = 1 - (1-\theta)^k$
+to the random estimate $\hat\theta = c/n$. By Jensen's inequality,
+$\mathbb{E}[f(\hat\theta)] \neq f(\mathbb{E}[\hat\theta])$ whenever $f$ is nonlinear,
+even though $\hat\theta$ is itself unbiased for $\theta$. So plugging an unbiased
+$\hat\theta$ into a nonlinear $f$ does not yield an unbiased estimate of $f(\theta)$.
+
+**Step 2.** The pass@$k$ function is concave in $\theta$ for $k \ge 2$ (its second
+derivative $-k(k-1)(1-\theta)^{k-2}$ is negative). For a concave $f$, Jensen gives
+$\mathbb{E}[f(\hat\theta)] \le f(\mathbb{E}[\hat\theta]) = f(\theta)$, so the naive
+plug-in is biased **downward**: it underestimates the true pass@$k$, which is why
+the worked example saw it sit several points low.
+
+</details>
+
+**Exercise 3 (code).** A model scores $73/100$ on a benchmark. Compute the $95\%$
+Wilson interval by hand-implemented formula, and confirm the interval lies inside
+$[0, 1]$ and contains the point estimate $0.73$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def wilson(x, m, z=1.96):                     # 95% CI for a proportion
+    p, denom = x / m, 1 + z*z/m
+    center = (p + z*z/(2*m)) / denom
+    half = z/denom * np.sqrt(p*(1-p)/m + z*z/(4*m*m))
+    return center - half, center + half
+
+lo, hi = wilson(73, 100)
+print(f"73/100 -> 95% Wilson CI [{lo:.3f}, {hi:.3f}]")
+
+assert 0.0 <= lo < 0.73 < hi <= 1.0
+```
+
+The interval comes out to roughly $[0.636, 0.807]$, about $\pm 9$ points around the
+$0.73$ estimate. It stays inside $[0, 1]$ and brackets the point estimate, which is
+the Wilson interval's whole advantage over the normal approximation for proportions
+near the extremes or with modest $m$.
+
+</details>
 
 The unbiased estimator lands on the true pass@k while the naive plug-in sits almost
 four points low, and the Wilson interval shows that "$82\%$" really means roughly

@@ -4,7 +4,7 @@ pillar: I
 subId: I1
 lessonId: orchestration-dags
 order: 2
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Model a pipeline as a directed acyclic graph of tasks, schedule it in dependency order by topological sort, and make each task idempotent so retries and backfills are safe."
 prerequisites: ["pipeline-paradigms", "A5/graph-traversal"]
 ---
@@ -129,9 +129,129 @@ print("replace rows after retry:", table_replace.size, "(correct)")
 The topological order schedules both extracts before the join and the join before
 either feature task, and the two strategies show why idempotency matters: the
 append leaves six rows after a single retry, the partition-replace leaves the
-correct three. With a safe-to-rerun task graph in hand, the next lesson serves
-those features consistently to training and inference through a
-[feature store](feature-stores).
+correct three.
+
+## Exercises
+
+**Exercise 1.** Run Kahn's algorithm by hand on this DAG (edge $u \to v$ means $v$
+depends on $u$): $A \to C$, $B \to C$, $C \to D$, $C \to E$, $D \to F$, $E \to F$.
+Give the in-degree of every node and produce one valid topological order, breaking
+ties alphabetically.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In-degree counts edges pointing *into* each node. $A$ and $B$ have
+none. $C$ is fed by $A$ and $B$. $D$ and $E$ are each fed by $C$. $F$ is fed by $D$
+and $E$:
+
+$$
+A : 0, \quad B : 0, \quad C : 2, \quad D : 1, \quad E : 1, \quad F : 2.
+$$
+
+**Step 2.** Ready set (in-degree $0$) starts as $\{A, B\}$. Pop $A$ (alphabetical):
+decrement $C$ to $1$. Pop $B$: decrement $C$ to $0$, so $C$ becomes ready. Pop $C$:
+decrement $D$ to $0$ and $E$ to $0$, both become ready. Pop $D$: decrement $F$ to
+$1$. Pop $E$: decrement $F$ to $0$, $F$ becomes ready. Pop $F$.
+
+**Step 3.** The emitted order is
+
+$$
+A, B, C, D, E, F.
+$$
+
+All six nodes were emitted, so the graph is acyclic and this is a valid schedule:
+every node appears after all of its dependencies.
+
+</details>
+
+**Exercise 2.** Classify each task as idempotent or not, and for the
+non-idempotent ones name a rewrite that makes them safe to rerun:
+(a) "append today's rows to the events table",
+(b) "delete the partition for date $d$, then write today's rows into it",
+(c) "increment a running counter column by the batch's row count",
+(d) "upsert each user's latest profile keyed by user_id".
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A task is idempotent when running it twice on the same input leaves the
+same destination state as running it once.
+
+**Step 2.** Classify:
+
+(a) *Not idempotent.* A second run appends the same rows again, doubling them.
+Rewrite as a partition replace for today's date (delete-then-write), so a rerun
+overwrites rather than accumulates.
+
+(b) *Idempotent.* Delete-then-write fixes the partition's contents to today's rows
+regardless of how many times it runs.
+
+(c) *Not idempotent.* Each rerun adds the batch count again, inflating the counter.
+Rewrite to *set* the counter to a value derived from the source (recompute the
+total and assign it), so the result does not depend on run count.
+
+(d) *Idempotent.* An upsert keyed by user_id replaces each user's row with the same
+latest profile every time, so reruns converge to the same state.
+
+</details>
+
+**Exercise 3 (code).** Extend Kahn's algorithm to *detect a cycle*. Build a graph
+that has one (add an edge that points back into an ancestor) and confirm the
+algorithm emits fewer than $n$ tasks, leaving the cycle's members unscheduled.
+Identify which tasks are stuck.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# A graph with a cycle: B -> C -> D -> B is a 3-task loop; A feeds B, D feeds E.
+deps = {
+    "A": ["B"],
+    "B": ["C"],
+    "C": ["D"],
+    "D": ["B", "E"],   # D -> B closes the cycle B->C->D->B
+    "E": [],
+}
+tasks = list(deps)
+
+indeg = {t: 0 for t in tasks}
+for u in tasks:
+    for v in deps[u]:
+        indeg[v] += 1
+
+ready = sorted(t for t in tasks if indeg[t] == 0)
+order = []
+while ready:
+    u = ready.pop(0)
+    order.append(u)
+    nxt = []
+    for v in deps[u]:
+        indeg[v] -= 1
+        if indeg[v] == 0:
+            nxt.append(v)
+    ready = sorted(ready + nxt)
+
+stuck = [t for t in tasks if t not in order]
+print("scheduled:", order)
+print("stuck (cycle members):", stuck)
+
+assert len(order) < len(tasks)               # cycle => not all tasks emitted
+assert set(stuck) == {"B", "C", "D", "E"}    # loop members plus their downstream
+assert order == ["A"]                          # only the pre-cycle root schedules
+```
+
+Only $A$ schedules: it feeds $B$, but $B$, $C$, $D$ each keep a remaining
+dependency from the loop, so none reaches in-degree $0$. $E$ is downstream of the
+stuck $D$, so it never becomes ready either, leaving four tasks unscheduled. The
+shortfall of emitted tasks is exactly the orchestrator's acyclicity check.
+
+</details>
+
+With a safe-to-rerun task graph in hand, the next lesson serves those features
+consistently to training and inference through a [feature store](feature-stores).
 
 <Footnotes>
   <FNItem n="1">**Reis, J., & Housley, M.** (2022). *Fundamentals of Data Engineering.* O'Reilly. Orchestration, scheduling, and the role of DAG-based workflow systems.</FNItem>

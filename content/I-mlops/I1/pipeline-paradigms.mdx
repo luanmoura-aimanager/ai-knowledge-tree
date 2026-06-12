@@ -4,7 +4,7 @@ pillar: I
 subId: I1
 lessonId: pipeline-paradigms
 order: 1
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Distinguish the four ways data reaches a model (extract-transform-load vs extract-load-transform, batch vs streaming) and pick the right shape from latency and reprocessing needs."
 prerequisites: []
 codeExempt: true
@@ -87,6 +87,90 @@ Two questions settle most designs:
   evolving, ELT's retained raw data lets you redefine and backfill features
   without re-extracting from the source. If the transform is fixed and storage is
   expensive, ETL's load-only-the-result discipline pays off.
+
+## Exercises
+
+**Exercise 1.** A team runs a nightly ETL job that extracts raw clickstream
+events, transforms them into a "sessions" table (dropping the raw events to save
+storage), and loads only the sessions. Six months later, a new model needs a
+"time-on-page" feature that requires the raw events, which were never kept. Name
+the paradigm choice that caused this, and the one-word change that would have
+prevented it. Then state the cost that change imposes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The job is ETL: it transforms before loading and writes only the
+finished sessions table, so the raw events are discarded. A feature that needs the
+raw events has nothing to reprocess from, which is the exact failure ETL trades
+for its smaller storage footprint.
+
+**Step 2.** The change is ELT: load the raw events first, then derive the sessions
+table (and later the time-on-page feature) with in-warehouse transforms. Keeping
+the raw data is what makes a new feature definition a backfill rather than an
+impossibility.
+
+**Step 3.** The cost is storage and warehouse compute: every raw event is retained,
+and the heavy transforms run inside the warehouse on demand. ELT pays in bytes and
+query cost to buy the freedom to recompute features when the model's needs change.
+
+</details>
+
+**Exercise 2.** A fraud model scores card transactions in real time and must react
+to a "transactions in the last 60 seconds" signal that changes by the second. The
+same platform also retrains the model weekly on a year of history. Assign a
+paradigm (batch vs streaming, and ETL vs ELT where relevant) to each of the two
+data paths, and justify why a single paradigm cannot serve both.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The live "last 60 seconds" signal has a sub-minute freshness
+requirement. Batch features computed on a schedule would be up to a full cycle
+stale, far too old for a per-second signal, so this path must be *streaming*: each
+transaction updates the rolling count as it arrives, typically a streaming ETL that
+cleans and writes the count to an online store.
+
+**Step 2.** Weekly retraining reads a year of fixed history with no freshness
+pressure. A *batch* path is the right fit: it has a clear start and end, reads a
+bounded input, and reruns reproducibly, which retraining and backfills need. ELT
+on retained raw history lets feature definitions evolve between retrains.
+
+**Step 3.** No single paradigm serves both because the requirements conflict:
+streaming buys freshness at the cost of harder reprocessing and unbounded input,
+while batch buys reproducibility and cheap reprocessing at the cost of staleness.
+The platform runs both, a batch ELT backbone for training plus a streaming path for
+the few signals that must be fresh, which is the standard split.
+
+</details>
+
+**Exercise 3.** "Rerun it" is unambiguous for a batch job but loses its meaning for
+a streaming job. Explain, using the properties of the two cadences from this
+lesson, why a batch run can be reproduced exactly while a streaming computation
+generally cannot, and describe one mechanism a streaming system uses to recover
+some notion of reproducibility.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A batch run reads a *bounded, fixed* input chunk (an hour, a day) with
+a clear start and end. The same input is still sitting in storage, so rerunning the
+job reads identical bytes and produces identical output. Reproducibility is a
+direct consequence of the input being fixed and re-readable.
+
+**Step 2.** A streaming job consumes an *unbounded* sequence in which records can
+arrive late or out of order, and it maintains continuously-updated state. There is
+no fixed input snapshot to point at: the "input" at any instant depends on exactly
+which records had arrived by then and in what order. Replaying later sees a
+different arrival pattern, so the output need not match.
+
+**Step 3.** A common recovery mechanism is an append-only, replayable log (a
+durable event stream) with checkpointed offsets and watermarks: the system records
+how far it has consumed and a bound on lateness, so it can replay from a saved
+offset and recompute deterministically up to the watermark. This restores a bounded
+"rerun" semantics on top of an inherently unbounded source.
+
+</details>
 
 These choices set up the rest of the discipline: a pipeline is a graph of tasks
 that has to be scheduled, retried, and backfilled, which is the

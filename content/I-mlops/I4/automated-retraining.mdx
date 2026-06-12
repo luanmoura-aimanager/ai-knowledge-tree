@@ -4,7 +4,7 @@ pillar: I
 subId: I4
 lessonId: automated-retraining
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Decide when a decaying model is worth retraining by weighing accuracy loss against retrain cost, choose a trigger (scheduled vs drift-based), and guard the new model behind a champion-challenger gate."
 prerequisites: ["production-drift", "I1/drift-detection"]
 ---
@@ -93,6 +93,92 @@ print(f"cost at T=120 (too rare)  = {(K/120 + c*r*(120+1)/2):.2f}")
 assert abs(T_opt - T_sqrt) <= 2   # closed form matches the grid minimizer
 print("optimal cadence balances retrain cost against staleness:", True)
 ```
+
+## Exercises
+
+**Exercise 1.** A model decays at $r = 0.2$ accuracy units per day, each lost
+unit costs $c = 5$ per day, and one retrain costs $K = 1000$. Use the square-root
+rule $T^\star \approx \sqrt{2K/(c\,r)}$ to find the optimal retrain interval in
+days, then state in words why doubling the retrain cost $K$ lengthens the interval
+by only a factor of $\sqrt{2}$, not $2$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute into the closed form:
+
+$$
+T^\star \approx \sqrt{\frac{2K}{c\,r}} = \sqrt{\frac{2 \cdot 1000}{5 \cdot 0.2}}
+       = \sqrt{\frac{2000}{1.0}} = \sqrt{2000} \approx 44.7 \text{ days}.
+$$
+
+So retrain roughly every $45$ days.
+
+**Step 2.** The interval grows as $\sqrt{K}$, not $K$. Doubling $K$ multiplies
+$T^\star$ by $\sqrt{2K/(c r)} / \sqrt{K/(c r)} = \sqrt{2} \approx 1.41$. The square
+root appears because staleness cost grows quadratically in $T$: the longer interval
+that a pricier retrain buys also lets the average staleness climb, and balancing a
+linear amortized cost $K/T$ against a linearly rising staleness term puts the
+optimum at the geometric midpoint, where the marginal savings on retrain cost equal
+the marginal rise in staleness.
+
+</details>
+
+**Exercise 2.** A team runs a pure scheduled trigger at the optimal cadence
+$T^\star$. Describe one failure mode this leaves uncovered, and one failure mode a
+pure drift-based trigger leaves uncovered. Explain why combining a drift trigger
+with a scheduled floor covers both.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A pure scheduled trigger is blind to timing. If a sudden distribution
+shift hits on day $5$ of a $45$-day cycle, the model serves a stale, decayed
+predictor for $40$ more days because the schedule does not know the world moved.
+The cost model assumed a constant decay rate $r$; a shock violates that assumption
+and the scheduled cadence has no way to react.
+
+**Step 2.** A pure drift-based trigger is blind during quiet stretches. If the
+monitored statistic never crosses its threshold (slow decay, or decay the input
+monitor cannot see, such as concept drift under label delay), the trigger never
+fires and the model can sit stale indefinitely even as accuracy slowly erodes.
+
+**Step 3.** Combining them covers both gaps: the drift trigger catches shocks the
+moment the statistic crosses, and the scheduled floor guarantees a refresh after at
+most $T^\star$ days even if no drift alarm ever fires. The floor bounds worst-case
+staleness; the drift trigger shortens the interval exactly when the world moves.
+
+</details>
+
+**Exercise 3 (code).** Sweep the retrain interval $T$ from $1$ to $200$ days for
+$K = 1000$, $c = 5$, $r = 0.2$. Confirm by grid search that the cost-minimizing
+interval matches the square-root rule from Exercise 1 to within $2$ days, and
+report the minimum average daily cost.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+K, c, r = 1000.0, 5.0, 0.2
+T = np.arange(1, 201)
+avg_cost = K / T + c * r * (T + 1) / 2.0    # amortized retrain + mean staleness
+
+T_opt = int(T[np.argmin(avg_cost)])
+T_sqrt = np.sqrt(2 * K / (c * r))
+print(f"grid-optimal interval = {T_opt} days")
+print(f"sqrt(2K/cr)           = {T_sqrt:.1f} days")
+print(f"min average daily cost = {avg_cost.min():.2f}")
+
+assert abs(T_opt - T_sqrt) <= 2            # closed form matches the grid minimizer
+```
+
+The grid minimizer lands at $T = 45$ days, matching $\sqrt{2000} \approx 44.7$, and
+the minimum average daily cost is about $45.22$ per day. The closed form and the
+brute-force sweep agree.
+
+</details>
 
 The same machinery that *detected* decay now *schedules* the response and the
 [champion-challenger gate](I2/ml-cicd) keeps a bad refresh from reaching users.
