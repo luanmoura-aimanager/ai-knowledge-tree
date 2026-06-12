@@ -4,7 +4,7 @@ pillar: D
 subId: D5
 lessonId: non-contrastive-ssl
 order: 3
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Avoid negatives entirely with predictor networks (BYOL) and student-teacher distillation (DINO)."
 prerequisites: ["contrastive-ssl"]
 codeExempt: true
@@ -134,6 +134,113 @@ graph LR
   TG --> L
   L -.->|EMA update| TG
 ```
+
+## Exercises
+
+**Exercise 1.** Contrastive InfoNCE prevents collapse with an explicit
+negative-pulling term. BYOL has no negatives. State precisely what the
+collapsed solution is for a non-contrastive method, why the objective
+alone does not forbid it, and which of BYOL's three pieces (predictor,
+stop-gradient, EMA target) directly addresses that the loss would
+otherwise reward it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Name the collapse. The trivial solution is a constant
+encoder: every input maps to the same fixed vector $c$. Then for any two
+views the online and target outputs are both $c$, so the cosine distance
+between the prediction and the target is zero, the global minimum of the
+loss.
+
+**Step 2.** Why the loss alone permits it. BYOL's objective only asks the
+online prediction to match the (stop-gradient) target embedding. A
+constant map satisfies "the two views agree" perfectly, with no term that
+grows when representations stop being distinct. Unlike InfoNCE, nothing
+in the loss penalizes mapping different images together, so the constant
+solution is not merely allowed, it is optimal for the loss as written.
+
+**Step 3.** What blocks it. The collapse is prevented by the
+architecture, not the loss. The stop-gradient on the target is the key
+piece: it makes the target a fixed objective the online network chases
+rather than a co-learner, so the system cannot jointly slide both sides
+to a shared constant in one gradient step. The online-side predictor and
+the slow EMA target shape the dynamics so the chased target keeps moving
+informatively. SimSiam isolates the stop-gradient as the necessary
+ingredient, showing the EMA target can be dropped but the stop-gradient
+cannot.
+
+</details>
+
+**Exercise 2.** DINO's teacher applies centering (subtract a running
+mean from the logits) and sharpening (a low softmax temperature) before
+forming the target distribution. These push in opposite directions.
+Explain the failure each one prevents, and why both are needed together.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The failure centering prevents. Without centering, one output
+dimension can grow to dominate the teacher's softmax for every image, so
+the teacher always outputs nearly the same one-hot distribution. The
+student then learns to predict a single constant class, a collapse onto
+one dimension. Subtracting the running mean removes any constant bias
+that lets one coordinate run away, keeping the teacher's outputs spread
+across dimensions.
+
+**Step 2.** The failure sharpening prevents. Centering alone pushes the
+teacher toward a near-uniform output (no dimension allowed to dominate),
+and a uniform target carries no information: the student would be trained
+to predict the uniform distribution for everything, a second, flat kind
+of collapse. A low teacher temperature sharpens the softmax so the target
+is peaked and image-specific, giving the student a real signal.
+
+**Step 3.** Why both. Centering counteracts collapse-to-one-dimension but
+risks collapse-to-uniform; sharpening counteracts collapse-to-uniform but
+alone risks one dimension dominating. Applied together they balance:
+centering keeps the output from concentrating on a fixed dimension while
+sharpening keeps it from flattening, so the teacher targets stay both
+spread across the batch and peaked per image. Tuning the two against each
+other is what keeps DINO off both collapse modes.
+
+</details>
+
+**Exercise 3.** A team wants vision features for a domain (industrial
+defect images) that is far from natural photos, and they have a few
+hundred thousand unlabeled images but no labels. Using this lesson's
+practical recipe and the contrastive-vs-non-contrastive trade-offs, lay
+out a decision: start from DINOv2/OpenCLIP weights, or train SSL from
+scratch, and if training from scratch, why a non-contrastive method over
+a contrastive one here.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Default to pretrained. The recipe says start from DINOv2 or
+OpenCLIP weights and linear-probe, then fine-tune for the last
+percentage points, and reserve from-scratch SSL for domains genuinely far
+from natural images with millions of unlabeled images. Industrial defect
+images are far from natural photos, but a few hundred thousand images is
+below the "millions" bar, and the domain gap does not by itself justify
+discarding strong general features.
+
+**Step 2.** The recommended path. Begin with a DINOv2 backbone, linear-
+probe for a quick baseline, then fine-tune the backbone on the unlabeled
+set with the SSL objective (continued pretraining) before adapting to the
+defect task. This adapts general features to the domain without paying
+the from-scratch data cost, which is the right move at this data scale.
+
+**Step 3.** If forced to train from scratch, prefer non-contrastive.
+Contrastive learning needs many negatives, hence large batches or queues,
+which strains a modest compute budget and a few-hundred-thousand-image
+set. Non-contrastive methods (DINO-style student-teacher EMA with
+multi-crop) need no negatives, work with smaller batches, and scale to
+state-of-the-art where contrastive methods saturate, so for a limited
+domain dataset they are the cheaper and stronger choice. The risk to
+manage is collapse, controlled by the stop-gradient, centering, and
+sharpening from Exercises 1 and 2.
+
+</details>
 
 ## The next lesson
 

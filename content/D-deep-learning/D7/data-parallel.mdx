@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: data-parallel
 order: 3
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Split a global batch across devices, shard parameters and optimizer state (FSDP / ZeRO), and synchronize gradients."
 prerequisites: ["mixed-precision-dl"]
 codeExempt: true
@@ -148,6 +148,95 @@ graph TD
 The major frameworks (PyTorch FSDP, DeepSpeed, Megatron-DeepSpeed) all
 support these patterns. Choosing the right combination is the central
 infrastructure decision in large-scale training.
+
+## Exercises
+
+**Exercise 1.** A 7B-parameter model trains with Adam. Per parameter, DDP
+stores: bf16 weights (2 bytes), fp32 master weights (4 bytes), fp32 gradient
+(4 bytes), and the two fp32 Adam moments (4 + 4 bytes). Compute the per-GPU
+memory for these states under DDP (full replication), then under ZeRO-3 / FSDP
+sharded across $G = 8$ GPUs. Ignore activations.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sum the per-parameter bytes: $2 + 4 + 4 + 4 + 4 = 18$ bytes.
+
+**Step 2.** DDP replicates all of it on every GPU:
+
+$$
+18 \text{ bytes} \times 7 \times 10^9 = 126 \text{ GB per GPU}.
+$$
+
+This exceeds an 80 GB GPU, so DDP alone cannot train this model.
+
+**Step 3.** ZeRO-3 / FSDP shards weights, gradients, and optimizer state by
+$G = 8$:
+
+$$
+126 / 8 \approx 15.75 \text{ GB per GPU},
+$$
+
+plus a small constant for the largest single layer gathered at a time. The
+sharded footprint fits comfortably, which is why FSDP is required past the DDP
+memory wall.
+
+</details>
+
+**Exercise 2.** A ring all-reduce of a gradient buffer of $P$ parameters
+across $G$ GPUs moves $2(G-1)/G \cdot P$ elements per GPU (reduce-scatter then
+all-gather). For $P = 7 \times 10^9$ parameters in bf16 (2 bytes each), $G =
+8$ GPUs, and an interconnect of 600 GB/s per GPU, estimate the all-reduce
+time. Then state why scaling to 64 GPUs over a 200 GB/s inter-node link is
+much costlier per step.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bytes moved per GPU: $2(G-1)/G \cdot P \cdot 2$ bytes $= 2 \cdot
+7/8 \cdot 7 \times 10^9 \cdot 2 = 24.5 \times 10^9$ bytes $\approx 24.5$ GB.
+
+**Step 2.** At 600 GB/s (NVLink within a node):
+
+$$
+24.5 / 600 \approx 0.041 \text{ s} = 41 \text{ ms per all-reduce}.
+$$
+
+**Step 3.** The per-GPU bytes $2(G-1)/G \cdot P$ are nearly independent of $G$
+(the factor $(G-1)/G \to 1$), so the volume barely changes, but the bandwidth
+does. Across nodes at 200 GB/s the same $\approx 24.5$ GB takes $24.5/200
+\approx 123$ ms, three times longer, and inter-node links are also shared and
+higher-latency. This is why tensor parallelism is kept inside a node (fast
+NVLink) and data-parallel all-reduce that must cross nodes becomes the
+bottleneck at scale.
+
+</details>
+
+**Exercise 3.** A run uses micro-batch 4 per GPU, gradient accumulation over
+8 micro-steps, and $G = 16$ GPUs. State the effective global batch size. The
+team wants to double it to fit a learning-rate schedule tuned for that batch,
+but per-GPU memory is already maxed. Give the two accumulation/parallelism
+levers available and the cost of each.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Effective batch = micro-batch $\times$ accumulation steps $\times$
+GPUs $= 4 \times 8 \times 16 = 512$.
+
+**Step 2.** To reach 1024 without raising per-GPU micro-batch (memory is
+maxed), either double the accumulation steps from 8 to 16, or double the GPU
+count from 16 to 32.
+
+**Step 3.** Doubling accumulation steps keeps hardware fixed but doubles the
+number of forward/backward passes before each optimizer step, so wall-clock
+per optimizer step roughly doubles (more compute serialized per update).
+Doubling the GPU count keeps per-step latency roughly constant (more parallel
+work) but doubles hardware cost and adds all-reduce volume across the larger
+group. Accumulation trades time for the same hardware; adding GPUs trades cost
+for time.
+
+</details>
 
 The next lesson covers the orthogonal scaling axis: splitting a single
 model across devices via pipeline and tensor parallelism.

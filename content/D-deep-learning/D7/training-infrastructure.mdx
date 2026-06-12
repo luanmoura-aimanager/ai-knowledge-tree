@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: training-infrastructure
 order: 7
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Survey the cluster pieces needed to train modern models: storage, schedulers, NCCL / collective comms, and observability."
 prerequisites: []
 codeExempt: true
@@ -179,6 +179,81 @@ graph LR
   OPT --> CK["checkpoint + logging"]
   CK -->|resume and monitor| W
 ```
+
+## Exercises
+
+**Exercise 1.** A cluster has 512 GPUs. Each data-parallel step must
+all-reduce a 28 GB gradient buffer (per GPU, after the $(G-1)/G$ ring factor
+this is the bytes each GPU moves). The compute per step takes 900 ms. Compare
+the step time when the all-reduce runs over NVLink-class bandwidth (600 GB/s)
+versus inter-node InfiniBand (200 Gbit/s), and state the implication for batch
+size.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** NVLink path: $28 \text{ GB} / 600 \text{ GB/s} \approx 0.047$ s
+$= 47$ ms. Step time is $\max$/overlap of compute and comm; even fully
+serialized it is $900 + 47 = 947$ ms, so communication is about 5% overhead.
+
+**Step 2.** InfiniBand at 200 Gbit/s is $200/8 = 25$ GB/s. The same 28 GB
+takes $28 / 25 = 1.12$ s $= 1120$ ms, longer than the 900 ms of compute.
+
+**Step 3.** When all-reduce time exceeds compute time, adding more
+data-parallel work no longer scales: communication dominates. The cluster's
+all-reduce bandwidth sets a ceiling on useful global batch size, which is why
+gradient buffers are kept off the slow inter-node fabric where possible (large
+TP groups inside nodes, gradient compression, overlap of comm with backward).
+
+</details>
+
+**Exercise 2.** A 70B model is checkpointed with FSDP. The checkpoint holds
+fp32 master weights (4 bytes/param) plus two fp32 Adam moments (8 bytes/param).
+Compute the checkpoint size. If the run saves every 500 steps, each step takes
+1.2 s, and the remote write sustains 5 GB/s, find the write time and the
+fraction of a save interval it consumes. Comment on async I/O.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bytes per parameter in the checkpoint: $4 + 8 = 12$. Total:
+$12 \times 70 \times 10^9 = 840 \times 10^9$ bytes $= 840$ GB.
+
+**Step 2.** Write time at 5 GB/s: $840 / 5 = 168$ s.
+
+**Step 3.** A save interval is $500 \times 1.2 = 600$ s of compute. A
+synchronous 168 s write would stall the run for $168/600 = 28\%$ of the
+interval, a large waste. Async/staggered I/O overlaps the write with continued
+training (snapshot to local NVMe fast, then stream to remote in the
+background), so the 168 s is hidden behind compute instead of blocking it.
+
+</details>
+
+**Exercise 3.** A 512-GPU run has a mean time between node failures of 18
+hours. Restarting from a checkpoint loses all steps since the last save plus a
+fixed 10-minute reload. The team weighs checkpointing every 30 minutes versus
+every 5 minutes. Estimate the expected wasted time per failure for each
+cadence and state the tradeoff that picks the cadence.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** On a failure, expected lost compute is on average half the
+checkpoint interval (the failure lands uniformly in the interval), plus the
+10-minute reload.
+
+**Step 2.** 30-minute cadence: expected loss $\approx 15 + 10 = 25$ minutes
+per failure. 5-minute cadence: expected loss $\approx 2.5 + 10 = 12.5$ minutes
+per failure.
+
+**Step 3.** Frequent checkpointing cuts recompute loss but adds steady write
+overhead (Exercise 2: each save costs I/O time and bandwidth). The cadence
+balances expected failure loss against per-save cost: with an 18-hour MTBF and
+cheap async saves, the 5-minute cadence's lower expected loss usually wins; if
+each save were expensive or failures rare, the longer interval would be
+cheaper overall.
+
+</details>
 
 ## This closes pillar D
 

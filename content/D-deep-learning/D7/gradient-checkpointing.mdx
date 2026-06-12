@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: gradient-checkpointing
 order: 2
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Trade compute for memory by recomputing activations during the backward pass instead of storing them."
 prerequisites: ["D1/backprop"]
 codeExempt: true
@@ -144,6 +144,85 @@ techniques used in large-scale training:
 Each saves memory at some compute cost. The combination is what makes
 billion-parameter and trillion-parameter training possible on
 real-world hardware.
+
+## Exercises
+
+**Exercise 1.** A network has $L = 48$ transformer blocks. Each block, when
+stored, holds $A = 0.5$ GB of activations for the current batch. Compare the
+peak activation memory of full storage against $\sqrt{L}$ checkpointing, and
+state the speed cost.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Full storage keeps every block's activations: $L \cdot A = 48
+\times 0.5 = 24$ GB.
+
+**Step 2.** With $K = \sqrt{L}$ checkpoints, $\sqrt{48} \approx 6.93$, so keep
+$K = 7$ checkpoints. Peak memory is the $K$ stored checkpoints plus one
+segment recomputed for backward, of length $L / K \approx 48/7 \approx 7$
+blocks:
+
+$$
+(K + L/K) \cdot A \approx (7 + 7) \times 0.5 = 7 \text{ GB}.
+$$
+
+**Step 3.** Memory drops from 24 GB to about 7 GB, roughly $3.4\times$ less.
+The cost is one extra forward pass over the recomputed segments during
+backward, which adds about 33% to step time (the recomputation runs one extra
+forward worth of FLOPs across the network).
+
+</details>
+
+**Exercise 2.** Derive that $K = \sqrt{L}$ minimizes the checkpoint memory.
+Treat memory as $M(K) = K + L/K$ (in units of one block's activations) and
+minimize over the number of checkpoints $K$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $M(K) = K + L/K$ sums the $K$ stored checkpoints and the $L/K$
+blocks of one recomputed segment held during backward.
+
+**Step 2.** Differentiate with respect to $K$ and set to zero:
+
+$$
+\frac{dM}{dK} = 1 - \frac{L}{K^2} = 0 \quad\Rightarrow\quad K^2 = L \quad\Rightarrow\quad K = \sqrt{L}.
+$$
+
+**Step 3.** The second derivative $2L/K^3 > 0$ confirms a minimum. At $K =
+\sqrt{L}$ the memory is $M = \sqrt{L} + L/\sqrt{L} = 2\sqrt{L}$, which is
+$O(\sqrt{L})$ instead of the $O(L)$ of full storage.
+
+</details>
+
+**Exercise 3.** A team trains a 100-layer model. Plain training needs 80 GB
+of activation memory but only 60 GB fits on the GPU. They consider uniform
+$\sqrt{L}$ checkpointing (memory $\propto 2\sqrt{L}/L$ of full) versus
+selective checkpointing that recomputes only attention (cheap to recompute,
+half the activation footprint) and stores everything else. Estimate whether
+each option fits, and name the tradeoff that decides between them.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Uniform $\sqrt{L}$ checkpointing scales full memory by roughly
+$2\sqrt{L}/L = 2/\sqrt{100} = 0.2$. So $80 \times 0.2 = 16$ GB, well under
+60 GB. It fits with large margin.
+
+**Step 2.** Selective attention-only checkpointing recomputes the attention
+activations (about half the footprint here) and stores the rest, so memory is
+about $80 \times 0.5 = 40$ GB. This also fits under 60 GB, with less margin.
+
+**Step 3.** Both fit, so the deciding factor is compute cost, not memory.
+Uniform checkpointing recomputes the whole network (about +33% step time);
+selective attention-only checkpointing recomputes only the attention
+sublayers, paying a smaller recomputation tax for the part that is expensive
+to store and (relatively) cheap to redo. With 60 GB available and only 40 GB
+needed by the selective scheme, the team would pick selective checkpointing
+to keep the speed penalty as small as possible while still fitting.
+
+</details>
 
 The next lesson covers the main scaling axis at the cluster level: data
 parallelism.

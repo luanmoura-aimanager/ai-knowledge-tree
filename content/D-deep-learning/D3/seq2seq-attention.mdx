@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: seq2seq-attention
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Build an encoder-decoder for translation, then add Bahdanau / Luong attention to let the decoder look back at every encoder state."
 prerequisites: ["lstm-gru"]
 ---
@@ -165,7 +165,112 @@ for shift in [0.0, 0.5, 1.0]:
 The attention distribution sums to 1 and concentrates on whichever
 encoder state best aligns with the decoder query; shifting the decoder
 state toward a specific source position pulls the attention to that
-position. The next lesson generalizes this to **self-attention**, where
+position.
+
+## Exercises
+
+**Exercise 1.** A decoder attends over $S = 3$ encoder states with raw
+scores $e = (2, 0, 1)$. Compute the attention weights $\alpha =
+\operatorname{softmax}(e)$ by hand (use $e^2 \approx 7.389$, $e^1 \approx
+2.718$, $e^0 = 1$), and state which source position the context vector
+is most aligned with.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Exponentiate each score: $e^2 \approx 7.389$, $e^0 = 1$,
+$e^1 \approx 2.718$.
+
+**Step 2.** Sum them: $Z = 7.389 + 1 + 2.718 = 11.107$.
+
+**Step 3.** Divide each by $Z$:
+
+$$
+\alpha = \left(\tfrac{7.389}{11.107}, \tfrac{1}{11.107}, \tfrac{2.718}{11.107}\right)
+\approx (0.665, 0.090, 0.245).
+$$
+
+The weights sum to 1 and the largest, $0.665$, falls on source position
+0, so the context vector $c = \sum_s \alpha_s h_s^{\text{enc}}$ is pulled
+mostly toward $h_0^{\text{enc}}$.
+
+</details>
+
+**Exercise 2.** Bahdanau scoring is $e_{t,s} = v^\top \tanh(W_h
+h_t^{\text{dec}} + W_e h_s^{\text{enc}})$ and Luong (dot) scoring is
+$e_{t,s} = h_t^{\text{dec}\top} h_s^{\text{enc}}$. Suppose the decoder
+hidden size is $d_d$ and the encoder hidden size is $d_e$. State the
+shape each scoring function requires for its parameters, and explain why
+the bare dot product cannot be used when $d_d \neq d_e$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bahdanau projects both states into a shared space of size
+$d_a$: $W_h \in \mathbb{R}^{d_a \times d_d}$ and $W_e \in \mathbb{R}^{d_a
+\times d_e}$, summed inside the $\tanh$, then scored by $v \in
+\mathbb{R}^{d_a}$. The two projections absorb any mismatch between $d_d$
+and $d_e$, so additive attention works for unequal sizes.
+
+**Step 2.** The dot product $h_t^{\text{dec}\top} h_s^{\text{enc}}$ is a
+sum over a single shared index, so it requires $d_d = d_e$. When the
+sizes differ the two vectors live in spaces of different dimension and
+the inner product is undefined.
+
+**Step 3.** Luong's general (multiplicative) form $h_t^{\text{dec}\top} W
+h_s^{\text{enc}}$ repairs this with $W \in \mathbb{R}^{d_d \times d_e}$,
+which maps the encoder state into the decoder space before the product.
+The bare dot product is the special case $W = I$, valid only when the
+dimensions match.
+
+</details>
+
+**Exercise 3 (code).** Implement dot-product attention over a batch of
+$S = 4$ encoder states, then verify two properties on a fixed seed: the
+weights form a valid distribution (nonnegative, sum to 1), and the
+context vector equals $h_s^{\text{enc}}$ exactly in the limit where one
+score dominates (scale the scores up by a large factor so softmax becomes
+a hard argmax).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+S, d_h = 4, 8
+H_enc = rng.normal(size=(S, d_h))
+h_dec = rng.normal(size=d_h)
+
+def softmax(z):
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+scores = H_enc @ h_dec
+alpha = softmax(scores)
+
+# Property 1: valid distribution
+assert np.all(alpha >= 0)
+assert np.isclose(alpha.sum(), 1.0)
+
+# Property 2: large temperature -> hard argmax -> context = winning state
+hard = softmax(1e4 * scores)
+context = (hard[:, None] * H_enc).sum(axis=0)
+winner = scores.argmax()
+assert np.allclose(context, H_enc[winner], atol=1e-6)
+print("argmax source:", winner, " top weight:", round(alpha.max(), 3))
+```
+
+Sharpening the scores drives all the attention mass onto the
+highest-scoring source state, and the context vector collapses to that
+encoder hidden state, which is the hard-alignment limit of soft
+attention.
+
+</details>
+
+The next lesson generalizes this to **self-attention**, where
 queries, keys, and values all come from the same sequence.
 
 <Footnotes>

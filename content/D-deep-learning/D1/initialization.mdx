@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: initialization
 order: 6
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Derive the variance-preserving initialization rules for tanh and ReLU networks, and see why bad initialization stalls training."
 prerequisites: ["activations"]
 ---
@@ -155,7 +155,88 @@ for name, fn in [("naive 0.05", naive), ("Xavier", xavier), ("He", he)]:
 
 He keeps variance stable across the depth of a ReLU network; Xavier
 matches it for tanh. Naive small-scale initialization collapses variance
-to zero within a few layers. The next lesson installs normalization
+to zero within a few layers.
+
+## Exercises
+
+**Exercise 1.** A linear layer has fan-in $d_{\ell-1} = 100$ and fan-out
+$d_\ell = 300$. Give the weight standard deviation $\sigma_W$ for He
+initialization and for Xavier (Glorot) initialization.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** He uses $\sigma_W^2 = 2 / d_{\ell-1} = 2/100 = 0.02$, so
+$\sigma_W = \sqrt{0.02} \approx 0.1414$.
+
+**Step 2.** Xavier uses $\sigma_W^2 = 2/(d_{\ell-1} + d_\ell) = 2/400 = 0.005$,
+so $\sigma_W = \sqrt{0.005} \approx 0.0707$. He is the larger scale because its
+factor-of-2 compensates for ReLU discarding the negative half.
+
+</details>
+
+**Exercise 2.** Derive the ReLU variance-halving fact used by He. For a
+zero-mean Gaussian $z$, show that
+$\mathbb{E}[\operatorname{ReLU}(z)^2] = \tfrac12 \operatorname{Var}(z)$, then
+conclude why the weight variance must double.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $\operatorname{ReLU}(z)^2 = z^2$ when $z > 0$ and $0$ when
+$z \le 0$. By symmetry of a zero-mean Gaussian, the events $z > 0$ and $z < 0$
+each carry half the mass and the distribution of $z^2$ is identical on both
+sides.
+
+**Step 2.** So
+$\mathbb{E}[\operatorname{ReLU}(z)^2] = \tfrac12 \mathbb{E}[z^2] = \tfrac12 \operatorname{Var}(z)$,
+using $\mathbb{E}[z] = 0$ so that $\mathbb{E}[z^2] = \operatorname{Var}(z)$.
+
+**Step 3.** A layer's pre-activation variance is
+$d_{\ell-1}\sigma_W^2 v_{\ell-1}$, then ReLU halves it. To keep the post-activation
+variance equal to $v_{\ell-1}$ requires $d_{\ell-1}\sigma_W^2 \cdot \tfrac12 = 1$,
+i.e. $\sigma_W^2 = 2/d_{\ell-1}$, the doubled variance.
+
+</details>
+
+**Exercise 3 (code).** Empirically confirm the variance-halving: pass a
+zero-mean unit-variance Gaussian through ReLU and check the output second
+moment is $\approx 0.5$. Then build a 30-layer linear-ReLU stack and assert
+that He init keeps the final activation variance within an order of magnitude
+of the input, while a naive small-scale init collapses it by many orders.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+# Variance-halving: E[ReLU(z)^2] = 0.5 for standard normal z
+rng = np.random.default_rng(0)
+z = rng.normal(size=2_000_000)
+assert np.isclose((np.maximum(0, z) ** 2).mean(), 0.5, atol=1e-3)
+
+def final_var_ratio(scale_fn, seed, depth=30, width=256, n=8192):
+    rng = np.random.default_rng(seed)
+    h = rng.normal(size=(n, width)); v0 = h.var()
+    for _ in range(depth):
+        W = rng.normal(scale=scale_fn(width), size=(width, width))
+        h = np.maximum(0, h @ W)
+    return h.var() / v0
+
+he    = final_var_ratio(lambda w: np.sqrt(2 / w), seed=0)
+naive = final_var_ratio(lambda w: 0.05,           seed=0)
+
+# He holds the same order of magnitude; naive collapses toward zero
+assert 0.1 < he < 10
+assert naive < 1e-10
+assert he / naive > 1e10
+print(f"He ratio={he:.3f}, naive ratio={naive:.2e}")
+```
+
+</details>
+
+The next lesson installs normalization
 layers that make the network self-stabilizing even when initialization
 is imperfect.
 

@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: self-attention
 order: 5
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Define scaled dot-product self-attention and explain why the softmax of QK^T gives a content-based mixing matrix."
 prerequisites: ["seq2seq-attention"]
 ---
@@ -192,8 +192,114 @@ print(f"\nmulti-head output shape: {Y_multi.shape}")
 
 The attention matrix is row-stochastic, the causal mask zeroes out
 future positions, and the multi-head computation returns to the
-original embedding dimension. The next lesson stacks attention and FFN
-blocks into the full Transformer.
+original embedding dimension.
+
+## Exercises
+
+**Exercise 1.** A single query $q = (1, 0)$ attends to two keys
+$k_1 = (1, 0)$ and $k_2 = (0, 1)$, with $d_k = 2$ and values
+$v_1 = (4, 0)$, $v_2 = (0, 4)$. Compute the scaled scores, the softmax
+attention weights, and the output by hand. Use
+$e^{1/\sqrt{2}} \approx 2.0281$ and $\sqrt{2} \approx 1.4142$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The scaled scores are $q^\top k_j / \sqrt{d_k}$. Then
+$q^\top k_1 = 1$ and $q^\top k_2 = 0$, so dividing by $\sqrt{2}$:
+$s_1 = 1/\sqrt{2} \approx 0.7071$ and $s_2 = 0$.
+
+**Step 2.** Softmax: $e^{s_1} \approx 2.0281$, $e^{s_2} = 1$, summing to
+$3.0281$. The weights are
+$a_1 = 2.0281 / 3.0281 \approx 0.6698$ and
+$a_2 = 1 / 3.0281 \approx 0.3302$.
+
+**Step 3.** The output is the weighted sum of values:
+
+$$
+y = a_1 v_1 + a_2 v_2 \approx 0.6698 \cdot (4, 0) + 0.3302 \cdot (0, 4) = (2.679,\ 1.321).
+$$
+
+The query aligns with $k_1$, so most of the mass ($0.67$) lands on $v_1$;
+the scaling by $\sqrt{d_k}$ keeps the distribution soft instead of
+collapsing onto a single key.
+
+</details>
+
+**Exercise 2.** Without scaling, $q^\top k$ for unit-variance Gaussian
+$q, k \in \mathbb{R}^{d_k}$ has variance $d_k$. Show this, and state what
+dividing by $\sqrt{d_k}$ does to the variance.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the dot product as a sum:
+$q^\top k = \sum_{m=1}^{d_k} q_m k_m$. Each $q_m, k_m$ is independent,
+zero-mean, unit-variance.
+
+**Step 2.** For one term, $\mathbb{E}[q_m k_m] = \mathbb{E}[q_m]\mathbb{E}[k_m] = 0$
+and $\operatorname{Var}(q_m k_m) = \mathbb{E}[q_m^2]\mathbb{E}[k_m^2] = 1 \cdot 1 = 1$
+(independence, zero means). The terms are independent, so variances add:
+$\operatorname{Var}(q^\top k) = \sum_{m=1}^{d_k} 1 = d_k$.
+
+**Step 3.** Dividing by $\sqrt{d_k}$ scales the variance by
+$(1/\sqrt{d_k})^2 = 1/d_k$, giving
+$\operatorname{Var}(q^\top k / \sqrt{d_k}) = d_k / d_k = 1$.
+
+The scaling fixes the score variance at $1$ regardless of head size, so
+the softmax does not saturate as $d_k$ grows.
+
+</details>
+
+**Exercise 3 (code).** Confirm the variance argument of Exercise 2
+empirically, and show that the unscaled softmax saturates while the
+scaled one stays soft. Sample many random $(q, k)$ pairs at $d_k = 64$,
+measure the variance of $q^\top k$ with and without scaling, and compare
+the average top softmax weight over $10$ keys.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+d_k, n_keys, trials = 64, 10, 20000
+
+def softmax(z):
+    z = z - z.max(axis=-1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=-1, keepdims=True)
+
+# Variance of q . k with and without the 1/sqrt(d_k) scaling
+q = rng.normal(size=(trials, d_k))
+k = rng.normal(size=(trials, d_k))
+dots = np.sum(q * k, axis=1)
+var_unscaled = dots.var()
+var_scaled = (dots / np.sqrt(d_k)).var()
+assert np.isclose(var_unscaled, d_k, rtol=0.05)   # variance ~ d_k
+assert np.isclose(var_scaled, 1.0, rtol=0.05)     # scaling -> variance ~ 1
+
+# Top softmax weight over n_keys keys, unscaled vs scaled
+q1 = rng.normal(size=(trials, d_k))
+K = rng.normal(size=(trials, n_keys, d_k))
+scores = np.einsum("td,tkd->tk", q1, K)
+top_unscaled = softmax(scores).max(axis=1).mean()
+top_scaled = softmax(scores / np.sqrt(d_k)).max(axis=1).mean()
+assert top_unscaled > top_scaled                  # unscaled saturates harder
+print("var unscaled:", round(var_unscaled, 1), " var scaled:", round(var_scaled, 3))
+print("mean top weight  unscaled:", round(top_unscaled, 3),
+      " scaled:", round(top_scaled, 3))
+```
+
+The unscaled dot product has variance near $d_k = 64$ and its softmax
+concentrates most mass on one key; dividing by $\sqrt{d_k}$ restores unit
+variance and a soft, gradient-carrying distribution.
+
+</details>
+
+The next lesson stacks attention and FFN blocks into the full
+Transformer.
 
 <Footnotes>
   <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). Defines scaled dot-product and multi-head self-attention.</FNItem>

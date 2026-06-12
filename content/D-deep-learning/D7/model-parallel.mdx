@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: model-parallel
 order: 4
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Split a single model across devices via pipeline stages (GPipe, 1F1B) and tensor parallelism (Megatron)."
 prerequisites: ["data-parallel"]
 codeExempt: true
@@ -166,6 +166,78 @@ For a typical training setup:
 Megatron-DeepSpeed and Megatron-LM are the reference open-source
 implementations. JAX with `jit` and `shard_map` is the cleaner
 alternative for greenfield projects.
+
+## Exercises
+
+**Exercise 1.** A GPipe pipeline has $N = 8$ stages. With $M$ microbatches,
+throughput is $M / (M + N - 1)$ of peak. Compute utilization for $M = 1$, $M =
+8$, and $M = 32$, and confirm the rule of thumb $M = 4N$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $M = 1$: $1 / (1 + 8 - 1) = 1/8 = 12.5\%$. One microbatch leaves
+only one stage busy at a time, the worst case.
+
+**Step 2.** $M = 8$: $8 / (8 + 7) = 8/15 \approx 53.3\%$.
+
+**Step 3.** $M = 32 = 4N$: $32 / (32 + 7) = 32/39 \approx 82.1\%$. The
+bubble fraction is $(N-1)/(M+N-1) = 7/39 \approx 18\%$, so the $M = 4N$ rule
+of thumb lands utilization near 80%, matching the lesson.
+
+</details>
+
+**Exercise 2.** A 70B model is trained on 64 nodes of 8 GPUs (512 GPUs). The
+plan: tensor parallelism (TP) of degree 8 within each node, pipeline
+parallelism (PP) across some nodes, and data parallelism (DP) across the rest.
+If pipeline depth is set to 8 stages, find the data-parallel width and state
+why TP is placed inside a node.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Total GPUs factor as $\text{TP} \times \text{PP} \times \text{DP}
+= 512$. With TP $= 8$ and PP $= 8$, the product is $64$, so DP $= 512 / 64 =
+8$.
+
+**Step 2.** Check the layout: each pipeline stage uses a group of TP $= 8$
+GPUs (one node), 8 stages span 8 nodes, and that 8-node pipeline is replicated
+DP $= 8$ times to cover all 64 nodes.
+
+**Step 3.** TP issues an all-reduce twice per transformer block (after
+attention, after FFN), so it needs the fastest link. Placing TP within a node
+keeps those all-reduces on NVLink ($\approx 600$ GB/s) rather than the slower
+inter-node fabric, while PP and DP, which communicate less per step, cross
+node boundaries.
+
+</details>
+
+**Exercise 3.** Tensor parallelism splits a linear layer $Y = XW$ with $W$ of
+shape $(d_\text{in}, d_\text{out}) = (8192, 8192)$ across $G = 8$ GPUs by the
+output dimension. State each GPU's shard shape and its output shape, the
+collective needed to assemble the full $Y$, and contrast the communication
+with a row-split that follows it (the Megatron column-then-row pattern).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Column (output) split: each GPU holds $W_i$ of shape $(8192,
+8192/8) = (8192, 1024)$ and computes $Y_i = X W_i$ of shape (batch, 1024). The
+input $X$ is replicated on every GPU.
+
+**Step 2.** Assembling the full $Y$ of width 8192 from the eight width-1024
+slices is a concatenation along the channel axis, an all-gather, if a
+materialized full $Y$ is required.
+
+**Step 3.** Megatron avoids that gather by following the column-split layer
+with a row-split layer: the second layer takes each GPU's own $Y_i$ slice as
+input (no redistribution), computes partial outputs, and a single all-reduce
+sums them. So the pair (column then row) needs only one all-reduce at the end
+of the block instead of an all-gather between the two layers, which is why the
+communication cost per transformer block is bounded to two all-reduces total
+(one for attention, one for FFN).
+
+</details>
 
 The next lesson covers a different scaling dimension: making the
 training compute itself faster via compilation.

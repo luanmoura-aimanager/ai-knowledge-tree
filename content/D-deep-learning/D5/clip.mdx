@@ -4,7 +4,7 @@ pillar: D
 subId: D5
 lessonId: clip
 order: 2
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Align images and captions in a shared embedding with contrastive loss across modalities."
 prerequisites: ["contrastive-ssl"]
 codeExempt: true
@@ -127,6 +127,121 @@ CLIP made text-conditioned image generation feasible (latent
 diffusion's text encoder is a CLIP variant), enabled the multimodal
 LLM era (LLaVA, GPT-4V), and is the default cross-modal embedding for
 retrieval. Its influence on the field is hard to overstate.
+
+## Exercises
+
+**Exercise 1.** CLIP's loss is symmetric cross-entropy over the
+$N \times N$ similarity matrix $S$, where $S_{ij} = z^I_i \cdot z^T_j / \tau$
+and the positives are the diagonal $(i, i)$. Write the per-batch loss as
+the average of an image-to-text term and a text-to-image term, and
+identify which axis of $S$ each term takes the softmax over.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Image-to-text. For image $i$, the candidates are the $N$
+texts (row $i$ of $S$), and the correct one is text $i$. The
+cross-entropy of identifying it is a softmax over the row index $j$:
+
+$$
+\mathcal{L}_{I \to T} = -\frac{1}{N}\sum_{i} \log \frac{e^{S_{ii}}}{\sum_{j} e^{S_{ij}}}.
+$$
+
+**Step 2.** Text-to-image. For text $i$, the candidates are the $N$
+images (column $i$ of $S$), correct one image $i$, so the softmax runs
+over the column, i.e. over the first index:
+
+$$
+\mathcal{L}_{T \to I} = -\frac{1}{N}\sum_{i} \log \frac{e^{S_{ii}}}{\sum_{j} e^{S_{ji}}}.
+$$
+
+**Step 3.** Average the two:
+
+$$
+\mathcal{L} = \tfrac12\left(\mathcal{L}_{I \to T} + \mathcal{L}_{T \to I}\right).
+$$
+
+The image-to-text term normalizes along each row; the text-to-image term
+normalizes along each column. The diagonal is the shared positive of
+both. With equal, indistinguishable scores each term reduces to
+$\log N$, the random-guess floor for $N$-way matching.
+
+</details>
+
+**Exercise 2.** SigLIP replaces CLIP's softmax cross-entropy with an
+independent sigmoid binary loss on every pair $(i, j)$: each pair is
+labelled positive when $i = j$ and negative otherwise. Explain why this
+removes the dependence on the full batch that the softmax introduces,
+and what this buys at very large batch sizes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Locate the coupling in CLIP. The softmax denominator
+$\sum_j e^{S_{ij}}$ couples every entry of row $i$: changing one
+negative's score changes the normalized probability of every other
+candidate in that row. Computing the loss for one pair requires all $N$
+scores in its row (and column), so the loss is inherently a function of
+the whole batch jointly.
+
+**Step 2.** SigLIP decouples the pairs. The sigmoid loss
+$-\sum_{i,j} \log \sigma\!\big(y_{ij}(S_{ij} - b)\big)$ with
+$y_{ij} = +1$ on the diagonal and $-1$ off it treats each $(i, j)$ entry
+as its own independent binary problem. No denominator sums over the
+batch, so each pair's loss and gradient depend only on that pair's
+score, not on the other candidates.
+
+**Step 3.** Consequence at scale. Because there is no batch-wide
+normalization, the objective does not need every score gathered to
+normalize, so it parallelizes and shards across devices more cleanly and
+stays numerically well-behaved as $N$ grows into the tens of thousands,
+where the softmax over an enormous candidate set becomes the bottleneck.
+SigLIP therefore scales to larger effective batches, the regime where
+contrastive matching benefits most from more negatives.
+
+</details>
+
+**Exercise 3.** Zero-shot CLIP classification with prompt templates
+ensembles several text embeddings per class (e.g. "a photo of a cat", "a
+sketch of a cat") by averaging them before scoring. A student proposes
+instead averaging the cosine similarities computed from each template
+separately. With unit-normalized embeddings, are these two procedures
+equal? Argue the design trade-off.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Set up both procedures. Let an image have embedding $u$
+(unit norm) and let a class have template embeddings $t_1, \dots, t_M$
+(each unit norm). Averaging-then-scoring uses
+$\bar t = \frac{1}{M}\sum_m t_m$ and scores $u \cdot \bar t$ (after
+renormalizing $\bar t$). Scoring-then-averaging computes
+$\frac{1}{M}\sum_m u \cdot t_m$.
+
+**Step 2.** Compare the raw quantities. By linearity of the dot product,
+
+$$
+u \cdot \bar t = u \cdot \tfrac{1}{M}\textstyle\sum_m t_m = \tfrac{1}{M}\textstyle\sum_m (u \cdot t_m),
+$$
+
+so before renormalization the two are identical. The difference is the
+renormalization: $\bar t$ has norm $\lVert \bar t \rVert \le 1$, which is
+smaller when the templates point in different directions. Averaging then
+renormalizing divides the averaged score by $\lVert \bar t \rVert$,
+rescaling every class by a factor that depends on how tightly its own
+templates cluster.
+
+**Step 3.** Trade-off. Renormalizing the averaged embedding makes the
+template ensemble a single unit vector, so all classes are compared on
+the same unit sphere and the score stays a genuine cosine; this is the
+CLIP recipe and it is cheaper at inference (one embedding per class).
+Averaging the similarities skips renormalization, so a class whose
+templates disagree (small $\lVert \bar t \rVert$) is implicitly
+penalized relative to a class whose templates agree, biasing the
+decision toward visually coherent prompt sets. The averaged-embedding
+route is preferred precisely because it removes that incidental bias.
+
+</details>
 
 The next lesson covers SSL methods that get strong features *without*
 contrastive negatives at all.

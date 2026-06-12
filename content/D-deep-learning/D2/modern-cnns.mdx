@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: modern-cnns
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Survey DenseNet, EfficientNet, and ConvNeXt, and the design decisions (compound scaling, large kernels) that made each one win."
 prerequisites: ["cnn-architectures"]
 codeExempt: true
@@ -149,6 +149,90 @@ graph LR
 | MobileNet v2 | 2018 | Inverted bottlenecks | Mobile default |
 | EfficientNet | 2019 | Compound scaling | Pareto-optimal accuracy/FLOPs |
 | ConvNeXt | 2022 | ResNet + modernizations | Matches ViT |
+
+## Exercises
+
+**Exercise 1.** A depthwise separable convolution factorizes a
+$k \times k$ convolution from $C_{\text{in}}$ to $C_{\text{out}}$ channels
+into a depthwise step ($k^2 C_{\text{in}}$ multiplies per output position)
+and a pointwise step ($C_{\text{in}} C_{\text{out}}$ multiplies). For
+$k = 3$ and $C_{\text{in}} = C_{\text{out}} = 256$, compute the ratio of
+separable to full-convolution multiply count.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A full $3 \times 3$ convolution costs
+$k^2 C_{\text{in}} C_{\text{out}} = 9 \cdot 256 \cdot 256 = 589{,}824$
+multiplies per output position.
+
+**Step 2.** The separable version costs
+$k^2 C_{\text{in}} + C_{\text{in}} C_{\text{out}} = 9 \cdot 256 + 256 \cdot 256 = 2{,}304 + 65{,}536 = 67{,}840$.
+
+**Step 3.** The ratio is
+$\frac{67{,}840}{589{,}824} \approx 0.115$, about an $8.7\times$ reduction.
+The closed form $\frac{1}{C_{\text{out}}} + \frac{1}{k^2}$ approaches
+$\frac{1}{9} \approx 0.111$ as $C_{\text{out}}$ grows, matching the
+roughly $9\times$ saving quoted for $3 \times 3$ kernels.
+
+</details>
+
+**Exercise 2.** EfficientNet's compound scaling sets
+$\text{depth} = \alpha^\phi$, $\text{width} = \beta^\phi$,
+$\text{resolution} = \gamma^\phi$ under the constraint
+$\alpha \cdot \beta^2 \cdot \gamma^2 \approx 2$. FLOPs are linear in
+depth, quadratic in width (each layer's cost is quadratic in channels),
+and quadratic in resolution (pixel count). Show that incrementing $\phi$
+by $1$ roughly doubles FLOPs.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the FLOP count as proportional to
+$\text{depth} \cdot \text{width}^2 \cdot \text{resolution}^2$, since cost
+is linear in depth and quadratic in both width (channels) and resolution
+(pixels per axis squared, the pixel count).
+
+**Step 2.** Substitute the scaling laws:
+
+$$
+\text{FLOPs} \propto \alpha^\phi \cdot (\beta^\phi)^2 \cdot (\gamma^\phi)^2 = (\alpha \cdot \beta^2 \cdot \gamma^2)^\phi.
+$$
+
+**Step 3.** With the constraint $\alpha \cdot \beta^2 \cdot \gamma^2 \approx 2$,
+this is $2^\phi$. Going from $\phi$ to $\phi + 1$ multiplies FLOPs by
+$2^{\phi+1} / 2^\phi = 2$, a doubling, which is why each EfficientNet step
+(B0 to B1 to and so on) roughly doubles compute.
+
+</details>
+
+**Exercise 3.** DenseNet and ResNet both shorten gradient paths through a
+deep stack, yet production pipelines usually pick ResNet. Identify the
+mechanism each uses to connect layers and explain the trade-off that
+favors ResNet in deployment.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** ResNet connects layers by **summing**: a block computes
+$y = F(x) + x$, so the shortcut adds the input to the learned residual
+without growing the channel dimension. DenseNet connects by
+**concatenating**: layer $\ell$ receives $[x_0, x_1, \dots, x_{\ell-1}]$,
+so the feature dimension grows by the growth rate $k$ at every layer.
+
+**Step 2.** Both give every layer a short path to the loss, so both train
+deep stacks without the gradient collapse plain nets suffer. DenseNet is
+more parameter-efficient at a given accuracy (a DenseNet-201 has 20M
+parameters versus a ResNet-152's 60M).
+
+**Step 3.** The trade-off is memory and bandwidth: concatenation forces
+every intermediate feature map to stay alive and be re-read by all later
+layers, so activation memory grows with depth and the access pattern is
+hardware-unfriendly. ResNet's additive shortcut keeps the channel count
+bounded and the memory footprint flat, which is why it remains the
+deployment default despite DenseNet's parameter edge.
+
+</details>
 
 The next lesson moves entirely to a different architecture family:
 Vision Transformers.

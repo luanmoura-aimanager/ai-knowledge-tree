@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: rnn
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Define a vanilla RNN, unroll it through time, and see why long-range dependencies vanish or explode in the gradients."
 prerequisites: ["D1/backprop"]
 ---
@@ -176,5 +176,96 @@ print(f"exploding: ||dh_T/dh_t|| from late to early steps: "
 ```
 
 The Jacobian product shrinks geometrically with small weights and grows
-geometrically with large weights, visible across just 30 timesteps. The
-next lesson fixes the problem at the architectural level: LSTM and GRU.
+geometrically with large weights, visible across just 30 timesteps.
+
+## Exercises
+
+**Exercise 1.** A scalar RNN has $h_t = \tanh(w_x x_t + w_h h_{t-1} + b)$
+with $w_x = 0.5$, $w_h = 1.0$, $b = 0$, and $h_0 = 0$. Compute $h_1$ and
+$h_2$ by hand for the input sequence $x_1 = 2$, $x_2 = -1$. Use
+$\tanh(1) \approx 0.7616$ and $\tanh(0.2616) \approx 0.2558$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The pre-activation at $t = 1$ is
+$w_x x_1 + w_h h_0 + b = 0.5 \cdot 2 + 1.0 \cdot 0 + 0 = 1.0$, so
+$h_1 = \tanh(1.0) \approx 0.7616$.
+
+**Step 2.** The pre-activation at $t = 2$ uses $h_1$:
+$w_x x_2 + w_h h_1 + b = 0.5 \cdot (-1) + 1.0 \cdot 0.7616 = 0.2616$.
+
+**Step 3.** Apply tanh: $h_2 = \tanh(0.2616) \approx 0.2558$.
+
+The hidden state carries $h_1$ into the $t = 2$ computation through the
+$w_h h_{t-1}$ term; that recurrence is exactly what BPTT differentiates
+through.
+
+</details>
+
+**Exercise 2.** The one-step recurrence Jacobian is
+$J_t = \operatorname{diag}(1 - \tanh^2(\cdot))\, W_h$. Suppose every tanh
+saturates so $1 - \tanh^2 = 0.25$ at every unit, and $W_h$ has spectral
+norm $\lVert W_h \rVert_2 = 2$. Bound the norm of the product
+$\partial h_T / \partial h_t$ over $T - t = 20$ steps, and say whether it
+vanishes or explodes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each factor is $D_k W_h$ with $D_k = 0.25 I$, so
+$\lVert D_k W_h \rVert_2 = 0.25 \cdot \lVert W_h \rVert_2 = 0.25 \cdot 2 = 0.5$.
+
+**Step 2.** The product norm is submultiplicative:
+$\lVert \partial h_T / \partial h_t \rVert_2 \le \prod_{k} \lVert D_k W_h \rVert_2 = 0.5^{20}$.
+
+**Step 3.** Evaluate: $0.5^{20} = 2^{-20} \approx 9.5 \times 10^{-7}$.
+
+The bound shrinks by six orders of magnitude over 20 steps, so this
+regime vanishes. The tanh derivative ceiling of $0.25$ is what makes
+vanishing the default unless $W_h$ has large singular values to
+compensate.
+
+</details>
+
+**Exercise 3 (code).** Implement scalar BPTT for the recurrence of
+Exercise 1 and verify the analytic gradient $\partial h_2 / \partial w_h$
+against a finite-difference estimate. With $h_0 = 0$, the only
+$h_{t-1}$-dependence comes through $h_1$, so
+$\partial h_2 / \partial w_h = (1 - h_2^2)\,[\,h_1 + w_h (1 - h_1^2) h_0\,] = (1 - h_2^2)\, h_1$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+wx, wh, b = 0.5, 1.0, 0.0
+x1, x2 = 2.0, -1.0
+h0 = 0.0
+
+def h2_of(wh):
+    h1 = np.tanh(wx * x1 + wh * h0 + b)
+    h2 = np.tanh(wx * x2 + wh * h1 + b)
+    return h2, h1
+
+h2, h1 = h2_of(wh)
+
+# Analytic: chain rule through h1, with h0 = 0 killing the h0 branch
+analytic = (1 - h2**2) * (h1 + wh * (1 - h1**2) * h0)
+
+# Finite difference
+eps = 1e-6
+num = (h2_of(wh + eps)[0] - h2_of(wh - eps)[0]) / (2 * eps)
+
+assert np.isclose(analytic, num, atol=1e-6)
+print("h1 =", round(h1, 4), " h2 =", round(h2, 4))
+print("analytic dh2/dwh =", round(analytic, 6), " numeric =", round(num, 6))
+```
+
+The analytic BPTT gradient matches the finite difference, confirming the
+chain rule routed correctly through the single recurrent step.
+
+</details>
+
+The next lesson fixes the problem at the architectural level: LSTM and GRU.

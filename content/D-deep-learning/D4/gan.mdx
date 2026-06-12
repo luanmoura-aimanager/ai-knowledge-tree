@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: gan
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Train a generator and discriminator with the minimax objective; recognize mode collapse and instability."
 prerequisites: ["autoencoders"]
 ---
@@ -184,8 +184,114 @@ print(f"real-sample range: [{x_real.min():.2f}, {x_real.max():.2f}]")
 
 The discriminator initially has near-random output, the generator
 produces noise; training would alternate updates until $D$ cannot
-distinguish $G(z)$ from real data. The next lesson surveys the
-production GAN families: DCGAN, StyleGAN, BigGAN.
+distinguish $G(z)$ from real data.
+
+## Exercises
+
+**Exercise 1.** At a fixed generator, the discriminator maximizes
+$V = \mathbb{E}_{x\sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{x\sim p_g}[\log(1 - D(x))]$.
+Derive the optimal discriminator $D^\star(x) = p_{\text{data}}(x)/(p_{\text{data}}(x) + p_g(x))$ by maximizing the integrand pointwise.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write $V$ as a single integral over $x$ by expanding both
+expectations against their densities:
+
+$$
+V = \int \left[p_{\text{data}}(x)\log D(x) + p_g(x)\log(1 - D(x))\right] dx.
+$$
+
+**Step 2.** For each fixed $x$, the bracket depends on $D(x) = u \in (0, 1)$
+through $h(u) = a\log u + b\log(1 - u)$ with $a = p_{\text{data}}(x)$ and
+$b = p_g(x)$. Maximize $h$ pointwise: $h'(u) = a/u - b/(1 - u) = 0$.
+
+**Step 3.** Solve $a(1 - u) = b u$, giving $u = a/(a + b)$. Since $h''(u) = -a/u^2 - b/(1-u)^2 < 0$, this is the maximum. Substituting back,
+
+$$
+D^\star(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)}.
+$$
+
+At $p_g = p_{\text{data}}$ the optimal discriminator is $\tfrac12$ everywhere: it
+cannot tell real from fake, which is the equilibrium the generator drives toward.
+
+</details>
+
+**Exercise 2.** Substitute $D^\star$ back into $V$ and show the generator then
+minimizes $2\, D_{\text{JS}}(p_{\text{data}}\,\|\,p_g) - \log 4$, where
+$D_{\text{JS}}$ is the Jensen-Shannon divergence. Conclude the minimum is at
+$p_g = p_{\text{data}}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Plug $D^\star(x) = \tfrac{p_{\text{data}}}{p_{\text{data}} + p_g}$ and
+$1 - D^\star(x) = \tfrac{p_g}{p_{\text{data}} + p_g}$ into $V$:
+
+$$
+V(D^\star) = \mathbb{E}_{p_{\text{data}}}\!\left[\log\frac{p_{\text{data}}}{p_{\text{data}} + p_g}\right] + \mathbb{E}_{p_g}\!\left[\log\frac{p_g}{p_{\text{data}} + p_g}\right].
+$$
+
+**Step 2.** Insert a factor of $2$ inside each log and compensate with $-\log 2$
+per term, so the denominators become the mixture $m = \tfrac12(p_{\text{data}} + p_g)$:
+
+$$
+V(D^\star) = -\log 4 + \mathbb{E}_{p_{\text{data}}}\!\left[\log\frac{p_{\text{data}}}{m}\right] + \mathbb{E}_{p_g}\!\left[\log\frac{p_g}{m}\right].
+$$
+
+**Step 3.** The two expectations are $D_{\text{KL}}(p_{\text{data}}\,\|\,m) + D_{\text{KL}}(p_g\,\|\,m) = 2\,D_{\text{JS}}(p_{\text{data}}\,\|\,p_g)$, by the definition of Jensen-Shannon divergence. So $V(D^\star) = 2\,D_{\text{JS}} - \log 4$.
+
+**Step 4.** $D_{\text{JS}} \ge 0$ with equality iff $p_g = p_{\text{data}}$, so the
+generator that minimizes $V(D^\star)$ matches the data distribution, reaching the
+global minimum $-\log 4$.
+
+</details>
+
+**Exercise 3 (code).** With both distributions known, the optimal discriminator
+is computable in closed form. On the lesson's two-Gaussian data and a mode-collapsed
+generator that covers only the right mode, evaluate $D^\star$ and confirm it stays
+near $1$ on the abandoned left mode, the gradient signal that should pull the
+generator to cover it.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def gauss(x, mu, sd):
+    return np.exp(-0.5 * ((x - mu) / sd)**2) / (sd * np.sqrt(2 * np.pi))
+
+# Data: equal mixture of N(-2, 0.3) and N(+2, 0.3)
+def p_data(x):
+    return 0.5 * gauss(x, -2, 0.3) + 0.5 * gauss(x, 2, 0.3)
+
+# Mode-collapsed generator: only the right mode N(+2, 0.3)
+def p_g(x):
+    return gauss(x, 2, 0.3)
+
+def D_star(x):
+    pd, pg = p_data(x), p_g(x)
+    return pd / (pd + pg)
+
+x_left = np.array([-2.0])           # abandoned mode
+x_right = np.array([2.0])           # covered mode
+print(f"D*(-2) on abandoned mode: {D_star(x_left)[0]:.4f}")
+print(f"D*(+2) on covered mode:   {D_star(x_right)[0]:.4f}")
+
+assert D_star(x_left)[0] > 0.99     # near 1: generator missing this mode
+assert np.isclose(D_star(x_right)[0], 1/3, atol=1e-2)   # p_g = 2*p_data here
+```
+
+On the abandoned left mode $p_g \approx 0$, so $D^\star \approx 1$: the
+discriminator is certain those points are real, the strong gradient that a
+non-collapsed generator would follow to cover the mode. On the covered right mode
+$p_g = 2\,p_{\text{data}}$, so $D^\star = 1/3$.
+
+</details>
+
+The next lesson surveys the production GAN families: DCGAN, StyleGAN,
+BigGAN.
 
 <Footnotes>
   <FNItem n="1">**Goodfellow, I., et al.** (2014). "Generative adversarial nets". *NeurIPS*. [arXiv:1406.2661](https://arxiv.org/abs/1406.2661). The minimax game and the JS-divergence optimum.</FNItem>

@@ -4,7 +4,7 @@ pillar: D
 subId: D6
 lessonId: equivariant-dl
 order: 5
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Build networks whose outputs transform predictably under symmetry groups (E(3)-equivariant nets for molecules)."
 prerequisites: ["graph-basics"]
 codeExempt: true
@@ -166,6 +166,89 @@ respect 3D rotation+translation+reflection.
 
 This thread (geometric deep learning) is a unifying view of deep
 learning architectures, and it has become a research field of its own.
+
+## Exercises
+
+**Exercise 1.** Show that a function built by composing an invariant feature map
+with an arbitrary network is invariant. Concretely, let $\rho(x)$ be invariant
+($\rho(g \cdot x) = \rho(x)$ for all $g \in G$) and let $h$ be any function. Prove
+$f = h \circ \rho$ is invariant. Use this to explain why a GNN whose messages
+depend only on pairwise distances $\lVert r_i - r_j\rVert$ is E(3)-invariant.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the group action to the input of $f$ and push it through the
+composition: $f(g \cdot x) = h(\rho(g \cdot x))$.
+
+**Step 2.** Use invariance of $\rho$ to drop the action:
+$\rho(g \cdot x) = \rho(x)$, so $f(g \cdot x) = h(\rho(x)) = f(x)$. The
+composition is invariant for any $h$.
+
+**Step 3.** For the distance-based GNN, the input map is
+$\rho(\{r_i\}) = \{\lVert r_i - r_j\rVert\}$. A rigid motion $g \in E(3)$ sends
+$r_i \mapsto R r_i + t$ with $R$ orthogonal, so
+$\lVert (R r_i + t) - (R r_j + t)\rVert = \lVert R(r_i - r_j)\rVert = \lVert r_i - r_j\rVert$
+because $R$ preserves norms. The distances are invariant, hence by Steps 1 to 2
+the whole network is E(3)-invariant regardless of the message and update MLPs.
+
+</details>
+
+**Exercise 2.** A composition of two equivariant maps is equivariant. Let $f$ and
+$h$ both satisfy the equivariance relation $f(g \cdot x) = g \cdot f(x)$. Prove
+$h \circ f$ is equivariant, and state why this matters when stacking many
+equivariant message-passing layers.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Evaluate the composition on a transformed input:
+$(h \circ f)(g \cdot x) = h(f(g \cdot x))$.
+
+**Step 2.** Use equivariance of $f$ to move the action outside:
+$f(g \cdot x) = g \cdot f(x)$, giving $h(g \cdot f(x))$.
+
+**Step 3.** Use equivariance of $h$ on the argument $f(x)$:
+$h(g \cdot f(x)) = g \cdot h(f(x)) = g \cdot (h \circ f)(x)$. The composition is
+equivariant.
+
+**Step 4.** Stacking equivariant layers therefore yields a network that is
+equivariant end to end, with no per-layer proof needed. This is why an
+equivariant force predictor can be many layers deep and still rotate its vector
+outputs exactly with the input, the property a plain MLP would only approximate.
+
+</details>
+
+**Exercise 3.** A team must predict (a) a molecule's total energy, a single
+scalar, and (b) the per-atom force vectors. For each, state whether the target
+is E(3)-invariant or E(3)-equivariant, and explain why a network using only
+invariant features (pairwise distances and angles) suffices for one but fails
+for the other.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Energy is a scalar property of the configuration; rotating,
+translating, or reflecting the molecule leaves the energy unchanged. The target
+is invariant: $E(g \cdot x) = E(x)$.
+
+**Step 2.** Force on an atom is a vector. Rotating the molecule rotates every
+force vector by the same rotation: $F(g \cdot x) = g \cdot F(x)$. The target is
+equivariant, not invariant.
+
+**Step 3.** An invariant-feature network outputs quantities that do not change
+under $g$, which matches the energy task exactly. So distances-and-angles models
+(SchNet-style) predict energy well.
+
+**Step 4.** For forces, an invariant network can only emit direction-free
+numbers; it has no mechanism to rotate an output vector when the input rotates,
+so it cannot represent an equivariant target without breaking the symmetry. The
+fix is to carry equivariant vector features (EGNN, NequIP) whose outputs rotate
+with the input by construction. One can recover forces as the negative gradient
+of an invariant energy, which is automatically equivariant, but a directly
+invariant vector head cannot.
+
+</details>
 
 This closes the D6 GNN track. The final D7 subsection covers the
 training-systems infrastructure that makes large deep learning possible.

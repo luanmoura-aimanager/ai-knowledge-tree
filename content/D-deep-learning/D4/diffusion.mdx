@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: diffusion
 order: 7
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Define the forward Gaussian noising process, derive the reverse-time denoising objective, and train DDPM."
 prerequisites: ["vae"]
 ---
@@ -229,8 +229,97 @@ print(f"true data:           mean={x0.mean():.3f}, std={x0.std():.3f}")
 
 The forward process visibly noisifies the data; the naive linear
 denoiser plus DDPM sampling recovers a sample distribution close to
-the original. The next lesson moves to the production form: latent
-diffusion (Stable Diffusion).
+the original.
+
+## Exercises
+
+**Exercise 1.** The forward process is $q(x_t \mid x_{t-1}) = \mathcal{N}(\sqrt{1 - \beta_t}\, x_{t-1},\ \beta_t I)$ with $\alpha_t = 1 - \beta_t$. Show that
+the marginal given $x_0$ is $q(x_t \mid x_0) = \mathcal{N}(\sqrt{\bar\alpha_t}\, x_0,\ (1 - \bar\alpha_t) I)$ with $\bar\alpha_t = \prod_{s=1}^t \alpha_s$, by composing two steps and inducting.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write each step in reparameterized form: $x_t = \sqrt{\alpha_t}\, x_{t-1} + \sqrt{1 - \alpha_t}\,\epsilon_t$ with independent $\epsilon_t \sim \mathcal{N}(0, I)$.
+
+**Step 2.** Compose two steps. Substitute $x_{t-1} = \sqrt{\alpha_{t-1}}\,x_{t-2} + \sqrt{1 - \alpha_{t-1}}\,\epsilon_{t-1}$:
+
+$$
+x_t = \sqrt{\alpha_t \alpha_{t-1}}\, x_{t-2} + \sqrt{\alpha_t(1 - \alpha_{t-1})}\,\epsilon_{t-1} + \sqrt{1 - \alpha_t}\,\epsilon_t.
+$$
+
+**Step 3.** The last two terms are independent zero-mean Gaussians, so they sum to
+a single Gaussian whose variance is the sum of variances: $\alpha_t(1 - \alpha_{t-1}) + (1 - \alpha_t) = 1 - \alpha_t\alpha_{t-1}$. Hence $x_t = \sqrt{\alpha_t\alpha_{t-1}}\,x_{t-2} + \sqrt{1 - \alpha_t\alpha_{t-1}}\,\bar\epsilon$ with $\bar\epsilon \sim \mathcal{N}(0, I)$.
+
+**Step 4.** Induct: each composition multiplies the signal coefficient by the next
+$\alpha$ and leaves the total variance as one minus that product. After $t$ steps,
+$x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1 - \bar\alpha_t}\,\epsilon$, i.e. $q(x_t \mid x_0) = \mathcal{N}(\sqrt{\bar\alpha_t}\,x_0,\ (1 - \bar\alpha_t)I)$. The closed form is why a single draw of $\epsilon$ gives $x_t$ at any $t$ without simulating the chain.
+
+</details>
+
+**Exercise 2.** On the standard linear schedule ($T = 1000$, $\beta_t$ from
+$10^{-4}$ to $0.02$), compute the signal weight $\sqrt{\bar\alpha_t}$ and noise
+weight $\sqrt{1 - \bar\alpha_t}$ at $t = 1$ and verify they match the lesson's
+quoted $\approx 1.000$ and $\approx 0.010$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $t = 1$, $\bar\alpha_1 = \alpha_1 = 1 - \beta_1$. The schedule starts
+at $\beta_1 = 10^{-4}$, so $\bar\alpha_1 = 1 - 10^{-4} = 0.9999$.
+
+**Step 2.** Signal weight $\sqrt{\bar\alpha_1} = \sqrt{0.9999} \approx 0.99995$,
+which rounds to $1.000$.
+
+**Step 3.** Noise weight $\sqrt{1 - \bar\alpha_1} = \sqrt{10^{-4}} = 0.01$, the
+quoted $\approx 0.010$. At the first step the image is almost pure signal with a
+$1\%$ noise admixture, the start of the monotone slide the lesson describes.
+
+</details>
+
+**Exercise 3 (code).** Implement one forward noising step in closed form and
+confirm it empirically. Draw many samples of $x_t = \sqrt{\bar\alpha_t}\, x_0 +
+\sqrt{1 - \bar\alpha_t}\,\epsilon$ for a fixed $x_0$ and check the sample mean and
+variance match $\sqrt{\bar\alpha_t}\, x_0$ and $1 - \bar\alpha_t$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+T = 1000
+beta = np.linspace(1e-4, 0.02, T)
+alpha = 1.0 - beta
+alpha_bar = np.cumprod(alpha)
+
+t = 500                                   # 1-indexed timestep
+ab = alpha_bar[t - 1]
+x0 = 1.3                                   # fixed clean scalar
+
+N = 2_000_000
+eps = rng.normal(size=N)
+xt = np.sqrt(ab) * x0 + np.sqrt(1 - ab) * eps    # closed-form forward step
+
+mean_emp, var_emp = xt.mean(), xt.var()
+mean_true, var_true = np.sqrt(ab) * x0, 1 - ab
+print(f"t={t}: alpha_bar={ab:.4f}")
+print(f"mean  empirical {mean_emp:.4f}  true {mean_true:.4f}")
+print(f"var   empirical {var_emp:.4f}  true {var_true:.4f}")
+
+assert np.isclose(mean_emp, mean_true, atol=2e-3)
+assert np.isclose(var_emp, var_true, atol=2e-3)
+```
+
+The sampled mean is $\sqrt{\bar\alpha_t}\, x_0$ and the sampled variance is
+$1 - \bar\alpha_t$, the Gaussian marginal Exercise 1 derived. At $t = 500$ the
+signal has shrunk to about a quarter while the noise dominates.
+
+</details>
+
+The next lesson moves to the production form: latent diffusion (Stable
+Diffusion).
 
 <Footnotes>
   <FNItem n="1">**Ho, J., Jain, A., & Abbeel, P.** (2020). "Denoising diffusion probabilistic models (DDPM)". *NeurIPS*. [arXiv:2006.11239](https://arxiv.org/abs/2006.11239). The noise-prediction objective and DDPM sampling.</FNItem>

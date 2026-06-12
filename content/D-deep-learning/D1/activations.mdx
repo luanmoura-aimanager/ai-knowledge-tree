@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: activations
 order: 5
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Compare common nonlinearities and explain when each one is preferred, including the dead-ReLU failure mode."
 prerequisites: ["mlp-forward"]
 ---
@@ -157,7 +157,74 @@ right-derivative is 1); the subdifferential convention picks one of these,
 typically 0, while a centered finite-difference averages them and prints
 0.5. GELU and Swish are smooth at zero. The bad-initialization demo shows
 how a substantial fraction of units can land in the dead region from a
-single poor initialization. The next lesson fixes this systematically with
+single poor initialization.
+
+## Exercises
+
+**Exercise 1.** Compute $\operatorname{ReLU}(z)$ and its derivative for
+$z \in \{-2,\ -0.5,\ 0,\ 1.5\}$, using the convention that the derivative at
+$z = 0$ is $0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $\operatorname{ReLU}(z) = \max(0, z)$ gives
+$\operatorname{ReLU}(-2) = 0$, $\operatorname{ReLU}(-0.5) = 0$,
+$\operatorname{ReLU}(0) = 0$, $\operatorname{ReLU}(1.5) = 1.5$.
+
+**Step 2.** The derivative is $1$ for $z > 0$ and $0$ for $z \le 0$ under the
+stated convention, so it is $0, 0, 0, 1$ in the same order. Only the strictly
+positive input passes gradient.
+
+</details>
+
+**Exercise 2.** Leaky ReLU with slope $0.01$ never zeros its gradient, so it
+has no dead-unit region. Show this: for what pre-activations $z$ is the
+derivative of $\operatorname{LeakyReLU}(z) = \max(0.01 z, z)$ equal to zero?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For $z > 0$ the active branch is $z$, with derivative $1$. For
+$z < 0$ the active branch is $0.01 z$, with derivative $0.01$.
+
+**Step 2.** Neither branch has derivative $0$: the gradient is $1$ on the
+positive side and $0.01$ on the negative side. There is no $z$ where it
+vanishes, so a leaky unit always has a nonzero gradient and can recover, which
+is the property plain ReLU lacks.
+
+</details>
+
+**Exercise 3 (code).** The Swish derivative is
+$\sigma(z) + z\,\sigma(z)(1 - \sigma(z))$ where $\sigma$ is the logistic
+sigmoid. Verify this analytic form against a central finite difference of
+$\operatorname{Swish}(z) = z\,\sigma(z)$ across a range of $z$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def sigmoid(z): return 1.0 / (1.0 + np.exp(-z))
+def swish(z):   return z * sigmoid(z)
+def swish_grad(z):
+    s = sigmoid(z)
+    return s + z * s * (1 - s)
+
+z = np.linspace(-5, 5, 200)
+analytic = swish_grad(z)
+
+eps = 1e-6
+fd = (swish(z + eps) - swish(z - eps)) / (2 * eps)
+
+assert np.max(np.abs(analytic - fd)) < 1e-7
+print("max |analytic - finite diff|:", np.max(np.abs(analytic - fd)))
+```
+
+</details>
+
+The next lesson fixes this systematically with
 Xavier and He initialization.
 
 <Footnotes>

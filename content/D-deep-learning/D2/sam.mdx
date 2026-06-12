@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: sam
 order: 7
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Build the SAM promptable segmentation pipeline (image encoder, prompt encoder, mask decoder) and its foundation-model training story."
 prerequisites: ["segmentation", "vit"]
 codeExempt: true
@@ -118,6 +118,85 @@ graph LR
   PE --> MD
   MD --> M["segmentation mask"]
 ```
+
+## Exercises
+
+**Exercise 1.** SAM's image encoder ($\sim$600M parameters) runs once per
+image; the mask decoder ($\sim$4M parameters) runs once per prompt.
+Suppose an interactive session issues $50$ prompts on one image. Treating
+per-call cost as proportional to parameter count, compare the total cost
+of caching the image embedding against re-encoding the image for every
+prompt.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With caching, the encoder runs once and the decoder runs $50$
+times: total $\propto 600 + 50 \cdot 4 = 600 + 200 = 800$ (in millions of
+parameter-calls).
+
+**Step 2.** Without caching, both run on every prompt: total
+$\propto 50 \cdot (600 + 4) = 50 \cdot 604 = 30{,}200$.
+
+**Step 3.** The ratio is $\frac{30{,}200}{800} \approx 37.75$, so caching
+the one-time encoder pass is about $38\times$ cheaper. This is the design
+reason for splitting the heavy encoder from the light decoder: the cost
+that dominates is amortized across all prompts on the same image.
+
+</details>
+
+**Exercise 2.** SAM's mask decoder predicts $3$ candidate masks per prompt
+rather than one. Explain the failure this addresses, using the example of
+a single point placed on a person's shirt, and how the model picks among
+the three at inference.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A point prompt is inherently ambiguous: a point on a person's
+shirt is consistent with masking the shirt, the upper body, or the whole
+person. A model forced to emit one mask must average over these
+incompatible interpretations, producing a mask that fits none of them
+well.
+
+**Step 2.** Predicting $3$ masks lets the decoder commit to distinct
+hypotheses (the part, a larger sub-object, the whole object) instead of
+blending them. Each candidate is internally coherent.
+
+**Step 3.** The decoder also predicts an estimated IoU (quality) score per
+candidate. At inference the highest-scoring mask is returned, or all three
+are surfaced for an interactive user to choose, so ambiguity is resolved
+by selection rather than by averaging.
+
+</details>
+
+**Exercise 3.** SAM's three-stage data engine produced roughly $4$M masks
+(assisted-manual), a further $\sim$5M (semi-automatic), then $\sim$1B
+(fully automatic). Explain why the stages must run in this order and what
+the model contributes at each stage that makes the next one possible.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Stage one needs a model good enough to assist, but none exists
+yet, so annotators label masks with only weak model help. This small,
+high-quality set ($\sim$4M masks) is what a first capable model is trained
+on.
+
+**Step 2.** That trained model is now good enough to auto-generate the
+obvious masks in stage two, leaving humans to fill in only the cases the
+model misses. Human effort per image drops, so coverage grows by another
+$\sim$5M masks at similar labeling cost.
+
+**Step 3.** The further-strengthened model is finally reliable enough to
+run fully automatically: a grid of point prompts is applied and only
+high-confidence outputs are kept, with no human in the loop. That removes
+the human bottleneck entirely and scales to $\sim$1B masks. Each stage
+depends on the model quality the previous stage's data bought, so the
+order cannot be permuted: automation at scale is only safe once the model
+is accurate, and accuracy requires the earlier human-curated data.
+
+</details>
 
 ## The promptable-foundation pattern
 

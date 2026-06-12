@@ -4,7 +4,7 @@ pillar: D
 subId: D5
 lessonId: mlm
 order: 4
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Pretrain BERT-style encoders by masking tokens and predicting them from bidirectional context."
 prerequisites: ["D3/transformer-arch"]
 codeExempt: true
@@ -134,6 +134,105 @@ graph LR
 MLM is one instance of the **denoising autoencoder** family from D4:
 corrupt the input, predict the original. BERT's specific recipe
 (mask 15%, bidirectional encoder) is one design point.
+
+## Exercises
+
+**Exercise 1.** BERT masks 15% of token positions, and within those uses
+the 80/10/10 split (80% replaced with [MASK], 10% random token, 10%
+unchanged). For a sequence of 200 tokens, compute the expected number of
+positions in each of the four categories: [MASK], random, unchanged-
+but-selected, and not selected at all.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Selected positions. With 15% of 200 selected,
+$0.15 \times 200 = 30$ positions enter the prediction task; the
+remaining $170$ are not selected.
+
+**Step 2.** Split the 30 selected by 80/10/10:
+
+$$
+\text{[MASK]} = 0.80 \times 30 = 24,\quad
+\text{random} = 0.10 \times 30 = 3,\quad
+\text{unchanged} = 0.10 \times 30 = 3.
+$$
+
+**Step 3.** Tally all four categories: 24 [MASK], 3 random, 3
+unchanged-but-predicted, and 170 not selected. The categories sum to
+$24 + 3 + 3 + 170 = 200$. Note the loss is still computed on all 30
+selected positions, including the 3 unchanged ones, which is what forces
+the encoder to build a real representation even where the input looks
+untouched.
+
+</details>
+
+**Exercise 2.** The lesson states that masking 100% with [MASK] would
+"teach the model only to predict [MASK] tokens, since at inference there
+are no masks." Make this train/inference mismatch precise, and explain
+how each of the random-token and unchanged-token cases in the 80/10/10
+split counteracts it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Name the mismatch. At pretraining, a predicted position
+carries the special [MASK] embedding as its input. At fine-tuning and
+inference, [MASK] never appears: every position carries a real token
+embedding. If the model only ever predicted positions holding [MASK], it
+could couple "this slot holds [MASK]" with "produce a content
+prediction," a feature absent downstream. The input distribution at the
+predicted positions differs between train and test, a covariate shift.
+
+**Step 2.** The unchanged case. Leaving 10% of selected positions as the
+true token, while still asking the model to predict them, means some
+prediction targets sit on ordinary token embeddings, exactly the
+condition seen at inference. The model cannot rely on "[MASK] present" as
+the cue to compute a careful contextual representation, because it must
+also do so on real tokens.
+
+**Step 3.** The random case. Replacing 10% with a random vocabulary
+token means the model cannot trust the input token at a selected position
+to be correct; it must use the surrounding context to decide whether and
+how to revise it. This pushes the encoder to represent every position
+from context rather than copying its own input, again reducing reliance
+on the [MASK] marker. Together the two cases spread the prediction task
+across [MASK], wrong, and correct inputs, shrinking the train/inference
+gap.
+
+</details>
+
+**Exercise 3.** ELECTRA replaces MLM with replaced-token detection: a
+small generator fills masked positions with plausible tokens, and the
+main model classifies every position as original or replaced. Argue why
+ELECTRA extracts more training signal per sequence than MLM, and name the
+cost this introduces.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Count the supervised positions. MLM computes a loss only at
+the selected positions, about 15% of the sequence; the other 85%
+contribute no prediction target. ELECTRA's detection loss is binary and
+applied at **every** position, so 100% of tokens carry a learning signal
+each step.
+
+**Step 2.** Why that raises efficiency. The main model sees a gradient
+from far more positions per sequence, so it extracts more information per
+token of compute, which is why ELECTRA reaches comparable quality with
+fewer pretraining steps or less data than MLM. The task is also better
+matched to inference: every position holds a real (possibly replaced)
+token, with no [MASK] symbol, avoiding the train/inference mismatch of
+Exercise 2.
+
+**Step 3.** The cost. ELECTRA must train and run a separate generator
+network alongside the main discriminator, adding a model, a coupled
+training dynamic (the generator and discriminator co-evolve), and the
+risk that a too-strong or too-weak generator degrades the signal. The
+extra signal per sequence is bought with extra architectural and tuning
+complexity.
+
+</details>
 
 The next lesson applies the same recipe to images: masked image
 modeling.

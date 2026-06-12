@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: autodiff
 order: 3
-estimatedMinutes: 22
+estimatedMinutes: 32
 goal: "Implement a tiny autodiff engine with `Value` nodes that record their parents and compute gradients on a backward pass."
 prerequisites: ["backprop"]
 ---
@@ -168,7 +168,109 @@ print(f"finite diffs: {fa:.4f}, {fb:.4f}, {fc:.4f}")
 
 The autodiff gradients match finite differences. The engine has no
 explicit knowledge of the function `f`; it derived everything from the
-operations recorded during the forward pass. The next lesson zooms out:
+operations recorded during the forward pass.
+
+## Exercises
+
+**Exercise 1.** Trace the backward pass by hand for $y = (a + b) \cdot c$
+with $a = 2$, $b = -1$, $c = 3$. Report $\bar a$, $\bar b$, $\bar c$ using
+only the `+` and `*` local rules ($\bar a$ denotes $\partial y / \partial a$,
+the accumulated `grad` field).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Forward records two nodes: $s = a + b = 1$ and $y = s \cdot c = 3$.
+Seed the root gradient $\bar y = 1$.
+
+**Step 2.** The `*` closure for $y = s \cdot c$ adds $c$ times $\bar y$ to $s$
+and $s$ times $\bar y$ to $c$: $\bar s = 3 \cdot 1 = 3$ and
+$\bar c = 1 \cdot 1 = 1$.
+
+**Step 3.** The `+` closure for $s = a + b$ passes $\bar s$ unchanged to both
+parents: $\bar a = 3$ and $\bar b = 3$.
+
+So $\bar a = 3$, $\bar b = 3$, $\bar c = 1$. Check against
+$y = (a+b)c$: $\partial y/\partial a = c = 3$ and $\partial y/\partial c = a+b = 1$.
+
+</details>
+
+**Exercise 2.** A node $v$ feeds **two** children, $c_1 = v \cdot v$. Show why
+the `_backward` closures must **accumulate** into `grad` (use `+=`, not `=`),
+and compute $\bar v$ for $v = 4$, $y = v \cdot v$ with $\bar y = 1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** When $v$ is reused, $y = v \cdot v$ is a single `*` node whose two
+parents are the same object. The multiplication law
+$\bar v = \sum_i \bar c_i\, \partial c_i / \partial v$ sums contributions over
+every edge leaving $v$.
+
+**Step 2.** The `*` closure runs once and adds the gradient through each
+operand slot: $\bar v \mathrel{+}= (\text{other}) \cdot \bar y$ for each of the
+two slots, both holding $v = 4$. So $\bar v = 4 \cdot 1 + 4 \cdot 1 = 8$.
+
+**Step 3.** With assignment (`=`) the second write would overwrite the first,
+giving $\bar v = 4$ and dropping half the gradient. Accumulation is what makes
+$\partial(v^2)/\partial v = 2v = 8$ come out right.
+
+</details>
+
+**Exercise 3 (code).** Add an `exp` operation to the `Value` class (local
+derivative of $e^x$ is $e^x$) and verify $\partial y / \partial a$ for
+$y = \exp(a \cdot b)$ against a finite difference.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+class Value:
+    def __init__(self, data, _prev=()):
+        self.data = data; self.grad = 0.0
+        self._prev = _prev; self._backward = lambda: None
+    def __mul__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
+        out = Value(self.data * other.data, (self, other))
+        def _backward():
+            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad
+        out._backward = _backward
+        return out
+    def exp(self):
+        e = np.exp(self.data)
+        out = Value(e, (self,))
+        def _backward():
+            self.grad += e * out.grad     # d/dx exp(x) = exp(x)
+        out._backward = _backward
+        return out
+    def backward(self):
+        topo, visited = [], set()
+        def build(v):
+            if v in visited: return
+            visited.add(v)
+            for p in v._prev: build(p)
+            topo.append(v)
+        build(self)
+        self.grad = 1.0
+        for v in reversed(topo): v._backward()
+
+a = Value(0.7); b = Value(1.3)
+y = (a * b).exp()
+y.backward()
+
+f = lambda av: np.exp(av * 1.3)
+eps = 1e-6
+fd = (f(0.7 + eps) - f(0.7 - eps)) / (2 * eps)
+assert np.isclose(a.grad, fd, atol=1e-6)
+print(a.grad, fd)
+```
+
+</details>
+
+The next lesson zooms out:
 *why* can these stacks of affine maps and nonlinearities fit any
 function?
 

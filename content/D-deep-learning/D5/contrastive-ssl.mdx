@@ -4,7 +4,7 @@ pillar: D
 subId: D5
 lessonId: contrastive-ssl
 order: 1
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Pretrain representations by pulling augmented views of the same image together (SimCLR, MoCo) using the InfoNCE loss."
 prerequisites: ["D1/mlp-forward"]
 ---
@@ -187,9 +187,131 @@ print(f"top-1 accuracy on shuffled positives: {top1(z1, z2[perm]):.3f}")
 ```
 
 The aligned positives produce a low loss and high top-1 classification
-accuracy among the batch; shuffling breaks both. The next lesson
-extends contrastive learning to cross-modal alignment with CLIP-style
-training, then surveys the non-contrastive alternatives.
+accuracy among the batch; shuffling breaks both.
+
+## Exercises
+
+**Exercise 1.** A single anchor has one positive and $K$ negatives, all
+sharing the same similarity score $s$ with the anchor (the worst case
+for the model, positive indistinguishable from negatives). Show that the
+InfoNCE loss equals $\log(K + 1)$, independent of $\tau$, and explain
+why this is the random-guess floor.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute equal scores into the loss. Every logit
+$s/\tau$ is the same, so each exponential is $e^{s/\tau}$. There are
+$K + 1$ terms in the denominator (one positive, $K$ negatives) and one
+in the numerator:
+
+$$
+\mathcal{L} = -\log \frac{e^{s/\tau}}{(K+1)\,e^{s/\tau}} = -\log \frac{1}{K+1} = \log(K+1).
+$$
+
+**Step 2.** The $e^{s/\tau}$ factors cancel, so $\tau$ drops out and the
+score level $s$ is irrelevant. The loss depends only on the count.
+
+**Step 3.** Interpret it. InfoNCE is the cross-entropy of a
+$(K+1)$-way classification. A model that cannot separate the positive
+from the negatives assigns probability $1/(K+1)$ to the correct class,
+giving cross-entropy $\log(K+1)$. For a SimCLR batch with $2(N-1)$
+negatives, this floor grows with batch size, which is why a useful
+loss value must be read against $\log(\text{number of candidates})$,
+not against zero.
+
+</details>
+
+**Exercise 2.** Take a perfectly aligned positive ($z^\top z^+ = 1$ for
+unit vectors) and a single negative at similarity $z^\top z^- = c$ with
+$-1 \le c < 1$. Write the loss as a function of $\tau$ and show it is
+increasing in $c$ and decreasing as $\tau \to 0$. What does the
+$\tau \to 0$ limit say about which negatives dominate the gradient?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With one positive (similarity 1) and one negative
+(similarity $c$):
+
+$$
+\mathcal{L}(\tau) = -\log \frac{e^{1/\tau}}{e^{1/\tau} + e^{c/\tau}}
+= \log\!\left(1 + e^{(c-1)/\tau}\right).
+$$
+
+**Step 2.** Monotonic in $c$. Since $c - 1 < 0$ and $\tau > 0$, the
+exponent $(c-1)/\tau$ rises with $c$, so $e^{(c-1)/\tau}$ rises, so
+$\mathcal{L}$ rises. A negative that sits closer to the anchor (larger
+$c$) costs more, as it should.
+
+**Step 3.** Behaviour in $\tau$. Hold $c < 1$ fixed. As $\tau \to 0^+$,
+$(c-1)/\tau \to -\infty$, so $e^{(c-1)/\tau} \to 0$ and
+$\mathcal{L} \to 0$: a small temperature makes the gap between the
+positive and a non-maximal negative look enormous, and the loss
+saturates. The gradient then concentrates on the **hardest** negatives,
+those with $c$ closest to 1, because only their $(c-1)/\tau$ stays near
+zero. Low $\tau$ is a hard-negative emphasis; high $\tau$ treats all
+negatives more evenly.
+
+</details>
+
+**Exercise 3 (code).** Implement the cosine-similarity matrix and the
+symmetric InfoNCE loss directly in numpy. For a batch of $N$ unit
+embeddings where each anchor's positive is the row of a second matrix at
+the same index, verify that (a) when the two matrices are identical the
+loss is below its shuffled value, and (b) the per-row argmax recovers
+the diagonal as the predicted positive.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, d = 32, 8
+
+# View 1 and an aligned View 2 (small perturbation), both L2-normalized
+z1 = rng.normal(size=(N, d))
+z2 = z1 + 0.05 * rng.normal(size=(N, d))
+z1 /= np.linalg.norm(z1, axis=1, keepdims=True)
+z2 /= np.linalg.norm(z2, axis=1, keepdims=True)
+
+def cosine_matrix(a, b):
+    # rows already unit norm, so the dot product is cosine similarity
+    return a @ b.T                                   # (N, N), S[i,j] = cos(a_i, b_j)
+
+def info_nce(a, b, tau=0.1):
+    s = cosine_matrix(a, b) / tau
+    labels = np.arange(len(a))                       # positive of row i is column i
+    # row-wise cross-entropy: -log softmax(s)[i, i]
+    logsumexp = np.log(np.exp(s).sum(axis=1))
+    row_loss = -(s[labels, labels] - logsumexp)
+    return row_loss.mean()
+
+def symmetric_info_nce(a, b, tau=0.1):
+    return 0.5 * (info_nce(a, b, tau) + info_nce(b, a, tau))
+
+loss_aligned = symmetric_info_nce(z1, z2)
+perm = rng.permutation(N)
+loss_shuffled = symmetric_info_nce(z1, z2[perm])
+
+# (a) aligned loss is lower than shuffled
+assert loss_aligned < loss_shuffled
+# (b) argmax over each row recovers the diagonal positive
+preds = cosine_matrix(z1, z2).argmax(axis=1)
+assert np.array_equal(preds, np.arange(N))
+print(round(loss_aligned, 4), round(loss_shuffled, 4))
+```
+
+The aligned loss prints well below the shuffled loss, and the
+similarity matrix's row-wise argmax lands exactly on the diagonal, the
+$(K+1)$-way classification picking each true positive.
+
+</details>
+
+The next lesson extends contrastive learning to cross-modal alignment
+with CLIP-style training, then surveys the non-contrastive alternatives.
 
 <Footnotes>
   <FNItem n="1">**Chen, T., Kornblith, S., Norouzi, M., & Hinton, G.** (2020). "A simple framework for contrastive learning of visual representations (SimCLR)". *ICML*. [arXiv:2002.05709](https://arxiv.org/abs/2002.05709). Augmented-view positives, large-batch negatives, and the projection head.</FNItem>

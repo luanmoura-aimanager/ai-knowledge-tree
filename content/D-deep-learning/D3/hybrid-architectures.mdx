@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: hybrid-architectures
 order: 10
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Combine attention and recurrence (RWKV, Hyena, Jamba, Griffin) to keep Transformer quality at lower context cost."
 prerequisites: ["state-space-models", "linear-attention"]
 codeExempt: true
@@ -147,6 +147,106 @@ graph LR
   S --> M
   M --> O["output"]
 ```
+
+## Exercises
+
+**Exercise 1.** Jamba interleaves blocks: one in every $K = 8$ is a
+quadratic attention block and the other 7 are linear-cost Mamba blocks.
+For a sequence of length $N$, write the per-token inference cost of a
+single Jamba layer-group of 8 blocks (attention is $O(N)$ per token
+against its KV cache, each Mamba block is $O(1)$ per token), and compare
+the group's total against 8 pure-attention blocks. State how the ratio
+behaves as $N$ grows.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Per generated token, the group of 8 blocks costs: 1
+attention block at $O(N)$ plus 7 Mamba blocks at $O(1)$ each, for a group
+cost of $O(N) + 7 \cdot O(1) = O(N + 7)$, which is $O(N)$ but with a
+single $N$-scaling term.
+
+**Step 2.** Eight pure-attention blocks cost $8 \cdot O(N) = O(8N)$ per
+token: every block scales with the cache length.
+
+**Step 3.** The ratio of pure-attention cost to Jamba cost is roughly
+$\frac{8N}{N + 7}$. For large $N$ this approaches 8: the hybrid does the
+$N$-scaling work in only 1 of 8 blocks, so it spends about one eighth of
+the context-dependent attention compute, while the 7 recurrent blocks
+contribute a constant that becomes negligible as $N$ grows. The hybrid is
+still $O(N)$ asymptotically (the attention checkpoints keep an exact
+global lookup), but with an eighth of the constant.
+
+</details>
+
+**Exercise 2.** The lesson splits tasks into two kinds: "retrieve the
+named entity from three pages ago" versus "compose the next token from
+local context". Explain, in terms of the mechanisms from the previous two
+lessons, why exact attention is the right tool for the first and a
+recurrent block (SSM or linear attention) suffices for the second. Use
+this to justify the hybrid design choice of placing only a few attention
+layers.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The retrieval task needs content-based addressing against an
+arbitrary past position: the query must score against every key and pull
+the matching value regardless of distance. Softmax attention does exactly
+this, with each query comparing to all keys and a sharp softmax selecting
+the match. A fixed-kernel recurrence compresses the past into a
+bounded state, so a specific entity from far back can be overwritten or
+blurred and is not guaranteed recoverable.
+
+**Step 2.** The local-composition task needs only nearby context, which a
+recurrent block carries in its running state cheaply: $O(1)$ per token
+with no growing cache. Paying attention's $O(N)$ per-token cost here buys
+nothing, since the needed information is already in the recent state.
+
+**Step 3.** Most positions in a long sequence are local-composition work,
+and only occasionally does the model need a long-range exact lookup. So a
+hybrid spends the cheap recurrent mechanism on the bulk and reserves a
+few expensive attention layers as global "checkpoints", matching each
+mechanism to the task it is best at while keeping the overall cost
+sub-quadratic.
+
+</details>
+
+**Exercise 3.** Rank these four families by per-token inference cost
+against a length-$N$ context, from cheapest to most expensive, and name
+the quality trade-off each accepts: (a) pure softmax-attention
+Transformer, (b) pure SSM (Mamba), (c) Griffin (gated recurrence plus
+windowed local attention of window $w$), (d) Jamba (mostly Mamba, one
+attention block per 8). Justify any ties or near-ties.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Costs per token. (a) Every layer attends against the full
+cache: $O(N)$ per layer, no constant savings. (b) Mamba keeps a
+fixed-size state: $O(1)$ per token, constant regardless of $N$. (c)
+Griffin uses recurrent blocks at $O(1)$ plus local-attention blocks
+limited to a window $w$, at $O(w)$: total $O(w)$, constant in $N$ since
+$w$ is fixed. (d) Jamba is $O(N)$ from its one-in-eight global attention
+block, but with an eighth of the constant of pure attention.
+
+**Step 2.** Ranking cheapest to most expensive: pure Mamba ($O(1)$) and
+Griffin ($O(w)$, constant in $N$) are the cheapest, effectively tied as
+context-independent; Mamba edges Griffin because $w > 1$. Then Jamba
+($O(N)$ with a small constant). Then the pure Transformer ($O(N)$ with
+the full constant). Jamba and the Transformer share the asymptotic order
+but Jamba's constant is roughly $8\times$ smaller.
+
+**Step 3.** Trade-offs. Pure Mamba is cheapest but weakest on
+arbitrary-distance exact lookup. Griffin keeps only local attention, so
+it also lacks unbounded-range exact retrieval but adds a short exact
+window. Jamba reintroduces full exact global attention in a few layers,
+recovering retrieval at the price of an $O(N)$ term. The pure Transformer
+has the strongest exact lookup at every layer and pays the full $O(N)$
+per layer for it. Cost and exact-retrieval quality trade against each
+other along this ranking.
+
+</details>
 
 ## This closes the D3 sequence-modeling track
 
