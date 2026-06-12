@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: transformer-arch
 order: 6
-estimatedMinutes: 20
+estimatedMinutes: 30
 goal: "Assemble multi-head self-attention, position-wise FFNs, residuals, and LayerNorm into the encoder-decoder Transformer."
 prerequisites: ["self-attention", "D1/normalization"]
 ---
@@ -222,7 +222,124 @@ print(f"parameters per block: {total_per_block:,}  "
 
 The 4-block Transformer processes an 8-token sequence; FFN parameters
 already dominate attention parameters at this small scale, and the
-ratio only grows in real models. The next lesson covers how positional
+ratio only grows in real models.
+
+## Exercises
+
+**Exercise 1.** Using the leading-order estimate $L \cdot d^2 \cdot 12$
+for the parameter count of a decoder-only Transformer, compute the
+parameter count for $L = 32$ layers and model dimension $d = 4096$. Then
+explain why the count is independent of sequence length $N$ but the
+inference *compute* per token is not.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Substitute into $L \cdot d^2 \cdot 12$:
+
+$$
+32 \cdot 4096^2 \cdot 12 = 32 \cdot 16{,}777{,}216 \cdot 12
+= 6{,}442{,}450{,}944 \approx 6.4 \text{ billion}.
+$$
+
+**Step 2.** The parameters are the projection matrices $W_q, W_k, W_v,
+W_o, W_1, W_2$, whose shapes depend only on $d$ and $d_{\text{ff}} = 4d$,
+not on how many tokens pass through them. Sequence length never enters
+the weight shapes.
+
+**Step 3.** Inference compute does depend on $N$: the attention sublayer
+scores every new query against all $N$ cached keys, an $O(N)$ cost per
+generated token (the KV cache grows with context). So a fixed-size model
+spends more compute per token as the context lengthens, even though its
+parameter count is fixed.
+
+</details>
+
+**Exercise 2.** The encoder block applies pre-norm:
+$X' = X + \operatorname{MHA}(\operatorname{LN}(X))$. Argue why the
+residual path (the bare $+X$ that skips the sublayer) is what lets a deep
+stack train, by tracing how a gradient reaches an early layer. Contrast
+with a hypothetical stack that drops the residual.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With the residual, the block output is $X' = X + F(X)$ where
+$F = \operatorname{MHA} \circ \operatorname{LN}$. Its Jacobian is
+$\partial X' / \partial X = I + \partial F / \partial X$. The identity
+term guarantees the Jacobian is close to $I$ even when $\partial F /
+\partial X$ is small.
+
+**Step 2.** Backpropagating through $L$ stacked blocks multiplies these
+Jacobians. With the identity present, the product keeps an $I + (\text{small})$
+form, so the gradient that reaches layer 1 retains an undamped path: the
+chain of identity terms passes the gradient straight through.
+
+**Step 3.** Without the residual, the block is $X' = F(X)$ with Jacobian
+$\partial F / \partial X$. The product of $L$ such Jacobians is a product
+of $L$ matrices with no identity floor; if their singular values sit
+below 1 the gradient shrinks geometrically with depth and early layers
+stop learning (the vanishing-gradient failure the residual was designed
+to remove).
+
+</details>
+
+**Exercise 3 (code).** A residual sublayer with pre-norm should leave the
+output a stable scale regardless of depth, while a no-residual stack of
+the same sublayer should let the scale drift. On a fixed seed, run a
+small linear sublayer 20 times with and without the residual and confirm
+that the residual version keeps the per-position norm bounded while the
+plain composition collapses or explodes.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, d = 6, 16
+
+def layer_norm(x, eps=1e-5):
+    mu = x.mean(axis=-1, keepdims=True)
+    var = x.var(axis=-1, keepdims=True)
+    return (x - mu) / np.sqrt(var + eps)
+
+# A contractive sublayer (small weights) stands in for MHA/FFN
+W = rng.normal(scale=0.3, size=(d, d))
+def sublayer(x):
+    return layer_norm(x) @ W
+
+X0 = rng.normal(size=(N, d))
+
+# With residual: X = X + sublayer(X)
+Xr = X0.copy()
+for _ in range(20):
+    Xr = Xr + sublayer(Xr)
+
+# Without residual: X = sublayer(X)
+Xp = X0.copy()
+for _ in range(20):
+    Xp = sublayer(Xp)
+
+norm_res = np.linalg.norm(Xr, axis=-1).mean()
+norm_plain = np.linalg.norm(Xp, axis=-1).mean()
+
+# Residual path stays comparable to the input scale
+assert 0.5 * np.linalg.norm(X0, axis=-1).mean() < norm_res
+# Plain composition contracts far below the input scale
+assert norm_plain < 0.1 * norm_res
+print("mean norm  residual:", round(norm_res, 3), " plain:", round(norm_plain, 4))
+```
+
+The residual stack carries the input scale through all 20 applications,
+while the plain composition of the same contractive sublayer drives the
+signal toward zero, the depth-instability the residual connection is
+there to prevent.
+
+</details>
+
+The next lesson covers how positional
 information is injected into the otherwise position-blind self-attention.
 
 <Footnotes>

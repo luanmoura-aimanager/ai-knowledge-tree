@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: regularization
 order: 8
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Combine stochastic dropout with L2 weight decay to regularize a deep network, and read each as a prior in disguise."
 prerequisites: ["A3/proximal-methods"]
 ---
@@ -175,8 +175,108 @@ for name, w in [("plain", w_plain), ("dropout", w_drop), ("wd", w_wd), ("both", 
 Dropout zeros a fraction of features during training, weight decay
 shrinks parameters geometrically, and in this noisy regression each one
 (or both together) reduces validation MSE relative to plain unregularized
-training. The next lesson chooses the right optimizer for the resulting
-regularized objective.
+training.
+
+## Exercises
+
+**Exercise 1.** A dropout layer uses drop probability $p = 0.2$ with the
+inverse-keep-probability rescaling: a kept activation is multiplied by
+$1/(1-p)$, a dropped one by $0$. Show that the expected value of a single
+activation $a$ under the random mask equals $a$ itself, so training-time
+dropout is unbiased.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The mask $m \sim \operatorname{Bernoulli}(1-p)$ takes the value
+$1$ (keep) with probability $1-p$ and $0$ (drop) with probability $p$. The
+dropout output is $a \cdot m / (1-p)$.
+
+**Step 2.** Take the expectation over the mask:
+
+$$
+\mathbb{E}\!\left[\frac{a\,m}{1-p}\right] = \frac{a}{1-p}\,\mathbb{E}[m] = \frac{a}{1-p}\,(1-p) = a.
+$$
+
+The rescaling by $1/(1-p) = 1/0.8 = 1.25$ exactly compensates for the
+fraction zeroed, so the expected activation is preserved. This is why
+inference can use the identity map: the training-time output already has
+the right mean.
+
+</details>
+
+**Exercise 2.** Weight decay updates a parameter with zero gradient as
+$\theta_{t+1} = (1 - \eta\lambda)\,\theta_t$. Show that after $T$ steps the
+parameter has shrunk geometrically, and compute the factor for
+$\eta = 0.01$, $\lambda = 0.1$, $T = 200$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With zero gradient each step multiplies $\theta$ by the same
+constant $1 - \eta\lambda$, so after $T$ steps
+
+$$
+\theta_T = (1 - \eta\lambda)^T\, \theta_0.
+$$
+
+**Step 2.** Substitute $\eta\lambda = 0.01 \cdot 0.1 = 0.001$:
+
+$$
+(1 - 0.001)^{200} = 0.999^{200} \approx 0.8186.
+$$
+
+The parameter retains about $81.9\%$ of its value, a shrink of roughly
+$18\%$ toward zero from the penalty alone. Unused weights (those with no
+opposing gradient signal) decay toward zero geometrically.
+
+</details>
+
+**Exercise 3 (code).** L2 weight decay is MAP estimation with a Gaussian
+prior, which on a linear regression is ridge regression. Verify this
+equivalence: run the weight-decay SGD update to convergence on a small
+regression and check that it lands on the closed-form ridge solution
+$\hat\theta = (X^\top X + \alpha I)^{-1} X^\top y$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+N, d = 200, 5
+X = rng.normal(size=(N, d))
+theta_true = rng.normal(size=d)
+y = X @ theta_true + 0.1 * rng.normal(size=N)
+
+# Weight decay corresponds to a penalty (lambda_pen / 2) * ||theta||^2 in
+# the loss. The full-batch MSE gradient is (1/N) X^T (X theta - y); the
+# decay adds lambda_pen * theta, so the ridge penalty is alpha = N * lambda_pen.
+lr, lambda_pen, n_iter = 0.05, 0.2, 50_000
+alpha = N * lambda_pen
+
+theta = np.zeros(d)
+for _ in range(n_iter):
+    grad = X.T @ (X @ theta - y) / N
+    theta = (1 - lr * lambda_pen) * theta - lr * grad
+
+theta_ridge = np.linalg.solve(X.T @ X + alpha * np.eye(d), X.T @ y)
+
+assert np.allclose(theta, theta_ridge, atol=1e-4)
+print("SGD-with-decay:", theta.round(4))
+print("closed-form ridge:", theta_ridge.round(4))
+```
+
+The decay update converges to the closed-form ridge estimate (matching to
+four decimals), confirming that L2 weight decay is a Gaussian prior on the
+weights, the same identity the ridge-regression lesson derives.
+
+</details>
+
+The next lesson chooses the right optimizer for the resulting regularized
+objective.
 
 <Footnotes>
   <FNItem n="1">**Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., & Salakhutdinov, R.** (2014). "Dropout: a simple way to prevent neural networks from overfitting". *JMLR*, 15, 1929-1958. Introduces dropout and the implicit-ensemble interpretation.</FNItem>

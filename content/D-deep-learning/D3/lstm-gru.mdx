@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: lstm-gru
 order: 3
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Use gated recurrent cells to control information flow, fixing the vanishing-gradient problem of plain RNNs."
 prerequisites: ["rnn"]
 ---
@@ -193,9 +193,109 @@ print(f"mean forget-gate value: {round(np.mean(forget_norms), 3)}  "
 ```
 
 The cell state norm remains stable across 30 timesteps because the
-forget gate (initialized to bias +1) is mostly open. The next lesson
-combines LSTMs with attention to handle variable-length input-output
-pairs.
+forget gate (initialized to bias +1) is mostly open.
+
+## Exercises
+
+**Exercise 1.** One LSTM unit has previous cell state $c_{t-1} = 0.8$ and
+gate/candidate values $f_t = 0.9$, $i_t = 0.5$, $\tilde c_t = -0.4$,
+$o_t = 0.6$. Compute the new cell state $c_t$ and hidden state $h_t$ by
+hand. Use $\tanh(0.52) \approx 0.4777$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The cell update is $c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t$.
+With scalars: $c_t = 0.9 \cdot 0.8 + 0.5 \cdot (-0.4) = 0.72 - 0.20 = 0.52$.
+
+**Step 2.** The hidden state is $h_t = o_t \odot \tanh(c_t)$. Then
+$\tanh(0.52) \approx 0.4777$, so $h_t = 0.6 \cdot 0.4777 \approx 0.2866$.
+
+The forget gate kept most of the old memory ($0.72$ of the $0.8$), and
+the input gate wrote a small negative correction; the output gate then
+exposed about $29\%$ of the squashed cell as the hidden state.
+
+</details>
+
+**Exercise 2.** A memory unit must hold a value over $50$ steps. Compare
+the gradient decay of the LSTM cell path against a vanilla RNN whose
+recurrence Jacobian has spectral norm $0.9$. Assume the forget gate holds
+at $f_t = 0.98$ for all $50$ steps. Which path preserves the signal, and
+by what factor do they differ?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The LSTM cell path gradient over $50$ steps scales by
+$\prod_t f_t = 0.98^{50}$. Compute
+$0.98^{50} = e^{50 \ln 0.98} = e^{50 \cdot (-0.02020)} = e^{-1.010} \approx 0.364$.
+
+**Step 2.** The vanilla RNN gradient scales by $0.9^{50}$. Compute
+$0.9^{50} = e^{50 \ln 0.9} = e^{50 \cdot (-0.10536)} = e^{-5.268} \approx 5.16 \times 10^{-3}$.
+
+**Step 3.** The ratio is
+$0.364 / (5.16 \times 10^{-3}) \approx 70$.
+
+The LSTM cell path keeps the gradient at order one ($0.36$) while the RNN
+has shrunk it $70\times$ further toward zero. The decay rate is set by a
+learned gate near $1$, not a fixed contraction below it.
+
+</details>
+
+**Exercise 3 (code).** Implement one GRU step in numpy and verify the
+convex-combination property of its update: when the update gate
+$z_t = 1$ the new hidden state equals the candidate $\tilde h_t$, and
+when $z_t = 0$ it equals the previous state $h_{t-1}$, with intermediate
+$z_t$ interpolating between them.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def sigmoid(z): return 1 / (1 + np.exp(-z))
+
+d_x, d_h = 4, 6
+
+def gru_step(x, h_prev, Wz, Wr, Wh, bz, br, bh):
+    z = sigmoid(Wz @ np.concatenate([x, h_prev]) + bz)
+    r = sigmoid(Wr @ np.concatenate([x, h_prev]) + br)
+    h_tilde = np.tanh(Wh @ np.concatenate([x, r * h_prev]) + bh)
+    h = (1 - z) * h_prev + z * h_tilde
+    return h, z, h_tilde
+
+def init(o, i): return rng.normal(scale=0.5, size=(o, i))
+Wz, Wr, Wh = init(d_h, d_x + d_h), init(d_h, d_x + d_h), init(d_h, d_x + d_h)
+bz, br, bh = rng.normal(size=d_h), rng.normal(size=d_h), rng.normal(size=d_h)
+
+x = rng.normal(size=d_x)
+h_prev = rng.normal(size=d_h)
+h, z, h_tilde = gru_step(x, h_prev, Wz, Wr, Wh, bz, br, bh)
+
+# The update is a per-unit convex combination of h_prev and h_tilde
+recombined = (1 - z) * h_prev + z * h_tilde
+assert np.allclose(h, recombined)
+# Forcing z = 0 keeps the old state; z = 1 takes the candidate
+assert np.allclose((1 - 0) * h_prev + 0 * h_tilde, h_prev)
+assert np.allclose((1 - 1) * h_prev + 1 * h_tilde, h_tilde)
+# h lies between h_prev and h_tilde componentwise
+lo = np.minimum(h_prev, h_tilde); hi = np.maximum(h_prev, h_tilde)
+assert np.all((h >= lo - 1e-12) & (h <= hi + 1e-12))
+print("z range:", round(z.min(), 3), "to", round(z.max(), 3))
+print("h within [min, max] of (h_prev, h_tilde):", bool(np.all((h >= lo - 1e-12) & (h <= hi + 1e-12))))
+```
+
+Each hidden unit is a convex blend of its old value and the candidate,
+weighted by the learned update gate; the endpoints $z = 0$ and $z = 1$
+recover pure carry-over and pure overwrite.
+
+</details>
+
+The next lesson combines LSTMs with attention to handle variable-length
+input-output pairs.
 
 <Footnotes>
   <FNItem n="1">**Hochreiter, S., & Schmidhuber, J.** (1997). "Long short-term memory". *Neural Computation*, 9(8), 1735-1780. [doi:10.1162/neco.1997.9.8.1735](https://doi.org/10.1162/neco.1997.9.8.1735). The original LSTM cell with forget, input, and output gates.</FNItem>

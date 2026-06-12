@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: object-detection
 order: 5
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Move from R-CNN's two-stage proposal-and-classify to YOLO's single-shot grid and DETR's set-prediction Transformer."
 prerequisites: ["cnn-architectures"]
 codeExempt: true
@@ -152,6 +152,87 @@ graph LR
   no NMS.
 
 For new projects in 2024+, an RT-DETR or YOLOv8 is the sensible default.
+
+## Exercises
+
+**Exercise 1.** A predicted box has corners $(1, 1, 5, 4)$ in
+$(x_1, y_1, x_2, y_2)$ format; the ground-truth box is $(3, 2, 7, 6)$.
+Compute the intersection-over-union (IoU) by hand and decide whether this
+detection counts as correct at the standard $0.5$ threshold.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The intersection rectangle spans
+$x \in [\max(1, 3), \min(5, 7)] = [3, 5]$ (width $2$) and
+$y \in [\max(1, 2), \min(4, 6)] = [2, 4]$ (height $2$), so its area is
+$2 \cdot 2 = 4$.
+
+**Step 2.** The predicted box has area $(5 - 1)(4 - 1) = 12$; the
+ground-truth box has area $(7 - 3)(6 - 2) = 16$. The union is
+$12 + 16 - 4 = 24$.
+
+**Step 3.** $\text{IoU} = \frac{4}{24} = \frac{1}{6} \approx 0.167$. This
+is below $0.5$, so the detection does not count as a true positive at the
+standard threshold.
+
+</details>
+
+**Exercise 2.** RetinaNet's focal loss is
+$\text{FL}(p_t) = -(1 - p_t)^\gamma \log p_t$, where $p_t$ is the model's
+probability on the true class. Compare the loss an easy example
+($p_t = 0.9$) and a hard example ($p_t = 0.1$) contribute under standard
+cross-entropy ($\gamma = 0$) versus focal loss with $\gamma = 2$, and
+explain how this addresses class imbalance.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $\gamma = 0$ focal loss reduces to cross-entropy
+$-\log p_t$. The easy example contributes $-\log 0.9 \approx 0.105$; the
+hard one contributes $-\log 0.1 \approx 2.303$. The ratio is about $22$.
+
+**Step 2.** With $\gamma = 2$ the modulating factor $(1 - p_t)^2$ scales
+each term. Easy: $(1 - 0.9)^2 \cdot 0.105 = 0.01 \cdot 0.105 \approx 0.00105$.
+Hard: $(1 - 0.1)^2 \cdot 2.303 = 0.81 \cdot 2.303 \approx 1.865$.
+
+**Step 3.** The easy example's loss drops by a factor of $100$ while the
+hard example's drops by only about $1.24$. The new ratio is roughly
+$1.865 / 0.00105 \approx 1780$. Detection produces tens of thousands of
+mostly-background (easy, well-classified) boxes, so summed over the image
+their gradient would swamp the few hard foreground boxes. The
+$(1 - p_t)^\gamma$ factor suppresses the easy majority so the gradient is
+dominated by the hard cases.
+
+</details>
+
+**Exercise 3.** Non-maximum suppression and DETR's bipartite matching
+both ensure one prediction per object, but at different stages. Contrast
+where each acts and explain why DETR can drop NMS while a YOLO cannot.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A YOLO or Faster R-CNN head emits many overlapping boxes for
+one object (multiple anchors and grid cells fire on the same thing).
+Nothing in training forces these to specialize, so at **inference** NMS
+sorts by confidence and greedily deletes lower-confidence boxes that
+overlap a kept box above an IoU threshold.
+
+**Step 2.** DETR instead applies a **Hungarian bipartite matching** at
+**training time**: each of the $N$ object queries is matched one-to-one
+with a ground-truth box, and unmatched queries are trained to predict
+"no object". The loss directly penalizes duplicate predictions of the
+same object.
+
+**Step 3.** Because DETR's queries are trained to divide the objects
+among themselves, at inference each object is claimed by a single query,
+so no overlap-removal post-processing is needed. A YOLO's anchors have no
+such one-to-one training signal, so duplicates survive to inference and
+NMS is required to remove them.
+
+</details>
+
 The next lesson tackles pixel-level prediction: segmentation.
 
 <Footnotes>

@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: segmentation
 order: 6
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Use U-Net for per-pixel labels and Mask R-CNN for per-instance masks, and understand encoder-decoder skip connections."
 prerequisites: ["object-detection"]
 codeExempt: true
@@ -117,6 +117,77 @@ graph LR
   D --> M["per-pixel labels"]
   E -.->|skip connections| D
 ```
+
+## Exercises
+
+**Exercise 1.** For a single class, a predicted mask and the ground-truth
+mask overlap in $30$ pixels. The prediction covers $50$ pixels and the
+ground truth covers $40$. Compute the mask IoU and the Dice coefficient
+$\frac{2|A \cap B|}{|A| + |B|}$, and note which is larger.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The intersection is $|A \cap B| = 30$. The union is
+$|A| + |B| - |A \cap B| = 50 + 40 - 30 = 60$, so
+$\text{IoU} = \frac{30}{60} = 0.5$.
+
+**Step 2.** Dice is
+$\frac{2 \cdot 30}{50 + 40} = \frac{60}{90} = 0.667$.
+
+**Step 3.** Dice exceeds IoU here, which holds in general for any
+imperfect overlap: with $i = |A \cap B|$ and $u$ the union,
+$\text{Dice} = \frac{2i}{u + i} \ge \frac{i}{u} = \text{IoU}$ since
+$u \ge i$. The two agree only at $0$ and at a perfect match.
+
+</details>
+
+**Exercise 2.** Panoptic Quality is
+$\text{PQ} = \frac{\sum_{\text{TP}} \text{IoU}}{\text{TP} + 0.5(\text{FP} + \text{FN})}$.
+A scene has $4$ true-positive matched segments with IoUs
+$0.9, 0.8, 0.7, 0.6$, plus $1$ false positive and $1$ false negative.
+Compute PQ.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sum the matched IoUs: $0.9 + 0.8 + 0.7 + 0.6 = 3.0$.
+
+**Step 2.** The denominator is
+$\text{TP} + 0.5(\text{FP} + \text{FN}) = 4 + 0.5(1 + 1) = 4 + 1 = 5$.
+
+**Step 3.** $\text{PQ} = \frac{3.0}{5} = 0.6$. PQ factors as segmentation
+quality (mean matched IoU $= 3.0 / 4 = 0.75$) times recognition quality
+($\text{TP} / (\text{TP} + 0.5(\text{FP} + \text{FN})) = 4 / 5 = 0.8$),
+and $0.75 \cdot 0.8 = 0.6$ confirms the result.
+
+</details>
+
+**Exercise 3.** Removing U-Net's encoder-to-decoder skip connections
+leaves only the bottleneck path. Explain in terms of spatial resolution
+why the output becomes blurry, and why the skip connections fix it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The encoder downsamples the image from $H$ to $H/16$ across
+its stages. The bottleneck feature map is low-resolution: each of its
+cells summarizes a large input region, so fine spatial information (exact
+boundary locations, thin structures) has been pooled away and cannot be
+recovered by upsampling alone.
+
+**Step 2.** Without skips, the decoder must reconstruct the full-resolution
+mask from only this coarse bottleneck. Upsampling spreads each coarse cell
+over many output pixels, so boundaries land roughly where the coarse cell
+sat: the mask is blurry at object edges.
+
+**Step 3.** Skip connections concatenate the encoder's high-resolution
+feature maps into the decoder at each matching scale. Those maps still
+carry the fine spatial detail that the bottleneck discarded, so the
+decoder can place boundaries precisely instead of interpolating them from
+the coarse path.
+
+</details>
 
 ## What changed with foundation models
 

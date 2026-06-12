@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: flow-matching
 order: 9
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Train continuous-time generators by matching vector fields (flow matching, rectified flow) and distill them into one-step samplers (consistency models)."
 prerequisites: ["diffusion", "normalizing-flows"]
 codeExempt: true
@@ -133,6 +133,86 @@ strong multimodal text encoder. The next subsection (D5) returns to a
 different problem: pretraining representations without labels.
 
 ![Flow matching transports a base Gaussian to the data along straight conditional paths: every sample rides a line from noise (t=0) to a target point (t=1), morphing the cloud into the ring.](/figures/D4/flow-matching.svg)
+
+## Exercises
+
+**Exercise 1.** For the straight-line Gaussian path $x_t = (1 - t)x_0 + t x_1$ with
+endpoints $x_0 \sim p_0$, $x_1 \sim p_{\text{data}}$, derive the conditional vector
+field $u_t(x \mid x_0, x_1)$ that transports a sample along the path, and confirm it
+is the flow-matching target $x_1 - x_0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The vector field is the velocity of the path: the time derivative of
+position along the interpolation, holding the endpoints fixed.
+
+**Step 2.** Differentiate $x_t = (1 - t)x_0 + t x_1$ with respect to $t$:
+
+$$
+\frac{dx_t}{dt} = -x_0 + x_1 = x_1 - x_0.
+$$
+
+**Step 3.** This derivative is constant in $t$: along a straight line the velocity
+does not change. So $u_t(x \mid x_0, x_1) = x_1 - x_0$, the target the
+flow-matching loss regresses $v_\theta((1-t)x_0 + t x_1,\ t)$ onto. The straightness
+of the path is exactly why the target is a single direction rather than a
+schedule-dependent quantity.
+
+</details>
+
+**Exercise 2.** Compare the flow-matching loss to the DDPM loss
+$\mathbb{E}\lVert \epsilon - \epsilon_\theta(x_t, t)\rVert^2$. Identify what plays
+the role of the regression target in each, and explain why the lesson calls the
+flow-matching target "simpler".
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** DDPM regresses the network onto the noise sample $\epsilon$ that was
+added to form $x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1 - \bar\alpha_t}\,\epsilon$.
+The target is a Gaussian draw whose relationship to $x_t$ is mediated by the
+schedule coefficients $\bar\alpha_t$. The mapping from $(x_0, x_t, t)$ to the target
+depends on the chosen noise schedule.
+
+**Step 2.** Flow matching regresses the network onto $x_1 - x_0$, a straight-line
+direction between a base sample and a data sample. There is no schedule: the target
+is the difference of two endpoints, identical for every $t$ along a given path.
+
+**Step 3.** "Simpler" means the target carries no schedule and no parameterization
+choice (predict $\epsilon$ vs $x_0$ vs $v$). A single interpolation defines both
+the noisy input and the target velocity, so there are fewer design knobs and the
+paths are straight, which also reduces the number of integration steps needed at
+sampling time.
+
+</details>
+
+**Exercise 3.** A consistency model enforces $f_\theta(x_t, t) = f_\theta(x_{t'}, t')$
+for all $t, t'$ on the same trajectory, so one network call maps any noisy point to
+the clean sample. Explain why this property permits one-step sampling, and what is
+given up relative to a many-step diffusion sampler.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Diffusion sampling integrates the reverse process in many small steps
+because each step only removes a little noise; the clean sample emerges after the
+whole trajectory. A consistency model is trained so that evaluating $f_\theta$ at
+any point on a trajectory returns the same endpoint $\hat x_0$.
+
+**Step 2.** Given that property, sampling needs no integration: draw $x_T \sim
+\mathcal{N}(0, I)$ and evaluate $\hat x_0 = f_\theta(x_T, T)$ once. The consistency
+constraint has folded the entire reverse trajectory into a single function
+evaluation.
+
+**Step 3.** What is given up is fidelity per call. The many-step sampler corrects
+its trajectory at each step, so errors do not compound into one jump; the one-step
+map must approximate the whole trajectory with a single network, which is harder and
+typically slightly lower quality unless combined with a few refinement steps or
+adversarial losses. Consistency models trade some sample quality for one-or-two-step
+inference speed.
+
+</details>
 
 ## The big picture for D4
 

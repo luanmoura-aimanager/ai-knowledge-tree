@@ -4,7 +4,7 @@ pillar: D
 subId: D6
 lessonId: gcn-gat
 order: 3
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Instantiate message passing with normalized-Laplacian smoothing (GCN), sampled neighborhoods (GraphSAGE), and attention weights (GAT)."
 prerequisites: ["message-passing"]
 ---
@@ -222,9 +222,95 @@ print(f"GAT output norm per node: {np.linalg.norm(H_gat, axis=1).round(2)}")
 ```
 
 Each of the three layers produces per-node embeddings of the same
-shape but with different mixing rules. The next lesson generalizes
-GAT's attention to global attention over the whole graph: Graph
-Transformers.
+shape but with different mixing rules.
+
+## Exercises
+
+**Exercise 1.** In the two-triangle bridge graph, node 2 has self-inclusive
+neighbors $0, 1, 3$ (and itself), with self-loop degrees $\tilde d_2 = 4$,
+$\tilde d_0 = \tilde d_1 = 3$, $\tilde d_3 = 4$. Compute the GCN symmetric-
+normalization weight $1/\sqrt{\tilde d_2\, \tilde d_j}$ that node 2 assigns each
+of these four neighbors by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The weight to neighbor $j$ is $(\tilde D^{-1/2} \tilde A \tilde D^{-1/2})_{2j} = 1/\sqrt{\tilde d_2\, \tilde d_j}$ for an edge present in $\tilde A$.
+
+**Step 2.** To neighbors 0 and 1 (degree 3): $1/\sqrt{4 \cdot 3} = 1/\sqrt{12} \approx 0.289$ each.
+
+**Step 3.** To neighbor 3 and to itself (degree 4): $1/\sqrt{4 \cdot 4} = 1/4 = 0.25$ each.
+
+The high-degree neighbor 3 and the self-loop are downweighted relative to the
+lower-degree neighbors 0 and 1, which is the degree normalization preventing
+hubs from dominating.
+
+</details>
+
+**Exercise 2.** A GAT node $i$ attends over its self-inclusive neighborhood
+$\{i, a, b\}$ with pre-softmax LeakyReLU scores $e_{ii} = 1$, $e_{ia} = 1$,
+$e_{ib} = 2$. Compute the attention coefficients $\alpha_{ij}$ by hand and
+confirm they sum to 1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** GAT normalizes scores with a softmax over the neighborhood:
+$\alpha_{ij} = e^{e_{ij}} / \sum_k e^{e_{ik}}$.
+
+**Step 2.** The exponentials are $e^1 \approx 2.718$, $e^1 \approx 2.718$, and
+$e^2 \approx 7.389$, summing to $\approx 12.826$.
+
+**Step 3.** Divide each through:
+
+$$
+\alpha_{ii} = \alpha_{ia} = \frac{2.718}{12.826} \approx 0.212, \qquad \alpha_{ib} = \frac{7.389}{12.826} \approx 0.576.
+$$
+
+They sum to $0.212 + 0.212 + 0.576 = 1.0$. The neighbor with the higher score
+$b$ captures most of the attention, the data-dependent weighting GCN cannot do.
+
+</details>
+
+**Exercise 3 (code).** Implement the GCN symmetric normalization
+$\tilde D^{-1/2} \tilde A \tilde D^{-1/2}$ directly in numpy on the two-triangle
+bridge graph. Assert that the normalized matrix is symmetric and that node 2's
+weights to neighbors 0 and 1 are $1/\sqrt{12}$ and to neighbor 3 and itself are
+$1/4$, matching Exercise 1.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+N = 6
+edges = [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3), (2, 3)]
+edges += [(j, i) for (i, j) in edges]
+A = np.zeros((N, N))
+for i, j in edges: A[i, j] = 1
+
+def gcn_norm(A):
+    A_tilde = A + np.eye(len(A))
+    deg = A_tilde.sum(axis=1)
+    D_inv_sqrt = np.diag(1 / np.sqrt(deg))
+    return D_inv_sqrt @ A_tilde @ D_inv_sqrt
+
+A_norm = gcn_norm(A)
+
+assert np.allclose(A_norm, A_norm.T)               # symmetric normalization
+assert np.isclose(A_norm[2, 0], 1 / np.sqrt(12))   # to degree-3 neighbor
+assert np.isclose(A_norm[2, 2], 0.25)              # to self (degree 4)
+print("node 2 weights:", A_norm[2].round(4))
+```
+
+The normalized adjacency is symmetric and its node-2 row reproduces the
+by-hand weights $0.289, 0.289, 0.25, 0.25$, fixed entirely by degrees.
+
+</details>
+
+The next lesson generalizes GAT's attention to global attention over the whole
+graph: Graph Transformers.
 
 <Footnotes>
   <FNItem n="1">**Kipf, T. N., & Welling, M.** (2017). "Semi-supervised classification with graph convolutional networks (GCN)". *ICLR*. [arXiv:1609.02907](https://arxiv.org/abs/1609.02907). The symmetric-normalization layer derived from spectral graph convolutions.</FNItem>

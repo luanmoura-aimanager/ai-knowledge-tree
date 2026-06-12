@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: ssl-vision
 order: 8
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Pretrain vision backbones without labels via student-teacher distillation (DINO) and masked image modeling (MAE)."
 prerequisites: ["vit"]
 codeExempt: true
@@ -126,6 +126,90 @@ graph LR
   R --> F["fine-tune on a<br/>small labeled set"]
   F --> T["downstream task"]
 ```
+
+## Exercises
+
+**Exercise 1.** MAE masks $75\%$ of patches and its encoder processes only
+the visible $25\%$. Self-attention is $O(N^2)$ in the token count $N$. By
+what factor is the encoder's attention cost reduced relative to processing
+all $N$ patches?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A full encoder attends over all $N$ tokens, costing
+$\propto N^2$.
+
+**Step 2.** The MAE encoder sees only the visible fraction $0.25 N$, so
+its attention cost is $\propto (0.25 N)^2 = 0.0625 N^2$.
+
+**Step 3.** The ratio is $\frac{0.0625 N^2}{N^2} = 0.0625 = \frac{1}{16}$,
+a $16\times$ reduction in attention cost. Dropping the masked tokens from
+the encoder (rather than feeding them as mask tokens) is what makes large
+MAEs cheap to pretrain; the masked positions reappear only in the small
+decoder.
+
+</details>
+
+**Exercise 2.** In DINO the teacher's parameters are an exponential moving
+average of the student's, and the loss pushes the student to match the
+teacher on different crops of the same image. A naive shortcut would make
+both networks output the same constant vector for every image (a collapse
+that drives the matching loss to zero). Explain the role of teacher
+centering and sharpening in preventing this.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The loss is minimized trivially if every output is the same
+distribution regardless of input: the student and teacher then always
+agree. This degenerate "constant output" solution carries no information
+about the image, so it must be blocked.
+
+**Step 2.** **Centering** subtracts a running mean of the teacher's
+outputs before the softmax. If one coordinate starts to dominate every
+output (the route to a constant), centering removes that shared component,
+penalizing the collapse toward a single direction.
+
+**Step 3.** **Sharpening** (a low softmax temperature on the teacher)
+pushes the teacher's target toward a confident, peaked distribution.
+Centering alone could instead collapse to the uniform distribution;
+sharpening counteracts that by rewarding peaked, input-specific targets.
+The two forces balance: centering blocks the one-coordinate collapse,
+sharpening blocks the uniform collapse, so the only stable solution is
+informative, input-dependent features. The EMA teacher provides a stable,
+slowly-moving target so this balance does not oscillate.
+
+</details>
+
+**Exercise 3.** DINO learns by matching features across two crops; MAE
+learns by reconstructing masked pixels. A practitioner wants frozen
+features that work well under a $k$-NN or linear probe with no
+fine-tuning. Which method's training objective is better aligned with
+that use, and why?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A $k$-NN or linear probe judges features by how well distance
+or a linear boundary separates classes in the frozen embedding space, so
+the goal is an embedding whose geometry already groups semantically
+similar images.
+
+**Step 2.** DINO's objective directly shapes this geometry: it forces two
+augmented crops of the same image to map to nearby feature distributions,
+which clusters views of the same content together and pushes the [CLS]
+embedding toward a semantic summary. This is why DINO reports strong $k$-NN
+accuracy without labels.
+
+**Step 3.** MAE optimizes pixel reconstruction of masked patches. Its
+encoder learns features useful for filling in pixels, which are excellent
+after **fine-tuning** but not necessarily linearly separable when frozen,
+since nothing in the objective enforces a clean class geometry in the raw
+embedding. For frozen-feature probing, DINO's invariance objective is
+better aligned; for fine-tuned transfer, MAE is competitive or better.
+
+</details>
 
 ## The big picture
 

@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: vit
 order: 4
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Tokenize an image into patches and apply a standard Transformer encoder; understand the ViT inductive-bias tradeoffs."
 prerequisites: ["cnn-architectures", "D3/transformer-arch"]
 ---
@@ -162,8 +162,98 @@ print(f"logits shape: {logits.shape}  (1 class probability vector per image)")
 ```
 
 The patchify embedding turns the image into a 16-token sequence (plus
-[CLS]) that any Transformer encoder can consume. The next lesson moves
-on from classification to localization: object detection.
+[CLS]) that any Transformer encoder can consume.
+
+## Exercises
+
+**Exercise 1.** A ViT processes a $384 \times 384 \times 3$ image with
+patch size $P = 16$. How many patch tokens does it produce, and what is
+the length of each flattened patch vector before projection?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The patches tile the image without overlap, so along each
+axis there are $384 / 16 = 24$ patches, giving $24 \times 24 = 576$ patch
+tokens. With the prepended [CLS] token the sequence length is $577$.
+
+**Step 2.** Each patch is $16 \times 16 \times 3$, flattened to a vector
+of length $16^2 \cdot 3 = 768$ before the linear projection to the model
+dimension $d$.
+
+</details>
+
+**Exercise 2.** Self-attention costs $O(N^2 d)$ in the number of tokens
+$N = (H/P)^2$. If the input resolution $H$ doubles at fixed patch size,
+by what factor does the per-layer attention cost grow? Explain why this
+motivates windowed attention.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Doubling $H$ doubles $H/P$ along each axis, so the token count
+$N = (H/P)^2$ grows by $2^2 = 4$.
+
+**Step 2.** Attention cost scales as $N^2$, so it grows by $4^2 = 16$.
+Doubling resolution multiplies the attention cost by $16$.
+
+**Step 3.** Global attention's quadratic-in-$N$ cost makes high-resolution
+inputs expensive. Windowed attention (Swin) restricts attention to local
+windows of fixed token count, making the cost linear in $N$ and so
+$O(H^2)$ rather than $O(H^4)$ in resolution.
+
+</details>
+
+**Exercise 3 (code).** Patchify is lossless: the non-overlapping patches
+partition the image, so reassembling them recovers the original. Implement
+patchify and its inverse, and verify reconstruction on a $32 \times 32$
+image with $P = 8$ (confirm the token count is $16$).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def patchify(img, P):
+    H, W, C = img.shape
+    patches = []
+    for i in range(0, H, P):
+        for j in range(0, W, P):
+            patches.append(img[i:i+P, j:j+P, :].copy())
+    return patches
+
+def unpatchify(patches, H, W, P, C):
+    img = np.zeros((H, W, C))
+    idx = 0
+    for i in range(0, H, P):
+        for j in range(0, W, P):
+            img[i:i+P, j:j+P, :] = patches[idx]
+            idx += 1
+    return img
+
+H = W = 32
+C = 3
+P = 8
+img = rng.normal(size=(H, W, C))
+
+patches = patchify(img, P)
+N = (H // P) * (W // P)
+assert len(patches) == N == 16                    # token count
+recon = unpatchify(patches, H, W, P, C)
+assert np.allclose(recon, img)                    # lossless partition
+print("tokens:", N, " reconstruction max error:", np.abs(recon - img).max())
+```
+
+The $32 \times 32$ image yields $16$ patch tokens, and reassembling them
+recovers the original exactly, confirming that patchify only reshapes.
+
+</details>
+
+The next lesson moves on from classification to localization: object
+detection.
 
 <Footnotes>
   <FNItem n="1">**Dosovitskiy, A., et al.** (2021). "An image is worth 16x16 words: transformers for image recognition at scale (ViT)". *ICLR*. [arXiv:2010.11929](https://arxiv.org/abs/2010.11929). Patch tokenization plus a standard Transformer encoder.</FNItem>

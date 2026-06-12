@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: dl-optimizers
 order: 9
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Move from SGD with momentum to Adam, AdamW, and learning-rate schedulers in the deep-learning regime."
 prerequisites: ["A3/adaptive-methods", "regularization"]
 ---
@@ -192,7 +192,97 @@ print(f"\nschedule values: t=0 -> {schedule[0]:.2e}, t={warmup} -> {schedule[war
 
 AdamW closes the ill-conditioned quadratic far faster than SGD with
 momentum because it rescales per coordinate; the warmup-cosine schedule
-starts at zero, peaks at warmup, and decays to zero. This closes the D1
+starts at zero, peaks at warmup, and decays to zero.
+
+## Exercises
+
+**Exercise 1.** Take one AdamW step by hand on a single coordinate. With
+$\theta_0 = 1$, gradient $g = 2$, $\beta_1 = 0.9$, $\beta_2 = 0.999$,
+$\eta = 0.1$, $\lambda = 0.1$, $\varepsilon = 0$, and zero-initialized moments,
+compute $\theta_1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Moments after one step:
+$m_1 = (1 - 0.9)\cdot 2 = 0.2$ and
+$v_1 = (1 - 0.999)\cdot 2^2 = 0.004$.
+
+**Step 2.** Bias correction at $t = 1$:
+$\hat m_1 = 0.2 / (1 - 0.9) = 2$ and
+$\hat v_1 = 0.004 / (1 - 0.999) = 4$, so $\sqrt{\hat v_1} = 2$.
+
+**Step 3.** AdamW update with decoupled decay:
+
+$$
+\theta_1 = \theta_0 - \eta\!\left(\frac{\hat m_1}{\sqrt{\hat v_1}} + \lambda\theta_0\right)
+         = 1 - 0.1\left(\frac{2}{2} + 0.1\cdot 1\right) = 1 - 0.11 = 0.89.
+$$
+
+The adaptive term contributes a unit-size step regardless of the gradient
+magnitude; the $0.01$ comes from the decoupled weight decay.
+
+</details>
+
+**Exercise 2.** Show why plain Adam couples weight decay to curvature. For two
+coordinates with the same decay $\lambda$ but second-moment estimates
+$\hat v_a = 1$ and $\hat v_b = 100$, compute the effective decay each receives
+when the $\lambda\theta$ term is folded into the gradient (so it passes through
+the $1/\sqrt{\hat v}$ rescaling).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In plain Adam the decay rides inside the gradient, so the update
+divides $\lambda\theta$ by $\sqrt{\hat v} + \varepsilon \approx \sqrt{\hat v}$.
+
+**Step 2.** Coordinate $a$: effective decay $\lambda / \sqrt{1} = \lambda$.
+Coordinate $b$: $\lambda / \sqrt{100} = \lambda / 10$.
+
+**Step 3.** The flat coordinate is decayed $10\times$ harder than the steep
+one, the ratio $\sqrt{\hat v_b / \hat v_a} = 10$, even though both were assigned
+the same $\lambda$. AdamW removes the division, so both decay by exactly
+$\lambda\theta$.
+
+</details>
+
+**Exercise 3 (code).** Implement a step-decay schedule (multiply the base LR by
+$0.1$ every $N$ epochs) and assert it produces the expected piecewise-constant
+values. Then confirm the warmup-cosine schedule from the lesson is continuous
+at the warmup boundary.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def step_decay(epoch, base_lr=0.1, drop=0.1, every=30):
+    return base_lr * drop ** (epoch // every)
+
+assert np.isclose(step_decay(0), 0.1)
+assert np.isclose(step_decay(29), 0.1)
+assert np.isclose(step_decay(30), 0.01)
+assert np.isclose(step_decay(60), 0.001)
+
+def cosine_warmup(t, warmup, total, base_lr):
+    if t < warmup:
+        return base_lr * t / warmup
+    progress = (t - warmup) / (total - warmup)
+    return base_lr * 0.5 * (1 + np.cos(np.pi * progress))
+
+base_lr, warmup, total = 1e-3, 100, 1000
+# At the boundary the warmup ramp reaches base_lr and cosine starts at base_lr
+left = cosine_warmup(warmup - 1, warmup, total, base_lr)
+peak = cosine_warmup(warmup, warmup, total, base_lr)
+assert np.isclose(peak, base_lr)
+assert abs(peak - left) < base_lr / warmup + 1e-12   # continuous to one ramp step
+print("step decay and warmup-cosine schedules verified")
+```
+
+</details>
+
+This closes the D1
 core-building-blocks track. The next subsection (D2) applies these
 foundations to image data with convolutional networks.
 

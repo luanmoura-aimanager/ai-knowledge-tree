@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: neural-rendering
 order: 9
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Represent a 3D scene as a learned radiance field or a set of anisotropic Gaussians, and render novel views."
 prerequisites: ["D1/mlp-forward"]
 codeExempt: true
@@ -148,6 +148,91 @@ graph LR
   D --> V["volume rendering:<br/>integrate along ray"]
   V --> P["pixel color"]
 ```
+
+## Exercises
+
+**Exercise 1.** Discretized volume rendering composites $N$ samples along
+a ray front-to-back. With per-sample opacities $\alpha_i$ and colors
+$c_i$, the transmittance reaching sample $i$ is
+$T_i = \prod_{j < i}(1 - \alpha_j)$, the weight is $w_i = T_i \alpha_i$,
+and $C = \sum_i w_i c_i$. For three samples with
+$\alpha = (0.5, 0.5, 1.0)$ and grayscale colors $c = (1.0, 0.5, 0.0)$,
+compute the weights and the final pixel color by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Sample $1$: $T_1 = 1$ (nothing in front), so
+$w_1 = 1 \cdot 0.5 = 0.5$.
+
+**Step 2.** Sample $2$: $T_2 = (1 - 0.5) = 0.5$, so
+$w_2 = 0.5 \cdot 0.5 = 0.25$. Sample $3$:
+$T_3 = (1 - 0.5)(1 - 0.5) = 0.25$, so $w_3 = 0.25 \cdot 1.0 = 0.25$.
+
+**Step 3.** The weights $0.5 + 0.25 + 0.25 = 1.0$ sum to one (the third
+sample is fully opaque, so no light passes beyond it). The color is
+
+$$
+C = 0.5 \cdot 1.0 + 0.25 \cdot 0.5 + 0.25 \cdot 0.0 = 0.5 + 0.125 = 0.625.
+$$
+
+</details>
+
+**Exercise 2.** NeRF feeds positions through a Fourier-feature encoding
+$\gamma(\mathbf{x})$ before the MLP, and the paper reports a blurry blob
+without it. Explain why a plain coordinate MLP struggles to represent
+high-frequency detail and how the encoding fixes it.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A standard MLP applied directly to raw coordinates
+$\mathbf{x}$ is biased toward low-frequency functions: nearby inputs map
+to nearby outputs, and the network must spend large weights to make its
+output change rapidly over small spatial distances. Sharp geometry and
+texture are exactly such rapid changes, so the MLP smooths them into a
+blob.
+
+**Step 2.** The encoding
+$\gamma(\mathbf{x}) = (\sin(2^0 \pi \mathbf{x}), \cos(2^0 \pi \mathbf{x}), \dots, \sin(2^L \pi \mathbf{x}), \cos(2^L \pi \mathbf{x}))$
+maps each coordinate to a bank of sinusoids at geometrically increasing
+frequencies. Two nearby points now differ substantially in the
+high-frequency channels.
+
+**Step 3.** The MLP can then express rapid spatial variation as a simple
+combination of these high-frequency features, instead of having to
+synthesize them from raw coordinates. Fine geometric detail becomes
+representable, which is why the same network goes from a blob to sharp
+reconstruction once the encoding is prepended.
+
+</details>
+
+**Exercise 3.** A real-time application (interactive walkthrough, 100+ FPS)
+must pick between a vanilla NeRF and Gaussian Splatting. Argue which to
+choose from the rendering cost of each representation, then name one
+situation that would flip the choice back to NeRF.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Vanilla NeRF renders a pixel by marching a ray, sampling many
+points, and querying a multilayer MLP at every sample, then integrating.
+The per-pixel MLP evaluations and volumetric integration cost minutes per
+frame, far from real time.
+
+**Step 2.** Gaussian Splatting represents the scene as explicit 3D
+Gaussians. Rendering projects each Gaussian to a 2D splat and alpha-blends
+them, with no neural-network query and no ray marching. This rasterization
+runs at 100+ FPS on a single GPU, so it is the right choice for the
+real-time walkthrough.
+
+**Step 3.** The choice flips back to NeRF when a **continuous** or compact
+representation is required: for example feeding the scene into a downstream
+physics simulation that needs a continuous density field, or shipping a
+single small MLP rather than millions of Gaussians. There NeRF's
+continuity and compactness outweigh its rendering cost.
+
+</details>
 
 ## What's next in 3D vision
 

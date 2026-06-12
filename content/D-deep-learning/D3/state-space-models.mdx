@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: state-space-models
 order: 8
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Replace attention with structured state space models (S4, Mamba) for linear-time sequence mixing."
 prerequisites: ["transformer-arch"]
 codeExempt: true
@@ -141,6 +141,115 @@ some of the gating flexibility of LSTM while preserving the parallel
 training story.
 
 ![An SSM's convolution kernel is a sum of decaying modes λᵏ: eigenvalues near 1 decay slowly and carry long-range memory, while small ones forget almost immediately.](/figures/D3/state-space-models.svg)
+
+## Exercises
+
+**Exercise 1.** Unroll the discrete SSM recurrence $h_k = \bar A h_{k-1} + \bar B u_k$, $y_k = C h_k$ (with $h_0 = 0$) and show that the output is a convolution $y_k = \sum_{j=0}^{k-1} K_j\, u_{k-j}$. Give the convolution kernel $K_j$ in terms of $\bar A, \bar B, C$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Apply the recurrence repeatedly from $h_0 = 0$:
+
+$$
+h_k = \sum_{i=1}^{k} \bar A^{\,k-i}\, \bar B\, u_i.
+$$
+
+Each input $u_i$ enters at step $i$ and is propagated forward by $k - i$
+applications of $\bar A$.
+
+**Step 2.** Project to the output with $C$:
+
+$$
+y_k = C h_k = \sum_{i=1}^{k} C \bar A^{\,k-i} \bar B\, u_i.
+$$
+
+**Step 3.** Re-index with $j = k - i$ (so $i = k - j$, $j$ runs from $0$
+to $k-1$):
+
+$$
+y_k = \sum_{j=0}^{k-1} \left(C \bar A^{\,j} \bar B\right) u_{k-j}.
+$$
+
+This is a convolution with kernel $K_j = C \bar A^{\,j} \bar B$. The
+kernel is fixed (input-independent) for a non-selective SSM, which is
+exactly why training can run as a single convolution in parallel rather
+than stepping the recurrence.
+
+</details>
+
+**Exercise 2.** Take the SSM diagonal so $\bar A = \operatorname{diag}(\lambda_1,
+\dots, \lambda_d)$ with each $|\lambda_i| < 1$. Show that the kernel
+$K_j = C \bar A^{\,j} \bar B$ is a sum of decaying geometric modes
+$\lambda_i^{\,j}$, and explain what an eigenvalue near 1 versus near 0
+does to the model's memory. (This is the behavior the lesson's figure
+plots.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $\bar A$ diagonal, $\bar A^{\,j} =
+\operatorname{diag}(\lambda_1^{\,j}, \dots, \lambda_d^{\,j})$. Writing
+$C = (c_1, \dots, c_d)$ as a row and $\bar B = (b_1, \dots, b_d)^\top$ as
+a column,
+
+$$
+K_j = C \bar A^{\,j} \bar B = \sum_{i=1}^{d} c_i\, \lambda_i^{\,j}\, b_i.
+$$
+
+The kernel at lag $j$ is a weighted sum of the powers $\lambda_i^{\,j}$,
+one geometric sequence per state coordinate.
+
+**Step 2.** Each mode $\lambda_i^{\,j}$ decays geometrically in the lag
+$j$ because $|\lambda_i| < 1$. The decay rate is set by $|\lambda_i|$:
+the half-life of mode $i$ is the lag $j$ at which $|\lambda_i|^{\,j} =
+\tfrac12$, namely $j = \log(1/2) / \log|\lambda_i|$.
+
+**Step 3.** An eigenvalue with $|\lambda_i|$ close to 1 decays slowly, so
+its mode keeps a large weight at large lag $j$: that coordinate carries
+long-range memory, mixing inputs from far in the past into the current
+output. An eigenvalue close to 0 decays almost immediately ($\lambda_i^1
+\approx 0$), so its mode forgets after one or two steps and contributes
+only local context. The spectrum of $\bar A$ is the model's memory
+spectrum, which is what HiPPO initialization is chosen to shape.
+
+</details>
+
+**Exercise 3.** Mamba makes $B$ and $C$ (and the step $\Delta$) functions
+of the input token, calling the result a *selective* SSM. Explain why
+this input-dependence breaks the convolution view of Exercise 1, and what
+the model gives up and gains by accepting that. Contrast the asymptotic
+inference cost of a selective SSM with softmax attention for generating a
+sequence of length $N$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The convolution view of Exercise 1 relied on a *fixed* kernel
+$K_j = C \bar A^{\,j} \bar B$, the same at every position. When $\bar B,
+C, \Delta$ depend on the input token $u_k$, the effective kernel changes
+from step to step, so there is no single $K$ to convolve with: the output
+is no longer a convolution of the input with a position-independent
+filter.
+
+**Step 2.** What it gives up: the simple parallel-convolution training
+path. Mamba recovers parallelism with a hardware-aware parallel-scan
+kernel instead of an FFT convolution, which is more engineering but still
+$O(N)$ work. What it gains: content-based selection. Like attention's
+content addressing, the model can choose what to write into and read from
+its state based on the current token, which fixes copy/lookup tasks that
+a fixed-kernel SSM handles poorly.
+
+**Step 3.** Inference cost for length $N$. A selective SSM keeps a
+fixed-size hidden state $h_k \in \mathbb{R}^d$ and updates it in $O(d)$
+per token, so generating $N$ tokens is $O(Nd)$ time with $O(d)$ memory:
+constant per-token cost, no growing cache. Softmax attention stores a KV
+cache that grows to length $N$ and scores each new query against the
+whole cache, an $O(Nd)$ per-token cost and $O(N^2 d)$ total, with $O(Nd)$
+cache memory. The SSM's constant per-token cost is the long-context
+advantage.
+
+</details>
 
 ## The big picture
 

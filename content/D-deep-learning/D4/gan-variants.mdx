@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: gan-variants
 order: 5
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Survey StyleGAN's style-based generator and BigGAN's large-batch stabilization tricks."
 prerequisites: ["gan"]
 codeExempt: true
@@ -129,6 +129,90 @@ graph LR
   D --> S["real or fake score"]
   S -.->|adversarial gradient| G
 ```
+
+## Exercises
+
+**Exercise 1.** StyleGAN injects the intermediate latent $w$ through AdaIN at
+every spatial resolution rather than feeding $z$ only to the first layer. Explain
+how this enables coarse-to-fine control, and what mixing $w$ from two sources at
+different layer ranges does to the generated image.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** In a convolutional generator, early layers operate at low spatial
+resolution and set global structure (pose, overall shape); later layers operate at
+high resolution and set fine detail (texture, color nuance). Feeding the style $w$
+into every layer's AdaIN means $w$ controls the feature statistics separately at
+each scale.
+
+**Step 2.** Because each resolution's normalization is driven by $w$, the latent
+exerts coarse control at early layers and fine control at late layers. Editing $w$
+and observing which scale of layer it feeds isolates which attributes it governs:
+the same $w$ change at an early layer moves pose, at a late layer moves texture.
+
+**Step 3.** Mixing means using $w_1$ for the early layer range and $w_2$ for the
+late range. The image then takes coarse attributes (pose, face shape) from source
+$1$ and fine attributes (skin texture, hair detail, color) from source $2$. Style
+mixing is the direct consequence of injecting style per resolution rather than once
+at the input.
+
+</details>
+
+**Exercise 2.** BigGAN's truncation trick samples the input $z$ from a Gaussian
+truncated to $\lVert z \rVert$ below a threshold at inference time. Explain why a
+smaller truncation threshold raises sample quality but lowers diversity, in terms of
+where the generator was well trained.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** During training, $z$ is drawn from the full Gaussian, but the density
+concentrates near the mode (small $\lVert z \rVert$); extreme-norm draws are rare,
+so the generator sees few of them and is trained least well in the tails. Points
+near the center of $z$-space map to the generator's most reliable, high-quality
+outputs.
+
+**Step 2.** A small truncation threshold rejects large-norm $z$ and resamples,
+keeping only central codes. These decode to the high-quality, near-average samples
+the generator handles best, so average fidelity rises. The cost is that the
+rejected tail carried the unusual, atypical samples, so the output set loses
+variety: many draws look similar.
+
+**Step 3.** A large threshold admits more of the tail, recovering diversity but
+including the poorly-trained regions where the generator produces artifacts. The
+threshold thus slides smoothly between high-quality-low-diversity and
+low-quality-high-diversity, a quality/diversity dial set at inference without
+retraining.
+
+</details>
+
+**Exercise 3.** CycleGAN learns unpaired image-to-image translation between domains
+$X$ and $Y$ using two generators $G: X \to Y$, $F: Y \to X$ and a cycle-consistency
+loss $\lVert F(G(x)) - x\rVert$. Explain what failure the cycle loss prevents that
+the adversarial losses alone would allow.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The adversarial loss on $G$ only requires that $G(x)$ look like a
+sample from domain $Y$; it says nothing about which $y$ a given $x$ maps to. A
+generator could map every input to one convincing $Y$ image, or permute content
+arbitrarily, and still fool the discriminator. Without paired supervision, nothing
+ties the output's content to the input's content.
+
+**Step 2.** The cycle loss requires $F(G(x)) \approx x$: translating to $Y$ and
+back must recover the original. To satisfy it, $G$ must preserve enough of $x$'s
+content that $F$ can invert it, which rules out collapsing many inputs to one
+output (that would be non-invertible) and rules out discarding the input's
+structure.
+
+**Step 3.** So the cycle loss supplies the content-preservation constraint that
+unpaired data lacks. The adversarial losses make outputs look like the target
+domain; the cycle loss makes the mapping a content-preserving bijection rather than
+an arbitrary one that merely matches the domain's statistics.
+
+</details>
 
 ## The next lesson
 

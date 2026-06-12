@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: compilation
 order: 5
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Trace, fuse, and lower DL graphs through torch.compile, XLA, and custom Triton kernels for speed."
 prerequisites: []
 codeExempt: true
@@ -153,6 +153,84 @@ For a typical PyTorch training pipeline:
 3. Profile and decide if specific layers need custom Triton kernels.
 
 For JAX, compilation is the default; eager-mode is rare.
+
+## Exercises
+
+**Exercise 1.** A SwiGLU feed-forward block runs five small element-wise ops
+in sequence (RMSNorm, two projections' activations, a SiLU, and a multiply).
+Each op in eager mode costs 5 microseconds of kernel-launch overhead and reads
+plus writes a 40 MB activation tensor to HBM at 3 TB/s. Estimate the per-op
+time eager mode spends on launch plus memory traffic, then state what fusing
+all five into one kernel removes.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Memory traffic per op: read 40 MB and write 40 MB is 80 MB. At
+3 TB/s, $80 \times 10^6 / 3 \times 10^{12} \approx 26.7$ microseconds.
+
+**Step 2.** Per-op total is launch plus traffic: $5 + 26.7 \approx 31.7$
+microseconds. Across five ops, eager mode spends $5 \times 31.7 \approx 158$
+microseconds, of which $5 \times 5 = 25$ microseconds is launch overhead and
+$5 \times 26.7 \approx 133$ microseconds is HBM round-trips of intermediates.
+
+**Step 3.** Fusing the five ops into one kernel pays one launch ($5$
+microseconds) and reads the input plus writes the final output once ($80$ MB,
+$\approx 26.7$ microseconds), keeping the four intermediate tensors in
+registers/SRAM. It removes four launches and eight intermediate HBM transfers,
+turning $\approx 158$ microseconds into $\approx 32$ microseconds, the kind of
+memory-bound speedup compilation targets.
+
+</details>
+
+**Exercise 2.** torch.compile pays a one-time tracing/compilation cost the
+first time a shape is seen, then reuses the compiled kernel. A training run
+does 50,000 steps at a fixed shape. Compilation costs 90 seconds once; each
+compiled step saves 8 ms over eager. Find the break-even step count and the
+net time saved over the run.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Break-even is when accumulated per-step savings equal the
+compilation cost: $90 \text{ s} / 0.008 \text{ s} = 11{,}250$ steps. After
+that, compilation is net positive.
+
+**Step 2.** Over 50,000 steps the savings are $50{,}000 \times 0.008 = 400$
+seconds.
+
+**Step 3.** Net time saved is $400 - 90 = 310$ seconds, about 5.2 minutes.
+The fixed compile cost is amortized roughly five times over, which is why
+compilation pays off for long fixed-shape training but not for a handful of
+calls.
+
+</details>
+
+**Exercise 3.** A model has highly dynamic shapes: the sequence length
+changes nearly every step, and torch.compile recompiles whenever it sees a new
+shape (a "recompilation storm"). The same model also has one fixed-shape
+sub-block (a per-token MLP head). Argue where compilation helps and where it
+hurts, and propose a layout that captures the win without the storm.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The dynamic part is the problem: each new sequence length triggers
+a fresh trace plus compile, and the compile cost is never amortized because
+the shape rarely repeats. Net effect is slower than eager, plus compile-cache
+churn.
+
+**Step 2.** The fixed-shape MLP head is the opposite: its shape is stable, so
+one compilation is reused across all steps and the fused element-wise ops give
+a steady speedup.
+
+**Step 3.** Compile selectively: wrap only the fixed-shape sub-block in
+torch.compile and leave the variable-length attention path in eager mode (or
+use dynamic-shape compilation with bucketed shapes so a small set of shapes is
+compiled once each). This captures the per-token MLP fusion win while avoiding
+recompilation for every new sequence length.
+
+</details>
 
 The next lesson covers the canonical example of a custom kernel that
 beat the default implementation by an order of magnitude:

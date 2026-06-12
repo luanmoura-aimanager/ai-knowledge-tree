@@ -4,7 +4,7 @@ pillar: D
 subId: D1
 lessonId: universal-approximation
 order: 4
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "State and use Cybenko / Hornik's theorem: one hidden layer with enough units can approximate any continuous function on a compact set."
 prerequisites: ["mlp-forward"]
 ---
@@ -131,8 +131,108 @@ for M in [5, 20, 100, 500]:
 
 The fit improves monotonically as the hidden width grows; with enough
 units, a single hidden layer reproduces the sinusoid to machine-precision
-RMSE. The next lesson picks the right $\sigma$ for the inner nonlinearity:
-ReLU and its modern variants.
+RMSE.
+
+## Exercises
+
+**Exercise 1.** The sketch builds a bump from two sigmoidal units. For a
+sharp sigmoid (large slope), the combination $c\,[\sigma(s(x - a)) - \sigma(s(x - b))]$
+with $a < b$ approximates a rectangular bump. State its approximate height
+and the interval over which it is nonzero, and explain what the height $c$
+and the gap $b - a$ control.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A sharp sigmoid $\sigma(s(x - a))$ with large slope $s$ is
+near $0$ for $x \ll a$ and near $1$ for $x \gg a$, switching on around
+$x = a$. Likewise $\sigma(s(x - b))$ switches on around $x = b$.
+
+**Step 2.** Their difference $\sigma(s(x - a)) - \sigma(s(x - b))$ is near
+$0$ outside $[a, b]$ (both terms agree) and near $1$ inside $[a, b]$ (the
+first is on, the second still off). Multiplying by $c$ gives a bump of
+height $\approx c$ supported on $[a, b]$.
+
+**Step 3.** So $c$ sets the bump height and $b - a$ sets its width;
+sliding $a, b$ moves it along the axis. Summing many such bumps, one per
+sub-interval, approximates any continuous function by a piecewise-constant
+staircase, which is the mechanism behind universal approximation.
+
+</details>
+
+**Exercise 2.** A ReLU unit is $\operatorname{ReLU}(wx + b) = \max(0, wx + b)$,
+a hinge. Show that a difference of two ReLU hinges produces a single
+"kink-up then kink-down" shape, and that with a third term you can build a
+triangular bump on the real line. Give the coefficients for a unit-height
+triangle peaking at $x = 0$ with support $[-1, 1]$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The combination $\operatorname{ReLU}(x + 1) - 2\operatorname{ReLU}(x) + \operatorname{ReLU}(x - 1)$
+is piecewise linear with breakpoints at $x = -1, 0, 1$. Evaluate the slope
+in each region by summing the active hinges' slopes.
+
+**Step 2.** For $x < -1$ all three are off, value $0$. For $-1 < x < 0$
+only the first is on, slope $+1$, so the value rises from $0$ at $x = -1$
+to $1$ at $x = 0$. For $0 < x < 1$ the first two are on, slope
+$1 - 2 = -1$, so the value falls from $1$ back to $0$ at $x = 1$. For
+$x > 1$ all three contribute, slope $1 - 2 + 1 = 0$, value $0$.
+
+**Step 3.** The result is a triangle of height $1$ peaking at $x = 0$ with
+support $[-1, 1]$, built from three ReLU units with output coefficients
+$(1, -2, 1)$. Tiling shifted copies of this triangle approximates any
+continuous one-dimensional function, the ReLU version of the bump
+construction.
+
+</details>
+
+**Exercise 3 (code).** Build the triangular bump from Exercise 2 with a
+hand-set ReLU network (no training), then verify it matches the target
+triangle and confirm the staircase idea: fit a small bump target
+$f(x) = \max(0, 1 - |x|)$ with a wider random ReLU layer and watch the
+error fall as width grows.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def relu(z): return np.maximum(0.0, z)
+
+x = np.linspace(-2, 2, 401)
+target = np.maximum(0.0, 1 - np.abs(x))    # unit triangle on [-1, 1]
+
+# Hand-built ReLU triangle: ReLU(x+1) - 2 ReLU(x) + ReLU(x-1)
+hand = relu(x + 1) - 2 * relu(x) + relu(x - 1)
+assert np.allclose(hand, target, atol=1e-12)
+
+# Staircase / random-feature fit: wider random hidden layer drives error down
+def fit_rmse(M):
+    w = rng.normal(scale=4.0, size=M)
+    b = rng.uniform(-2, 2, size=M)
+    Phi = relu(np.outer(x, w) + b)
+    c, *_ = np.linalg.lstsq(Phi, target, rcond=None)
+    return np.sqrt(np.mean((Phi @ c - target) ** 2))
+
+rmses = [fit_rmse(M) for M in [4, 16, 64, 256]]
+assert rmses[-1] < rmses[0]                 # error falls as width grows
+print("hand-built triangle matches target exactly")
+for M, r in zip([4, 16, 64, 256], rmses):
+    print(f"M = {M:>3}: RMSE = {r:.4f}")
+```
+
+The three hand-set ReLU units reproduce the triangle exactly, and the
+random wide layer's fit error drops as the hidden width grows, both
+illustrations of one hidden layer's universal-approximation reach.
+
+</details>
+
+The next lesson picks the right $\sigma$ for the inner nonlinearity: ReLU
+and its modern variants.
 
 <Footnotes>
   <FNItem n="1">**Cybenko, G.** (1989). "Approximation by superpositions of a sigmoidal function". *Mathematics of Control, Signals and Systems*, 2, 303-314. [doi:10.1007/BF02551274](https://doi.org/10.1007/BF02551274). Proves universal approximation for sigmoidal single-hidden-layer networks.</FNItem>

@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: mixed-precision-dl
 order: 1
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Train networks in fp16 or bf16 with master fp32 weights and loss scaling, picking the right format per layer."
 prerequisites: ["A4/mixed-precision"]
 ---
@@ -200,8 +200,108 @@ print(f"gradient {g_small} after loss scaling (x 1024) and unscaling: "
 fp16 has noticeable error on the matrix multiply but loss scaling
 rescues underflowing gradients; bf16 has somewhat larger per-element
 approximation error (7-bit vs fp16's 10-bit mantissa) but its much wider
-exponent range removes the need for loss scaling entirely. The next
-lesson handles a different memory tradeoff: gradient checkpointing.
+exponent range removes the need for loss scaling entirely.
+
+## Exercises
+
+**Exercise 1.** A 7B-parameter model is trained with bf16 weights and an
+Adam optimizer. The optimizer keeps an fp32 master copy of the weights plus
+two fp32 moment buffers ($m$ and $v$), and the bf16 working weights are kept
+for the forward/backward pass. Count the bytes per parameter and the total
+memory just for weights and optimizer state.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** List each stored quantity and its width. bf16 working weights:
+2 bytes. fp32 master weights: 4 bytes. fp32 first moment $m$: 4 bytes. fp32
+second moment $v$: 4 bytes.
+
+**Step 2.** Sum the per-parameter cost: $2 + 4 + 4 + 4 = 14$ bytes per
+parameter.
+
+**Step 3.** Scale to 7B parameters:
+
+$$
+14 \text{ bytes} \times 7 \times 10^9 = 98 \times 10^9 \text{ bytes} \approx 98 \text{ GB}.
+$$
+
+This is the weight-plus-optimizer footprint alone, before activations and
+gradients, which is why a 7B model does not train on a single 80 GB GPU
+without sharding.
+
+</details>
+
+**Exercise 2.** fp16 has a 5-bit exponent with a smallest positive normal
+value near $6.1 \times 10^{-5}$. A gradient element has magnitude
+$1 \times 10^{-8}$, which underflows to zero in fp16. Find the smallest
+power-of-two loss scale $S$ that lifts the scaled gradient above the normal
+threshold, and confirm the recovered value after dividing by $S$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Require $S \cdot 1 \times 10^{-8} \ge 6.1 \times 10^{-5}$, so
+$S \ge 6.1 \times 10^{-5} / 1 \times 10^{-8} = 6100$.
+
+**Step 2.** Round up to the next power of two: $2^{12} = 4096$ is too small
+(below 6100), so $2^{13} = 8192$ is the smallest power-of-two scale that
+clears the threshold.
+
+**Step 3.** The scaled gradient is $8192 \cdot 1 \times 10^{-8} \approx
+8.19 \times 10^{-5}$, above the normal threshold, so it survives in fp16.
+Dividing by $S$ after backward recovers $8.19 \times 10^{-5} / 8192 = 1
+\times 10^{-8}$, the original magnitude modulo rounding. This is why dynamic
+loss scaling searches over powers of two.
+
+</details>
+
+**Exercise 3 (code).** bf16 keeps fp32's 8-bit exponent but truncates the
+mantissa to 7 bits, so it never underflows at training magnitudes but is
+coarse. Emulate bf16 by zeroing the low 16 bits of the fp32 representation.
+Verify that a gradient of $1 \times 10^{-8}$ survives in bf16 (does not become
+zero), while the same value becomes zero in fp16, and that bf16's relative
+rounding error on a generic value stays under $2^{-7}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def emulate_fp16(x):
+    return x.astype(np.float16).astype(np.float32)
+
+def emulate_bf16(x):
+    bits = np.asarray(x, np.float32).view(np.uint32)
+    bits = bits & np.uint32(0xFFFF0000)        # truncate mantissa to 7 bits
+    return bits.view(np.float32)
+
+g = np.float32(1e-8)
+
+# fp16 underflows this gradient to zero; bf16 keeps it.
+assert emulate_fp16(np.array([g]))[0] == 0.0
+assert emulate_bf16(np.array([g]))[0] != 0.0
+
+# bf16 relative rounding error is bounded by 2^-7 (7 mantissa bits).
+rng = np.random.default_rng(0)
+x = rng.normal(size=10_000).astype(np.float32)
+x = x[x != 0]
+rel = np.abs(emulate_bf16(x) - x) / np.abs(x)
+assert rel.max() < 2.0 ** -7
+print("fp16 underflows:", emulate_fp16(np.array([g]))[0])
+print("bf16 keeps:", emulate_bf16(np.array([g]))[0])
+print("max bf16 relative error:", round(float(rel.max()), 5))
+```
+
+The bf16 result keeps the tiny gradient because the exponent range is
+unchanged; the relative error stays below $2^{-7} = 0.0078$ because only the
+mantissa was truncated. This is exactly the tradeoff that lets bf16 skip loss
+scaling at the cost of a coarser mantissa.
+
+</details>
+
+The next lesson handles a different memory tradeoff: gradient checkpointing.
 
 <Footnotes>
   <FNItem n="1">**Micikevicius, P., et al.** (2018). "Mixed precision training". *ICLR*. [arXiv:1710.03740](https://arxiv.org/abs/1710.03740). Master fp32 weights plus dynamic loss scaling, the recipe used here.</FNItem>

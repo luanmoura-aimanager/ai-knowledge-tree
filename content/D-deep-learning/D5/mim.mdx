@@ -4,7 +4,7 @@ pillar: D
 subId: D5
 lessonId: mim
 order: 5
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Apply the masked-token objective to image patches (MAE, BEiT) to pretrain vision Transformers."
 prerequisites: ["mlm", "D2/vit"]
 codeExempt: true
@@ -128,6 +128,109 @@ For a vision project:
 2. **Fine-tune** for your task.
 3. Only train MIM from scratch if you have a custom domain (medical,
    satellite) with millions of unlabeled images.
+
+## Exercises
+
+**Exercise 1.** MAE masks 75% of patches and runs the encoder on only
+the visible 25%. For a $224 \times 224$ image with $16 \times 16$
+patches, count the patches the encoder processes under MAE versus a
+dense ViT that processes all of them. If encoder cost scales with the
+square of the token count (attention is quadratic), what is MAE's
+encoder speedup over the dense ViT?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Count patches. A $224 \times 224$ image with $16 \times 16$
+patches has $(224 / 16)^2 = 14^2 = 196$ patches. MAE keeps 25%, so the
+encoder sees $0.25 \times 196 = 49$ patches; the dense ViT sees all 196.
+
+**Step 2.** Apply the quadratic cost. With cost proportional to the
+square of the token count, the ratio is
+
+$$
+\frac{196^2}{49^2} = \left(\frac{196}{49}\right)^2 = 4^2 = 16.
+$$
+
+**Step 3.** Read it off. MAE's encoder is about $16\times$ cheaper than
+the dense ViT on the attention term, because dropping to a quarter of
+the tokens cuts a quadratic cost by $4^2$. This is why the high mask
+rate is not only a learning-difficulty knob but also the lever that
+makes scaling MAE encoders affordable.
+
+</details>
+
+**Exercise 2.** The lesson says low mask rates let the network
+reconstruct masked patches by copying neighbors, "learning nothing,"
+while 75% forces high-level features. Frame this as a signal-redundancy
+argument and explain why the analogous BERT mask rate (15%) is so much
+lower for text.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** State the redundancy. Adjacent image pixels (and adjacent
+patches) are strongly correlated: a patch is largely predictable from
+its immediate neighbors by local interpolation. At a low mask rate, most
+masked patches still have several visible neighbors, so the decoder can
+fill them with low-level texture continuation and never needs object- or
+scene-level understanding.
+
+**Step 2.** Why 75% breaks the shortcut. Masking three patches in four
+removes the local neighborhood for most masked positions, so
+interpolation has nothing nearby to copy. The only way to predict a
+large contiguous hole is to infer what object or structure occupies it,
+which requires the high-level semantic features the pretraining is meant
+to produce.
+
+**Step 3.** Contrast with text. Tokens carry far less local redundancy:
+a word is rarely recoverable by copying its neighbor, and each token is a
+discrete, information-dense symbol. So even at a 15% mask rate, BERT's
+masked positions are genuinely hard and force contextual prediction.
+Raising text masking toward 75% would instead destroy too much context,
+leaving too little signal to predict from. The right mask rate tracks the
+redundancy of the modality: high for pixels, low for tokens.
+
+</details>
+
+**Exercise 3.** MAE regresses raw pixels (MSE), BEiT predicts discrete
+codebook tokens (cross-entropy), and MaskFeat/I-JEPA predict a teacher
+network's features. Lay out the trade-offs of these three target choices
+along two axes: target quality (semantic content of the supervision) and
+training cost/complexity. Which would you pick to pretrain a backbone on
+a niche domain with no good pretrained teacher available?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Pixel targets (MAE). Cost and complexity are lowest: the
+target is the input itself, no auxiliary model to train or run. Target
+quality is the weakest, because pixel MSE rewards reconstructing
+low-level texture and is noisy with respect to semantics; the model
+still learns good features at 75% masking, but the supervision signal
+itself is not semantic.
+
+**Step 2.** Discrete-token targets (BEiT). Quality is intermediate:
+predicting a VQ codebook index is a cleaner classification target than
+raw pixels and abstracts away some pixel noise. The cost is higher
+because a separate tokenizer (a VQ-VAE) must be trained first, adding a
+stage and a dependency.
+
+**Step 3.** Feature targets (MaskFeat, I-JEPA). Quality is highest:
+predicting a strong teacher's features supervises directly in a semantic
+embedding space, which empirically yields the best representations. The
+cost is highest and the complexity sharpest, since it needs a good
+pretrained teacher and risks inheriting the teacher's blind spots.
+
+**Step 4.** Pick for a niche domain with no teacher. Feature targets are
+out, because there is no strong teacher to distill from, and training one
+is the very problem being solved. Between pixels and discrete tokens,
+pixel MAE is the safe default: it needs no auxiliary model, scales
+cheaply, and is known to give strong fine-tuning performance, so it is
+the right starting point; a domain tokenizer for BEiT is worth the extra
+stage only if pixel MAE underperforms.
+
+</details>
 
 This closes the D5 self-supervision track. Pillar D's other tracks
 (D6 GNNs, D7 training systems) cover narrower but still important

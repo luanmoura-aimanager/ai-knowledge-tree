@@ -4,7 +4,7 @@ pillar: D
 subId: D6
 lessonId: graph-basics
 order: 1
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Represent a graph by its adjacency and feature matrices, and state the node, edge, and graph-level learning tasks."
 prerequisites: ["A5/graph-traversal"]
 ---
@@ -163,9 +163,96 @@ W_graph = rng.normal(size=(d, 2))
 print(f"graph-level logits: {(graph_emb @ W_graph).round(2)}")
 ```
 
-The three task heads consume the same node embeddings differently. The
-next lesson formalizes how those node embeddings are produced through
-the message-passing framework.
+The three task heads consume the same node embeddings differently.
+
+## Exercises
+
+**Exercise 1.** Take the undirected path graph on 4 nodes with edges
+$\{(0,1), (1,2), (2,3)\}$. Write its adjacency matrix $A$ and the degree of
+each node by hand.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each undirected edge $(i, j)$ sets both $A_{ij} = 1$ and
+$A_{ji} = 1$. The three edges give six nonzero entries:
+
+$$
+A = \begin{pmatrix} 0 & 1 & 0 & 0 \\ 1 & 0 & 1 & 0 \\ 0 & 1 & 0 & 1 \\ 0 & 0 & 1 & 0 \end{pmatrix}.
+$$
+
+**Step 2.** The degree of node $i$ is the row sum $\sum_j A_{ij}$. Reading off
+the rows: $\deg = (1, 2, 2, 1)$. The two endpoints have one neighbor each, the
+two interior nodes have two.
+
+</details>
+
+**Exercise 2.** For the same path graph, the entry $(A^2)_{ij}$ counts walks of
+length 2 from $i$ to $j$. Compute $(A^2)_{02}$ and $(A^2)_{00}$ by hand and say
+what each counts.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By the definition of matrix multiplication,
+$(A^2)_{ij} = \sum_k A_{ik} A_{kj}$, which adds one for every intermediate node
+$k$ adjacent to both $i$ and $j$.
+
+**Step 2.** For $(A^2)_{02}$: the only $k$ with $A_{0k} = 1$ is $k = 1$, and
+$A_{12} = 1$, so the sum is $1$. There is exactly one length-2 walk $0 \to 1 \to 2$.
+
+**Step 3.** For $(A^2)_{00}$: again only $k = 1$ has $A_{0k} = 1$, and $A_{10} = 1$,
+so $(A^2)_{00} = 1$. The single closed walk is $0 \to 1 \to 0$. A diagonal entry
+of $A^2$ equals the node's degree, consistent with $\deg(0) = 1$.
+
+</details>
+
+**Exercise 3 (code).** On the 5-cycle (nodes $0..4$, each joined to its two
+neighbors), build the adjacency matrix from an edge list, smooth random node
+features by the neighbor-mean from the lesson, then mean-pool to a graph
+embedding. Verify the graph embedding is unchanged when the nodes are relabeled
+by a random permutation (permutation invariance of the readout).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+N = 5
+edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)]   # 5-cycle
+edges += [(j, i) for (i, j) in edges]              # undirected
+
+A = np.zeros((N, N))
+for i, j in edges: A[i, j] = 1
+
+d = 3
+X = rng.normal(size=(N, d))
+
+def neighbor_mean(A, X):
+    deg = A.sum(axis=1)[:, None]
+    return (A @ X) / deg
+
+graph_emb = neighbor_mean(A, X).mean(axis=0)
+
+# Relabel nodes by a random permutation P, then redo the pipeline.
+perm = rng.permutation(N)
+P = np.eye(N)[perm]
+A_p, X_p = P @ A @ P.T, P @ X
+graph_emb_p = neighbor_mean(A_p, X_p).mean(axis=0)
+
+assert np.allclose(graph_emb, graph_emb_p)
+print("graph emb:", graph_emb.round(4))
+```
+
+The mean-pool readout depends only on the multiset of node features, so
+relabeling the nodes leaves the graph-level vector fixed.
+
+</details>
+
+The next lesson formalizes how those node embeddings are produced through the
+message-passing framework.
 
 <Footnotes>
   <FNItem n="1">**Hamilton, W. L., Ying, R., & Leskovec, J.** (2017). "Inductive representation learning on large graphs (GraphSAGE)". *NeurIPS*. [arXiv:1706.02216](https://arxiv.org/abs/1706.02216). Sets up node/edge/graph-level learning over node feature matrices.</FNItem>

@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: linear-attention
 order: 9
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Approximate softmax attention in linear time via kernel feature maps (Linformer, Performer) and IO-aware kernels (FlashAttention)."
 prerequisites: ["transformer-arch"]
 codeExempt: true
@@ -143,6 +143,108 @@ For 1M-token contexts, the KV cache alone is gigabytes. Solutions:
 - **SSMs**: constant cache size regardless of context.
 
 ![Softmax attention's cost grows quadratically with sequence length; linear-attention variants grow linearly, winning decisively once sequences are long.](/figures/D3/linear-attention.svg)
+
+## Exercises
+
+**Exercise 1.** Linear attention replaces $\operatorname{softmax}(q^\top
+k)$ with a kernel feature map $\phi(q)^\top \phi(k)$, so that $AV =
+\phi(Q)\,(\phi(K)^\top V)$. Count the FLOPs of computing the output two
+ways for $N$ tokens, feature dimension $m$, and value dimension $d$:
+(a) left-to-right as $(\phi(Q)\phi(K)^\top)V$, and (b) right-to-left as
+$\phi(Q)(\phi(K)^\top V)$. State the crossover that makes (b) the win.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Left-to-right. First form $S = \phi(Q)\phi(K)^\top$, an $N
+\times N$ matrix: each of its $N^2$ entries is an inner product of length
+$m$, so $O(N^2 m)$ FLOPs and $O(N^2)$ memory. Then $S V$ costs $O(N^2 d)$.
+Total $O(N^2(m + d))$, quadratic in $N$.
+
+**Step 2.** Right-to-left. First form $T = \phi(K)^\top V$, an $m \times
+d$ matrix: a sum over the $N$ tokens of outer products, $O(N m d)$ FLOPs
+and only $O(md)$ memory. Then $\phi(Q) T$ costs $O(N m d)$. Total $O(N m
+d)$, linear in $N$.
+
+**Step 3.** Associativity of matrix multiplication makes the two outputs
+identical, so the only difference is cost. Right-to-left wins whenever
+$N m d \ll N^2(m+d)$, i.e. roughly when $m \ll N$: once the feature
+dimension is much smaller than the sequence length, reordering turns a
+quadratic cost into a linear one. The same reordering also collapses the
+$N \times N$ intermediate, removing the $O(N^2)$ memory.
+
+</details>
+
+**Exercise 2.** The right-to-left grouping $\phi(Q)(\phi(K)^\top V)$
+exposes a recurrence that makes a linear-attention layer an RNN at
+inference. Define $S_t = \sum_{i \le t} \phi(k_i) v_i^\top$ for causal
+attention and write the per-step update and output. Compare its
+per-token inference cost and memory with the KV cache of softmax
+attention.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For causal attention the (unnormalized) output at position
+$t$ sums only over $i \le t$:
+
+$$
+o_t = \phi(q_t)^\top \sum_{i \le t} \phi(k_i) v_i^\top = \phi(q_t)^\top S_t,
+\qquad S_t = \sum_{i \le t} \phi(k_i) v_i^\top.
+$$
+
+**Step 2.** $S_t$ obeys a rank-one recurrence:
+
+$$
+S_t = S_{t-1} + \phi(k_t)\, v_t^\top,
+$$
+
+a running sum updated by one outer product per step. The state $S_t \in
+\mathbb{R}^{m \times d}$ has fixed size $md$, independent of $t$. Each
+step costs $O(md)$ for the update plus $O(md)$ for $\phi(q_t)^\top S_t$.
+
+**Step 3.** So linear attention generates with $O(md)$ time and $O(md)$
+memory per token, both constant in the context length. Softmax attention
+instead stores a KV cache that grows to length $t$, costing $O(td)$ time
+and $O(td)$ memory at step $t$. The constant-size state is exactly the
+"transformers are RNNs" result: the linear-attention layer carries a
+fixed recurrent state rather than an unbounded cache.
+
+</details>
+
+**Exercise 3.** Three methods cut attention's cost differently: Linformer
+projects $K, V$ to a fixed rank $k$, Performer uses an $m$-dimensional
+random feature map, and FlashAttention keeps the exact softmax but tiles
+the computation. Classify each as *approximate* or *exact*, give its
+asymptotic time and memory in $N$, and explain why FlashAttention does
+not reduce per-token inference cost against a KV cache even though it
+reduces training memory.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Linformer: approximate (the low-rank projection $K' = EK$
+discards information when the true attention matrix is not rank-$k$).
+Cost $O(Nkd)$ time, $O(Nk)$ memory: linear in $N$ for fixed $k$.
+
+**Step 2.** Performer: approximate (random features estimate the softmax
+kernel with variance that vanishes only as $m \to \infty$). Cost $O(Nmd)$
+time, $O(md + Nd)$ memory: linear in $N$.
+
+**Step 3.** FlashAttention: exact (it computes the same softmax attention,
+only reordering the arithmetic with online softmax statistics). Training
+cost $O(N^2 d)$ FLOPs, but memory $O(N)$ instead of $O(N^2)$ because the
+$N \times N$ matrix is never materialized in slow memory.
+
+**Step 4.** At inference with a KV cache, generation is one token at a
+time and each new token still attends against all $N$ cached keys, an
+$O(N)$ exact computation. FlashAttention reduces the *constant* (less
+data moved between memory tiers) but not the *order*: it does the same
+FLOPs, so the per-token cost stays $O(N)$. Only an approximate method
+(linear/sparse) or a recurrent replacement (SSM, linear attention)
+changes that asymptotic.
+
+</details>
 
 ## The big picture
 

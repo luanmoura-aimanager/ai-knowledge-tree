@@ -4,7 +4,7 @@ pillar: D
 subId: D3
 lessonId: positional-encoding
 order: 7
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Compare sinusoidal, learned, ALiBi, and RoPE positional encodings, and see why position must be injected into self-attention."
 prerequisites: ["transformer-arch"]
 ---
@@ -180,8 +180,116 @@ print(bias.round(2))
 ```
 
 The RoPE dot product depends on (pk - pq), not absolute positions; the
-ALiBi bias matrix is a function of distance only. The next lesson
-introduces an alternative to attention entirely: state space models.
+ALiBi bias matrix is a function of distance only.
+
+## Exercises
+
+**Exercise 1.** For model dimension $d = 4$, compute the sinusoidal
+positional encoding rows $\text{PE}(0)$ and $\text{PE}(1)$ by hand. Recall
+$\text{PE}(p, 2i) = \sin(p / 10000^{2i/d})$ and
+$\text{PE}(p, 2i+1) = \cos(p / 10000^{2i/d})$. Use $\sin(1) \approx 0.8415$,
+$\cos(1) \approx 0.5403$, $\sin(0.01) \approx 0.01$, $\cos(0.01) \approx 1$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** With $d = 4$ there are two frequency pairs, $i = 0$ and
+$i = 1$. The denominators are $10000^{0/4} = 1$ for $i = 0$ and
+$10000^{2/4} = 10000^{0.5} = 100$ for $i = 1$.
+
+**Step 2.** At $p = 0$ every argument is $0$, so the sines are $0$ and the
+cosines are $1$: $\text{PE}(0) = (0, 1, 0, 1)$.
+
+**Step 3.** At $p = 1$, dimension $0$ uses argument $1/1 = 1$ and
+dimension $2$ uses argument $1/100 = 0.01$:
+
+$$
+\text{PE}(1) = (\sin 1,\ \cos 1,\ \sin 0.01,\ \cos 0.01) \approx (0.8415,\ 0.5403,\ 0.01,\ 1.0).
+$$
+
+The low-index dimension (high frequency) changes fast between positions
+$0$ and $1$, while the high-index dimension (long wavelength) barely
+moves; that spread of frequencies is what lets the encoding distinguish
+both nearby and distant positions.
+
+</details>
+
+**Exercise 2.** RoPE rotates dimension pairs by angle $p\theta_i$ and its
+key property is that $q'^\top k'$ depends only on the relative position
+$p_k - p_q$. For a single 2D pair with $\theta = 1$, take
+$q = (1, 0)$ and $k = (1, 0)$. Show that the rotated dot product at
+$(p_q, p_k) = (0, 2)$ equals the one at $(p_q, p_k) = (3, 5)$ by hand.
+Use $\cos 2 \approx -0.4161$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Rotating $q = (1, 0)$ by angle $p_q$ gives
+$q' = (\cos p_q, \sin p_q)$; rotating $k = (1, 0)$ by $p_k$ gives
+$k' = (\cos p_k, \sin p_k)$. Their dot product is
+$q'^\top k' = \cos p_q \cos p_k + \sin p_q \sin p_k = \cos(p_k - p_q)$.
+
+**Step 2.** At $(p_q, p_k) = (0, 2)$ the relative position is
+$p_k - p_q = 2$, so $q'^\top k' = \cos 2 \approx -0.4161$.
+
+**Step 3.** At $(p_q, p_k) = (3, 5)$ the relative position is again
+$5 - 3 = 2$, so $q'^\top k' = \cos 2 \approx -0.4161$.
+
+Both pairs give the same value because the rotation reduces the dot
+product to a function of $p_k - p_q$ alone; absolute positions cancel.
+
+</details>
+
+**Exercise 3 (code).** Verify the RoPE relative-position invariance in
+numpy: for random query and key vectors, the rotated dot product is equal
+across all position pairs sharing the same offset $p_k - p_q$. Build the
+attention score for several offsets and assert that shifting both
+positions by the same amount leaves each score unchanged.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def rope(x, position):
+    d = x.shape[-1]
+    theta = 10000.0 ** (-np.arange(0, d, 2) / d)
+    cos = np.cos(position * theta); sin = np.sin(position * theta)
+    x_even, x_odd = x[..., 0::2], x[..., 1::2]
+    out = np.empty_like(x)
+    out[..., 0::2] = x_even * cos - x_odd * sin
+    out[..., 1::2] = x_even * sin + x_odd * cos
+    return out
+
+def score(q, k, pq, pk):
+    return rope(q, pq) @ rope(k, pk)
+
+q = rng.normal(size=8); k = rng.normal(size=8)
+
+# Same offset (pk - pq = 4) at three different absolute placements
+s_a = score(q, k, 0, 4)
+s_b = score(q, k, 3, 7)
+s_c = score(q, k, 10, 14)
+assert np.isclose(s_a, s_b) and np.isclose(s_a, s_c)
+
+# A different offset gives a genuinely different score
+s_other = score(q, k, 0, 5)
+assert not np.isclose(s_a, s_other)
+print("offset 4 scores:", round(s_a, 4), round(s_b, 4), round(s_c, 4))
+print("offset 5 score: ", round(s_other, 4))
+```
+
+The three offset-4 scores match to floating-point precision while the
+offset-5 score differs, confirming RoPE encodes relative position and
+discards the absolute placement.
+
+</details>
+
+The next lesson introduces an alternative to attention entirely: state
+space models.
 
 <Footnotes>
   <FNItem n="1">**Vaswani, A., et al.** (2017). "Attention is all you need". *NeurIPS*. [arXiv:1706.03762](https://arxiv.org/abs/1706.03762). The original sinusoidal positional encoding.</FNItem>

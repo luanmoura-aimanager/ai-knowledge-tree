@@ -4,7 +4,7 @@ pillar: D
 subId: D2
 lessonId: cnn-architectures
 order: 2
-estimatedMinutes: 18
+estimatedMinutes: 28
 goal: "Trace LeNet, AlexNet, VGG, and ResNet's skip connections, and see why depth without residuals collapses gradient flow."
 prerequisites: ["convolution", "D1/backprop"]
 ---
@@ -195,8 +195,112 @@ for D in [1, 5, 10, 20]:
 
 Plain networks collapse their activation norm to near zero as depth
 grows because the small initialization compounds; residual networks
-preserve the norm via the shortcut. The next lesson surveys modern CNN
-families that build on this ResNet template.
+preserve the norm via the shortcut.
+
+## Exercises
+
+**Exercise 1.** VGG's design replaces one $5 \times 5$ convolution with
+two stacked $3 \times 3$ convolutions of the same receptive field. With
+$C$ input and $C$ output channels at every layer (and no bias), count the
+weights of each option and compute the fraction saved.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A $k \times k$ convolution from $C$ input to $C$ output
+channels has $k^2 C^2$ weights. The single $5 \times 5$ layer has
+$25 C^2$.
+
+**Step 2.** Two stacked $3 \times 3$ layers each have $9 C^2$ weights, so
+$2 \cdot 9 C^2 = 18 C^2$ together.
+
+**Step 3.** The ratio is $\frac{18 C^2}{25 C^2} = 0.72$, a $28\%$
+reduction, and the stacked version adds an extra nonlinearity between the
+two layers. The receptive fields match: two $3 \times 3$ layers cover
+$1 + 2 \cdot (3 - 1) = 5$ positions per axis, the same as one $5 \times 5$.
+
+</details>
+
+**Exercise 2.** Backpropagation through a residual block $y = F(x) + x$
+gives $\bar x = \bar y + \bar y\,\partial F/\partial x$. Explain why this
+keeps gradients from vanishing in a deep stack, and contrast it with a
+plain block $y = F(x)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For a plain block $y = F(x)$, the upstream gradient is
+$\bar x = \bar y\,\partial F/\partial x$. Composing $L$ such blocks
+multiplies $L$ Jacobians $\partial F/\partial x$; if each has spectral
+norm below $1$, the product shrinks geometrically and the gradient
+reaching early layers vanishes.
+
+**Step 2.** For a residual block, $\bar x = \bar y(I + \partial F/\partial x)$.
+The identity term means the upstream gradient always contains a copy of
+$\bar y$ passed through unscaled, regardless of how small or badly
+conditioned $\partial F/\partial x$ is.
+
+**Step 3.** Composing $L$ residual blocks expands into a sum of products
+over subsets of the $\partial F/\partial x$ factors, and the all-identity
+term contributes $\bar y$ undamped. The gradient to early layers cannot
+collapse to zero from the depth alone, which is why residual stacks train
+at depths plain stacks cannot.
+
+</details>
+
+**Exercise 3 (code).** A residual block with $F$ set to the zero function
+should compute the identity on nonnegative inputs (since
+$y = \mathrm{relu}(F(x) + x) = \mathrm{relu}(x)$). Verify this on a random
+nonnegative feature map.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def conv2d(X, K, stride=1, pad=0):
+    if pad:
+        X = np.pad(X, ((pad, pad), (pad, pad), (0, 0)))
+    H, W, _ = X.shape
+    kh, kw, _, Co = K.shape
+    out_h = (H - kh) // stride + 1
+    out_w = (W - kw) // stride + 1
+    Y = np.zeros((out_h, out_w, Co))
+    for i in range(out_h):
+        for j in range(out_w):
+            Y[i, j] = np.tensordot(
+                X[i*stride:i*stride+kh, j*stride:j*stride+kw], K,
+                axes=([0, 1, 2], [0, 1, 2]))
+    return Y
+
+def relu(x):
+    return np.maximum(0, x)
+
+def residual_block(X, W1, W2):
+    h = relu(conv2d(X, W1, pad=1))
+    h = conv2d(h, W2, pad=1)
+    return relu(h + X)                            # shortcut
+
+C = 4
+X = np.abs(rng.normal(size=(8, 8, C)))            # nonnegative feature map
+W_zero = np.zeros((3, 3, C, C))                   # F is the zero function
+
+y = residual_block(X, W_zero, W_zero)
+assert np.allclose(y, X)                          # block degenerates to identity
+print("max abs deviation from identity:", np.abs(y - X).max())
+```
+
+With the residual branch zeroed, the block reproduces its nonnegative
+input exactly, the property that lets a deep ResNet fall back to the
+identity rather than degrade.
+
+</details>
+
+The next lesson surveys modern CNN families that build on this ResNet
+template.
 
 <Footnotes>
   <FNItem n="1">**LeCun, Y., Bottou, L., Bengio, Y., & Haffner, P.** (1998). "Gradient-based learning applied to document recognition". *Proceedings of the IEEE*, 86(11), 2278-2324. [doi:10.1109/5.726791](https://doi.org/10.1109/5.726791). LeNet-5, the original convolution-pooling classifier.</FNItem>

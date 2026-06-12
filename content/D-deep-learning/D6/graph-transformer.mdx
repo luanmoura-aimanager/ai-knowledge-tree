@@ -4,7 +4,7 @@ pillar: D
 subId: D6
 lessonId: graph-transformer
 order: 4
-estimatedMinutes: 12
+estimatedMinutes: 22
 goal: "Replace local message passing with global attention augmented by structural / positional encodings."
 prerequisites: ["gcn-gat", "D3/transformer-arch"]
 codeExempt: true
@@ -125,6 +125,93 @@ The state of GNN architectures as of 2024:
   attention (GraphGPS pattern).
 - **Equivariant GNNs** (next lesson): for tasks with symmetry (3D
   point clouds, molecules in 3D space).
+
+## Exercises
+
+**Exercise 1.** A Graph Transformer scores a query node $i$ against three
+candidate nodes with equal content scores $Q_i K_j^\top / \sqrt{d} = 2$ for all
+three, but Graphormer-style spatial biases $b(i, j) = (0, -1, -2)$ (penalizing
+larger shortest-path distance). Compute the attention weights and explain what
+the bias accomplishes when content scores are tied.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The biased score is $\text{score}(i, j) = Q_i K_j^\top/\sqrt{d} + b(i, j)$,
+giving $(2 + 0, 2 - 1, 2 - 2) = (2, 1, 0)$.
+
+**Step 2.** Softmax over the three: exponentials $e^2 \approx 7.389$,
+$e^1 \approx 2.718$, $e^0 = 1$, summing to $\approx 11.107$. The weights are
+
+$$
+\alpha = \left(\tfrac{7.389}{11.107}, \tfrac{2.718}{11.107}, \tfrac{1}{11.107}\right) \approx (0.665, 0.245, 0.090).
+$$
+
+**Step 3.** With content scores tied, the structural bias alone breaks the
+symmetry: the nearest node (smallest shortest-path distance, zero penalty) gets
+two-thirds of the attention and the farthest gets under a tenth. The bias
+reinjects graph distance that the all-pairs attention would otherwise ignore.
+
+</details>
+
+**Exercise 2.** Plain self-attention over the node set is permutation-
+equivariant but blind to edges: it gives the same output for two graphs with
+identical node features but different connectivity. Explain why this is a problem
+for graph tasks, and show how an additive attention bias $b(i, j)$ that depends
+on the edge or shortest-path between $i$ and $j$ restores sensitivity to
+structure.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Self-attention computes $\text{softmax}(Q K^\top/\sqrt{d}) V$ from
+node features alone. If two graphs share the node feature matrix $H$ but differ
+in their edges, $Q$, $K$, $V$ are identical, so the outputs are identical. The
+edges never enter the computation.
+
+**Step 2.** Graph tasks depend on connectivity: a benzene ring and a chain of the
+same six atoms have different properties. A structure-blind encoder cannot tell
+them apart, so it cannot predict properties that hinge on the difference.
+
+**Step 3.** Adding $b(i, j)$ to the pre-softmax score makes the attention a
+function of the pair's structural relation (edge type, shortest-path distance).
+Now two graphs with different edges produce different bias matrices, hence
+different attention weights and different outputs. The bias is the channel
+through which discrete graph structure modulates the otherwise fully-connected
+attention.
+
+</details>
+
+**Exercise 3.** A practitioner has two datasets: (a) social graphs with
+50,000 nodes each, and (b) small molecules with about 30 atoms each, where the
+target depends on long-range atom interactions. For each, recommend a local GNN
+(GraphSAGE with sampling) or a Graph Transformer, and justify the choice from the
+cost and receptive-field trade-offs.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Graph Transformer attention is all-pairs, costing order $n^2$ in
+nodes per layer. For (a) with $n = 50{,}000$, that is $2.5 \times 10^9$ pairs
+per graph per layer, prohibitive in memory and time.
+
+**Step 2.** For (a), a local GNN with neighbor sampling (GraphSAGE) keeps the per
+node cost bounded by the sample size, independent of total graph size, which is
+the only scalable option at this node count. Node-level social tasks are usually
+locally informative, so bounded receptive fields are acceptable.
+
+**Step 3.** For (b), $n \approx 30$ makes $n^2 \approx 900$ pairs, negligible.
+The target needs long-range interactions, which a local GNN reaches only by
+stacking many layers, risking over-smoothing. A Graph Transformer connects every
+atom pair in a single attention layer, handling the long-range dependency
+directly.
+
+**Step 4.** Recommendation: GraphSAGE-with-sampling for the large social graphs,
+Graph Transformer for the small long-range molecules. The deciding factors are
+node count (sets the quadratic cost) and interaction range (sets whether global
+attention is worth it).
+
+</details>
 
 The next lesson covers the equivariant family that respects symmetries
 like rotation and reflection.

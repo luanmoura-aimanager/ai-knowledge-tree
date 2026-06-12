@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: latent-diffusion
 order: 8
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Run diffusion in a VAE's latent space (Stable Diffusion) and condition on text via cross-attention."
 prerequisites: ["diffusion", "vae-variants"]
 codeExempt: true
@@ -139,6 +139,97 @@ graph LR
   rendering, complex compositions, and precise control are open
   problems.
 - **Long-form video**: temporal consistency over minutes is hard.
+
+## Exercises
+
+**Exercise 1.** The lesson states the autoencoder compresses a
+$3 \times 512 \times 512$ image to a $4 \times 64 \times 64$ latent, and that this
+makes diffusion "64× cheaper per step". Verify the $64\times$ spatial-pixel
+compression and explain why the per-step diffusion cost scales with the spatial
+resolution rather than the channel count.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Spatial pixel count of the image is $512 \times 512 = 262144$; of the
+latent it is $64 \times 64 = 4096$. The ratio is $262144 / 4096 = 64$, the quoted
+spatial compression.
+
+**Step 2.** The denoiser is a convolutional or attention network applied over the
+spatial grid. Convolution cost is linear in the number of spatial positions, and
+self-attention cost is quadratic in it, so shrinking the grid from $512^2$ to
+$64^2$ positions is what cuts the per-step compute. The channel count (3 vs 4) is a
+small constant factor on top.
+
+**Step 3.** Hence running diffusion at $64 \times 64$ instead of $512 \times 512$
+saves the $64\times$ spatial factor per step (more for the attention layers, where
+the saving is quadratic in positions). The autoencoder pays a one-time encode and
+decode; the many diffusion steps run entirely in the small latent grid.
+
+</details>
+
+**Exercise 2.** In classifier-free guidance, the guided prediction is $\tilde
+\epsilon = (1 + w)\,\epsilon_\theta(z_t, t, c) - w\,\epsilon_\theta(z_t, t,
+\emptyset)$. Rewrite it as the unconditional prediction plus a scaled difference,
+and explain what $w = 0$ and large $w$ do to prompt adherence and diversity.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Group the two terms by factoring out the conditional and
+unconditional predictions:
+
+$$
+\tilde\epsilon = \epsilon_\theta(z_t, t, \emptyset) + (1 + w)\,\epsilon_\theta(z_t, t, c) - (1 + w)\,\epsilon_\theta(z_t, t, \emptyset) + w\,\epsilon_\theta(z_t,t,\emptyset) - w\,\epsilon_\theta(z_t,t,\emptyset).
+$$
+
+Collecting gives the clean form
+
+$$
+\tilde\epsilon = \epsilon_\theta(z_t, t, \emptyset) + (1 + w)\big[\epsilon_\theta(z_t, t, c) - \epsilon_\theta(z_t, t, \emptyset)\big].
+$$
+
+The difference $\epsilon_\theta(\cdots c) - \epsilon_\theta(\cdots \emptyset)$ is
+the direction that conditioning on $c$ adds to the noise prediction.
+
+**Step 2.** At $w = 0$, $\tilde\epsilon = \epsilon_\theta(z_t, t, c)$, the ordinary
+conditional model. Conditioning is present but not amplified, so prompt adherence is
+moderate and diversity is high.
+
+**Step 3.** As $w$ grows, the conditioning direction is scaled by $(1 + w)$,
+pushing each step harder toward "matches the prompt". Prompt adherence sharpens, but
+over-amplifying the conditional direction collapses the output toward the few modes
+most consistent with $c$, reducing diversity (and at very high $w$, introducing
+artifacts). The guidance scale is the adherence-versus-variety dial, typically
+$w \in [5, 12]$.
+
+</details>
+
+**Exercise 3.** Latent diffusion supports image-to-image editing by encoding a
+prompt image to $z_0 = E(x)$, adding noise up to a chosen timestep $t$, and
+denoising from there. Explain why a smaller $t$ preserves more of the prompt image,
+and what the limiting cases $t \to 0$ and $t \to T$ produce.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The noised latent at step $t$ is $z_t = \sqrt{\bar\alpha_t}\,z_0 +
+\sqrt{1 - \bar\alpha_t}\,\epsilon$. Smaller $t$ means $\bar\alpha_t$ is close to
+$1$, so $z_t$ retains most of $z_0$ with only a little noise. The denoiser then
+starts from a latent that still carries the prompt image's structure.
+
+**Step 2.** Because the reverse process only has to undo a small amount of noise,
+it preserves the encoded content and makes minor edits guided by the text. The
+prompt image dominates the result.
+
+**Step 3.** In the limit $t \to 0$, almost no noise is added and denoising returns
+essentially $z_0$, so the output is the prompt image unchanged. In the limit
+$t \to T$, $z_t$ is nearly pure noise with $z_0$ washed out, so the result is a
+fresh sample from the text prompt with no trace of the prompt image, i.e.
+text-to-image generation. The chosen $t$ slides between faithful editing and free
+generation.
+
+</details>
 
 The next lesson covers the continuous-time framework that's overtaking
 DDPM-style discrete diffusion: flow matching and rectified flow.

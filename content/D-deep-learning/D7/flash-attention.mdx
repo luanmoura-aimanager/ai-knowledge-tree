@@ -4,7 +4,7 @@ pillar: D
 subId: D7
 lessonId: flash-attention
 order: 6
-estimatedMinutes: 14
+estimatedMinutes: 24
 goal: "Tile attention into SRAM-fitting blocks, recompute softmax statistics, and avoid materializing the n x n attention matrix."
 prerequisites: ["D3/self-attention"]
 codeExempt: true
@@ -157,9 +157,88 @@ algorithm that operates on large intermediate tensors should consider
 tiling, fusion, and recomputation to reduce data movement.
 
 This thinking permeates modern kernel writing: KV cache management,
-mixture-of-experts routing, attention variants. The next lesson
-covers the broader infrastructure that wraps all of these: training
-clusters and orchestration.
+mixture-of-experts routing, attention variants.
+
+## Exercises
+
+**Exercise 1.** Standard attention materializes the $N \times N$ score matrix
+in HBM. For a single head with sequence length $N = 8192$ and fp16 scores
+(2 bytes each), compute the memory of that matrix. Then state FlashAttention's
+memory order and why it does not store the matrix.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The score matrix has $N^2 = 8192^2 = 6.71 \times 10^7$ entries.
+
+**Step 2.** At 2 bytes each, $6.71 \times 10^7 \times 2 \approx 1.34 \times
+10^8$ bytes $\approx 134$ MB per head, per layer, for one sequence. Across
+many heads and layers this dominates memory and blocks long contexts.
+
+**Step 3.** FlashAttention keeps only a few row/column blocks in SRAM at a
+time and an $O(N)$ running max and running sum per query row, never
+materializing the full matrix. Its memory is $O(N)$: $8192$ entries of
+statistics rather than $8192^2$ of scores, so memory grows linearly in
+sequence length instead of quadratically.
+
+</details>
+
+**Exercise 2.** FlashAttention's correctness rests on the shift-invariance of
+softmax: $\operatorname{softmax}(z) = \operatorname{softmax}(z - c\mathbf{1})$
+for any scalar $c$. Prove it, then explain how it lets two blocks with
+different running maxima be combined into one normalized output.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Write the $i$-th softmax component and subtract $c$ from every
+logit:
+
+$$
+\operatorname{softmax}(z - c\mathbf{1})_i = \frac{e^{z_i - c}}{\sum_j e^{z_j - c}} = \frac{e^{-c} e^{z_i}}{e^{-c}\sum_j e^{z_j}} = \frac{e^{z_i}}{\sum_j e^{z_j}} = \operatorname{softmax}(z)_i.
+$$
+
+The common factor $e^{-c}$ cancels, so the result is unchanged.
+
+**Step 2.** When streaming blocks, each block is exponentiated against its own
+running max $m$ to stay numerically safe. When a later block raises the max to
+$m'$, the already-accumulated sum and output are rescaled by $e^{m - m'}$,
+which is exactly subtracting the new shift $c = m' - m$ from the earlier
+terms.
+
+**Step 3.** Because shift-invariance guarantees the final normalized softmax
+is independent of which constant was subtracted, rescaling partial results by
+$e^{m - m'}$ and continuing yields the same output as computing softmax over
+the whole row at once. The block-by-block stream is exact, not approximate.
+
+</details>
+
+**Exercise 3.** A team weighs storing the forward softmax statistics ($O(N)$
+per row) versus recomputing them in the backward pass. The recompute path adds
+about 10% FLOPs but saves the $O(N^2)$ storage a naive backward would need.
+For $N = 32768$, compare the storage of the two approaches (fp16, one head)
+and state which the lesson recommends and why.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Naive backward that stored the full score matrix needs $O(N^2)$:
+$32768^2 \times 2 \approx 2.1 \times 10^9$ bytes $\approx 2.1$ GB per head per
+layer, infeasible across a deep model.
+
+**Step 2.** FlashAttention stores only the $O(N)$ per-row statistics (max and
+sum): about $32768 \times 2$ values $\times$ a few bytes $\approx$ tens of
+kilobytes, then recomputes the block scores on the fly during backward.
+
+**Step 3.** The recompute path costs about 10% extra FLOPs but turns 2.1 GB of
+storage into kilobytes. Since attention was memory-bound, not compute-bound,
+the lesson recommends recomputation: the extra FLOPs are nearly free while the
+memory saving is what makes long-context backward feasible.
+
+</details>
+
+The next lesson covers the broader infrastructure that wraps all of these:
+training clusters and orchestration.
 
 <Footnotes>
   <FNItem n="1">**Dao, T., Fu, D. Y., Ermon, S., Rudra, A., & Ré, C.** (2022). "FlashAttention: fast and memory-efficient exact attention with IO-awareness". *NeurIPS*. [arXiv:2205.14135](https://arxiv.org/abs/2205.14135). The tiling plus online-softmax algorithm derived here.</FNItem>

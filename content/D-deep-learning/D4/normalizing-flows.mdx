@@ -4,7 +4,7 @@ pillar: D
 subId: D4
 lessonId: normalizing-flows
 order: 6
-estimatedMinutes: 16
+estimatedMinutes: 26
 goal: "Use invertible neural networks with tractable Jacobian determinants to model exact likelihoods."
 prerequisites: ["A2/change-of-variables"]
 ---
@@ -192,8 +192,132 @@ print(f"log p(x) for a few samples: {log_px[:5].round(3)}")
 ```
 
 Each coupling layer is invertible and contributes a cheap log-Jacobian
-to the total log-density. The next lesson covers the generative method
-that took over from GANs: diffusion models.
+to the total log-density.
+
+## Exercises
+
+**Exercise 1.** A RealNVP coupling layer sets $y_a = x_a$ and $y_b = x_b \odot
+\exp(s(x_a)) + t(x_a)$. Show that the Jacobian $\partial y / \partial x$ is lower
+triangular and that $\log|\det J| = \sum_i s(x_a)_i$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Order the coordinates as $(x_a, x_b)$ and write the Jacobian in
+$2\times 2$ block form, where each block is a partial of an output half by an
+input half:
+
+$$
+J = \begin{pmatrix} \dfrac{\partial y_a}{\partial x_a} & \dfrac{\partial y_a}{\partial x_b} \\[1.2em] \dfrac{\partial y_b}{\partial x_a} & \dfrac{\partial y_b}{\partial x_b} \end{pmatrix}.
+$$
+
+**Step 2.** Compute the blocks. Since $y_a = x_a$, the top-left block is $I$ and
+the top-right is $0$ (because $y_a$ does not depend on $x_b$). For the bottom row,
+$y_b = x_b \odot \exp(s(x_a)) + t(x_a)$, so $\partial y_b / \partial x_b =
+\operatorname{diag}(\exp(s(x_a)))$ and $\partial y_b / \partial x_a$ is some block
+$B$ (its value does not matter):
+
+$$
+J = \begin{pmatrix} I & 0 \\ B & \operatorname{diag}(\exp(s(x_a))) \end{pmatrix}.
+$$
+
+**Step 3.** With a zero top-right block, $J$ is block lower triangular, so its
+determinant is the product of the diagonal block determinants:
+
+$$
+\det J = \det(I)\cdot \det\!\big(\operatorname{diag}(\exp(s(x_a)))\big) = \prod_i \exp(s(x_a)_i).
+$$
+
+**Step 4.** Take the log: $\log|\det J| = \sum_i s(x_a)_i$. The off-diagonal block
+$B$ never enters, which is why the coupling layer's log-determinant costs only
+$O(d)$ regardless of how complex $s$ and $t$ are.
+
+</details>
+
+**Exercise 2.** A flow stacks layers $f = f_L \circ \cdots \circ f_1$. Starting
+from the single-step change-of-variables formula, derive the additive log-density
+$\log p_X(x) = \log p_Z(z_L) + \sum_{\ell=1}^L \log|\det \partial f_\ell / \partial
+z_{\ell-1}|$, where $z_0 = x$ is mapped to $z_L$ in the base space.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** For one invertible map $z_\ell = f_\ell(z_{\ell-1})$, the
+change-of-variables formula relates the densities of input and output:
+
+$$
+p_{\ell-1}(z_{\ell-1}) = p_\ell(z_\ell)\,\left|\det \frac{\partial f_\ell}{\partial z_{\ell-1}}\right|.
+$$
+
+**Step 2.** Take logs of each step: $\log p_{\ell-1}(z_{\ell-1}) = \log p_\ell(z_\ell) + \log|\det \partial f_\ell/\partial z_{\ell-1}|$. Rearranged, $\log p_{\ell-1} = \log p_\ell - (-\log|\det\cdots|)$; keep the form
+
+$$
+\log p_{\ell-1}(z_{\ell-1}) = \log p_\ell(z_\ell) + \log\left|\det \frac{\partial f_\ell}{\partial z_{\ell-1}}\right|.
+$$
+
+**Step 3.** Chain from $\ell = 1$ (where $z_0 = x$, $p_0 = p_X$) up to $\ell = L$
+(where $p_L = p_Z$, the base). Summing the telescoping log-densities,
+
+$$
+\log p_X(x) = \log p_Z(z_L) + \sum_{\ell=1}^L \log\left|\det \frac{\partial f_\ell}{\partial z_{\ell-1}}\right|.
+$$
+
+**Step 4.** This is the stated formula: the base density is evaluated at the
+fully transformed point $z_L$, and each layer contributes one additive
+$\log|\det \partial f_\ell / \partial z_{\ell-1}|$ term. The total log-Jacobian
+of a stack is the sum of per-layer log-Jacobians.
+
+</details>
+
+**Exercise 3 (code).** Implement a 1-D affine flow $z = f(x) = (x - t)\,e^{-s}$
+that maps data to a standard normal base, with scalar parameters $s, t$. Use
+change of variables to evaluate $\log p_X(x)$ and confirm it integrates to a
+proper density by checking it matches the implied Gaussian
+$\mathcal{N}(t, e^{2s})$ numerically.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+s, t = 0.4, 1.5                          # flow params: scale e^s, shift t
+
+def f(x):                                # data -> base
+    return (x - t) * np.exp(-s)
+
+def log_px(x):
+    z = f(x)
+    log_pz = -0.5 * z**2 - 0.5 * np.log(2 * np.pi)   # N(0,1) base
+    log_det = -s                                      # d/dx of (x - t) e^{-s}
+    return log_pz + log_det
+
+# f pushes data to N(0,1), so X = t + e^s * Z is N(t, e^{2s})
+xs = np.linspace(-4, 7, 1000)
+implied_mu, implied_sigma = t, np.exp(s)
+log_gauss = -0.5 * ((xs - implied_mu) / implied_sigma)**2 - np.log(implied_sigma * np.sqrt(2 * np.pi))
+
+print(f"max |log_px - log N(t, e^2s)|: {np.max(np.abs(log_px(xs) - log_gauss)):.2e}")
+
+# numerical normalization: density integrates to 1
+px = np.exp(log_px(xs))
+integral = np.trapz(px, xs)
+print(f"integral of p_X over the grid: {integral:.4f}")
+
+assert np.allclose(log_px(xs), log_gauss, atol=1e-10)
+assert np.isclose(integral, 1.0, atol=1e-3)
+```
+
+The change-of-variables density matches the Gaussian $\mathcal{N}(t, e^{2s})$ the
+affine map implies, and it integrates to $1$: the $\log|\det J| = -s$ term is
+exactly the volume correction that keeps the transformed density normalized.
+
+</details>
+
+The next lesson covers the generative method that took over from GANs:
+diffusion models.
 
 <Footnotes>
   <FNItem n="1">**Rezende, D. J., & Mohamed, S.** (2015). "Variational inference with normalizing flows". *ICML*. [arXiv:1505.05770](https://arxiv.org/abs/1505.05770). The normalizing-flow framework via the change-of-variables formula.</FNItem>
