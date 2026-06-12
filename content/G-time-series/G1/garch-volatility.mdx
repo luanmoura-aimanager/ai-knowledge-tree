@@ -64,9 +64,18 @@ $$
 $$
 
 This is finite and positive only when $\alpha + \beta < 1$, the **stationarity
-condition**<FN n="3" />. The sum $\alpha + \beta$ measures persistence: values near one (common
-for daily equity data, around 0.99) mean shocks to volatility decay slowly. When
-$\alpha + \beta = 1$ the unconditional variance is infinite, the IGARCH boundary.
+condition**<FN n="3" />. The sum $\alpha + \beta$ measures persistence, and its grip is
+clearest as a **half-life**: a deviation of $\sigma_t^2$ from $\bar{\sigma}^2$ decays
+by $(\alpha+\beta)^h$ over $h$ steps, so it halves at $h = \ln(1/2)/\ln(\alpha+\beta)$.
+
+- $\alpha + \beta = 0.95$ gives a half-life of about $13.5$ days: a volatility
+  spike is mostly forgotten inside a trading month.
+- $\alpha + \beta = 0.99$, the value common for daily equity returns, gives a
+  half-life of about $69$ days: the same spike still echoes a full quarter later.
+
+A change of $0.04$ in the persistence stretches the memory fivefold. When
+$\alpha + \beta = 1$ the half-life is infinite and the unconditional variance
+diverges, the IGARCH boundary.
 
 ![GARCH captures volatility clustering (large moves beget large moves), so the conditional band ±2σₜ widens in turbulent stretches and contracts in calm ones.](/figures/G1/garch-volatility.svg)
 

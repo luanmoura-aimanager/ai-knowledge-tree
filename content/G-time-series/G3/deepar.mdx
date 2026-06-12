@@ -61,8 +61,19 @@ $$
 $$
 
 Minimizing it trains $\mu_t$ toward the value and $\sigma_t$ toward the actual
-residual spread, so the model learns to be uncertain exactly where the data is
-noisy. Gradients flow through the RNN by backpropagation through time.
+residual spread, so the model learns to be uncertain where the data is noisy.
+The second role, the one a point forecast cannot express, is concrete in the
+loss. Fix a residual $z_t - \mu_t = 2$ and vary only the emitted $\sigma_t$:
+
+- **Overconfident**, $\sigma_t = 0.5$: NLL $= \tfrac12\log(2\pi\cdot 0.25) + \tfrac{4}{2\cdot 0.25} = 8.23$ nats. The squared-error term $4 / (2\sigma_t^2)$ explodes because a tight Gaussian assigns almost no density two units out.
+- **Honest**, $\sigma_t = 2$: NLL $= \tfrac12\log(2\pi\cdot 4) + \tfrac{4}{2\cdot 4} = 2.11$ nats, the minimum over $\sigma_t$ for this residual (it sits at $\sigma_t = |z_t - \mu_t|$).
+- **Underconfident**, $\sigma_t = 4$: NLL $= 2.43$ nats. Widening past the residual now wastes density, so the log-variance term $\tfrac12\log(2\pi\sigma_t^2)$ dominates and the loss rises again.
+
+The penalty is sharply asymmetric: claiming $\sigma_t = 0.5$ when the error is $2$
+costs almost four times the honest loss, while overcautious $\sigma_t = 4$ costs only
+a little extra. The loss pushes $\sigma_t$ toward the residual it actually sees and
+punishes false precision hardest. Gradients flow through the RNN by backpropagation
+through time.
 
 ## Scaling for a global model
 
