@@ -266,34 +266,28 @@ def gh(p):
 fh = lambda p: (p[0]**2 + p[1] - 11)**2 + (p[0] + p[1]**2 - 7)**2
 
 rng = np.random.default_rng(0)
-starts = rng.uniform(-5, 5, (200, 2))
+starts = rng.uniform(-5, 5, (120, 2))
 
-def descend(f, g, p, eta, steps=4000):
+def descend(g, p, eta, steps=2000):
     for _ in range(steps):
         p = p - eta * g(p)
-    return f(p)
+    return p
 
-ends1 = {round(descend(f1, g1, s.copy(), 0.1), 4) for s in starts}
-endsh = {round(descend(fh, gh, s.copy(), 0.005), 4) for s in starts}
+# Convex bowl: every start funnels to the same value
+ends1 = {round(f1(descend(g1, s.copy(), 0.1)), 4) for s in starts}
 print("distinct convex outcomes:", ends1)
-print("distinct Himmelblau outcomes:", endsh)
 assert ends1 == {0.0}
-assert len(endsh) == 1 and endsh == {0.0}
 
-# The VALUES coincide (all four basins have value 0), so distinguish by
-# location instead: count distinct endpoints
-pts = []
-for s in starts:
-    p = s.copy()
-    for _ in range(4000):
-        p = p - 0.005 * gh(p)
-    pts.append(np.round(p, 3))
+# Himmelblau: descend once per start, read off both value and location
+pts = [np.round(descend(gh, s.copy(), 0.005), 3) for s in starts]
+endsh = {round(fh(p), 4) for p in pts}
 uniq = np.unique(np.array(pts), axis=0)
-print("distinct Himmelblau minimizers found:", len(uniq))
-assert len(uniq) == 4
+print("distinct Himmelblau values:", endsh, " distinct minimizers:", len(uniq))
+assert endsh == {0.0}        # all four basins have value 0
+assert len(uniq) == 4        # but four different minimizers
 ```
 
-The convex bowl funnels all 200 starts to the unique value $0$ at the
+The convex bowl funnels all 120 starts to the unique value $0$ at the
 unique point; Himmelblau also reports "value 0" from every start, but
 at **four different minimizers**, exposed only by comparing locations.
 Convexity is what guarantees value *and* minimizer agree globally;

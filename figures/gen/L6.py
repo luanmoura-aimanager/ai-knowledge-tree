@@ -25,11 +25,6 @@ def critical_points() -> None:
     cs = ax.contour(X, Y, Z, levels=13, cmap="viridis")
     ax.clabel(cs, inline=True, fontsize=6)
 
-    pts = [
-        (np.pi / 2, np.pi / 2, "max: λ both < 0", HOT),
-        (np.pi / 2, -np.pi / 2 + np.pi * 0, "min", GOOD),       # placeholder
-        (np.pi, np.pi, "saddle: mixed signs", ACCENT),
-    ]
     ax.plot([np.pi / 2], [np.pi / 2], "o", ms=8, color=HOT, zorder=5)
     ax.annotate("max: both λ < 0", (np.pi / 2, np.pi / 2),
                 xytext=(np.pi / 2 - 1.7, np.pi / 2 + 0.8), color="#e6e9f5",
