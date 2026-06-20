@@ -2266,6 +2266,24 @@ export const CONNECTIONS: Connection[] = [
     label: "Steepest ascent ⇒ policy gradients",
     kind: "uses",
   },
+  {
+    from: "L3",
+    to: "A3",
+    label: "Taylor expansion ⇒ convergence analysis",
+    kind: "uses",
+  },
+  {
+    from: "L4",
+    to: "B1",
+    label: "Hessian ⇒ Fisher information & Cramér-Rao",
+    kind: "uses",
+  },
+  {
+    from: "L6",
+    to: "C2",
+    label: "Convexity & duality ⇒ SVMs",
+    kind: "uses",
+  },
 ];
 
 // -------------------------------------------------------------------------
