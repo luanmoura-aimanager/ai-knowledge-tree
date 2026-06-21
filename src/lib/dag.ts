@@ -1929,6 +1929,151 @@ export const PILLARS: Pillar[] = [
       },
     ],
   },
+  {
+    letter: "M",
+    slug: "M-advanced-causal-ml",
+    name: "Advanced Causal Machine Learning",
+    shortName: "Causal ML",
+    tagline:
+      "Causal discovery, heterogeneous effects, orthogonal estimation, deep & policy learning",
+    color: "#ee7de0",
+    intro:
+      "Pillar B taught causal inference's foundations: potential outcomes, structural causal models, d-separation, the do-calculus, propensity scores, instrumental variables, and the first estimators. This pillar is the machine-learning course built directly on top of that base. It assumes you already speak that language (its prerequisites point back into B5 rather than re-teaching it) and asks the questions a modern causal data scientist actually faces: what if you do not even know the graph, what if the effect is different for every unit, what is the estimation theory that makes debiased ML trustworthy, and how do you turn an estimated effect into a decision you can defend.\n\nYou will start by learning the graph itself from data (causal discovery: PC, GES, LiNGAM, NOTEARS, FCI), then estimate heterogeneous effects unit by unit (meta-learners, the R- and DR-learners, generalized random forests, uplift modeling). The orthogonal-estimation discipline is the theoretical spine: influence functions, Neyman orthogonality, AIPW, TMLE, and automatic debiased ML, the machinery that lets you plug flexible ML models into a causal estimand without inheriting their bias. From there the pillar turns neural (representation balancing, TARNet/Dragonnet, GANITE, CEVAE, DeepIV), then decision-facing (policy learning and off-policy evaluation), and closes with the honesty layer every causal claim needs: sensitivity analysis, partial identification, negative controls, and refutation tests.\n\nThis pillar connects forward and back across the tree. It draws on B's causal core and statistics, A's optimization and the deep generative models of D, the bandits of B4 and the off-policy ideas of H, and it is where the credibility of any data-driven decision is finally earned.",
+    prerequisites: [
+      "B5 Causal inference: potential outcomes, SCMs and DAGs, d-separation, the do-calculus, propensity scores, IV, and the intro to double ML are assumed throughout.",
+      "B1-B3 Statistics: estimators and their properties, sampling distributions, and cross-validation.",
+      "A3 Optimization and L6 gradient descent; D4 generative models (VAEs, GANs) for the deep-causal discipline. Comfort with Python, numpy, and scikit-learn.",
+    ],
+    subs: [
+      {
+        id: "M1",
+        name: "Causal discovery",
+        intro:
+          "Every method in pillar B starts from a graph you are handed. Causal discovery asks where that graph comes from: can you learn the structure itself from data, and how much of it is even identifiable. The honest answer (a whole Markov equivalence class of DAGs can fit the same observational distribution) is the starting point, and the algorithms here each buy back orientation with a different extra assumption.\n\nYou will characterize what observational independencies pin down (the CPDAG that summarizes an equivalence class), recover structure two classic ways (constraint-based PC by conditional-independence testing, score-based GES by searching equivalence-class space), then break the equivalence-class ceiling with functional assumptions (LiNGAM's non-Gaussianity, additive noise models) and with continuous optimization (NOTEARS turning acyclicity into a smooth penalty). The discipline closes with the realistic case of unobserved confounders, where FCI returns a partial ancestral graph with bidirected edges.\n\nThis is the discipline that makes the rest of the tree's causal work possible when no domain expert can draw the DAG for you.",
+        prerequisites: [
+          "B5 structural causal models, DAGs, and d-separation (the objects being learned).",
+          "B1 hypothesis testing (conditional-independence tests drive constraint-based discovery).",
+          "L6 gradient descent for the continuous-optimization method; comfort with numpy.",
+        ],
+        topics: [
+          { name: "Markov equivalence & CPDAGs", status: "gap" },
+          { name: "PC algorithm (constraint-based)", status: "gap" },
+          { name: "GES (score-based)", status: "gap" },
+          { name: "LiNGAM & additive noise models", status: "gap" },
+          {
+            name: "NOTEARS (continuous optimization)",
+            status: "gap",
+            hot: true,
+          },
+          { name: "FCI, latent confounders & PAGs", status: "gap" },
+        ],
+      },
+      {
+        id: "M2",
+        name: "Heterogeneous treatment effects",
+        intro:
+          "An average treatment effect is a single number for a whole population, but the decision you actually want to make is per unit: treat this customer, not that one. This discipline estimates the conditional average treatment effect, the effect as a function of covariates, which is the object uplift modeling and personalized policy both need.\n\nYou will define the CATE and the assumptions that identify it, then build estimators in increasing sophistication: meta-learners that wrap any regression model (S-, T-, X-learner), the R-learner that turns Robinson's residual-on-residual transformation into an orthogonal loss, and the DR-learner that regresses a doubly-robust pseudo-outcome on covariates. Generalized random forests estimate the CATE as the solution of a local moment condition with honest, valid confidence intervals, and the discipline closes with uplift modeling and its Qini/uplift-curve evaluation, the form this all takes in marketing and growth.\n\nThe orthogonal losses here are the same Neyman-orthogonality idea developed formally in M3, and the CATE estimates feed directly into the policy learning of M5.",
+        prerequisites: [
+          "B5 potential outcomes, propensity scores, and the intro to causal forests.",
+          "B5 double ML (the R- and DR-learners build on residualization and cross-fitting).",
+          "C1 regression and tree ensembles; comfort with scikit-learn-style estimators.",
+        ],
+        topics: [
+          { name: "The CATE estimand", status: "gap" },
+          { name: "Meta-learners (S, T, X)", status: "gap", hot: true },
+          {
+            name: "R-learner & Robinson's transform",
+            status: "gap",
+            hot: true,
+          },
+          { name: "DR-learner & doubly-robust pseudo-outcomes", status: "gap" },
+          { name: "Generalized random forests", status: "gap", hot: true },
+          { name: "Uplift modeling & evaluation", status: "gap" },
+        ],
+      },
+      {
+        id: "M3",
+        name: "Orthogonal & semiparametric estimation",
+        intro:
+          "Double ML in pillar B worked, but this discipline explains why, and gives you the toolkit to build a debiased estimator for any causal parameter, not just the partially linear one. The theory is semiparametric: treat the nuisance functions as infinite-dimensional and ask what the best possible estimator of the finite-dimensional target can do.\n\nYou will read an estimator's first-order behavior off its influence function, identify the efficient influence function that sets the variance floor, and define Neyman orthogonality (the moment condition whose insensitivity to nuisance error is exactly what lets flexible ML plug in). From there come the workhorse estimators: AIPW and its double robustness, TMLE's targeting step that makes a plug-in estimate solve the efficient-influence equation, and automatic debiased ML that learns the Riesz representer directly instead of hand-deriving the correction. The discipline ends on inference: cross-fitted confidence intervals and when to trust them.\n\nThis is the theoretical spine of modern causal ML. The orthogonal losses of M2, the OPE estimators of M5, and the bias diagnostics of M6 are all this machinery applied.",
+        prerequisites: [
+          "B5 double ML and propensity scores; M2 the CATE estimand.",
+          "B1 estimator properties (bias, consistency, efficiency) and B3 cross-validation.",
+          "A2 probability and expectation; comfort with numpy for the estimators.",
+        ],
+        topics: [
+          { name: "Influence functions & efficiency bound", status: "gap" },
+          { name: "Neyman orthogonality", status: "gap", hot: true },
+          { name: "AIPW & double robustness", status: "gap", hot: true },
+          { name: "Targeted MLE (TMLE)", status: "gap" },
+          { name: "Auto-DML & Riesz representers", status: "gap", hot: true },
+          { name: "Inference after debiased ML", status: "gap" },
+        ],
+      },
+      {
+        id: "M4",
+        name: "Deep causal inference",
+        intro:
+          "When covariates are high-dimensional and the response surface is complicated, the right nuisance model is a neural network. This discipline covers the neural architectures built specifically for treatment-effect estimation, where the design problem is not just fit but balance: the treated and control groups have different covariate distributions, and a network must not let that imbalance masquerade as an effect.\n\nYou will frame ITE estimation as covariate shift and bound the counterfactual error with an integral-probability-metric penalty (the CFR idea), then build the architectures: TARNet's shared trunk with per-treatment heads, Dragonnet's propensity head and targeted regularization, GANITE's generative imputation of counterfactuals, CEVAE's latent-confounder VAE, and DeepIV's two neural stages for instrumental variables. Each is a deep-learning answer to an estimator you met earlier in pillars B and M.\n\nThis discipline sits where pillar D's generative models (VAEs, GANs) meet causal estimation, and its targeted-regularization ideas tie back to the TMLE and orthogonality of M3.",
+        prerequisites: [
+          "M2 the CATE estimand and M3 AIPW/targeting (the losses these networks optimize).",
+          "D1 neural-network training; D4 VAEs and GANs for CEVAE and GANITE.",
+          "B5 instrumental variables for DeepIV. PyTorch-level familiarity (code is shown statically).",
+        ],
+        topics: [
+          { name: "Balancing representations (CFR)", status: "gap" },
+          { name: "TARNet & Dragonnet", status: "gap", hot: true },
+          { name: "GANITE", status: "gap" },
+          { name: "CEVAE (latent confounders)", status: "gap" },
+          { name: "Deep IV", status: "gap" },
+        ],
+      },
+      {
+        id: "M5",
+        name: "Policy learning & off-policy evaluation",
+        intro:
+          "Estimating an effect is not the goal; making a decision is. This discipline turns treatment effects into policies (rules mapping a unit's covariates to an action) and answers the two questions that follow: how do you score a policy you have not deployed, and how do you learn a good one from logged data alone.\n\nYou will define a policy's value and show the optimal policy treats exactly the positive-CATE units, then evaluate counterfactual policies off-policy with inverse-propensity scoring, the direct method, and the doubly-robust estimator that combines them. Policy learning turns that value into an objective (outcome-weighted learning, policy trees) with regret guarantees; counterfactual risk minimization controls the brutal variance of importance weights with clipping, self-normalization, and a variance penalty; and the discipline closes by casting the whole problem as an offline contextual bandit, the bridge to the exploration of B4 and the off-policy methods of reinforcement learning.\n\nThe OPE estimators here are the AIPW and orthogonality of M3 wearing a decision-theoretic hat, and the bandit framing connects causal ML directly to pillar H.",
+        prerequisites: [
+          "M2 the DR-learner / CATE and M3 AIPW (off-policy value reuses the doubly-robust score).",
+          "B4 multi-armed and contextual bandits (the offline-bandit framing).",
+          "A3 optimization; comfort with numpy for the value estimators.",
+        ],
+        topics: [
+          { name: "Optimal treatment policies", status: "gap" },
+          {
+            name: "Off-policy evaluation (IPS, DM, DR)",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Policy learning & regret", status: "gap" },
+          { name: "Counterfactual risk minimization", status: "gap" },
+          { name: "Offline contextual bandits", status: "gap" },
+        ],
+      },
+      {
+        id: "M6",
+        name: "Robustness, sensitivity & assumptions",
+        intro:
+          "Every estimate in this pillar rests on assumptions that data cannot verify: no unmeasured confounding, correct overlap, a valid instrument. This discipline is the honesty layer. It does not pretend those assumptions hold; it asks how much they would have to be violated to change your conclusion, and gives you tools to report that alongside the estimate.\n\nYou will quantify the bias a hidden confounder injects and frame sensitivity analysis around it, compute Rosenbaum bounds and the E-value to say how strong an unmeasured confounder would need to be to overturn a finding, drop point identification entirely and report Manski's partial-identification intervals, recover effects through negative controls and proximal causal inference when proxies of the confounder exist, and stress-test any estimate with placebo, random-common-cause, and data-subset refutation tests.\n\nThis is the discipline that separates a causal claim you can defend from one you merely hope is true, and it is where the whole tree's emphasis on honest evaluation reaches its sharpest point.",
+        prerequisites: [
+          "M3 AIPW and B5 counterfactuals (the estimate being stress-tested).",
+          "B5 instrumental variables (negative controls and proximal inference generalize it).",
+          "B1 hypothesis testing for the refutation tests; comfort with numpy.",
+        ],
+        topics: [
+          { name: "When ignorability fails", status: "gap" },
+          { name: "Rosenbaum bounds & the E-value", status: "gap", hot: true },
+          { name: "Partial identification (Manski bounds)", status: "gap" },
+          {
+            name: "Negative controls & proximal inference",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Refutation & falsification tests", status: "gap" },
+        ],
+      },
+    ],
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -2283,6 +2428,62 @@ export const CONNECTIONS: Connection[] = [
     to: "C2",
     label: "Convexity & duality ⇒ SVMs",
     kind: "uses",
+  },
+
+  // ---- M. Advanced Causal ML building on B's causal core ----
+  {
+    from: "B5",
+    to: "M1",
+    label: "DAGs ⇒ learning the DAG from data",
+    kind: "generalizes",
+  },
+  {
+    from: "B5",
+    to: "M2",
+    label: "ATE ⇒ heterogeneous (conditional) effects",
+    kind: "generalizes",
+  },
+  {
+    from: "B5",
+    to: "M3",
+    label: "Double ML ⇒ orthogonal estimation theory",
+    kind: "generalizes",
+  },
+  {
+    from: "M3",
+    to: "M2",
+    label: "Neyman orthogonality ⇒ R-/DR-learner losses",
+    kind: "uses",
+  },
+  {
+    from: "M2",
+    to: "M5",
+    label: "CATE ⇒ optimal treatment policy",
+    kind: "uses",
+  },
+  {
+    from: "D4",
+    to: "M4",
+    label: "VAEs & GANs ⇒ deep counterfactual models",
+    kind: "uses",
+  },
+  {
+    from: "B4",
+    to: "M5",
+    label: "Contextual bandits ↔ offline policy learning",
+    kind: "shared-concept",
+  },
+  {
+    from: "M5",
+    to: "H2",
+    label: "Off-policy value ↔ policy-gradient RL",
+    kind: "shared-concept",
+  },
+  {
+    from: "B5",
+    to: "M6",
+    label: "Unconfoundedness ⇒ sensitivity analysis",
+    kind: "generalizes",
   },
 ];
 
@@ -3313,6 +3514,101 @@ export const PATHS: Path[] = [
         lessonId: "backprop",
         section: "Into the tree",
         note: "the chain rule at scale",
+      },
+    ],
+  },
+  {
+    name: "🔗 Advanced Causal ML",
+    desc: "The sequel to the causal foundations in B5, for someone who already knows potential outcomes and the do-calculus and wants the machine-learning frontier: discover the graph from data, estimate the effect for every unit, understand the orthogonal-estimation theory behind debiased ML, go neural, turn effects into policies, and stress-test the assumptions that hold it all up.",
+    color: "var(--pm)",
+    pillars: ["B5", "M1", "M2", "M3", "M4", "M5", "M6"],
+    steps: [
+      {
+        subId: "B5",
+        lessonId: "potential-outcomes",
+        section: "Foundations recap",
+        note: "the language M assumes",
+      },
+      {
+        subId: "B5",
+        lessonId: "propensity-scores",
+        section: "Foundations recap",
+      },
+      { subId: "B5", lessonId: "double-ml", section: "Foundations recap" },
+      {
+        subId: "M1",
+        lessonId: "discovery-problem",
+        section: "Discover the graph",
+      },
+      { subId: "M1", lessonId: "pc-algorithm", section: "Discover the graph" },
+      { subId: "M1", lessonId: "notears", section: "Discover the graph" },
+      {
+        subId: "M2",
+        lessonId: "cate-estimand",
+        section: "Heterogeneous effects",
+      },
+      {
+        subId: "M2",
+        lessonId: "meta-learners",
+        section: "Heterogeneous effects",
+      },
+      { subId: "M2", lessonId: "r-learner", section: "Heterogeneous effects" },
+      {
+        subId: "M2",
+        lessonId: "generalized-random-forests",
+        section: "Heterogeneous effects",
+      },
+      {
+        subId: "M3",
+        lessonId: "influence-functions",
+        section: "Orthogonal estimation",
+      },
+      {
+        subId: "M3",
+        lessonId: "neyman-orthogonality",
+        section: "Orthogonal estimation",
+      },
+      { subId: "M3", lessonId: "aipw", section: "Orthogonal estimation" },
+      { subId: "M3", lessonId: "tmle", section: "Orthogonal estimation" },
+      {
+        subId: "M4",
+        lessonId: "representation-balancing",
+        section: "Deep causal",
+      },
+      {
+        subId: "M4",
+        lessonId: "tarnet-dragonnet",
+        section: "Deep causal",
+      },
+      {
+        subId: "M5",
+        lessonId: "optimal-policies",
+        section: "Effects into decisions",
+      },
+      {
+        subId: "M5",
+        lessonId: "off-policy-evaluation",
+        section: "Effects into decisions",
+      },
+      {
+        subId: "M5",
+        lessonId: "policy-learning",
+        section: "Effects into decisions",
+      },
+      {
+        subId: "M6",
+        lessonId: "unconfoundedness-failure",
+        section: "Honesty layer",
+      },
+      {
+        subId: "M6",
+        lessonId: "sensitivity-rosenbaum-evalue",
+        section: "Honesty layer",
+      },
+      {
+        subId: "M6",
+        lessonId: "refutation-tests",
+        section: "Honesty layer",
       },
     ],
   },
