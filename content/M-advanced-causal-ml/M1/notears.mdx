@@ -1,0 +1,290 @@
+---
+title: "Continuous structure learning: NOTEARS"
+pillar: M
+subId: M1
+lessonId: notears
+order: 5
+estimatedMinutes: 32
+goal: "Replace the combinatorial acyclicity constraint with a smooth trace-exponential penalty and learn a weighted DAG by gradient descent."
+prerequisites: ["ges-score", "L6/steepest-descent"]
+---
+
+GES searches a discrete space: it adds and deletes edges one at a time and checks
+acyclicity combinatorially. That search scales badly, because the number of DAGs
+on $d$ nodes is super-exponential and the acyclicity check is a global,
+non-smooth constraint. NOTEARS removes the combinatorial step entirely. It writes
+the graph as a real weight matrix, measures acyclicity with a single smooth
+function that is zero exactly on DAGs, and minimizes a least-squares loss by
+gradient descent (L6/steepest-descent)<FN n="1" />.
+
+## The graph as a weight matrix
+
+Encode a candidate graph as a $d \times d$ matrix $W$, where $W_{ij} \neq 0$ means
+an edge $X_i \to X_j$ with that weight, and $W_{ij} = 0$ means no edge. The linear
+structural model is
+
+$$
+X = W^\top X + \varepsilon,
+$$
+
+so each variable is a weighted sum of its parents plus noise. Fitting the data is
+a least-squares problem in $W$: minimize $\frac{1}{2n}\lVert \mathbf{X} -
+\mathbf{X} W \rVert_F^2$ over the $n \times d$ data matrix $\mathbf{X}$, where
+$\lVert \cdot \rVert_F$ is the Frobenius norm. The obstacle is that an
+unconstrained least-squares fit gives a dense matrix with cycles, not a DAG.
+
+## A smooth acyclicity function
+
+The combinatorial constraint "the graph of $W$ is acyclic" is non-smooth, so it
+cannot enter a gradient method directly. NOTEARS replaces it with the scalar
+function
+
+$$
+h(W) = \operatorname{tr}\!\left(e^{\,W \circ W}\right) - d,
+$$
+
+where $W \circ W$ is the elementwise (Hadamard) square of $W$, $e^{M}$ is the
+matrix exponential $\sum_{k=0}^{\infty} M^k / k!$, and $\operatorname{tr}$ is the
+trace. The claim is that $h(W) = 0$ if and only if the weighted graph of $W$ is
+acyclic, and $h$ is smooth with an easy gradient.
+
+**Step 1.** Let $A = W \circ W$, a nonnegative matrix with $A_{ij} > 0$ exactly
+where there is an edge $i \to j$. The entry $(A^k)_{ii}$ counts the
+weight of closed walks of length $k$ from node $i$ back to itself; it is positive
+if and only if node $i$ lies on a directed cycle of length $k$.
+
+**Step 2.** The trace of the matrix exponential expands as
+
+$$
+\operatorname{tr}(e^{A}) = \operatorname{tr}\!\left(\sum_{k=0}^{\infty}
+\frac{A^k}{k!}\right) = \sum_{k=0}^{\infty} \frac{\operatorname{tr}(A^k)}{k!}
+= d + \sum_{k=1}^{\infty} \frac{\operatorname{tr}(A^k)}{k!},
+$$
+
+using $\operatorname{tr}(A^0) = \operatorname{tr}(I) = d$. Subtracting $d$ leaves
+$h(W) = \sum_{k \ge 1} \operatorname{tr}(A^k)/k!$.
+
+**Step 3.** Every term is nonnegative, since $A \ge 0$ entrywise makes
+$\operatorname{tr}(A^k) \ge 0$. So $h(W) = 0$ if and only if every
+$\operatorname{tr}(A^k) = 0$, that is no node lies on any directed cycle: the graph
+is a DAG. The matrix exponential is chosen over a plain power series because it
+converges for every $W$ and has the clean gradient below.
+
+**Step 4.** The gradient is
+
+$$
+\nabla h(W) = \left(e^{\,W \circ W}\right)^\top \circ 2W,
+$$
+
+a single matrix-exponential evaluation. This is what lets $h$ enter a smooth
+optimizer.
+
+The figure shows both halves of the claim. On the left, $h$ as a function of the
+weight on a single three-node cycle sits at zero only when that weight is zero and
+rises smoothly as the cycle strengthens. On the right, a penalized gradient run
+starting from a cyclic $W$ drives $h(W)$ toward zero, turning a cyclic matrix into
+an acyclic one through smooth steps.
+
+![Left: h(W) is zero only for an acyclic weight and grows with cycle strength. Right: penalized descent drives h(W) toward zero.](/figures/M1/notears-acyclicity.svg)
+
+## The constrained objective
+
+Structure learning becomes the smooth constrained program
+
+$$
+\min_{W}\; \frac{1}{2n}\lVert \mathbf{X} - \mathbf{X} W \rVert_F^2
++ \lambda \lVert W \rVert_1 \quad \text{subject to}\quad h(W) = 0,
+$$
+
+with an $\ell_1$ penalty $\lambda\lVert W\rVert_1$ encouraging sparsity. The
+equality constraint $h(W) = 0$ is handled by the **augmented Lagrangian**, which
+turns the constrained problem into a sequence of unconstrained ones:
+
+$$
+L_\rho(W, \alpha) = \frac{1}{2n}\lVert \mathbf{X} - \mathbf{X} W \rVert_F^2
++ \lambda\lVert W \rVert_1 + \alpha\, h(W) + \frac{\rho}{2}\, h(W)^2.
+$$
+
+Here $\alpha$ is a Lagrange multiplier and $\rho > 0$ a penalty weight. Each outer
+iteration minimizes $L_\rho$ over $W$ by gradient descent, then updates
+$\alpha \leftarrow \alpha + \rho\, h(W)$ and increases $\rho$<FN n="2" />. As $\rho$ grows the
+quadratic term forces $h(W) \to 0$, and the final $W$ is thresholded (small
+entries set to zero) to read off the DAG.
+
+```mermaid
+graph TD
+  D["data matrix X"] --> L["least-squares loss<br/>+ L1 sparsity"]
+  L --> AL["augmented Lagrangian<br/>L_rho(W, alpha)"]
+  AC["acyclicity h(W)=0<br/>tr(exp(W o W)) - d"] --> AL
+  AL --> G["minimize over W<br/>by gradient descent"]
+  G --> U["update alpha, increase rho"]
+  U -->|h(W) not yet 0| AL
+  U -->|h(W) ~ 0| T["threshold small<br/>weights -> DAG"]
+```
+
+## A worked acyclicity check
+
+The trace-exponential characterization is the crux, so the code verifies it
+directly: $h$ is zero for an acyclic (upper-triangular) weight matrix, strictly
+positive once a back-edge creates a cycle, and its analytic gradient matches a
+finite-difference estimate.
+
+```python
+import numpy as np
+
+def h(W):
+    A = W * W
+    # matrix exponential via the truncated series (converges fast for small W)
+    E = np.eye(W.shape[0]); term = np.eye(W.shape[0])
+    for k in range(1, 25):
+        term = term @ A / k
+        E = E + term
+    return np.trace(E) - W.shape[0]
+
+def grad_h(W):
+    A = W * W
+    E = np.eye(W.shape[0]); term = np.eye(W.shape[0])
+    for k in range(1, 25):
+        term = term @ A / k
+        E = E + term
+    return E.T * 2 * W
+
+# acyclic weight (upper triangular = a valid topological order)
+W_dag = np.array([[0.0, 0.8, 0.3],
+                  [0.0, 0.0, 0.6],
+                  [0.0, 0.0, 0.0]])
+# cyclic weight: add a back-edge 2 -> 0
+W_cyc = W_dag.copy(); W_cyc[2, 0] = 0.7
+
+print("h(DAG)   =", round(h(W_dag), 6))
+print("h(cyclic)=", round(h(W_cyc), 6))
+
+# check the gradient against a finite difference at W_cyc
+g = grad_h(W_cyc)
+eps = 1e-6; fd = np.zeros_like(W_cyc)
+for i in range(3):
+    for j in range(3):
+        d = np.zeros_like(W_cyc); d[i, j] = eps
+        fd[i, j] = (h(W_cyc + d) - h(W_cyc - d)) / (2 * eps)
+
+assert abs(h(W_dag)) < 1e-9                 # acyclic => h = 0
+assert h(W_cyc) > 1e-3                       # a cycle => h > 0
+assert np.allclose(g, fd, atol=1e-4)         # analytic gradient is correct
+print("gradient matches finite difference")
+```
+
+The acyclic matrix gives $h = 0$ to machine precision, the cyclic one gives a
+strictly positive $h$, and the closed-form gradient $(e^{W\circ W})^\top \circ 2W$
+matches finite differences. Those three facts are what make NOTEARS a smooth
+optimization rather than a combinatorial search.
+
+## Exercises
+
+**Exercise 1.** Prove that $h(W) \ge 0$ for every real matrix $W$, with equality
+exactly when the weighted directed graph of $W$ is acyclic.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Let $A = W \circ W$, so $A_{ij} = W_{ij}^2 \ge 0$. From the series
+expansion, $h(W) = \sum_{k \ge 1} \operatorname{tr}(A^k)/k!$.
+
+**Step 2.** Because $A$ is entrywise nonnegative, every power $A^k$ is entrywise
+nonnegative, so $\operatorname{tr}(A^k) = \sum_i (A^k)_{ii} \ge 0$. A sum of
+nonnegative terms is nonnegative, giving $h(W) \ge 0$.
+
+**Step 3.** Equality holds iff every $\operatorname{tr}(A^k) = 0$. The diagonal
+entry $(A^k)_{ii}$ is a sum over length-$k$ closed walks $i \to \cdots \to i$ of
+products of the (positive) edge weights, so it is positive iff such a walk exists,
+that is iff node $i$ lies on a directed cycle. All traces vanish iff no node lies
+on a cycle, which is the definition of a DAG.
+
+</details>
+
+**Exercise 2.** The augmented Lagrangian adds both a linear term $\alpha\, h(W)$
+and a quadratic term $\tfrac{\rho}{2} h(W)^2$. Explain the role of each and why
+$\rho$ is increased across outer iterations rather than set huge from the start.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The quadratic term $\tfrac{\rho}{2} h(W)^2$ penalizes any violation of
+$h(W) = 0$; as $\rho \to \infty$ it forces feasibility. Alone, a finite $\rho$
+leaves a residual constraint violation, because the loss gradient balances against
+it.
+
+**Step 2.** The linear term $\alpha\, h(W)$ carries the Lagrange multiplier. The
+update $\alpha \leftarrow \alpha + \rho\, h(W)$ accumulates the constraint
+residual, so at the optimum the multiplier supplies the exact gradient correction
+needed for feasibility *without* sending $\rho$ to infinity. This is what
+distinguishes the augmented Lagrangian from a plain penalty method.
+
+**Step 3.** Setting $\rho$ huge immediately makes the subproblem ill-conditioned:
+the quadratic penalty dominates and the optimizer struggles to also fit the data.
+Growing $\rho$ gradually keeps each subproblem well-conditioned while steadily
+tightening feasibility.
+
+</details>
+
+**Exercise 3 (code).** Fit the *unconstrained* least-squares $W$ on a two-node
+chain $X_0 \to X_1$ by regressing each variable on the other, and show why the
+acyclicity constraint is indispensable: the fit recovers the forward slope but
+*also* leaves a large reverse weight, so the matrix is cyclic ($h(W)$ far from
+zero) and no threshold can separate the directions. Assert that the forward entry
+$W_{01}$ matches the true slope, that the reverse entry $W_{10}$ is also large,
+and that $h(W)$ is well above zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 5000
+X0 = rng.normal(0, 1, n)
+X1 = 0.9 * X0 + rng.normal(0, 0.3, n)     # true X0 -> X1, slope 0.9
+Xd = np.column_stack([X0, X1])
+
+def h(W):
+    A = W * W; E = np.eye(2); term = np.eye(2)
+    for k in range(1, 20):
+        term = term @ A / k; E = E + term
+    return np.trace(E) - 2
+
+# column-wise least squares: regress each variable on the others (no self-edge)
+W = np.zeros((2, 2))
+for j in range(2):
+    others = [k for k in range(2) if k != j]
+    Z = Xd[:, others]
+    coef = np.linalg.lstsq(Z, Xd[:, j], rcond=None)[0]
+    for c, k in zip(coef, others):
+        W[k, j] = c
+
+print("W =\n", np.round(W, 3))
+print("h(W) =", round(h(W), 4))
+
+# the forward weight recovers the slope, but the reverse weight is just as large:
+# the unconstrained fit is dense and cyclic, so h(W) is far from zero
+assert abs(W[0, 1] - 0.9) < 0.1            # forward edge ~ true slope
+assert abs(W[1, 0]) > 0.5                   # reverse edge is also large
+assert h(W) > 0.1                           # the fit is cyclic, not a DAG
+```
+
+The forward entry $W_{01} \approx 0.904$ lands near the true slope $0.9$, but the
+reverse entry $W_{10} \approx 0.995$ is just as large: with Gaussian noise the
+plain least-squares fit cannot tell $X_0 \to X_1$ from $X_1 \to X_0$, so it keeps
+both and $h(W) \approx 0.87$ flags the result as cyclic. This is exactly why
+NOTEARS imposes $h(W) = 0$: the acyclicity constraint, not thresholding, is what
+forces the optimizer to drop one direction and return a genuine DAG.
+
+</details>
+
+The next lesson returns to constraint-based discovery but drops its strongest
+assumption: when unobserved confounders may exist, FCI replaces the CPDAG with a
+partial ancestral graph that records where a latent common cause could sit.
+
+<Footnotes>
+  <FNItem n="1">**Zheng, X., Aragam, B., Ravikumar, P., & Xing, E. P.** (2018). "DAGs with NO TEARS: Continuous optimization for structure learning". *Advances in Neural Information Processing Systems (NeurIPS) 31*. The smooth trace-exponential acyclicity constraint and augmented-Lagrangian formulation. [arXiv:1803.01422](https://arxiv.org/abs/1803.01422)</FNItem>
+  <FNItem n="2">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization*, 2nd ed. Springer, Ch. 17. The augmented Lagrangian method for equality-constrained optimization. [doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)</FNItem>
+</Footnotes>

@@ -1,0 +1,314 @@
+---
+title: "Balancing representations for counterfactuals"
+pillar: M
+subId: M4
+lessonId: representation-balancing
+order: 1
+estimatedMinutes: 32
+goal: "Frame ITE estimation as a covariate-shift problem and bound the counterfactual error with an integral-probability-metric penalty on the representation."
+prerequisites: ["M2/cate-estimand", "B5/causal-representation-learning"]
+---
+
+The CATE lesson (M2/cate-estimand) estimated the individual effect
+$\tau(x) = \mathbb{E}[Y(1) - Y(0) \mid X = x]$ as a regression target. A neural
+network can fit each potential-outcome surface, but it faces a problem a plain
+regressor never does. For a treated unit the data carries $Y(1)$ and the network
+must predict its missing $Y(0)$; for a control unit the reverse. The training
+labels for the $Y(0)$ head come only from control units, yet at test time that
+head is asked about treated units, whose covariates are distributed differently.
+Estimating the individual treatment effect (ITE) is therefore a prediction *under
+covariate shift*: every counterfactual query is out of the training distribution
+of the head answering it<FN n="3" />. This lesson makes that statement precise and turns it
+into a trainable penalty.
+
+## Factual and counterfactual loss
+
+Write the treatment as $w \in \{0, 1\}$ and let $p(x \mid w)$ be the covariate
+distribution within each arm. A model $f(x, w)$ predicts the potential outcome
+$Y(w)$. Two losses matter. The **factual loss** measures error on the
+treatment each unit actually received:
+
+$$
+\varepsilon_F = \mathbb{E}_{x, w \sim p(x, w)}\big[ \ell\big(f(x, w),\, Y(w)\big) \big],
+$$
+
+where $\ell$ is a per-example loss (squared error below). This is the only
+quantity the data lets the network minimize, because $Y(w)$ is observed exactly
+when the unit got $w$. The **counterfactual loss** measures error on the
+treatment each unit did *not* receive:
+
+$$
+\varepsilon_{CF} = \mathbb{E}_{x, w \sim p(x,\, 1 - w)}\big[ \ell\big(f(x, w),\, Y(w)\big) \big].
+$$
+
+The expectation here draws covariates from the *opposite* arm: it scores the
+$w = 0$ head on the treated covariate distribution and vice versa. The ITE error
+is controlled by $\varepsilon_{CF}$, but $\varepsilon_{CF}$ is never directly
+observable. The whole strategy is to bound it using things that are.
+
+The gap between the two losses is exactly a distribution-shift gap. The factual
+loss for the control head integrates against $p(x \mid w = 0)$; the
+counterfactual loss for the same head integrates against $p(x \mid w = 1)$. If
+those two covariate distributions were identical, the two losses would coincide
+and minimizing the factual error would minimize the counterfactual error for
+free. Treatment selection is precisely what makes them differ.
+
+## The representation and its pushforward
+
+Following B5/causal-representation-learning, route both heads through a shared
+representation. A map $\Phi : \mathcal{X} \to \mathcal{R}$ sends covariates into
+a feature space; two outcome heads $h_0, h_1 : \mathcal{R} \to \mathbb{R}$ read
+the potential outcomes off $\Phi(x)$, so $f(x, w) = h_w(\Phi(x))$. Require
+$\Phi$ to be invertible (one-to-one) so no covariate information is destroyed;
+the inverse $\Psi = \Phi^{-1}$ exists.
+
+The two within-arm covariate distributions push forward through $\Phi$ to two
+distributions over the representation:
+
+$$
+p_{\Phi}^{w=1} = \Phi_{\#}\, p(x \mid w = 1), \qquad
+p_{\Phi}^{w=0} = \Phi_{\#}\, p(x \mid w = 0),
+$$
+
+where $\Phi_{\#} p$ denotes the pushforward, the law of $\Phi(X)$ when
+$X \sim p$. The covariate imbalance is now imbalance between these two
+representation distributions, and $\Phi$ is free to reduce it. The figure shows
+the picture: raw covariates separate the arms (left), while a representation that
+the penalty below pulls together overlaps them (right).
+
+![Treated and control covariate distributions are imbalanced in raw X (left); a balancing representation makes the two pushforward distributions overlap (right).](/figures/M4/imbalance-balance.svg)
+
+## Measuring the gap: integral probability metrics
+
+To penalize imbalance, the distance between $p_{\Phi}^{w=1}$ and $p_{\Phi}^{w=0}$
+must be a number $\Phi$ can lower by gradient descent. An **integral probability
+metric** (IPM) measures the distance between two distributions $p$ and $q$ as the
+largest mean discrepancy over a class $\mathcal{G}$ of test functions<FN n="1" />:
+
+$$
+\mathrm{IPM}_{\mathcal{G}}(p, q) = \sup_{g \in \mathcal{G}} \left| \int g \, dp - \int g \, dq \right|.
+$$
+
+Two choices of $\mathcal{G}$ give the metrics used in practice.
+
+- The **Wasserstein-1 distance** takes $\mathcal{G}$ to be the 1-Lipschitz
+  functions. It is the cost of optimally transporting one distribution onto the
+  other.
+- The **maximum mean discrepancy** (MMD) takes $\mathcal{G}$ to be the unit ball
+  of a reproducing-kernel Hilbert space with kernel $k$. The MMD has a closed
+  form in terms of kernel means, which makes it cheap to compute from samples:
+
+$$
+\mathrm{MMD}^2(p, q) = \mathbb{E}_{x, x' \sim p}[k(x, x')] + \mathbb{E}_{y, y' \sim q}[k(y, y')] - 2\,\mathbb{E}_{x \sim p,\, y \sim q}[k(x, y)].
+$$
+
+Both vanish if and only if $p = q$ (for a characteristic kernel, in the MMD
+case), which is the property a penalty needs: zero exactly at balance, positive
+otherwise. As a representation pulls the two arms' pushforwards together, the IPM
+falls toward zero, which is the signal gradient descent on the penalty follows.
+
+![As a balancing knob maps the treated branch toward the control distribution, the RBF-MMD between the two representation samples shrinks toward zero.](/figures/M4/ipm-shrinks.svg)
+
+## The generalization bound
+
+The central result of Shalit, Johansson and Sontag ties these pieces together.
+With $\ell$ the squared loss and $\Phi$ invertible, the expected ITE error
+$\varepsilon_{PEHE}$ (the precision in estimating heterogeneous effects, the mean
+squared error of the predicted individual effect) is bounded by the factual loss
+plus the imbalance of the representation<FN n="2" />:
+
+$$
+\varepsilon_{PEHE} \;\le\; 2\Big( \varepsilon_F^{\,w=1} + \varepsilon_F^{\,w=0} + B_{\Phi}\,\mathrm{IPM}_{\mathcal{G}}\big(p_{\Phi}^{w=1},\, p_{\Phi}^{w=0}\big) - 2\sigma_Y^2 \Big).
+$$
+
+Read the three movable terms. The two factual losses $\varepsilon_F^{\,w}$ are
+in-arm prediction error, minimized by fitting the observed outcomes well. The IPM
+term is the imbalance between the two pushforward distributions, scaled by a
+constant $B_{\Phi}$ that bounds the loss of the counterfactual head over the
+representation. The constant $\sigma_Y^2$ is the irreducible outcome noise and
+does not depend on the model.
+
+**Step 1.** The counterfactual loss decomposes as the factual loss of the same
+head plus the change of measure from one arm's representation distribution to the
+other's. Writing the control-head loss as a function $u_0(r) = \ell(h_0(r),
+Y(0))$ on the representation,
+
+$$
+\varepsilon_{CF}^{\,w=0} = \int u_0 \, dp_{\Phi}^{w=1}, \qquad
+\varepsilon_F^{\,w=0} = \int u_0 \, dp_{\Phi}^{w=0}.
+$$
+
+**Step 2.** Their difference is a mean discrepancy of the single function $u_0$
+between the two distributions, which the IPM supremum upper-bounds whenever
+$u_0 / B_{\Phi}$ lies in $\mathcal{G}$:
+
+$$
+\varepsilon_{CF}^{\,w=0} - \varepsilon_F^{\,w=0} = \int u_0 \,\big(dp_{\Phi}^{w=1} - dp_{\Phi}^{w=0}\big) \;\le\; B_{\Phi}\,\mathrm{IPM}_{\mathcal{G}}\big(p_{\Phi}^{w=1}, p_{\Phi}^{w=0}\big).
+$$
+
+The constant $B_{\Phi}$ is whatever scaling puts $u_0$ inside the test-function
+class (a Lipschitz bound for Wasserstein, an RKHS-norm bound for MMD).
+
+**Step 3.** Summing the factual and counterfactual losses over both heads
+reconstructs the potential-outcome errors, and a standard inequality relating the
+sum of those errors to $\varepsilon_{PEHE}$ closes the bound. The full constant
+tracking is in the paper; the structure is the point: counterfactual error is
+factual error plus a representation-imbalance penalty.
+
+## The CFR objective
+
+The bound is also a recipe. Minimize its right-hand side over $\Phi, h_0, h_1$.
+That gives **counterfactual regression** (CFR): fit the factual outcomes while
+penalizing the representation imbalance,
+
+$$
+\min_{\Phi,\, h_0,\, h_1} \;\; \frac{1}{n} \sum_{i=1}^{n} \ell\big(h_{w_i}(\Phi(x_i)),\, y_i\big) \;+\; \alpha \cdot \mathrm{IPM}_{\mathcal{G}}\big(\hat p_{\Phi}^{w=1},\, \hat p_{\Phi}^{w=0}\big),
+$$
+
+with $\hat p_{\Phi}^{w}$ the empirical representation distribution of arm $w$ in
+the batch and $\alpha \ge 0$ the balancing weight. Setting $\alpha = 0$ recovers
+a plain two-head regressor (TARNet, the next lesson). A positive $\alpha$ trades
+in-sample fit for balance.
+
+That trade-off has a sweet spot. Too little balancing leaves the counterfactual
+head extrapolating across a covariate gap; too much crushes the outcome-relevant
+structure out of $\Phi$ and hurts even the factual fit. The PEHE is U-shaped in
+$\alpha$.
+
+![Counterfactual error is U-shaped in the balancing weight: extrapolation error falls while lost outcome signal rises, with an interior optimum.](/figures/M4/pehe-vs-alpha.svg)
+
+## Worked code: the IPM penalty
+
+The penalty is the only new machinery, and the MMD form runs in numpy. The
+following computes the RBF-kernel $\mathrm{MMD}^2$ between the treated and control
+representation samples, then checks that mapping the treated branch onto the
+control distribution drives it toward zero. This is exactly the term CFR adds to
+the loss.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, gamma = 200, 0.5
+
+# representation samples for the two arms (here 1-D for clarity)
+phi_ctrl = rng.normal(-1.0, 0.8, (n, 1))
+phi_trt = rng.normal(1.3, 0.8, (n, 1))    # selection: treated shifted right
+
+def mmd2_rbf(a, b, gamma):
+    # squared MMD with an RBF kernel k(x,y) = exp(-gamma * ||x-y||^2)
+    def k(x, y):
+        d2 = ((x[:, None, :] - y[None, :, :]) ** 2).sum(-1)
+        return np.exp(-gamma * d2)
+    return k(a, a).mean() + k(b, b).mean() - 2.0 * k(a, b).mean()
+
+imbalanced = mmd2_rbf(phi_ctrl, phi_trt, gamma)
+
+# a balancing map: pull the treated branch onto the control mean and spread
+phi_trt_bal = (phi_trt - phi_trt.mean()) * (phi_ctrl.std() / phi_trt.std())
+phi_trt_bal += phi_ctrl.mean()
+balanced = mmd2_rbf(phi_ctrl, phi_trt_bal, gamma)
+
+print(f"MMD^2 imbalanced: {imbalanced:.4f}")
+print(f"MMD^2 balanced:   {balanced:.4f}")
+assert imbalanced > 0.1          # raw arms are far apart
+assert balanced < imbalanced / 5 # balancing collapses the discrepancy
+```
+
+The penalty is large when the arms separate and near zero once their
+representation distributions match, so gradient descent on it pushes $\Phi$
+toward overlap. The bound guarantees that this overlap, paid for by a small loss
+of fit, buys a smaller counterfactual error.
+
+## Exercises
+
+**Exercise 1.** A control unit and a treated unit have identical covariates
+$x_0$. The control head predicts $h_0(\Phi(x_0)) = 3$ for the control unit's
+factual outcome, with true $Y(0) = 3.4$. The treated unit's factual outcome is
+$Y(1) = 5.1$ and the treated head predicts $h_1(\Phi(x_0)) = 4.7$. Compute the
+predicted ITE at $x_0$ and the squared error of that ITE against the true effect.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The predicted ITE reads off the two heads at the shared
+representation: $\hat\tau(x_0) = h_1(\Phi(x_0)) - h_0(\Phi(x_0)) = 4.7 - 3 = 1.7$.
+
+**Step 2.** The true individual effect at $x_0$ is $Y(1) - Y(0) = 5.1 - 3.4 =
+1.7$. The squared error is $(1.7 - 1.7)^2 = 0$ here, even though each head is
+individually off by $0.4$, because the two head errors cancel in the difference.
+This is why PEHE, not per-head loss, is the right target: correlated head errors
+do not hurt the effect estimate.
+
+</details>
+
+**Exercise 2.** Show from the IPM definition that
+$\mathrm{IPM}_{\mathcal{G}}(p, q) = 0$ whenever $p = q$, and that for the
+1-Lipschitz class the metric is symmetric, $\mathrm{IPM}(p, q) =
+\mathrm{IPM}(q, p)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** If $p = q$ then for every $g$, $\int g\,dp - \int g\,dq = 0$, so the
+absolute value is $0$ for all $g$ and the supremum over $\mathcal{G}$ is $0$.
+
+**Step 2.** Symmetry uses the absolute value and closure of the Lipschitz class
+under negation. For any $g$, $\left|\int g\,dp - \int g\,dq\right| = \left|\int
+g\,dq - \int g\,dp\right|$, so the two suprema range over the same set of values
+and are equal. (Equivalently, if $g$ is 1-Lipschitz so is $-g$, so swapping $p$
+and $q$ relabels the witness function without changing the optimum.)
+
+</details>
+
+**Exercise 3 (code).** The balancing weight $\alpha$ should shrink the IPM term
+in the CFR objective. Build a representation as a scalar rescaling
+$\Phi_s(x) = s \cdot x$ of a confounded covariate, and verify numerically that
+the RBF $\mathrm{MMD}^2$ between the two arms' representations is monotone
+non-increasing as $s \to 0$ (because shrinking toward a point collapses both
+arms together). End with an assert that the smallest scale gives the smallest
+discrepancy.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n, gamma = 200, 0.5
+x_ctrl = rng.normal(-1.0, 0.8, (n, 1))
+x_trt = rng.normal(1.3, 0.8, (n, 1))
+
+def mmd2_rbf(a, b, gamma):
+    def k(x, y):
+        d2 = ((x[:, None, :] - y[None, :, :]) ** 2).sum(-1)
+        return np.exp(-gamma * d2)
+    return k(a, a).mean() + k(b, b).mean() - 2.0 * k(a, b).mean()
+
+scales = [1.0, 0.5, 0.25, 0.1, 0.02]
+mmds = [mmd2_rbf(s * x_ctrl, s * x_trt, gamma) for s in scales]
+for s, m in zip(scales, mmds):
+    print(f"s = {s:>4}:  MMD^2 = {m:.4f}")
+
+# scaling toward 0 contracts both arms onto a point, killing the discrepancy
+assert all(mmds[i] >= mmds[i + 1] - 1e-9 for i in range(len(mmds) - 1))
+assert mmds[-1] == min(mmds)
+```
+
+The discrepancy falls monotonically as $s$ shrinks. The lesson's warning is that
+the cheapest way to zero the IPM, collapsing $\Phi$ to a constant, also destroys
+the outcome signal, which is why the factual-loss term in the objective is what
+keeps $\Phi$ informative.
+
+</details>
+
+The next lesson turns the CFR objective into a concrete architecture: TARNet, the
+shared-trunk two-head network that is CFR at $\alpha = 0$, and Dragonnet, which
+adds a propensity head and a targeted-regularization term.
+
+<Footnotes>
+  <FNItem n="1">**Müller, A.** (1997). "Integral probability metrics and their generating classes of functions". *Advances in Applied Probability*, 29(2), 429-443. Defines IPMs and the Wasserstein/MMD special cases. [doi:10.2307/1428011](https://doi.org/10.2307/1428011)</FNItem>
+  <FNItem n="2">**Shalit, U., Johansson, F. D., & Sontag, D.** (2017). "Estimating individual treatment effect: generalization bounds and algorithms". *ICML*. The CFR bound on PEHE and the balancing-penalty algorithm. [arXiv:1606.03976](https://arxiv.org/abs/1606.03976)</FNItem>
+  <FNItem n="3">**Johansson, F. D., Shalit, U., & Sontag, D.** (2016). "Learning representations for counterfactual inference". *ICML*. The covariate-shift framing of counterfactual prediction over a learned representation. [arXiv:1605.03661](https://arxiv.org/abs/1605.03661)</FNItem>
+</Footnotes>

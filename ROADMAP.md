@@ -4,27 +4,34 @@ Canonical backlog of upcoming work for `ai-knowledge-tree`. When asked "what are
 the next steps?", read this file. As items ship, check them off or remove them so
 the list never claims work that's already done.
 
-Last reviewed: 2026-06-12 (Calculus pillar L shipped; Causal Inference ML
-remains queued).
+Last reviewed: 2026-06-20 (Advanced Causal ML pillar M shipped; backlog of new
+pillars now empty).
 
 ## Backlog
 
-### New pillars to author
+_No new pillars queued._ The causal-inference work is shipped: foundations live
+in pillar B (B5), and the advanced machine-learning frontier is pillar M below.
+Add new agreed next steps here.
 
-- **Causal Inference / Machine Learning pillar.** A new top-level pillar covering
-  causal inference and causal ML (e.g. potential outcomes, DAGs & do-calculus,
-  confounding & adjustment, instrumental variables, propensity scores & matching,
-  difference-in-differences, regression discontinuity, structural causal models,
-  causal discovery, heterogeneous treatment effects / uplift modeling,
-  double/debiased ML, causal forests). Follow the standard pillar workflow in
-  CLAUDE.md ("Author a complete pillar"): add subsections + topics to
-  `src/lib/dag.ts`, author `src/lib/curriculum/<Letter>.ts`, write all lesson MDX
-  (each with figures + exercises per STYLE.md), wire cross-pillar `CONNECTIONS`,
-  then `npm run build`/`npm run lint`, open a PR, run `/code-review`, and print the
-  PR link.
 ---
 
-Four efforts shipped:
+Five efforts shipped:
+
+- **Advanced Causal Machine Learning pillar M** (2026-06-20). New top-level pillar,
+  the ML frontier sitting on top of B5's causal foundations (cross-linked, not
+  duplicative). 6 subsections (M1 causal discovery, M2 heterogeneous treatment
+  effects, M3 orthogonal & semiparametric estimation, M4 deep causal inference, M5
+  policy learning & off-policy evaluation, M6 robustness/sensitivity/assumptions),
+  33 lessons, all per STYLE.md: derivations, ≥1 image per lesson (Mermaid and/or
+  the per-subsection figure scripts figures/gen/M1-M6.py, 23 SVGs), ≥3 exercises
+  with hidden solutions, and verified references each. 10 cross-pillar CONNECTIONS
+  tie M to B5/B4/D4/H; new "Advanced Causal ML" learning path threads B5 → M1-M6.
+  Every runnable numpy block executes under python3 (asserts pass); render-check
+  --exercises 33/33; build + lint clean. (B5 was found already complete during
+  scoping, so M was authored as the differentiated advanced course rather than a
+  duplicate foundations pillar.)
+
+Four earlier efforts shipped:
 
 - **Calculus pillar L** (2026-06-12). New top-level pillar with 6 subsections
   (L1 limits & continuity, L2 differentiation, L3 integration & series, L4

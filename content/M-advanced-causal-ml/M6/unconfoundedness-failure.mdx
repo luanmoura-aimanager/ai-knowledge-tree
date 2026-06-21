@@ -1,0 +1,260 @@
+---
+title: "When ignorability fails"
+pillar: M
+subId: M6
+lessonId: unconfoundedness-failure
+order: 1
+estimatedMinutes: 30
+goal: "Quantify the bias a hidden confounder injects into an adjusted estimate, and frame sensitivity analysis as asking how strong that confounder would have to be."
+prerequisites: ["M3/aipw", "B5/counterfactuals"]
+---
+
+Every estimator in M3 (AIPW, TMLE, double ML) assumes **ignorability**: conditional
+on the measured covariates $X$, treatment $W$ is as good as randomly assigned, so the
+treated and control groups are comparable once $X$ is held fixed. That assumption is
+**untestable** from the data. If a confounder $U$ drives both who gets treated and what
+outcome they have, and $U$ is not in $X$, then adjusting for $X$ alone leaves a residual
+imbalance, and the "debiased" estimate is biased after all. This lesson quantifies that
+bias as an explicit function of how strongly $U$ acts, which turns the untestable
+question "is ignorability true?" into the answerable one "how strong would a hidden
+confounder have to be to change my conclusion?".
+
+## The setup: an adjusted estimate that should be unbiased
+
+Take a binary treatment $W \in \{0,1\}$ and outcome $Y$. The **average treatment
+effect** is $\tau = E[Y(1) - Y(0)]$, where $Y(1)$ and $Y(0)$ are the potential outcomes
+of B5's counterfactual framework. With ignorability given $X$, the adjusted
+(regression or AIPW) estimator targets
+
+$$
+\tau = E_X\!\left[\, E[Y \mid W{=}1, X] - E[Y \mid W{=}0, X]\, \right].
+$$
+
+Suppose the true world also contains an unmeasured binary confounder $U \in \{0,1\}$,
+and that ignorability holds only given **both** $X$ and $U$:
+
+$$
+\{Y(0), Y(1)\} \perp W \mid X, U.
+$$
+
+Adjusting for $X$ alone omits $U$. The question is how much the estimate moves.
+
+## Step-by-step: the omitted-confounder bias
+
+Hold $X$ fixed at a stratum (drop it from the notation; everything below is within a
+stratum of $X$). Inside that stratum, two numbers describe $U$:
+
+- **Imbalance** $\delta = P(U{=}1 \mid W{=}1) - P(U{=}1 \mid W{=}0)$: how much more common
+  the confounder is among the treated than the controls.
+- **Outcome effect** $\beta_U = E[Y \mid U{=}1] - E[Y \mid U{=}0]$ at fixed $W$: how much
+  $U$ shifts the outcome, net of treatment.
+
+**Step 1.** The naive within-stratum contrast (adjusting for $X$ but not $U$) is the
+difference in observed mean outcomes between treatment arms:
+
+$$
+\hat\tau = E[Y \mid W{=}1] - E[Y \mid W{=}0].
+$$
+
+**Step 2.** Decompose each arm's mean by conditioning on $U$, using the law of total
+expectation. Write $\mu_w(u) = E[Y \mid W{=}w, U{=}u]$ and
+$p_w = P(U{=}1 \mid W{=}w)$:
+
+$$
+E[Y \mid W{=}w] = (1 - p_w)\,\mu_w(0) + p_w\,\mu_w(1).
+$$
+
+**Step 3.** Assume the structural effect is additive and constant,
+$\mu_w(u) = \alpha + \tau\, w + \beta_U\, u$, with true effect $\tau$. Substituting,
+
+$$
+E[Y \mid W{=}w] = \alpha + \tau\, w + \beta_U\, p_w.
+$$
+
+**Step 4.** Subtract the two arms:
+
+$$
+\hat\tau = (\alpha + \tau + \beta_U p_1) - (\alpha + \beta_U p_0)
+        = \tau + \beta_U (p_1 - p_0)
+        = \tau + \beta_U\, \delta.
+$$
+
+The bias is the product
+
+$$
+\boxed{\ \text{bias} = \hat\tau - \tau = \beta_U \cdot \delta\ }.
+$$
+
+It is a clean **omitted-variable-bias** decomposition<FN n="1" />: bias = (how unbalanced
+the confounder is across treatment) $\times$ (how much the confounder moves the outcome).
+Both factors must be nonzero. A confounder that is perfectly balanced across arms
+($\delta = 0$) injects no bias no matter how strongly it affects $Y$; a confounder with
+no outcome effect ($\beta_U = 0$) injects no bias no matter how unbalanced it is. This is
+why randomization works: it forces $\delta = 0$ for **every** variable, measured or not<FN n="2" />.
+
+## A magnitude scale
+
+Pin numbers to the two factors so the product has a feel. Suppose the true effect is
+$\tau = 0$ (the treatment does nothing) and adjustment for $X$ leaves a confounder $U$:
+
+| confounder | imbalance $\delta$ | outcome effect $\beta_U$ | bias $\beta_U \delta$ |
+|---|---|---|---|
+| negligible | 0.02 | 0.5 | 0.01 |
+| moderate | 0.10 | 1.0 | 0.10 |
+| strong | 0.30 | 2.0 | 0.60 |
+
+A weak confounder shifts the estimate by 0.01, indistinguishable from noise. A strong
+one fabricates an effect of 0.60 out of a true effect of zero. Sensitivity analysis
+(next lesson) asks which row of this table you would need to believe to overturn a
+specific finding.
+
+![Adjusted estimate vs. confounder imbalance, for three outcome-effect strengths. The bias grows linearly in the imbalance and steepens with the confounder's effect on the outcome.](/figures/M6/confounding-bias.svg)
+
+## A contrasting pair: same imbalance, opposite conclusions
+
+Two studies each report an adjusted effect $\hat\tau = 0.3$.
+
+- **Study A** measured every plausible driver of treatment, so any leftover $U$ can have
+  at most $\delta \approx 0.03$ and $\beta_U \approx 1$: maximum bias $\approx 0.03$, far
+  below $0.3$. The finding survives.
+- **Study B** measured only demographics, leaving a strong behavioral confounder with
+  plausibly $\delta \approx 0.3$ and $\beta_U \approx 1$: maximum bias $\approx 0.3$,
+  the entire estimate. The finding could be confounding alone.
+
+The point estimate is identical; the credibility is not. What separates them is the
+**size of the confounder that remains plausible**, not anything in the data.
+
+## A named confusion: precision is not unbiasedness
+
+A tight confidence interval reports **sampling** uncertainty: how much $\hat\tau$ would
+wobble across repeated samples from the same biased data-generating process. It says
+nothing about $\beta_U \delta$, which is a **systematic** shift present in every sample.
+Doubling $n$ shrinks the interval and leaves the bias untouched. An estimate can be
+extremely precise and entirely wrong. Sensitivity analysis targets the bias term, a
+question no amount of data answers on its own.
+
+## Implementation
+
+The simulation builds a world where the true effect is exactly zero, then shows that
+adjusting only for $X$ recovers the bias formula $\beta_U \delta$.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200_000
+beta_U = 1.5            # effect of the hidden confounder on Y
+tau_true = 0.0         # the treatment does nothing
+
+# Hidden confounder U drives treatment: treated units carry more U.
+U = rng.binomial(1, 0.5, n)
+# P(W=1) rises with U, creating imbalance delta across arms.
+pW = np.where(U == 1, 0.7, 0.3)
+W = (rng.uniform(size=n) < pW).astype(float)
+
+# Outcome: additive, constant effect tau_true, plus beta_U * U.
+Y = 1.0 + tau_true * W + beta_U * U + rng.normal(0, 0.5, n)
+
+# Naive estimate adjusting for nothing observable about U.
+tau_hat = Y[W == 1].mean() - Y[W == 0].mean()
+
+# Predicted bias from the formula: beta_U * (P(U=1|W=1) - P(U=1|W=0)).
+delta = U[W == 1].mean() - U[W == 0].mean()
+bias_pred = beta_U * delta
+
+print(f"true effect      : {tau_true}")
+print(f"naive estimate   : {tau_hat:.4f}")
+print(f"imbalance delta  : {delta:.4f}")
+print(f"predicted bias   : {bias_pred:.4f}")
+assert np.isclose(tau_hat, tau_true + bias_pred, atol=0.02)
+```
+
+The naive estimate lands near $\beta_U \delta$ even though the treatment has no effect,
+and the printed bias matches the formula to within Monte Carlo noise.
+
+## Exercises
+
+**Exercise 1.** A study reports an adjusted effect $\hat\tau = 0.45$. An analyst argues
+a leftover confounder $U$ could have imbalance $\delta = 0.15$ and outcome effect
+$\beta_U = 2.0$. Using the bias decomposition, compute the implied true effect $\tau$
+after removing this confounder's bias, and state whether the sign of the effect could
+flip.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The bias is $\beta_U \delta = 2.0 \times 0.15 = 0.30$.
+
+**Step 2.** The adjusted estimate equals the truth plus the bias,
+$\hat\tau = \tau + \beta_U \delta$, so $\tau = \hat\tau - \beta_U \delta = 0.45 - 0.30 = 0.15$.
+
+**Step 3.** The implied true effect is $0.15$, still positive, so this particular
+confounder does not flip the sign. It would take a bias above $0.45$ (for example
+$\delta = 0.25$ at the same $\beta_U$, giving $0.50$) to drive the corrected effect
+negative.
+
+</details>
+
+**Exercise 2.** Show from the decomposition that a confounder which is exactly balanced
+across the treatment arms ($\delta = 0$) injects zero bias regardless of how strongly it
+affects the outcome, and explain in one sentence why randomized assignment guarantees
+$\delta = 0$ for every variable.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The bias is the product $\beta_U \delta$. With $\delta = 0$ the product is
+$\beta_U \cdot 0 = 0$ for any finite $\beta_U$, so the omitted variable contributes
+nothing to $\hat\tau - \tau$.
+
+**Step 2.** Randomized assignment draws $W$ independently of every pre-treatment
+variable, so $P(U{=}1 \mid W{=}1) = P(U{=}1 \mid W{=}0) = P(U{=}1)$, giving $\delta = 0$
+for measured and unmeasured $U$ alike. That is why a randomized trial needs no ignorability
+assumption: imbalance is removed by design, not by adjustment.
+
+</details>
+
+**Exercise 3 (code).** Extend the lesson's simulation: sweep $\beta_U$ over
+$\{0.5, 1.0, 2.0\}$ at a fixed treatment-assignment rule, and verify numerically that the
+naive estimate's bias is linear in $\beta_U$ with the same slope $\delta$ at each value.
+End in a true `assert`.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n = 300_000
+
+U = rng.binomial(1, 0.5, n)
+pW = np.where(U == 1, 0.7, 0.3)
+W = (rng.uniform(size=n) < pW).astype(float)
+delta = U[W == 1].mean() - U[W == 0].mean()
+
+biases = []
+for beta_U in [0.5, 1.0, 2.0]:
+    Y = 1.0 + 0.0 * W + beta_U * U + rng.normal(0, 0.5, n)
+    tau_hat = Y[W == 1].mean() - Y[W == 0].mean()
+    biases.append(tau_hat)        # true effect is 0, so this is the bias
+
+biases = np.array(biases)
+# bias / beta_U should be constant (= delta) across the three runs.
+ratios = biases / np.array([0.5, 1.0, 2.0])
+assert np.allclose(ratios, delta, atol=0.01)
+print("delta:", round(delta, 4), " bias/beta_U:", np.round(ratios, 4))
+```
+
+The ratio bias$/\beta_U$ is the same imbalance $\delta$ at every value, confirming the
+bias is $\beta_U \delta$ with $\delta$ fixed by the assignment rule.
+
+</details>
+
+The next lesson turns this bias formula into a decision rule: Rosenbaum's $\Gamma$ and
+the E-value report the minimum confounder strength that would overturn a finding.
+
+<Footnotes>
+  <FNItem n="1">**Cinelli, C., & Hazlett, C.** (2020). "Making Sense of Sensitivity: Extending Omitted Variable Bias". *Journal of the Royal Statistical Society: Series B*, 82(1), 39-67. [arXiv:1808.00666](https://arxiv.org/abs/1808.00666)</FNItem>
+  <FNItem n="2">**Hernán, M. A., & Robins, J. M.** (2020). *Causal Inference: What If.* Chapman & Hall/CRC. Chapters on exchangeability and the consequences of unmeasured confounding.</FNItem>
+</Footnotes>

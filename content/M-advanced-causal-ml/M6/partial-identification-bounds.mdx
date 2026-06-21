@@ -1,0 +1,261 @@
+---
+title: "Partial identification and Manski bounds"
+pillar: M
+subId: M6
+lessonId: partial-identification-bounds
+order: 3
+estimatedMinutes: 30
+goal: "Drop point identification and report the interval of effects consistent with the data and weak assumptions, deriving the no-assumption and monotonicity bounds."
+prerequisites: ["unconfoundedness-failure"]
+---
+
+Sensitivity analysis keeps a point estimate and asks how fragile it is. **Partial
+identification** takes the opposite stance: refuse to assume ignorability at all, and
+report the *entire set* of treatment effects consistent with the data plus whatever weak
+assumptions are credible. The data alone never pin down a single number, because each unit
+has one observed potential outcome and one missing one. But the data do bound the missing
+outcome, and those bounds give an **interval** for the effect. Manski's insight is that this
+interval is the honest summary: it widens when assumptions are weak and tightens as
+credible structure is added, never claiming more than the data and assumptions support<FN n="1" />.
+
+## The missing-data view of the ATE
+
+Take a binary treatment $W \in \{0,1\}$ and a **bounded** outcome $Y \in [0, 1]$ (a binary
+outcome, or any outcome rescaled to the unit interval). The average treatment effect is
+
+$$
+\tau = E[Y(1)] - E[Y(0)].
+$$
+
+For a treated unit we observe $Y(1)$ but not $Y(0)$; for a control unit, the reverse. Split
+each potential-outcome mean by what is observed, using the law of total expectation with
+$p = P(W{=}1)$:
+
+$$
+E[Y(1)] = E[Y(1)\mid W{=}1]\, p + E[Y(1)\mid W{=}0]\,(1-p).
+$$
+
+The first term is **observed** (it is $E[Y \mid W{=}1]$, the mean outcome among the treated).
+The second, $E[Y(1)\mid W{=}0]$, is the counterfactual outcome the controls *would* have had
+under treatment. It is never observed. The entire identification problem is this one unknown
+term per potential outcome.
+
+## Step-by-step: the no-assumption (Manski) bounds
+
+With no assumption beyond $Y \in [0,1]$, replace each unobserved term by its worst and best
+possible value.
+
+**Step 1.** The unobserved $E[Y(1) \mid W{=}0]$ lies in $[0, 1]$ because $Y$ is bounded.
+Therefore
+
+$$
+E[Y(1)] \in \Big[\, E[Y\mid W{=}1]\,p + 0\cdot(1-p),\ \ E[Y\mid W{=}1]\,p + 1\cdot(1-p) \,\Big].
+$$
+
+Write $a_1 = E[Y\mid W{=}1]\,p$ (the observed contribution). Then
+$E[Y(1)] \in [a_1,\ a_1 + (1-p)]$.
+
+**Step 2.** Symmetrically, with $a_0 = E[Y\mid W{=}0]\,(1-p)$ the observed contribution from
+controls,
+
+$$
+E[Y(0)] \in [a_0,\ a_0 + p].
+$$
+
+**Step 3.** The ATE $\tau = E[Y(1)] - E[Y(0)]$ is largest when $E[Y(1)]$ is at its upper
+bound and $E[Y(0)]$ at its lower, and smallest in the reverse case:
+
+$$
+\tau \in \Big[\, a_1 - (a_0 + p),\ \ a_1 + (1-p) - a_0 \,\Big].
+$$
+
+**Step 4.** Substitute $a_1, a_0$ and simplify the width. Upper minus lower is
+
+$$
+\big[a_1 + (1-p) - a_0\big] - \big[a_1 - a_0 - p\big] = (1-p) + p = 1.
+$$
+
+The no-assumption interval always has **width exactly 1** for a unit-interval outcome,
+independent of the data. The data shift where the interval sits; only assumptions shrink it.
+Critically, this interval **always contains 0**: the data alone can never sign the effect.
+
+## A worked numeric instance
+
+Suppose $p = P(W{=}1) = 0.5$, the treated mean is $E[Y\mid W{=}1] = 0.7$, and the control
+mean is $E[Y\mid W{=}0] = 0.4$. The naive (ignorability) estimate is $0.7 - 0.4 = 0.3$. The
+Manski bounds:
+
+- $a_1 = 0.7 \times 0.5 = 0.35$, so $E[Y(1)] \in [0.35, 0.85]$.
+- $a_0 = 0.4 \times 0.5 = 0.20$, so $E[Y(0)] \in [0.20, 0.70]$.
+- $\tau \in [0.35 - 0.70,\ 0.85 - 0.20] = [-0.35,\ 0.65]$, width $1.0$, straddling 0.
+
+The honest data-only conclusion is "the effect is somewhere in $[-0.35, 0.65]$": it could be
+substantially harmful or substantially beneficial. The point estimate $0.3$ is one value
+inside that interval, selected by an assumption the data cannot check.
+
+![Identified intervals for the ATE shrinking as assumptions strengthen: the no-assumption Manski bounds straddle zero, monotone treatment response removes the negative part, and adding monotone treatment selection narrows it further toward the point estimate.](/figures/M6/manski-bounds.svg)
+
+## Tightening with monotonicity assumptions
+
+Two weak, often-defensible assumptions narrow the interval<FN n="2" />.
+
+**Monotone treatment response (MTR).** Treatment never hurts any unit: $Y(1) \ge Y(0)$ for
+all units. This forces $\tau \ge 0$, so the lower bound is raised to $\max(0, \text{Manski lower})$.
+In the worked instance, MTR alone changes the interval from $[-0.35, 0.65]$ to $[0, 0.65]$,
+removing the harmful half.
+
+**Monotone treatment selection (MTS).** Units that select into treatment have weakly higher
+potential outcomes than those that do not: $E[Y(w) \mid W{=}1] \ge E[Y(w) \mid W{=}0]$ for
+each $w$. This means the treated would have done at least as well as the controls even under
+control, so the observed treated mean over-states $E[Y(1)]$ relative to the controls' missing
+value, tightening the **upper** bound on $\tau$ down toward the naive contrast. Combining MTR
+and MTS sandwiches $\tau$ between 0 and the naive difference $0.3$:
+
+$$
+0 \le \tau \le E[Y\mid W{=}1] - E[Y\mid W{=}0] = 0.3.
+$$
+
+Each assumption is a deliberate, stated restriction; the reader sees exactly what buys each
+reduction in width.
+
+## A named confusion: an interval is not a confidence interval
+
+The Manski interval is the set of effects consistent with the **population** distribution
+under the assumptions; it is an *identification* region, present even with infinite data.
+A confidence interval reports **sampling** uncertainty around a single estimated quantity.
+The two are orthogonal: with $n \to \infty$ a confidence interval shrinks to a point, while
+the Manski interval keeps its width 1 until an assumption narrows it. Reporting only a tight
+confidence interval around the naive estimate hides the identification width entirely.
+
+## Implementation
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 100_000
+
+# Bounded outcome in [0, 1]; confounding makes the naive contrast unreliable.
+U = rng.binomial(1, 0.5, n)
+pW = np.where(U == 1, 0.65, 0.35)
+W = (rng.uniform(size=n) < pW).astype(float)
+# Binary outcome whose mean rises with U (the confounder) and slightly with W.
+pY = np.clip(0.3 + 0.3 * U + 0.1 * W, 0, 1)
+Y = rng.binomial(1, pY).astype(float)
+
+p = W.mean()
+m1 = Y[W == 1].mean()        # E[Y | W=1]
+m0 = Y[W == 0].mean()        # E[Y | W=0]
+
+# Manski no-assumption bounds for Y in [0, 1].
+EY1_lo, EY1_hi = m1 * p,            m1 * p + (1 - p)
+EY0_lo, EY0_hi = m0 * (1 - p),      m0 * (1 - p) + p
+tau_lo = EY1_lo - EY0_hi
+tau_hi = EY1_hi - EY0_lo
+
+print(f"naive contrast    : {m1 - m0:.3f}")
+print(f"Manski ATE bounds : [{tau_lo:.3f}, {tau_hi:.3f}]  width {tau_hi - tau_lo:.3f}")
+
+# The no-assumption interval has width exactly 1 and contains the naive contrast.
+assert np.isclose(tau_hi - tau_lo, 1.0, atol=1e-6)
+assert tau_lo <= (m1 - m0) <= tau_hi
+
+# Monotone treatment response (Y(1) >= Y(0)) raises the lower bound to >= 0.
+tau_lo_mtr = max(0.0, tau_lo)
+assert tau_lo_mtr == 0.0
+print(f"MTR lower bound   : {tau_lo_mtr:.3f}")
+```
+
+The no-assumption interval has width exactly 1 and brackets the naive contrast, and the
+monotone-treatment-response assumption lifts the lower bound to zero.
+
+## Exercises
+
+**Exercise 1.** A study with a binary outcome reports $P(W{=}1) = 0.4$,
+$E[Y \mid W{=}1] = 0.6$, and $E[Y \mid W{=}0] = 0.5$. Compute the no-assumption Manski
+bounds for the ATE by hand and confirm the width is 1.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Observed contributions: $a_1 = 0.6 \times 0.4 = 0.24$ and
+$a_0 = 0.5 \times 0.6 = 0.30$ (using $1 - p = 0.6$).
+
+**Step 2.** Potential-outcome bounds: $E[Y(1)] \in [0.24,\ 0.24 + 0.6] = [0.24, 0.84]$ and
+$E[Y(0)] \in [0.30,\ 0.30 + 0.4] = [0.30, 0.70]$.
+
+**Step 3.** ATE bounds: lower $= 0.24 - 0.70 = -0.46$, upper $= 0.84 - 0.30 = 0.54$, so
+$\tau \in [-0.46, 0.54]$. Width $= 0.54 - (-0.46) = 1.0$, as the derivation requires, and the
+interval straddles 0.
+
+</details>
+
+**Exercise 2.** Prove that the no-assumption ATE interval always contains 0 for a bounded
+outcome. Use the derived bounds to show the lower bound is $\le 0$ and the upper bound is
+$\ge 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The lower bound is $\tau_{\text{lo}} = a_1 - a_0 - p$. Since
+$a_1 = E[Y\mid W{=}1]\,p \le p$ (because $E[Y\mid W{=}1] \le 1$) and $a_0 \ge 0$, we have
+$\tau_{\text{lo}} \le p - 0 - p = 0$.
+
+**Step 2.** The upper bound is $\tau_{\text{hi}} = a_1 + (1-p) - a_0$. Since
+$a_0 = E[Y\mid W{=}0](1-p) \le 1-p$ and $a_1 \ge 0$, we have
+$\tau_{\text{hi}} \ge 0 + (1-p) - (1-p) = 0$.
+
+**Step 3.** Thus $\tau_{\text{lo}} \le 0 \le \tau_{\text{hi}}$, so 0 is always inside the
+interval. The data alone can never establish that the treatment has any effect, in either
+direction.
+
+</details>
+
+**Exercise 3 (code).** Simulate a confounded binary-outcome dataset, compute the Manski
+bounds, then impose monotone treatment response (MTR) and monotone treatment selection (MTS)
+and verify the combined interval is sandwiched between 0 and the naive contrast. End in a
+true `assert`.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(2)
+n = 200_000
+
+U = rng.binomial(1, 0.5, n)
+pW = np.where(U == 1, 0.6, 0.4)
+W = (rng.uniform(size=n) < pW).astype(float)
+pY = np.clip(0.25 + 0.35 * U + 0.15 * W, 0, 1)
+Y = rng.binomial(1, pY).astype(float)
+
+p = W.mean()
+m1, m0 = Y[W == 1].mean(), Y[W == 0].mean()
+naive = m1 - m0
+
+tau_lo = m1 * p - (m0 * (1 - p) + p)
+tau_hi = (m1 * p + (1 - p)) - m0 * (1 - p)
+
+# MTR: tau >= 0. MTS: treated would do at least as well under control, so the
+# naive contrast is an UPPER bound on tau. Combined interval: [0, naive].
+lo_comb, hi_comb = max(0.0, tau_lo), min(naive, tau_hi)
+
+assert tau_hi - tau_lo > 0.99            # no-assumption width ~ 1
+assert 0.0 <= lo_comb <= hi_comb <= naive + 1e-9
+print(f"Manski [{tau_lo:.3f}, {tau_hi:.3f}], MTR+MTS [{lo_comb:.3f}, {hi_comb:.3f}]")
+```
+
+The combined monotonicity interval $[0, \text{naive}]$ sits strictly inside the
+no-assumption bounds, showing how each stated assumption pays for a narrower set.
+
+</details>
+
+The next lesson recovers a point identification by a different route: negative controls and
+proximal inference use proxies of the hidden confounder instead of bounding it.
+
+<Footnotes>
+  <FNItem n="1">**Manski, C. F.** (1990). "Nonparametric Bounds on Treatment Effects". *American Economic Review*, 80(2), 319-323. Introduces the no-assumption worst-case bounds on treatment effects.</FNItem>
+  <FNItem n="2">**Manski, C. F.** (2003). *Partial Identification of Probability Distributions.* Springer. Develops monotone treatment response and selection as identifying restrictions.</FNItem>
+</Footnotes>
