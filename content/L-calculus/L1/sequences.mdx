@@ -1,0 +1,265 @@
+---
+title: "Sequences and convergence"
+pillar: L
+subId: L1
+lessonId: sequences
+order: 5
+estimatedMinutes: 33
+goal: "Define convergence of a sequence, prove limits with the monotone convergence theorem, and recognize geometric decay against harmonic divergence."
+prerequisites: ["limit-laws"]
+---
+
+A **sequence** is a function whose domain is the positive integers: an
+infinite ordered list $a_1, a_2, a_3, \dots$ Training a model produces one
+every run, the loss at step $n$, and the question "does training converge?" is
+this lesson's question wearing a GPU. Sequences are also the raw material for
+series and Taylor expansions in L3, so the convergence vocabulary set here gets
+reused for the rest of the pillar.
+
+## Convergence
+
+The sequence $(a_n)$ **converges to $L$**, written $a_n \to L$ or
+$\lim_{n \to \infty} a_n = L$, if for every $\varepsilon \gt 0$ there is an
+index $N$ such that
+
+$$
+n \ge N \quad \Longrightarrow \quad \lvert a_n - L \rvert \lt \varepsilon .
+$$
+
+This is the epsilon-delta definition with the input window replaced by a tail:
+past some point $N$ (which may depend on $\varepsilon$), *every* term sits
+inside the $\varepsilon$-band around $L$. Early terms are irrelevant; only the
+tail matters. A sequence with no such $L$ **diverges**<FN n="3" />.
+
+A worked proof from the definition. Claim: $a_n = \dfrac{1}{n} \to 0$.
+
+**Step 1.** Given $\varepsilon \gt 0$, the error is
+$\lvert a_n - 0 \rvert = 1/n$, so the requirement is $1/n \lt \varepsilon$,
+i.e. $n \gt 1/\varepsilon$.
+
+**Step 2.** Choose $N$ to be any integer larger than $1/\varepsilon$. For
+$n \ge N$,
+
+$$
+\lvert a_n - 0 \rvert = \frac{1}{n} \le \frac{1}{N} \lt \varepsilon .
+$$
+
+Every $\varepsilon$ is answered, so $1/n \to 0$. The same skeleton shows
+$c/n^p \to 0$ for any constant $c$ and power $p \gt 0$.
+
+The limit laws carry over verbatim: limits of sums are sums of limits, and so
+on, with the same proofs. A standard maneuver divides through by the fastest
+term:
+
+$$
+\frac{2n + 1}{n + 3} = \frac{2 + 1/n}{1 + 3/n} \longrightarrow \frac{2 + 0}{1 + 0} = 2 .
+$$
+
+## Geometric decay
+
+The **geometric sequence** $a_n = r^n$ is the most important special case.
+For $\lvert r \rvert \lt 1$ it converges to $0$, and at a characteristic
+speed: each term is a fixed *fraction* of the previous one. With $r = 0.8$,
+every step removes 20% of what remains; after $n$ steps the size is $0.8^n$,
+and $0.8^{50} \approx 1.4 \times 10^{-5}$. Compare $a_n = 1/n$, which also
+goes to $0$ but by shaving ever-smaller fractions: after 50 terms it has only
+reached $0.02$. Both converge to zero; the geometric one is in a different
+hurry. That speed distinction returns in A3 as "linear convergence" of
+gradient descent, which is geometric decay of the error<FN n="1" />.
+
+For $\lvert r \rvert \gt 1$ the powers blow up; for $r = 1$ the sequence is
+constant; for $r = -1$ it oscillates between $\pm 1$ and diverges by
+disagreement.
+
+## The monotone convergence theorem
+
+Proving convergence from the definition needs a candidate $L$ in hand. Often
+there is none. The escape is structural:
+
+**Monotone convergence theorem.** Every sequence that is **increasing and
+bounded above** converges (to the least upper bound of its values); likewise
+decreasing and bounded below<FN n="2" />.
+
+No candidate limit required: monotonicity plus a ceiling forces the terms to
+pile up against *something*, and that something is the limit. This is the
+completeness of the real numbers in action, the same property underneath the
+IVT last lesson.
+
+The classic payoff defines the most important constant in the pillar. The
+sequence
+
+$$
+a_n = \left(1 + \frac{1}{n}\right)^{\! n}
+$$
+
+can be shown (by binomial expansion, term-by-term comparison) to be increasing
+and bounded above by $3$. The theorem says it converges; its limit is
+**defined** to be $e = 2.71828\dots$ No formula for $e$ existed beforehand,
+which is exactly why an existence theorem was needed.
+
+![Left: the monotone sequence (1 + 1/n)^n climbing to its ceiling e, and the alternating geometric (-0.8)^n collapsing to 0. Right: partial sums, where the geometric series levels off at 2 while the harmonic series grows past every bound.](/figures/L1/sequences.svg)
+
+## Series, briefly: the harmonic warning
+
+Adding the terms of a sequence produces its **partial sums**
+$s_n = a_1 + \dots + a_n$, themselves a sequence; if $s_n$ converges, the
+infinite series $\sum a_k$ converges. L3 treats series properly, but one
+contrast belongs here because it kills a tempting intuition.
+
+The geometric series converges: with ratio $1/2$,
+
+$$
+s_n = 1 + \tfrac12 + \tfrac14 + \dots + \tfrac{1}{2^{n-1}} = 2 - \tfrac{1}{2^{n-1}} \longrightarrow 2 .
+$$
+
+The **harmonic series** $\sum 1/k$ diverges, even though its terms go to
+zero. Group the terms:
+
+$$
+1 + \frac12 + \underbrace{\frac13 + \frac14}_{\gt \, 2 \cdot \frac14 = \frac12}
++ \underbrace{\frac15 + \dots + \frac18}_{\gt \, 4 \cdot \frac18 = \frac12}
++ \underbrace{\frac19 + \dots + \frac{1}{16}}_{\gt \, 8 \cdot \frac{1}{16} = \frac12} + \dots
+$$
+
+Each block contributes more than $\tfrac12$, and there are infinitely many
+blocks, so the partial sums pass every bound (glacially: about $0.7$ per
+*doubling* of $n$, which is the $\ln n$ growth checked in the code).
+
+The named confusion: **terms going to zero does not make the series
+converge.** Necessary, yes (if $\sum a_k$ converges then $a_k \to 0$);
+sufficient, no, and the harmonic series is the canonical counterexample. What
+separates the two examples is the *rate*: geometric terms die fast enough to
+have a finite total, harmonic terms do not.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+n = np.arange(1, 100_001, dtype=np.float64)
+
+# (1 + 1/n)^n is increasing and converges to e
+a = (1 + 1 / n) ** n
+assert np.all(np.diff(a[:1000]) > 0)            # monotone on the prefix
+print("a_100000 =", a[-1], " e =", np.e)
+assert abs(a[-1] - np.e) < 2e-5                 # gap shrinks like e/(2n)
+
+# Geometric decay vs 1/n decay after 50 steps
+print("0.8^50 =", 0.8**50, "   1/50 =", 1 / 50)
+assert 0.8**50 < 1e-4 < 1 / 50
+
+# Harmonic partial sums grow like ln(n) + gamma; geometric sums cap at 2
+harm = np.cumsum(1 / n)
+gamma = 0.5772156649
+print("s_100000 =", harm[-1], "  ln(1e5)+gamma =", np.log(1e5) + gamma)
+assert abs(harm[-1] - (np.log(1e5) + gamma)) < 1e-4
+
+geo = np.cumsum(0.5 ** (n[:40] - 1))
+assert geo[-1] < 2.0 and abs(geo[-1] - 2.0) < 1e-11
+```
+
+The monotone sequence closes in on $e$, geometric decay beats $1/n$ by orders
+of magnitude at the same index, and the harmonic sums track $\ln n + \gamma$,
+confirming they diverge at logarithmic speed while the geometric sums stop
+just short of $2$.
+
+## Exercises
+
+**Exercise 1.** Prove from the definition that
+$a_n = \dfrac{3n}{n + 2} \to 3$: given $\varepsilon \gt 0$, produce an explicit
+$N$ that works.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Compute the error:
+
+$$
+\lvert a_n - 3 \rvert
+= \left\lvert \frac{3n}{n+2} - 3 \right\rvert
+= \left\lvert \frac{3n - 3n - 6}{n+2} \right\rvert
+= \frac{6}{n + 2} .
+$$
+
+**Step 2.** Force the error below $\varepsilon$:
+$\dfrac{6}{n+2} \lt \varepsilon$ holds when $n + 2 \gt 6/\varepsilon$, i.e.
+$n \gt 6/\varepsilon - 2$.
+
+**Step 3.** Take $N$ to be any integer greater than $6/\varepsilon - 2$. For
+$n \ge N$,
+
+$$
+\lvert a_n - 3 \rvert = \frac{6}{n+2} \le \frac{6}{N+2} \lt \varepsilon .
+$$
+
+For instance $\varepsilon = 0.01$ is answered by $N = 599$.
+
+</details>
+
+**Exercise 2.** Define $a_1 = 1$ and $a_{n+1} = \sqrt{2 + a_n}$. Show the
+sequence is increasing and bounded above by $2$, conclude it converges, and
+find the limit.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (bounded above by 2, by induction).** Base: $a_1 = 1 \le 2$. Step: if
+$a_n \le 2$ then $a_{n+1} = \sqrt{2 + a_n} \le \sqrt{4} = 2$. So every term is
+at most $2$.
+
+**Step 2 (increasing).** Compare $a_{n+1}$ with $a_n$:
+$a_{n+1} \ge a_n$ is equivalent (squaring, both sides nonnegative) to
+$2 + a_n \ge a_n^2$, i.e. $(a_n - 2)(a_n + 1) \le 0$, which holds because
+$-1 \le a_n \le 2$ by Step 1. So the sequence is increasing.
+
+**Step 3 (convergence).** Increasing and bounded above: the monotone
+convergence theorem applies, so $a_n \to L$ for some $L \le 2$.
+
+**Step 4 (identify the limit).** Limits pass through the continuous map
+$x \mapsto \sqrt{2 + x}$, so taking $n \to \infty$ in the recurrence gives
+$L = \sqrt{2 + L}$. Squaring: $L^2 - L - 2 = 0$, so $(L-2)(L+1) = 0$, and
+since $L \ge a_1 = 1$, the limit is $L = 2$.
+
+</details>
+
+**Exercise 3 (code).** Verify Exercise 2 numerically: iterate the recurrence
+60 times, check monotonicity and the bound at every step, and confirm the
+distance to $2$ shrinks geometrically (estimate the ratio).
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+a = [1.0]
+for _ in range(60):
+    a.append(np.sqrt(2 + a[-1]))
+a = np.array(a)
+
+assert np.all(np.diff(a) >= 0)            # increasing
+assert np.all(a <= 2.0)                   # bounded above by 2
+assert abs(a[-1] - 2.0) < 1e-15           # converged to the limit
+
+err = 2.0 - a[:22]                        # error before it hits machine zero
+ratios = err[1:] / err[:-1]
+print("error ratios:", ratios[:5].round(4), "...")
+assert np.allclose(ratios[5:20], 0.25, atol=0.01)
+```
+
+The error is multiplied by about $1/4$ each step (the derivative of
+$\sqrt{2+x}$ at the fixed point $x = 2$ is $1/(2\sqrt{4}) = 1/4$): geometric
+decay again, with the contraction rate set by a derivative, a preview of how
+L2's tools analyze iteration.
+
+</details>
+
+Sequences run the index to infinity; the next lesson runs the *input* of a
+function to infinity and ranks how fast functions grow, which is where big-O
+notation comes from.
+
+<Footnotes>
+  <FNItem n="1">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.). Springer. Ch. 3 defines linear (geometric) convergence rates for descent methods. [doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)</FNItem>
+  <FNItem n="2">**Abbott, S.** (2015). *Understanding Analysis* (2nd ed.). Springer. Ch. 2.3-2.4, convergence and the monotone convergence theorem. [doi:10.1007/978-1-4939-2712-8](https://doi.org/10.1007/978-1-4939-2712-8)</FNItem>
+  <FNItem n="3">**Rudin, W.** (1976). *Principles of Mathematical Analysis* (3rd ed.). McGraw-Hill. Ch. 3, sequences and series at full rigor.</FNItem>
+</Footnotes>

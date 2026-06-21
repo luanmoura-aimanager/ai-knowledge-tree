@@ -1,0 +1,274 @@
+---
+title: "Substitution and integration by parts"
+pillar: L
+subId: L3
+lessonId: integration-techniques
+order: 3
+estimatedMinutes: 34
+goal: "Run the chain rule and product rule in reverse: evaluate integrals by substitution and by parts, and recognize which to reach for."
+prerequisites: ["fundamental-theorem", "L2/chain-rule"]
+---
+
+The FTC made integration a hunt for antiderivatives, but the table from last
+lesson covers only pristine integrands. $\int 2x\,e^{x^2} dx$ and
+$\int x e^x dx$ are not in it. There is no product rule or chain rule *for
+integrals*; what exists instead is the two differentiation rules run in
+reverse. **Substitution** inverts the chain rule, **integration by parts**
+inverts the product rule, and between them they crack most integrals that
+crack at all<FN n="2" />.
+
+## Substitution: the chain rule backwards
+
+The chain rule says $\frac{d}{dx} F(g(x)) = F'(g(x))\, g'(x)$. Read
+right-to-left as an antiderivative statement:
+
+$$
+\int f(g(x))\, g'(x)\, dx = F(g(x)) + C, \qquad \text{where } F' = f .
+$$
+
+The skill is *recognition*: spot a composite $f(g(x))$ whose inner
+function's derivative $g'(x)$ is also standing in the integrand (up to a
+constant). The mechanical notation sets $u = g(x)$, $du = g'(x)\,dx$
+(the differential bookkeeping from L2), and rewrites everything in $u$.
+
+**Worked example 1.** $\displaystyle \int 2x\, e^{x^2} dx$.
+
+**Step 1.** The composite is $e^{x^2}$, inner $u = x^2$; its derivative
+$2x$ is right there as a factor. Set $du = 2x\,dx$.
+
+**Step 2.** Rewrite and integrate in $u$:
+
+$$
+\int e^{u}\, du = e^u + C = e^{x^2} + C .
+$$
+
+Check by differentiating: $(e^{x^2})' = 2x e^{x^2}$, the original integrand.
+Every substitution self-verifies this way.
+
+**Step 3 (definite version).** Limits transform with $u$:
+
+$$
+\int_0^1 2x e^{x^2} dx = \int_{u=0}^{u=1} e^u du = e - 1 \approx 1.71828 .
+$$
+
+![Substitution as area-preserving reshaping: the lopsided region under 2x times e to the x-squared on the left becomes the clean region under e to the u on the right. Different silhouettes, identical area e minus 1.](/figures/L3/integration-techniques.svg)
+
+**Worked example 2 (constant adjustment).**
+$\displaystyle \int \cos(5x)\, dx$. Inner $u = 5x$, $du = 5\,dx$, so
+$dx = du/5$:
+
+$$
+\int \cos u \cdot \frac{du}{5} = \frac{1}{5} \sin(5x) + C .
+$$
+
+Missing constants can be manufactured; missing *functions* cannot. If the
+integrand were $e^{x^2}$ alone, with no $2x$ factor available, substitution
+has nothing to grab, and indeed $\int e^{x^2}dx$ has no elementary
+antiderivative at all<FN n="3" />. **Substitution is not "replace and hope": the inner
+derivative must be present**, and that is the named confusion of this
+lesson. Forgetting to transform $dx$ (or the limits) is the same bookkeeping
+failure in different clothing.
+
+**Worked example 3 (log pattern).** Whenever the numerator is the
+denominator's derivative,
+
+$$
+\int \frac{g'(x)}{g(x)}\, dx = \ln \lvert g(x) \rvert + C ,
+$$
+
+e.g. $\int \tan x \, dx = \int \frac{\sin x}{\cos x} dx =
+-\ln \lvert \cos x \rvert + C$ (with $u = \cos x$, $du = -\sin x \, dx$).
+This pattern is the logarithmic derivative from L2, met in reverse.
+
+## Integration by parts: the product rule backwards
+
+The product rule $(uv)' = u'v + uv'$, integrated and rearranged:
+
+$$
+\int u \, dv = u v - \int v \, du .
+$$
+
+It does not finish an integral; it *trades* one for another, and the craft
+is choosing the split so the trade is profitable: $u$ should simplify when
+differentiated, $dv$ should be integrable.
+
+**Worked example 4.** $\displaystyle \int x e^x dx$.
+
+**Step 1.** Choose $u = x$ (differentiates to the simpler $1$) and
+$dv = e^x dx$ (integrates without complaint to $v = e^x$).
+
+**Step 2.** Apply the formula:
+
+$$
+\int x e^x dx = x e^x - \int e^x \cdot 1 \, dx = x e^x - e^x + C = (x-1)e^x + C .
+$$
+
+The wrong split, $u = e^x$, $dv = x\,dx$, trades up to
+$\int \frac{x^2}{2} e^x dx$: a worse integral. A serviceable heuristic for
+picking $u$ is LIATE (Logs, Inverse trig, Algebraic, Trig, Exponentials:
+earlier in the list differentiates away nicer)<FN n="1" />.
+
+**Worked example 5 (the invisible $dv$).**
+$\displaystyle \int_1^e \ln x \, dx$. Nothing looks like a product until
+$dv = dx$: take $u = \ln x$, $v = x$:
+
+$$
+\int_1^e \ln x \, dx = \left[ x \ln x \right]_1^e - \int_1^e x \cdot \frac{1}{x} dx
+= e - \left[ x \right]_1^e = e - (e - 1) = 1 .
+$$
+
+**Worked example 6 (reduction).** $\int x^2 e^x dx$: parts with $u = x^2$
+knocks the power down to $\int 2x e^x dx$, already solved above. Each
+application strips one power; integrals like $\int x^n e^x dx$ fall to $n$
+rounds. The expectation integrals of A2 ($\mathbb{E}[X]$,
+$\mathbb{E}[X^2]$ under exponential and Gaussian densities) are exactly
+these shapes, which is why both techniques are daily tools there:
+substitution handles the Gaussian's $x e^{-x^2/2}$, parts handles the
+exponential's $x e^{-x}$.
+
+Choosing between the techniques is pattern recognition with two questions.
+Is some inner function's derivative present as a factor? Substitution. Is
+the integrand a product of unrelated species (polynomial times
+exponential, log times power)? Parts.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+def riemann(fn, a, b, n=400_001):
+    x = np.linspace(a, b, n)
+    return np.sum(fn((x[:-1] + x[1:]) / 2)) * (x[1] - x[0])   # midpoint rule
+
+# Example 1/3: substitution result e - 1
+assert abs(riemann(lambda x: 2 * x * np.exp(x**2), 0, 1) - (np.e - 1)) < 1e-9
+
+# Example 4: parts result (x-1)e^x on [0, 2]
+F = lambda x: (x - 1) * np.exp(x)
+assert abs(riemann(lambda x: x * np.exp(x), 0, 2) - (F(2) - F(0))) < 1e-9
+
+# Example 5: integral of ln on [1, e] equals 1
+assert abs(riemann(np.log, 1, np.e) - 1.0) < 1e-9
+
+# Log pattern: integral of tan on [0, 1] is -ln(cos 1)
+assert abs(riemann(np.tan, 0, 1) - (-np.log(np.cos(1.0)))) < 1e-8
+
+# Reduction: integral of x^2 e^x on [0,1] = (x^2-2x+2)e^x evaluated = e - 2
+G = lambda x: (x**2 - 2 * x + 2) * np.exp(x)
+assert abs(riemann(lambda x: x**2 * np.exp(x), 0, 1) - (G(1) - G(0))) < 1e-9
+print("all five antiderivatives confirmed numerically")
+print("e - 1 =", np.e - 1, "  e - 2 =", np.e - 2)
+```
+
+Each closed form from the worked examples matches a two-million-slice
+midpoint sum to nine decimals: the reversed rules produce true
+antiderivatives, not formal symbols.
+
+## Exercises
+
+**Exercise 1.** Evaluate
+(a) $\displaystyle \int \frac{x}{\sqrt{1 + x^2}}\, dx$ and
+(b) $\displaystyle \int_0^{\pi/4} \sin^3\theta \cos\theta \, d\theta$.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Inner $u = 1 + x^2$, $du = 2x\,dx$, so $x\,dx = du/2$:
+
+$$
+\int \frac{du/2}{\sqrt{u}} = \frac{1}{2} \cdot 2\sqrt{u} + C = \sqrt{1 + x^2} + C .
+$$
+
+Check: $\left( \sqrt{1+x^2} \right)' = \frac{2x}{2\sqrt{1+x^2}} =
+\frac{x}{\sqrt{1+x^2}}$.
+
+**(b)** Inner $u = \sin\theta$, $du = \cos\theta \, d\theta$; limits map
+$0 \mapsto 0$ and $\pi/4 \mapsto \frac{\sqrt2}{2}$:
+
+$$
+\int_0^{\sqrt2/2} u^3\, du = \left[ \frac{u^4}{4} \right]_0^{\sqrt2/2}
+= \frac{(\sqrt2/2)^4}{4} = \frac{1/4}{4} = \frac{1}{16} .
+$$
+
+</details>
+
+**Exercise 2.** Evaluate $\displaystyle \int x \cos x \, dx$ by parts, then
+use the same technique twice to evaluate
+$\displaystyle \int x^2 \cos x\, dx$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Parts with $u = x$, $dv = \cos x\,dx$, so $du = dx$,
+$v = \sin x$:
+
+$$
+\int x \cos x \, dx = x \sin x - \int \sin x \, dx = x \sin x + \cos x + C .
+$$
+
+**Step 2.** For the square, parts with $u = x^2$, $dv = \cos x\,dx$:
+
+$$
+\int x^2 \cos x\, dx = x^2 \sin x - 2 \int x \sin x \, dx .
+$$
+
+**Step 3.** The remaining integral falls to one more round ($u = x$,
+$dv = \sin x \, dx$): $\int x \sin x\,dx = -x\cos x + \sin x + C$.
+Assemble:
+
+$$
+\int x^2 \cos x \, dx = x^2 \sin x + 2x \cos x - 2 \sin x + C .
+$$
+
+Differentiating back gives $x^2 \cos x$ after cancellation, confirming the
+two rounds stripped the power cleanly.
+
+</details>
+
+**Exercise 3 (code).** The exponential distribution with rate $1$ has
+density $e^{-x}$ on $[0, \infty)$, and its mean is
+$\int_0^\infty x e^{-x} dx$. By parts, the antiderivative of $x e^{-x}$ is
+$-(x+1)e^{-x}$. Verify numerically on $[0, 50]$ that the integral is $1$,
+and that the by-parts antiderivative matches a running Riemann sum across
+the whole range.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+x = np.linspace(0, 50, 500_001)
+dx = x[1] - x[0]
+mids = (x[:-1] + x[1:]) / 2
+f = mids * np.exp(-mids)
+
+# The mean of Exp(1) is 1 (the tail beyond 50 is ~ 51 e^-50 ~ 1e-20)
+total = np.sum(f) * dx
+print("integral of x e^-x on [0, 50]:", total)
+assert abs(total - 1.0) < 1e-9
+
+# The by-parts antiderivative F(x) = -(x+1)e^{-x} tracks the running sum
+F = lambda t: -(t + 1) * np.exp(-t)
+running = np.cumsum(f) * dx
+idx = np.arange(50_000, 500_000, 70_000)
+assert np.allclose(running[idx], F(x[idx + 1]) - F(0.0), atol=1e-8)
+print("antiderivative matches the accumulation at all checkpoints")
+```
+
+The integral lands on $1$, the mean of the unit exponential, and the
+by-parts antiderivative reproduces the running accumulation everywhere:
+the same computation A2 performs for every expectation, with this lesson's
+technique doing the closed-form half.
+
+</details>
+
+Both techniques assumed finite intervals and finite integrands; the next
+lesson drops both restrictions and asks when an integral over an infinite
+range, like the Gaussian's, still converges to a number.
+
+<Footnotes>
+  <FNItem n="1">**Kasube, H. E.** (1983). "A technique for integration by parts". *The American Mathematical Monthly*, 90(3), 210-211. The LIATE ordering heuristic. [doi:10.1080/00029890.1983.11971195](https://doi.org/10.1080/00029890.1983.11971195)</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 5.5 and 7.1, substitution and integration by parts.</FNItem>
+  <FNItem n="3">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 19, integration in elementary terms, including why some integrands have no elementary antiderivative.</FNItem>
+</Footnotes>

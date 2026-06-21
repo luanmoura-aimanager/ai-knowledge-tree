@@ -1,0 +1,282 @@
+---
+title: "The mean value theorem and L'Hopital's rule"
+pillar: L
+subId: L2
+lessonId: mvt-lhopital
+order: 5
+estimatedMinutes: 34
+goal: "Prove the mean value theorem, read monotonicity off the derivative's sign, and resolve 0/0 and infinity-over-infinity limits with L'Hopital's rule."
+prerequisites: ["differentiation-rules", "L1/continuity"]
+---
+
+The derivative is a pointwise object: $f'(a)$ knows only an infinitesimal
+neighborhood of $a$. Yet the claims worth making are global: "this function
+is increasing on the whole interval", "these two antiderivatives differ by a
+constant", "this loss decreases along the whole step". The **mean value
+theorem** is the bridge from pointwise to global, and almost every theorem in
+the rest of the pillar crosses it. As a bonus it powers **L'Hopital's rule**,
+the systematic crusher of $0/0$ limits.
+
+## Rolle's theorem, the seed
+
+**Rolle's theorem.** If $f$ is continuous on $[a, b]$, differentiable on
+$(a, b)$, and $f(a) = f(b)$, then some $c \in (a, b)$ has $f'(c) = 0$.
+
+**Step 1.** By the extreme value theorem (L1), $f$ attains a maximum and a
+minimum on $[a, b]$.
+
+**Step 2.** If both extremes sit at the endpoints, then (since
+$f(a) = f(b)$) the max equals the min and $f$ is constant, so $f' = 0$
+everywhere in between.
+
+**Step 3.** Otherwise some extreme point $c$ is interior. At an interior
+maximum, the difference quotient $\frac{f(c+h)-f(c)}{h}$ has numerator
+$\le 0$, so it is $\le 0$ for $h \gt 0$ and $\ge 0$ for $h \lt 0$. The
+two one-sided limits squeeze $f'(c)$ to $0$. (Interior minimum: same with
+signs flipped.)
+
+This last step is its own headline, used again in L6: **at an interior
+extremum, the derivative vanishes.**
+
+## The mean value theorem
+
+**MVT.** If $f$ is continuous on $[a,b]$ and differentiable on $(a,b)$, then
+some $c \in (a, b)$ satisfies
+
+$$
+f'(c) = \frac{f(b) - f(a)}{b - a} .
+$$
+
+Somewhere, the instantaneous rate equals the average rate: a car that
+averaged 100 km/h over an hour hit exactly 100 km/h at some instant.
+
+**Proof.** Tilt the picture until Rolle applies. Subtract the secant line
+from $f$:
+
+$$
+g(x) = f(x) - \left[ f(a) + \frac{f(b)-f(a)}{b-a}\,(x - a) \right] .
+$$
+
+Then $g$ inherits continuity and differentiability, and $g(a) = g(b) = 0$ by
+construction. Rolle gives a $c$ with $g'(c) = 0$, and since
+$g'(x) = f'(x) - \frac{f(b)-f(a)}{b-a}$, that $c$ satisfies the MVT
+equation<FN n="1" />.
+
+![The mean value theorem on a cubic: the secant over the interval and, at the interior point c, a tangent with the same slope. Tilting the cubic by subtracting the secant turns this picture into Rolle's theorem.](/figures/L2/mvt-lhopital.svg)
+
+## What the MVT buys
+
+**Monotonicity from the derivative's sign.** Suppose $f' \gt 0$ throughout an
+interval. For any two points $x_1 \lt x_2$ in it, the MVT on $[x_1, x_2]$
+gives a $c$ with
+
+$$
+f(x_2) - f(x_1) = f'(c)\,(x_2 - x_1) \gt 0 ,
+$$
+
+both factors being positive. So $f$ is strictly increasing; the pointwise
+sign became a global ordering<FN n="3" />. With $f' \lt 0$, decreasing; with $f' = 0$
+everywhere, $f(x_2) = f(x_1)$ for all pairs, so **a function with zero
+derivative on an interval is constant**, and two functions with the same
+derivative differ by a constant. That last sentence is the uniqueness half of
+antiderivatives, on which integration (L3) depends.
+
+**Error bounds.** If $\lvert f'(x) \rvert \le M$ on an interval, the MVT
+bounds every increment: $\lvert f(x_2) - f(x_1) \rvert \le M \lvert x_2 - x_1
+\rvert$. Since $(\sin)' = \cos$ is bounded by $1$:
+$\lvert \sin u - \sin v \rvert \le \lvert u - v \rvert$ for all $u, v$. Bounded
+derivative means controlled change; L6 leans on exactly this (as "Lipschitz
+smoothness") to pick step sizes that provably decrease a loss.
+
+## L'Hopital's rule
+
+A strengthened MVT (Cauchy's version, applied to the pair $f, g$) yields the
+workhorse for indeterminate limits<FN n="2" />:
+
+**L'Hopital's rule.** Suppose $f(x) \to 0$ and $g(x) \to 0$ as $x \to a$
+(or both $\to \pm\infty$), $g' \ne 0$ near $a$, and
+$\lim_{x \to a} \frac{f'(x)}{g'(x)}$ exists. Then
+
+$$
+\lim_{x \to a} \frac{f(x)}{g(x)} = \lim_{x \to a} \frac{f'(x)}{g'(x)} .
+$$
+
+The intuition is linearization: near $a$, $f(x) \approx f'(a)(x - a)$ and
+$g(x) \approx g'(a)(x-a)$ when both vanish at $a$, so their ratio approaches
+the ratio of slopes.
+
+**Worked example 1.** $\displaystyle \lim_{x \to 0} \frac{e^x - 1}{\sin x}$.
+Both pieces $\to 0$. Differentiate top and bottom separately:
+
+$$
+\lim_{x \to 0} \frac{e^x}{\cos x} = \frac{1}{1} = 1 .
+$$
+
+**Worked example 2 (iterate when needed).**
+$\displaystyle \lim_{x \to 0} \frac{1 - \cos x}{x^2}$. First pass:
+$\frac{\sin x}{2x}$, still $0/0$. Second pass: $\frac{\cos x}{2} \to
+\tfrac12$. So $1 - \cos x \approx x^2/2$ for small $x$, a fact Taylor series
+(L3) will explain structurally.
+
+**Worked example 3 (growth hierarchy, now in one line).** For $p \gt 0$,
+
+$$
+\lim_{x \to \infty} \frac{\ln x}{x^p}
+= \lim_{x \to \infty} \frac{1/x}{p\,x^{p-1}}
+= \lim_{x \to \infty} \frac{1}{p\,x^{p}} = 0 ,
+$$
+
+re-deriving L1's sandwich result mechanically.
+
+Two cautions, each a named trap. **First: the rule applies only to
+indeterminate forms.** Applied to the determinate
+$\lim_{x \to 0^+} \frac{\sin x}{x^2+1} = \frac{0}{1} = 0$, differentiating
+top and bottom gives $\frac{\cos x}{2x} \to \infty$: confidently wrong,
+because the hypothesis $0/0$ or $\infty/\infty$ was never checked. **Second:
+this is not the quotient rule.** L'Hopital differentiates numerator and
+denominator *separately*; the quotient rule differentiates the *function*
+$f/g$. They answer different questions and produce different expressions.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+t = 10.0 ** -np.arange(2, 8)
+
+# Example 1: (e^x - 1)/sin(x) -> 1
+r1 = (np.exp(t) - 1) / np.sin(t)
+assert abs(r1[-1] - 1.0) < 1e-6
+
+# Example 2: (1 - cos x)/x^2 -> 1/2, needing two rounds of L'Hopital
+r2 = (1 - np.cos(t)) / t**2
+print("(1-cos)/x^2:", r2[:4], "-> 1/2")
+assert abs(r2[2] - 0.5) < 1e-7
+
+# MVT bound: |sin u - sin v| <= |u - v| on a million random pairs
+rng = np.random.default_rng(0)
+u, v = rng.uniform(-50, 50, (2, 1_000_000))
+assert np.all(np.abs(np.sin(u) - np.sin(v)) <= np.abs(u - v) + 1e-15)
+
+# Monotonicity: f' = 3x^2+1 > 0 everywhere, so x^3+x is sorted on any grid
+x = np.sort(rng.uniform(-5, 5, 10_000))
+fx = x**3 + x
+assert np.all(np.diff(fx) > 0)
+
+# The trap: L'Hopital on a NON-indeterminate form gives garbage
+good = np.sin(t) / (t**2 + 1)             # true limit 0
+fake = np.cos(t) / (2 * t)                # "rule" output blows up
+print("true ratio:", good[-1], " fake L'Hopital:", fake[-1])
+assert abs(good[-1]) < 1e-6 and fake[-1] > 1e5
+```
+
+Both worked limits land on their values, the MVT bound survives a million
+random pairs, the positive-derivative function is sorted on every grid, and
+the misapplied rule diverges while the honest limit sits at zero.
+
+## Exercises
+
+**Exercise 1.** Evaluate
+$\displaystyle \lim_{x \to 0} \frac{\tan x - x}{x^3}$, iterating L'Hopital as
+needed and verifying the $0/0$ hypothesis at each round.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $x = 0$: $\tan 0 - 0 = 0$ and $0^3 = 0$, so $0/0$. Round one,
+using $(\tan x)' = \sec^2 x$:
+
+$$
+\lim_{x \to 0} \frac{\sec^2 x - 1}{3x^2} .
+$$
+
+Numerator at $0$: $1 - 1 = 0$; still $0/0$.
+
+**Step 2.** Use the identity $\sec^2 x - 1 = \tan^2 x$, then round two:
+
+$$
+\lim_{x \to 0} \frac{\tan^2 x}{3x^2}
+= \frac{1}{3} \lim_{x \to 0} \left( \frac{\tan x}{x} \right)^{\!2}
+= \frac{1}{3} \cdot 1^2 = \frac{1}{3},
+$$
+
+where $\tan x / x = \frac{\sin x}{x} \cdot \frac{1}{\cos x} \to 1 \cdot 1$
+(L1's limit and continuity of cosine). So $\tan x \approx x + x^3/3$ for
+small $x$: the cubic correction's coefficient is the limit just computed.
+
+</details>
+
+**Exercise 2.** Use the MVT to prove the inequality
+$\ln(1 + x) \lt x$ for all $x \gt 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Fix $x \gt 0$ and apply the MVT to $f(t) = \ln(1 + t)$ on
+$[0, x]$: $f$ is continuous there and differentiable with
+$f'(t) = \frac{1}{1+t}$. The theorem gives $c \in (0, x)$ with
+
+$$
+\ln(1+x) - \ln(1) = \frac{1}{1+c} \,(x - 0) .
+$$
+
+**Step 2.** Since $c \gt 0$, the factor $\frac{1}{1+c} \lt 1$, so
+
+$$
+\ln(1 + x) = \frac{x}{1+c} \lt x .
+$$
+
+The same argument with $c \lt x$ gives the lower companion
+$\ln(1+x) \gt \frac{x}{1+x}$, bracketing the log between two rational
+functions. Inequalities of this shape, derivative bound times interval
+length, are the MVT's signature move.
+
+</details>
+
+**Exercise 3 (code).** For $f(x) = x^3 - x$ on $[a, b] = [-0.2, 1.5]$, find
+numerically the point $c$ promised by the MVT (solve $f'(c) = $ secant slope
+with bisection), and verify $c$ lies strictly inside the interval and the
+slopes match to $10^{-10}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda x: x**3 - x
+df = lambda x: 3 * x**2 - 1
+a, b = -0.2, 1.5
+sec = (f(b) - f(a)) / (b - a)
+
+# Solve df(c) = sec on (0, b): df is increasing there, so bisection works
+g = lambda c: df(c) - sec
+lo, hi = 0.0, b
+assert g(lo) < 0 < g(hi)
+for _ in range(60):
+    mid = 0.5 * (lo + hi)
+    lo, hi = (mid, hi) if g(mid) < 0 else (lo, mid)
+c = 0.5 * (lo + hi)
+
+print(f"secant slope {sec:.6f}, tangent slope at c {df(c):.6f}, c = {c:.6f}")
+assert a < c < b
+assert abs(df(c) - sec) < 1e-10
+# Cross-check against the closed form c = sqrt((sec+1)/3)
+assert np.isclose(c, np.sqrt((sec + 1) / 3), atol=1e-10)
+```
+
+The interior point lands at $c \approx 0.787$, matching the closed-form root
+of $3c^2 - 1 = $ secant slope, and its tangent slope reproduces the secant
+slope to ten decimals: the MVT's promised point, computed.
+
+</details>
+
+With the MVT in hand, the tangent line's error can finally be *bounded*, not
+just observed; the next lesson does so and turns "replace $f$ by its tangent"
+into the linearization that the rest of calculus scales up.
+
+<Footnotes>
+  <FNItem n="1">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 11, Rolle, the MVT, and their consequences.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 4.4, indeterminate forms and L'Hopital's rule (with the Cauchy MVT in the appendix).</FNItem>
+  <FNItem n="3">**Abbott, S.** (2015). *Understanding Analysis* (2nd ed.). Springer. Ch. 5.3, the MVT as the gateway from local to global statements. [doi:10.1007/978-1-4939-2712-8](https://doi.org/10.1007/978-1-4939-2712-8)</FNItem>
+</Footnotes>

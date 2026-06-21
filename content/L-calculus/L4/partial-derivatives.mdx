@@ -1,0 +1,301 @@
+---
+title: "Partial derivatives"
+pillar: L
+subId: L4
+lessonId: partial-derivatives
+order: 2
+estimatedMinutes: 30
+goal: "Differentiate in one coordinate at a time, compute and interpret partial derivatives, and verify the symmetry of mixed partials (Clairaut's theorem)."
+prerequisites: ["multivariable-functions", "L2/differentiation-rules"]
+---
+
+A scalar field has no single slope: standing on a hillside, the grade
+depends on which way you face. The simplest move is to measure one
+direction at a time, along the coordinate axes. That is the **partial
+derivative**, and it costs nothing new: freeze every variable but one and
+the field collapses to a single-variable function that L2 already knows how
+to differentiate. The price of the simplicity surfaces at the end, and
+fixing it is the next two lessons' job.
+
+## The definition
+
+The partial derivative of $f$ with respect to $x$ at $(a, b)$ is
+
+$$
+\frac{\partial f}{\partial x}(a, b)
+= \lim_{h \to 0} \frac{f(a + h, \, b) - f(a, b)}{h} ,
+$$
+
+the ordinary derivative of the slice function $g(x) = f(x, b)$ at $a$.
+Likewise $\frac{\partial f}{\partial y}$ holds $x$ frozen. Notations:
+$\partial f/\partial x = f_x = \partial_x f$, the curly $\partial$
+signaling that other variables are being held still. With $n$ inputs there
+are $n$ partials, one slice per axis.
+
+Geometrically, the plane $y = b$ cuts the surface $z = f(x,y)$ in a curve,
+and $f_x(a,b)$ is that curve's slope, the grade you feel walking due east.
+
+![Two slices through the same surface point: freezing y gives a curve in x with slope equal to the x-partial, freezing x gives a curve in y with slope equal to the y-partial. Each is an ordinary one-variable tangent from L2.](/figures/L4/partial-derivatives.svg)
+
+## Computing: differentiate, treating the rest as constants
+
+All L2 rules apply verbatim; the only skill is bookkeeping about what is
+frozen.
+
+**Worked example 1.** $f(x, y) = x^3 y^2 + e^{xy} + \sin y$.
+
+Treating $y$ as a constant (so $y^2$ is a coefficient, $e^{xy}$ has inner
+derivative $y$, and $\sin y$ is a frozen constant):
+
+$$
+f_x = 3x^2 y^2 + y\, e^{xy} + 0 .
+$$
+
+Treating $x$ as a constant:
+
+$$
+f_y = 2 x^3 y + x\, e^{xy} + \cos y .
+$$
+
+**Worked example 2 (a loss surface).** The two-parameter least-squares loss
+for a line through the data points $(x_i, y_i)$:
+
+$$
+\ell(w, b) = \frac{1}{2} \sum_{i=1}^m \left( w x_i + b - y_i \right)^2 .
+$$
+
+Differentiating with respect to $w$ (each term is a chain through the
+square; $b$ frozen) and then $b$:
+
+$$
+\frac{\partial \ell}{\partial w} = \sum_i \left( w x_i + b - y_i \right) x_i ,
+\qquad
+\frac{\partial \ell}{\partial b} = \sum_i \left( w x_i + b - y_i \right) .
+$$
+
+These two numbers are what one step of gradient descent on linear
+regression computes; "the gradient" two lessons from now is just this pair
+in a vector<FN n="1" />.
+
+## Higher partials and Clairaut's theorem
+
+Partials of partials: $f_{xx} = \partial_x(\partial_x f)$,
+$f_{xy} = \partial_y(\partial_x f)$ (first $x$, then $y$), and so on; a
+two-variable function has four second partials. On Example 1's polynomial
+piece $x^3 y^2$:
+
+$$
+f_x = 3x^2y^2 \Rightarrow f_{xy} = 6x^2 y,
+\qquad
+f_y = 2x^3 y \Rightarrow f_{yx} = 6 x^2 y .
+$$
+
+The two **mixed partials** agree, and that is not luck:
+
+**Clairaut's theorem.** If $f_{xy}$ and $f_{yx}$ both exist and are
+continuous near a point, they are equal there<FN ns="2, 3" />.
+
+The proof compares the double difference
+$f(a+h, b+k) - f(a+h, b) - f(a, b+k) + f(a,b)$ read two ways (rows first
+or columns first), each via the MVT; continuity lets the two readings meet
+in the limit. The symmetry is load-bearing downstream: it is why the
+Hessian matrix (two lessons ahead) is symmetric, hence has real
+eigenvalues and orthogonal eigenvectors, which is what makes curvature
+analysis and the second-derivative test work at all.
+
+## The warning label
+
+A single-variable function with a derivative at a point is automatically
+continuous there (L2). Partials are weaker: they only test the two axis
+directions, and a function can behave perfectly along both axes while
+misbehaving everywhere else. The L4 counterexample
+$f(x,y) = \frac{xy}{x^2+y^2}$ (with $f(0,0) = 0$) has *both* partials at
+the origin, $f_x(0,0) = f_y(0,0) = 0$, since the function vanishes
+identically on each axis, yet $f$ is not even continuous at the origin
+(its diagonal limit was $\tfrac12$). **Having all partial derivatives is
+not differentiability**; the partials are $n$ slope measurements, not yet a
+linear approximation. Patching this gap, demanding a genuine tangent
+plane, is exactly the content of the total derivative in two lessons.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+h = 1e-6
+
+# Example 1: f = x^3 y^2 + e^{xy} + sin y, partials at a grid of points
+f = lambda x, y: x**3 * y**2 + np.exp(x * y) + np.sin(y)
+fx = lambda x, y: 3 * x**2 * y**2 + y * np.exp(x * y)
+fy = lambda x, y: 2 * x**3 * y + x * np.exp(x * y) + np.cos(y)
+
+rng = np.random.default_rng(0)
+X, Y = rng.uniform(-1.5, 1.5, (2, 200))
+fx_num = (f(X + h, Y) - f(X - h, Y)) / (2 * h)
+fy_num = (f(X, Y + h) - f(X, Y - h)) / (2 * h)
+assert np.allclose(fx_num, fx(X, Y), atol=1e-5)
+assert np.allclose(fy_num, fy(X, Y), atol=1e-5)
+
+# Clairaut: mixed partials of f agree (cross central differences)
+fxy_num = (f(X + h, Y + h) - f(X + h, Y - h) - f(X - h, Y + h) + f(X - h, Y - h)) / (4 * h * h)
+fxy = lambda x, y: 6 * x**2 * y + np.exp(x * y) * (1 + x * y)   # d/dy of fx
+assert np.allclose(fxy_num, fxy(X, Y), atol=1e-3)
+
+# The least-squares partials, against numerical differentiation of the loss
+xs = np.array([0.0, 1.0, 2.0, 3.0])
+ys = np.array([1.1, 1.9, 3.2, 3.8])
+loss = lambda w, b: 0.5 * np.sum((w * xs + b - ys) ** 2)
+w0, b0 = 0.7, 0.5
+dw = np.sum((w0 * xs + b0 - ys) * xs)
+db = np.sum((w0 * xs + b0 - ys))
+dw_num = (loss(w0 + h, b0) - loss(w0 - h, b0)) / (2 * h)
+db_num = (loss(w0, b0 + h) - loss(w0, b0 - h)) / (2 * h)
+print("dl/dw:", dw, dw_num, " dl/db:", db, db_num)
+assert np.isclose(dw, dw_num, atol=1e-5) and np.isclose(db, db_num, atol=1e-5)
+
+# Partials exist, continuity fails: xy/(x^2+y^2) along the diagonal
+g = lambda x, y: np.where((x == 0) & (y == 0), 0.0, x * y / (x**2 + y**2))
+t = 10.0 ** -np.arange(3, 8)
+assert abs((g(h, 0.0) - g(-h, 0.0)) / (2 * h)) < 1e-12   # f_x(0,0) = 0
+assert np.allclose(g(t, t), 0.5)                          # yet no continuity
+```
+
+Both symbolic partials, the mixed partial, and the two least-squares
+gradient components all match their finite-difference versions, and the
+pathological example shows a vanishing axis derivative coexisting with a
+diagonal value pinned at $\tfrac12$.
+
+## Exercises
+
+**Exercise 1.** Compute all four second partial derivatives of
+$f(x, y) = x^2 e^{y} + y \ln x$ (for $x \gt 0$), and confirm the mixed pair
+agrees.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** First partials:
+
+$$
+f_x = 2x e^y + \frac{y}{x}, \qquad f_y = x^2 e^y + \ln x .
+$$
+
+**Step 2.** Pure seconds:
+
+$$
+f_{xx} = 2 e^y - \frac{y}{x^2}, \qquad f_{yy} = x^2 e^y .
+$$
+
+**Step 3.** Mixed, both orders:
+
+$$
+f_{xy} = \partial_y \left( 2x e^y + \frac{y}{x} \right) = 2x e^y + \frac{1}{x},
+\qquad
+f_{yx} = \partial_x \left( x^2 e^y + \ln x \right) = 2x e^y + \frac{1}{x} .
+$$
+
+Equal, as Clairaut demands of this everywhere-smooth function.
+
+</details>
+
+**Exercise 2.** The ideal gas law gives $P = \dfrac{nRT}{V}$ ($n, R$
+constants). Compute $\partial P/\partial T$ and $\partial P/\partial V$,
+interpret their signs physically, and verify the curious identity
+
+$$
+\frac{\partial P}{\partial T} \cdot \frac{\partial T}{\partial V} \cdot \frac{\partial V}{\partial P} = -1
+$$
+
+(each factor computed from the law solved for the corresponding variable).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Direct partials of $P(T, V)$:
+
+$$
+\frac{\partial P}{\partial T} = \frac{nR}{V} \gt 0 ,
+\qquad
+\frac{\partial P}{\partial V} = -\frac{nRT}{V^2} \lt 0 :
+$$
+
+heating a sealed container raises pressure; expanding it lowers pressure.
+
+**Step 2.** The other two factors: from $T = \frac{PV}{nR}$,
+$\frac{\partial T}{\partial V} = \frac{P}{nR}$; from $V = \frac{nRT}{P}$,
+$\frac{\partial V}{\partial P} = -\frac{nRT}{P^2}$.
+
+**Step 3.** Multiply:
+
+$$
+\frac{nR}{V} \cdot \frac{P}{nR} \cdot \left( -\frac{nRT}{P^2} \right)
+= -\frac{nRT}{PV} = -1 ,
+$$
+
+using $PV = nRT$ in the last step. The product is $-1$, not $+1$: partial
+derivatives are not fractions, and "canceling" the $\partial$'s would have
+predicted the wrong sign. Each factor froze a *different* third variable,
+and the triple-product identity records that mismatch.
+
+</details>
+
+**Exercise 3 (code).** For the loss surface
+$\ell(w, b) = \frac{1}{2}\sum_i (w x_i + b - y_i)^2$ with the four data
+points from the worked code, set both partials to zero and solve the
+resulting $2 \times 2$ linear system for the optimal $(w^*, b^*)$. Verify
+both partials vanish there numerically and that the loss at
+$(w^*, b^*)$ is below the loss at 1000 random nearby points.
+
+<details>
+<summary>Solution</summary>
+
+**Setup.** $\partial \ell/\partial w = 0$ and $\partial \ell/\partial b = 0$
+give the *normal equations*:
+
+$$
+w \textstyle\sum x_i^2 + b \sum x_i = \sum x_i y_i,
+\qquad
+w \sum x_i + b \, m = \sum y_i .
+$$
+
+```python
+import numpy as np
+
+xs = np.array([0.0, 1.0, 2.0, 3.0])
+ys = np.array([1.1, 1.9, 3.2, 3.8])
+loss = lambda w, b: 0.5 * np.sum((w * xs + b - ys) ** 2)
+
+A = np.array([[np.sum(xs**2), np.sum(xs)],
+              [np.sum(xs),    len(xs)   ]])
+rhs = np.array([np.sum(xs * ys), np.sum(ys)])
+w_star, b_star = np.linalg.solve(A, rhs)
+print("w* =", w_star, " b* =", b_star)
+
+h = 1e-6
+dw = (loss(w_star + h, b_star) - loss(w_star - h, b_star)) / (2 * h)
+db = (loss(w_star, b_star + h) - loss(w_star, b_star - h)) / (2 * h)
+assert abs(dw) < 1e-8 and abs(db) < 1e-8        # both partials vanish
+
+rng = np.random.default_rng(0)
+pert = rng.normal(0, 0.2, (1000, 2))
+vals = np.array([loss(w_star + p, b_star + q) for p, q in pert])
+assert np.all(vals >= loss(w_star, b_star))
+print("loss at optimum:", loss(w_star, b_star), " beats all 1000 neighbors")
+```
+
+The normal equations deliver $w^* \approx 0.96$, $b^* \approx 1.06$, both
+partials vanish to $10^{-8}$, and no random neighbor does better: setting
+all partials to zero found the minimum, the move L6 systematizes as the
+first-order condition.
+
+</details>
+
+The partials measure $n$ axis slopes; the natural next question is the
+slope in an *arbitrary* direction, and its answer assembles the partials
+into the most important vector in machine learning: the gradient.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 4.3, gradient-based optimization built from partial derivatives. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+  <FNItem n="2">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 2.3 and 3.1, partial derivatives and the equality of mixed partials.</FNItem>
+  <FNItem n="3">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 14.3, partial derivatives and Clairaut's theorem.</FNItem>
+</Footnotes>

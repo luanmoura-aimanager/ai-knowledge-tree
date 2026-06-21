@@ -1,0 +1,289 @@
+---
+title: "Power series and Taylor series"
+pillar: L
+subId: L3
+lessonId: power-series
+order: 6
+estimatedMinutes: 33
+goal: "Sum geometric series, find a power series' radius of convergence, and expand exp, log, and sine as the Taylor series numerical libraries evaluate."
+prerequisites: ["taylor-polynomials", "L1/sequences"]
+---
+
+Taylor polynomials stop at degree $n$ and carry a remainder; letting
+$n \to \infty$ trades the remainder for a new question. An infinite sum of
+powers is a **power series**, and it behaves like a polynomial of infinite
+degree, but only inside a sharply defined zone. This lesson locates that
+zone, the radius of convergence, and certifies the three expansions
+($e^x$, $\sin$, $\ln$) that the rest of the tree, and the math libraries
+under it, evaluate daily.
+
+## The geometric series, summed exactly
+
+Everything starts from the one series with a closed-form partial sum. For
+ratio $x \ne 1$,
+
+$$
+s_N = 1 + x + x^2 + \dots + x^N = \frac{1 - x^{N+1}}{1 - x}
+$$
+
+(multiply $s_N$ by $(1-x)$ and watch the telescope collapse). As
+$N \to \infty$: the term $x^{N+1}$ dies exactly when $\lvert x \rvert \lt 1$
+(geometric decay, L1) and otherwise refuses, so
+
+$$
+\sum_{k=0}^{\infty} x^k = \frac{1}{1 - x},
+\qquad \lvert x \rvert \lt 1 ,
+$$
+
+and the series diverges for every $\lvert x \rvert \ge 1$. The boundary is
+brutally sharp: at $x = 0.99$ the series patiently sums to $100$; at
+$x = 1$ it is $1 + 1 + \cdots = \infty$. No gradual degradation, a cliff.
+
+![Partial sums of the geometric series against its limit one over one minus x. Inside the radius the dashed sums snap onto the curve, slowly near the boundary; outside, each higher partial sum is worse: the cliff at the radius of convergence.](/figures/L3/power-series.svg)
+
+## The radius of convergence
+
+A general **power series** centered at $a$ is
+$\sum_{k=0}^\infty c_k (x - a)^k$. Its convergence region has a rigid
+geometry<FN n="1" />:
+
+**Theorem.** For every power series there is an $R \in [0, \infty]$ (the
+**radius of convergence**) such that the series converges absolutely for
+$\lvert x - a \rvert \lt R$ and diverges for $\lvert x - a \rvert \gt R$.
+
+The proof's engine is comparison with a geometric series: if the series
+converges at some point $x_0$, its terms there are bounded, and at any $x$
+strictly closer to the center, $\lvert c_k (x-a)^k \rvert \le M r^k$ with
+$r = \lvert x - a \rvert / \lvert x_0 - a \rvert \lt 1$: a convergent geometric
+ceiling. Convergence anywhere forces convergence everywhere closer in,
+which is exactly what a radius means.
+
+$R$ is computed with the **ratio test**: the series converges when
+consecutive-term ratios tend below $1$,
+
+$$
+\lim_{k \to \infty} \left\lvert \frac{c_{k+1}(x-a)^{k+1}}{c_k (x-a)^k} \right\rvert
+= \lvert x - a \rvert \lim_{k \to \infty} \left\lvert \frac{c_{k+1}}{c_k} \right\rvert \lt 1 .
+$$
+
+**Worked example.** $\sum_{k=0}^\infty \frac{x^k}{k!}$ (the exponential
+candidate): the coefficient ratio is
+$\frac{1/(k+1)!}{1/k!} = \frac{1}{k+1} \to 0$, so the condition
+$\lvert x \rvert \cdot 0 \lt 1$ holds for every $x$: $R = \infty$. The factorial
+swallows any power; this series converges on the whole line, the formal
+content of "factorials win" from last lesson. For
+$\sum k!\, x^k$ the same test gives $R = 0$ (converges only at the
+center); for the geometric series, $R = 1$.
+
+Inside its radius a power series is as docile as a polynomial: it may be
+differentiated and integrated **term by term**, and the result keeps the
+same radius. That license is the factory for new expansions.
+
+## Taylor series of the big three
+
+A function's **Taylor series** is its Taylor polynomial continued forever.
+The series *represents* the function wherever the remainder dies:
+$R_n(x) \to 0$<FN n="3" />.
+
+**Exponential and sine, everywhere.** On any fixed interval
+$\lvert x \rvert \le r$, the Lagrange bound gives
+$\lvert R_n \rvert \le \frac{M_r \, r^{n+1}}{(n+1)!} \to 0$ (for $e^x$,
+$M_r = e^r$; for sine, $M_r = 1$). So for **all real $x$**:
+
+$$
+e^x = \sum_{k=0}^{\infty} \frac{x^k}{k!},
+\qquad
+\sin x = \sum_{k=0}^{\infty} \frac{(-1)^k x^{2k+1}}{(2k+1)!},
+\qquad
+\cos x = \sum_{k=0}^{\infty} \frac{(-1)^k x^{2k}}{(2k)!} .
+$$
+
+**The logarithm, by the term-by-term license.** Start from geometric with
+ratio $-t$:
+$\frac{1}{1+t} = \sum_{k=0}^\infty (-1)^k t^k$ for $\lvert t \rvert \lt 1$.
+Integrate both sides from $0$ to $x$ (FTC supplies the left side):
+
+$$
+\ln(1 + x) = x - \frac{x^2}{2} + \frac{x^3}{3} - \cdots
+= \sum_{k=1}^{\infty} \frac{(-1)^{k-1} x^k}{k},
+\qquad -1 \lt x \le 1 .
+$$
+
+No derivative table was consulted: one known series, integrated, produced
+another, radius intact ($R = 1$; the endpoint $x = 1$ converges to
+$\ln 2$ by the alternating series test, the endpoint $x = -1$ is the
+divergent harmonic series, both edges decided individually).
+
+The confusion worth naming: **a series can converge without converging *to
+the function*, and the radius is about the series, not the function's
+health.** $\ln(1+x)$ is perfectly smooth at $x = 2$, yet its series
+diverges there; the series' radius was set by the singularity at
+$x = -1$, the *nearest* trouble in any direction. Convergence speed also
+degrades toward the edge: at $x = 0.999$ the geometric series needs
+thousands of terms for two digits. Power series are precision instruments
+near their center, which is why library implementations of $\sin$ first
+reduce the argument into a small interval and only then unleash the
+series<FN n="2" />.
+
+## Check it on arrays
+
+```python
+import numpy as np
+from math import factorial
+
+# Ratio test in action: terms of exp converge for x = 30, despite 30^k.
+# Build terms iteratively (term *= x/k); factorial(k) itself overflows floats.
+x = 30.0
+terms = [1.0]
+for k in range(1, 150):
+    terms.append(terms[-1] * x / k)
+terms = np.array(terms)
+assert terms.argmax() in (29, 30)                     # peak near k = x
+assert abs(terms.sum() - np.exp(30.0)) / np.exp(30.0) < 1e-14
+
+# Geometric cliff: 30 terms at x = 0.5 vs x = 0.99 vs x = 1.01
+for r in [0.5, 0.99, 1.01]:
+    s = sum(r**k for k in range(30))
+    tgt = 1 / (1 - r) if r < 1 else np.inf
+    print(f"x={r}: S_29 = {s:9.3f}, limit = {tgt}")
+assert abs(sum(0.5**k for k in range(30)) - 2.0) < 1e-8
+assert sum(1.01**k for k in range(300)) > 1000           # past r = 1: unbounded
+
+# ln(1+x) by integrated geometric series, inside and at the radius
+def log_series(x, n):
+    k = np.arange(1, n + 1)
+    return np.sum((-1.0) ** (k - 1) * x**k / k)
+
+assert abs(log_series(0.5, 60) - np.log(1.5)) < 1e-15
+assert abs(log_series(1.0, 2_000_000) - np.log(2.0)) < 1e-6   # slow at the edge
+
+# sin series with argument reduction: reduce 100 rad mod 2 pi, then expand
+def sin_series(x, n=25):
+    k = np.arange(n)
+    return np.sum((-1.0) ** k * x ** (2 * k + 1) /
+                  np.array([factorial(int(j)) for j in 2 * k + 1]))
+
+big = 100.0
+reduced = np.mod(big + np.pi, 2 * np.pi) - np.pi      # into [-pi, pi)
+assert abs(sin_series(reduced) - np.sin(big)) < 1e-12
+print("sin(100) via reduction + series:", sin_series(reduced), np.sin(big))
+```
+
+The exponential's terms balloon to a peak near $k = 30$ before the
+factorial flattens them into a fourteen-digit answer, the geometric series
+shows its cliff at the radius, the log series is superb at $0.5$ and
+glacial at the edge $1$, and argument reduction lets twenty-five sine terms
+nail $\sin(100)$ to twelve digits.
+
+## Exercises
+
+**Exercise 1.** Find the radius of convergence of
+(a) $\displaystyle \sum_{k=1}^\infty \frac{x^k}{k \, 3^k}$ and
+(b) $\displaystyle \sum_{k=0}^\infty k! \, x^k$.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Coefficient ratio:
+
+$$
+\left\lvert \frac{c_{k+1}}{c_k} \right\rvert
+= \frac{k \, 3^k}{(k+1) 3^{k+1}}
+= \frac{k}{3(k+1)} \longrightarrow \frac{1}{3} .
+$$
+
+Convergence requires $\lvert x \rvert \cdot \tfrac13 \lt 1$, so $R = 3$. (At
+$x = -3$ the series is alternating-harmonic and converges; at $x = 3$ it is
+harmonic and diverges: edges differ, as usual.)
+
+**(b)** Ratio $\frac{(k+1)!}{k!} = k + 1 \to \infty$, so for any
+$x \neq 0$ the term ratios blow past $1$: $R = 0$. The series defines a
+function only at its center, a formal object with no interval of validity.
+
+</details>
+
+**Exercise 2.** Derive the series for $\arctan x$ by integrating the
+geometric series with ratio $-t^2$, state its radius, and use $x = 1$ to
+obtain the Leibniz formula $\frac{\pi}{4} = 1 - \frac13 + \frac15 -
+\cdots$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Geometric with ratio $-t^2$, valid for
+$\lvert t \rvert \lt 1$:
+
+$$
+\frac{1}{1 + t^2} = \sum_{k=0}^{\infty} (-1)^k t^{2k} .
+$$
+
+**Step 2.** Integrate from $0$ to $x$, term by term (the license holds
+inside the radius); the left side is $\arctan x$ since
+$(\arctan t)' = \frac{1}{1+t^2}$:
+
+$$
+\arctan x = \sum_{k=0}^{\infty} \frac{(-1)^k x^{2k+1}}{2k+1}
+= x - \frac{x^3}{3} + \frac{x^5}{5} - \cdots, \qquad R = 1 .
+$$
+
+**Step 3.** At the edge $x = 1$ the alternating series test grants
+convergence, and continuity (Abel's theorem, quoted) carries the value:
+
+$$
+\frac{\pi}{4} = 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \cdots
+$$
+
+Beautiful and uselessly slow: error after $n$ terms is about
+$\frac{1}{2n}$, so a thousand terms deliver three digits of $\pi$.
+
+</details>
+
+**Exercise 3 (code).** Verify term-by-term differentiation numerically: the
+derivative of the $\sin$ series (differentiated coefficient by
+coefficient) reproduces the $\cos$ series, and both match numpy on
+$[-\pi, \pi]$ to $10^{-12}$ using 20 terms.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+from math import factorial
+
+x = np.linspace(-np.pi, np.pi, 1001)
+N = 20
+
+# sin series: sum (-1)^k x^(2k+1)/(2k+1)!
+sin_s = sum((-1.0) ** k * x ** (2 * k + 1) / factorial(2 * k + 1)
+            for k in range(N))
+
+# Differentiate each term: d/dx x^(2k+1)/(2k+1)! = x^(2k)/(2k)!
+dsin_s = sum((-1.0) ** k * x ** (2 * k) / factorial(2 * k)
+             for k in range(N))
+
+cos_s = sum((-1.0) ** k * x ** (2 * k) / factorial(2 * k)
+            for k in range(N))
+
+assert np.allclose(sin_s, np.sin(x), atol=1e-12)
+assert np.allclose(dsin_s, cos_s, atol=0)            # identical term by term
+assert np.allclose(cos_s, np.cos(x), atol=1e-12)
+print("term-by-term derivative of sin series == cos series, both 1e-12 exact")
+```
+
+Differentiating the sine series term by term produces, coefficient for
+coefficient, the cosine series, and both agree with numpy across a full
+period: the derivative cycle of L2, now an identity between infinite
+polynomials.
+
+</details>
+
+This closes the single-variable arc: limits built derivatives and
+integrals, the FTC fused them, and series made functions computable. The
+next discipline sends the same ideas into $n$ dimensions, where the
+derivative becomes a vector called the gradient.
+
+<Footnotes>
+  <FNItem n="1">**Abbott, S.** (2015). *Understanding Analysis* (2nd ed.). Springer. Ch. 6.5, power series, the radius theorem, and term-by-term operations. [doi:10.1007/978-1-4939-2712-8](https://doi.org/10.1007/978-1-4939-2712-8)</FNItem>
+  <FNItem n="2">**Muller, J.-M.** (2016). *Elementary Functions: Algorithms and Implementation* (3rd ed.). Birkhäuser. Range reduction plus polynomial evaluation, the production version of this lesson. [doi:10.1007/978-1-4899-7983-4](https://doi.org/10.1007/978-1-4899-7983-4)</FNItem>
+  <FNItem n="3">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 11.8-11.10, power series and Taylor series.</FNItem>
+</Footnotes>

@@ -1,0 +1,280 @@
+---
+title: "The gradient and directional derivatives"
+pillar: L
+subId: L4
+lessonId: gradient-directional
+order: 3
+estimatedMinutes: 33
+goal: "Assemble the partials into the gradient, compute directional derivatives as dot products, and prove the gradient points in the direction of steepest ascent, orthogonal to level sets."
+prerequisites: ["partial-derivatives"]
+---
+
+Partial derivatives answer "what is the slope due east?" and "due north?".
+A hiker, or an optimizer, wants more: the slope in *any* direction, and
+above all the direction where the surface climbs or drops fastest. Both
+answers come from one vector built out of the partials. The **gradient** is
+that vector, and the fact that it points exactly uphill is the single
+geometric fact underneath all of gradient-based learning<FN n="1" />.
+
+## Directional derivatives
+
+Fix a point $\mathbf{a}$ and a **unit** vector $\mathbf{u}$ (direction).
+Walking from $\mathbf{a}$ along $\mathbf{u}$ traces the one-variable
+function $t \mapsto f(\mathbf{a} + t\mathbf{u})$, and its derivative at
+$t = 0$ is the **directional derivative**
+
+$$
+D_{\mathbf{u}} f(\mathbf{a}) = \lim_{t \to 0} \frac{f(\mathbf{a} + t \mathbf{u}) - f(\mathbf{a})}{t} :
+$$
+
+the slope of the surface in direction $\mathbf{u}$. The partials are the
+special cases $\mathbf{u} = \mathbf{e}_1, \dots, \mathbf{e}_n$ (the
+coordinate axes)<FN ns="2, 3" />.
+
+For differentiable $f$ (formalized next lesson; smooth formulas qualify),
+the directional derivative needs no new limits, only a dot product:
+
+$$
+D_{\mathbf{u}} f(\mathbf{a}) = \nabla f(\mathbf{a}) \cdot \mathbf{u},
+\qquad \text{where} \quad
+\nabla f = \left( \frac{\partial f}{\partial x_1}, \dots, \frac{\partial f}{\partial x_n} \right)
+$$
+
+is the **gradient** of $f$ (also written $\operatorname{grad} f$). The
+derivation is one chain rule: with
+$\mathbf{x}(t) = \mathbf{a} + t\mathbf{u}$, each coordinate moves at rate
+$u_i$, so the composite's rate is $\sum_i f_{x_i} \cdot u_i$, which is the
+dot product. $n$ slice measurements determine the slope in every one of
+the infinitely many directions; that compression is the gradient's first
+gift.
+
+**Worked example.** $f(x,y) = x^2 y$ at $\mathbf{a} = (1, 2)$, direction
+of the vector $(3, 4)$.
+
+**Step 1.** Gradient: $\nabla f = (2xy, \, x^2)$, so
+$\nabla f(1,2) = (4, 1)$.
+
+**Step 2.** Normalize the direction: $\lVert (3,4) \rVert = 5$, so
+$\mathbf{u} = (3/5, 4/5)$. (Skipping this step scales the answer by the
+vector's length, a silent factor-of-5 error here.)
+
+**Step 3.** Dot product:
+
+$$
+D_{\mathbf{u}} f = (4, 1) \cdot \left( \tfrac35, \tfrac45 \right) = \tfrac{12}{5} + \tfrac{4}{5} = \tfrac{16}{5} = 3.2 .
+$$
+
+## Steepest ascent
+
+Which direction maximizes the slope? The dot product answers by the
+Cauchy-Schwarz inequality (equivalently, the cosine formula): for unit
+$\mathbf{u}$,
+
+$$
+D_{\mathbf{u}} f = \nabla f \cdot \mathbf{u}
+= \lVert \nabla f \rVert \, \cos\theta ,
+$$
+
+where $\theta$ is the angle between $\mathbf{u}$ and the gradient. The
+cosine ranges over $[-1, 1]$, so:
+
+- **Maximum slope** $\lVert \nabla f \rVert$, attained when $\theta = 0$:
+  the gradient direction is the steepest ascent, and the gradient's
+  *length* is that steepest rate.
+- **Minimum slope** $-\lVert \nabla f \rVert$ at $\theta = \pi$: straight
+  downhill is $-\nabla f$, the direction every descent step in this tree
+  will take.
+- **Zero slope** at $\theta = \pi/2$: moving perpendicular to the gradient
+  changes nothing, to first order.
+
+The third bullet has a geometric restatement. A level set is where $f$
+does not change; first-order no-change directions are exactly those
+perpendicular to $\nabla f$. So **the gradient is orthogonal to the level
+set through its point**. The formal version: along any differentiable
+curve $\mathbf{r}(t)$ lying inside the level set, $f(\mathbf{r}(t))$ is
+constant, so differentiating with the chain rule gives
+$\nabla f \cdot \mathbf{r}'(t) = 0$: the gradient is perpendicular to
+every tangent direction of the set.
+
+On a contour map the whole theorem becomes visible: gradients cross the
+contour lines at right angles, and they are long where contours crowd
+(steep terrain compresses level curves). Water runoff, which follows
+steepest descent, crosses elevation contours perpendicularly for exactly
+this reason.
+
+![Contours of a bowl with its gradient field: every arrow crosses its level curve at a right angle, points uphill, and grows longer where the rings tighten, the full steepest-ascent theorem in one picture.](/figures/L4/gradient-directional.svg)
+
+A confusion worth naming before L6 relies on it: **the gradient lives in
+the input space, not on the surface.** For $f(x,y)$, $\nabla f$ is a 2D
+arrow on the floor plan (the contour map), not a 3D arrow along the hill.
+It says "walk this way on the map for the fastest climb", and for a
+million-weight loss it is a million-dimensional arrow in weight space,
+where no surface picture exists at all but the map reading survives
+intact.
+
+**Worked example (where does it point?).** $f(x,y) = x^2 + y^2$ has
+$\nabla f = (2x, 2y) = 2 \cdot (x, y)$: at every point, the gradient
+points radially *away* from the origin (straight uphill on the bowl), with
+length $2r$ growing as the bowl steepens, and each circle-contour is
+crossed at $90°$. Every claim of the theorem, visible in one formula.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+f = lambda p: p[0] ** 2 * p[1]                  # f(x, y) = x^2 y
+grad = lambda p: np.array([2 * p[0] * p[1], p[0] ** 2])
+a = np.array([1.0, 2.0])
+
+# Directional derivative via dot product == direct 1D limit along u
+u = np.array([3.0, 4.0]) / 5.0
+h = 1e-6
+direct = (f(a + h * u) - f(a - h * u)) / (2 * h)
+assert np.isclose(direct, grad(a) @ u, atol=1e-6)
+assert np.isclose(grad(a) @ u, 3.2)
+
+# Scan 360 directions: the max slope sits at the gradient's angle,
+# with value equal to the gradient's norm
+theta = np.linspace(0, 2 * np.pi, 3601)
+dirs = np.stack([np.cos(theta), np.sin(theta)])
+slopes = grad(a) @ dirs
+g = grad(a)
+assert np.isclose(slopes.max(), np.linalg.norm(g), atol=1e-6)
+best = theta[slopes.argmax()]
+grad_angle = np.arctan2(g[1], g[0])
+assert abs(best - grad_angle) < 2e-3
+print(f"steepest slope {slopes.max():.4f} = ||grad|| {np.linalg.norm(g):.4f} "
+      f"at angle {best:.4f} (gradient angle {grad_angle:.4f})")
+
+# Orthogonality: walk along the level set of x^2+y^2 (a circle); the value
+# is flat, while walking along the gradient changes it at rate ||grad||
+fc = lambda p: p[0] ** 2 + p[1] ** 2
+p0 = np.array([0.6, 0.8])                       # on the unit circle
+tangent = np.array([-p0[1], p0[0]])             # perpendicular to radius
+radial = p0 / np.linalg.norm(p0)
+flat = (fc(p0 + h * tangent) - fc(p0 - h * tangent)) / (2 * h)
+climb = (fc(p0 + h * radial) - fc(p0 - h * radial)) / (2 * h)
+assert abs(flat) < 1e-9
+assert np.isclose(climb, 2.0, atol=1e-6)        # ||grad|| = 2r = 2
+print("along the contour:", flat, " along the gradient:", climb)
+```
+
+The dot-product formula matches the honest one-dimensional limit, a sweep
+of 3600 directions finds the maximum slope at the gradient's own angle
+with value equal to its norm, and on the circle the contour direction is
+flat to nine digits while the radial direction climbs at the predicted
+rate $2$.
+
+## Exercises
+
+**Exercise 1.** For $f(x, y) = x e^{y} + y^2$ at the point $(2, 0)$:
+compute $\nabla f(2,0)$, the directional derivative toward the point
+$(5, 4)$, and the steepest-descent direction as a unit vector.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $\nabla f = (e^y, \; x e^y + 2y)$, so
+$\nabla f(2, 0) = (1, 2)$.
+
+**Step 2.** Direction toward $(5,4)$: the displacement is
+$(5-2, 4-0) = (3, 4)$, length $5$, unit $\mathbf{u} = (3/5, 4/5)$. Then
+
+$$
+D_{\mathbf{u}} f = (1, 2) \cdot \left( \tfrac35, \tfrac45 \right)
+= \tfrac{3}{5} + \tfrac{8}{5} = \tfrac{11}{5} = 2.2 .
+$$
+
+**Step 3.** Steepest descent is the negative gradient, normalized:
+
+$$
+-\frac{\nabla f}{\lVert \nabla f \rVert} = -\frac{(1, 2)}{\sqrt{5}}
+= \left( -\tfrac{1}{\sqrt5}, -\tfrac{2}{\sqrt5} \right),
+$$
+
+with descent rate $-\lVert \nabla f \rVert = -\sqrt5 \approx -2.236$,
+steeper than the $2.2$ available toward $(5,4)$, as the theorem requires.
+
+</details>
+
+**Exercise 2.** Prove: at any point where $\nabla f \ne \mathbf{0}$, the
+set of unit directions with $D_{\mathbf{u}} f = 0$ is exactly the unit
+vectors orthogonal to $\nabla f$, and conclude that in $n$ dimensions the
+"flat" directions form an $(n-1)$-dimensional subspace's unit sphere.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** By the formula, $D_{\mathbf{u}} f = \nabla f \cdot \mathbf{u}$.
+This vanishes if and only if $\mathbf{u}$ is orthogonal to $\nabla f$, by
+the definition of orthogonality via the dot product. That is the set
+equality claimed, both inclusions at once.
+
+**Step 2.** The orthogonal complement of the single nonzero vector
+$\nabla f$ in $\mathbb{R}^n$ is a subspace of dimension $n - 1$ (one
+linear constraint, $\nabla f \cdot \mathbf{u} = 0$, cuts the dimension by
+one). The flat unit directions are that subspace's unit sphere.
+
+**Step 3 (interpretation).** In two inputs, flat directions are the two
+tangents to the contour line; in a million-dimensional weight space, an
+optimizer at a non-critical point has a $999{,}999$-dimensional sphere of
+directions that change nothing to first order, and exactly one direction
+of steepest descent. Level sets are enormous; progress directions are
+scarce.
+
+</details>
+
+**Exercise 3 (code).** Steepest descent on the bowl
+$f(x,y) = \tfrac12 x^2 + y^2$: starting at $(2.0, 1.5)$, take 120 steps
+$\mathbf{p} \leftarrow \mathbf{p} - 0.1 \nabla f(\mathbf{p})$. Verify the
+function value decreases at every step, that each step direction is
+orthogonal to the level set (check against the contour tangent), and that
+the iterates approach the minimum at the origin.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda p: 0.5 * p[0] ** 2 + p[1] ** 2
+grad = lambda p: np.array([p[0], 2 * p[1]])
+
+p = np.array([2.0, 1.5])
+vals = [f(p)]
+for _ in range(120):
+    g = grad(p)
+    # The step is along -g; the contour tangent at p is perpendicular to g,
+    # so the dot of step direction with the tangent must vanish.
+    tangent = np.array([-g[1], g[0]])
+    step = -0.1 * g
+    assert abs(step @ tangent) < 1e-12
+    p = p + step
+    vals.append(f(p))
+
+vals = np.array(vals)
+assert np.all(np.diff(vals) < 0)              # monotone decrease
+assert np.linalg.norm(p) < 1e-3               # converged to the origin
+print("first 5 values:", vals[:5].round(4), "... final point:", p)
+```
+
+Every step is exactly perpendicular to its contour (the step *is* the
+negative gradient), the loss decreases monotonically, and 120 steps land
+within $10^{-3}$ of the minimizer (the slow coordinate contracts by only
+$0.9$ per step, so it sets the schedule). This loop, with a million coordinates
+and a learned step size, is a training run; L6 returns to it with
+convergence guarantees.
+
+</details>
+
+The gradient packages all first-order information about a scalar field;
+the next lesson asks what "differentiable" properly means in
+$\mathbb{R}^n$ and finds the answer in the total derivative, the linear
+map the gradient represents.
+
+<Footnotes>
+  <FNItem n="1">**Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning.* MIT Press. Ch. 4.3, the gradient and steepest descent as the basis of training. [https://www.deeplearningbook.org](https://www.deeplearningbook.org)</FNItem>
+  <FNItem n="2">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 2.6, gradients, directional derivatives, and orthogonality to level sets.</FNItem>
+  <FNItem n="3">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 14.6, directional derivatives and the gradient vector.</FNItem>
+</Footnotes>

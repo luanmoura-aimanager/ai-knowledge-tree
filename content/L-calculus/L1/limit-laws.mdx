@@ -1,0 +1,262 @@
+---
+title: "Limit laws and the squeeze theorem"
+pillar: L
+subId: L1
+lessonId: limit-laws
+order: 3
+estimatedMinutes: 32
+goal: "Evaluate limits algebraically with the sum, product, quotient, and composition laws, and trap hard cases like sin(x)/x with the squeeze theorem."
+prerequisites: ["limits"]
+---
+
+Proving every limit with epsilons and deltas would be like doing arithmetic
+with set theory: correct and unbearable. The **limit laws** prove once and for
+all that limits respect the ordinary algebra of functions, after which most
+limits fall to algebraic manipulation. The cases algebra cannot reach, like
+$\sin(x)/x$, fall to a second tool: the **squeeze theorem**.
+
+## The limit laws
+
+Suppose $\lim_{x \to a} f(x) = L$ and $\lim_{x \to a} g(x) = M$, both finite.
+Then<FN ns="1, 3" />:
+
+$$
+\begin{aligned}
+\lim_{x \to a} \, [f(x) + g(x)] &= L + M
+&& \text{(sum)} \\
+\lim_{x \to a} \, [c \, f(x)] &= c L
+&& \text{(constant multiple)} \\
+\lim_{x \to a} \, [f(x) \, g(x)] &= L M
+&& \text{(product)} \\
+\lim_{x \to a} \, \frac{f(x)}{g(x)} &= \frac{L}{M} \quad (M \neq 0)
+&& \text{(quotient)}
+\end{aligned}
+$$
+
+Each is an epsilon-delta theorem proved once. The sum law shows the proof
+pattern; the others use the same skeleton with more bookkeeping.
+
+**Step 1.** Given $\varepsilon \gt 0$, the goal is to make
+$\lvert (f(x) + g(x)) - (L + M) \rvert \lt \varepsilon$. The triangle
+inequality ($\lvert u + v \rvert \le \lvert u \rvert + \lvert v \rvert$) splits
+the error into the two pieces already under control:
+
+$$
+\lvert f(x) + g(x) - L - M \rvert
+\;\le\; \lvert f(x) - L \rvert + \lvert g(x) - M \rvert .
+$$
+
+**Step 2.** Spend half the budget on each piece. Because $f \to L$, there is a
+$\delta_1$ forcing $\lvert f(x) - L \rvert \lt \varepsilon/2$; because
+$g \to M$, there is a $\delta_2$ forcing $\lvert g(x) - M \rvert \lt
+\varepsilon/2$.
+
+**Step 3.** Take $\delta = \min(\delta_1, \delta_2)$, so both guarantees hold
+at once. Inside that window the total error is below
+$\varepsilon/2 + \varepsilon/2 = \varepsilon$, which completes the proof.
+
+Two corollaries do a lot of quiet work. First, since $\lim_{x \to a} x = a$ and
+$\lim_{x \to a} c = c$ are immediate from the definition, repeated products and
+sums give: **every polynomial satisfies $\lim_{x \to a} p(x) = p(a)$**, and
+every rational function does too wherever its denominator is nonzero. Plugging
+in is not cheating for these functions; the laws are why it works. Second, for
+compositions: if $\lim_{x \to a} g(x) = b$ and $f$ is continuous at $b$ (next
+lesson), then $\lim_{x \to a} f(g(x)) = f(b)$, so limits pass inside
+well-behaved outer functions.
+
+## Where the laws stop
+
+The quotient law demands $M \neq 0$. When numerator and denominator both go to
+$0$, the form $0/0$ is **indeterminate**: it carries no verdict, and the answer
+depends on the functions, not the form. Three quotients, all $0/0$ at the
+origin:
+
+$$
+\frac{x^2}{x} \to 0, \qquad \frac{x}{x} \to 1, \qquad \frac{x}{x^3} \to \infty .
+$$
+
+Same form, three different fates: the limit can be anything. That is what
+"indeterminate" means, and it is the confusion to keep straight: **$0/0$ is not
+a value, it is a flag that more work is needed.** The usual work is algebraic:
+factor and cancel, as in
+
+$$
+\lim_{x \to 3} \frac{x^2 - 9}{x - 3}
+= \lim_{x \to 3} \frac{(x-3)(x+3)}{x-3}
+= \lim_{x \to 3} (x + 3) = 6,
+$$
+
+or multiply by a conjugate to clear roots:
+
+$$
+\lim_{x \to 0} \frac{\sqrt{x + 1} - 1}{x}
+= \lim_{x \to 0} \frac{(x+1) - 1}{x \, (\sqrt{x+1} + 1)}
+= \lim_{x \to 0} \frac{1}{\sqrt{x+1} + 1}
+= \frac{1}{2}.
+$$
+
+## The squeeze theorem
+
+Some limits resist algebra entirely. The squeeze theorem replaces manipulation
+with inequalities: if
+
+$$
+g(x) \le f(x) \le h(x)
+$$
+
+for all $x$ near $a$ (except possibly at $a$), and the two bounds converge to
+the same value, $\lim_{x \to a} g(x) = \lim_{x \to a} h(x) = L$, then the
+trapped function has no choice:
+
+$$
+\lim_{x \to a} f(x) = L .
+$$
+
+The proof is one line of epsilon bookkeeping: inside a small enough window both
+bounds sit in the $\varepsilon$-band around $L$, and $f$ sits between them.
+
+The showcase example: $f(x) = x^2 \sin(1/x)$ near $0$. The factor $\sin(1/x)$
+oscillates faster and faster and has no limit, so the product law does not
+apply. But $\lvert \sin(\cdot) \rvert \le 1$ always, so
+
+$$
+-x^2 \;\le\; x^2 \sin(1/x) \;\le\; x^2,
+$$
+
+and both envelopes go to $0$. The oscillation survives all the way in, but its
+*amplitude* dies, and the squeeze forces the limit to $0$.
+
+![The squeeze in action: x-squared times sin(1/x) oscillates without end, but the envelopes plus and minus x-squared pinch together at the origin and drag the trapped function to 0 with them.](/figures/L1/limit-laws.svg)
+
+The same tool proves the limit this pillar needs most. For
+$0 \lt x \lt \pi/2$, comparing areas of two triangles and a circular sector in
+the unit circle gives the inequality chain<FN n="2" />
+
+$$
+\cos x \;\le\; \frac{\sin x}{x} \;\le\; 1 .
+$$
+
+As $x \to 0^+$, the left bound $\cos x \to 1$ and the right bound is constant
+$1$, so the squeeze gives $\sin(x)/x \to 1$; evenness handles the left side.
+This limit is the engine inside every trig derivative in L2.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+x = np.linspace(-0.5, 0.5, 100_001)
+x = x[np.abs(x) > 1e-12]
+
+# The squeeze bounds hold everywhere on the grid
+f = x**2 * np.sin(1.0 / x)
+assert np.all(f <= x**2 + 1e-15)
+assert np.all(f >= -(x**2) - 1e-15)
+
+# And the trapped values die as x -> 0: check on shrinking windows
+for w in [0.5, 0.05, 0.005]:
+    inside = np.abs(x) < w
+    print(f"|x| < {w:>6}: max|f| = {np.abs(f[inside]).max():.2e}  (bound {w**2:.2e})")
+assert np.abs(f[np.abs(x) < 0.005]).max() <= 0.005**2
+
+# Indeterminate 0/0: same form, three different limits
+t = 10.0 ** -np.arange(3, 10)
+print("x^2/x ->", (t**2 / t)[-1], "  x/x ->", (t / t)[-1], "  x/x^3 ->", (t / t**3)[-1])
+```
+
+The oscillating function never escapes its parabolic envelope, the maximum
+inside each window shrinks like the bound $w^2$, and the three $0/0$ quotients
+land at $0$, $1$, and a huge number: the form decides nothing.
+
+## Exercises
+
+**Exercise 1.** Evaluate $\displaystyle \lim_{x \to 2} \frac{x^2 + x - 6}{x - 2}$
+by factoring, citing which limit law justifies each step.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** At $x = 2$ both numerator and denominator vanish ($4 + 2 - 6 = 0$),
+so the quotient law does not apply directly: the form is $0/0$.
+
+**Step 2.** Factor the numerator. Two numbers with product $-6$ and sum $1$
+are $3$ and $-2$, so $x^2 + x - 6 = (x - 2)(x + 3)$. For $x \neq 2$ the factor
+$x - 2$ cancels (the limit never inspects $x = 2$ itself):
+
+$$
+\frac{x^2 + x - 6}{x - 2} = x + 3 .
+$$
+
+**Step 3.** Now apply the sum law to the polynomial $x + 3$:
+$\lim_{x \to 2}(x + 3) = 2 + 3 = 5$.
+
+</details>
+
+**Exercise 2.** Use the squeeze theorem to show
+$\displaystyle \lim_{x \to 0} x \cos\!\left(\frac{5}{x}\right) = 0$.
+State the bounds explicitly and verify both converge.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bound the oscillating factor: $\lvert \cos(5/x) \rvert \le 1$ for
+every $x \neq 0$, so
+
+$$
+-\lvert x \rvert \;\le\; x \cos(5/x) \;\le\; \lvert x \rvert .
+$$
+
+(The absolute values handle the sign of $x$: whatever sign $x$ has, the product
+is trapped within $\lvert x \rvert$ of zero.)
+
+**Step 2.** Both envelopes converge to the same value:
+$\lim_{x \to 0} \lvert x \rvert = 0$ and $\lim_{x \to 0} (-\lvert x \rvert) = 0$.
+
+**Step 3.** The squeeze theorem applies with $L = 0$, so the trapped function
+converges: $\lim_{x \to 0} x \cos(5/x) = 0$. The difference from
+$x^2 \sin(1/x)$ is only the envelope shape, linear here, quadratic there; any
+envelope that pinches to zero works.
+
+</details>
+
+**Exercise 3 (code).** Verify the unit-circle squeeze
+$\cos x \le \sin(x)/x \le 1$ numerically on $(0, \pi/2)$, then confirm that
+$\sin(x)/x$ and both bounds agree to within $10^{-6}$ for
+$x = 10^{-3}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+x = np.linspace(1e-6, np.pi / 2 - 1e-6, 200_000)
+ratio = np.sin(x) / x
+
+# The chain cos x <= sin(x)/x <= 1 holds across the whole interval
+assert np.all(np.cos(x) <= ratio + 1e-15)
+assert np.all(ratio <= 1.0 + 1e-15)
+
+# Near zero the two bounds pinch: all three values agree to ~x^2/2
+x0 = 1e-3
+lo, mid, hi = np.cos(x0), np.sin(x0) / x0, 1.0
+print(f"cos(x0) = {lo:.9f}, sin(x0)/x0 = {mid:.9f}, 1 = {hi:.9f}")
+assert hi - lo < 1e-6          # the squeeze window itself is tiny
+assert abs(mid - 1.0) < 1e-6
+```
+
+The chain of inequalities holds on the entire interval, and at
+$x = 10^{-3}$ the gap between the bounds is below $10^{-6}$ (it shrinks like
+$x^2/2$), pinning $\sin(x)/x$ to $1$ at that accuracy.
+
+</details>
+
+The laws assumed limits exist and quietly used the idea of a function agreeing
+with its own limit; the next lesson gives that property its name, continuity,
+and extracts its two famous consequences.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 2.3, calculating limits using the limit laws.</FNItem>
+  <FNItem n="2">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 15 derives the sin(x)/x limit from the circle-sector area comparison.</FNItem>
+  <FNItem n="3">**Apostol, T. M.** (1967). *Calculus, Vol. 1* (2nd ed.). Wiley. Ch. 3, the limit theorems with complete proofs.</FNItem>
+</Footnotes>

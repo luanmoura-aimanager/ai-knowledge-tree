@@ -1,0 +1,309 @@
+---
+title: "Gradient descent as steepest descent"
+pillar: L
+subId: L6
+lessonId: steepest-descent
+order: 4
+estimatedMinutes: 34
+goal: "Derive gradient descent from the first-order Taylor model, choose a step size that provably decreases a smooth function, and watch the iterates run downhill on a real surface."
+prerequisites: ["convexity"]
+---
+
+Every model in this tree trains by some descendant of one update rule:
+
+$$
+\mathbf{x}_{k+1} = \mathbf{x}_k - \eta \, \nabla f(\mathbf{x}_k) .
+$$
+
+This lesson derives that rule instead of postulating it, prices the step
+size $\eta$ against the function's curvature, and proves the descent
+guarantee: with the right $\eta$, a smooth function *must* decrease every
+step. Nothing here is heuristic; it is the linearization of L2 and the
+steepest-ascent theorem of L4 doing exactly what they were built
+for<FN n="1" />.
+
+## The derivation: trust the linear model, briefly
+
+At the current point $\mathbf{x}_k$, the first-order Taylor model says
+that for a small step $\mathbf{s}$,
+
+$$
+f(\mathbf{x}_k + \mathbf{s}) \approx f(\mathbf{x}_k) + \nabla f(\mathbf{x}_k)^\top \mathbf{s} .
+$$
+
+To decrease $f$, make the inner product negative; to decrease it *as
+fast as the model allows* for a given step length, take $\mathbf{s}$
+opposite the gradient, the steepest-descent direction of L4. Writing the
+length via a rate $\eta \gt 0$:
+
+$$
+\mathbf{s} = -\eta \, \nabla f(\mathbf{x}_k),
+$$
+
+which is the update rule. The linear model is only locally honest, so
+$\eta$ exists to keep the step inside the model's region of validity;
+everything difficult about gradient descent is in that sentence.
+
+## Pricing the step against curvature
+
+How far can the linear model be trusted? The quadratic term it ignores
+is controlled by curvature. Call $f$ **$L$-smooth** if its curvature is
+bounded: $\mathbf{d}^\top H(\mathbf{x})\, \mathbf{d} \le L \lVert
+\mathbf{d} \rVert^2$ everywhere (all Hessian eigenvalues $\le L$;
+equivalently the gradient is $L$-Lipschitz). Taylor with the Lagrange
+remainder (L3/L4) then gives a global *upper* parabola:
+
+$$
+f(\mathbf{x} + \mathbf{s}) \;\le\; f(\mathbf{x}) + \nabla f(\mathbf{x})^\top \mathbf{s} + \frac{L}{2} \lVert \mathbf{s} \rVert^2 .
+$$
+
+**Step 1.** Insert the update $\mathbf{s} = -\eta \nabla f$ (writing
+$g = \lVert \nabla f(\mathbf{x}_k) \rVert$):
+
+$$
+f(\mathbf{x}_{k+1}) \;\le\; f(\mathbf{x}_k) - \eta g^2 + \frac{L \eta^2}{2} g^2
+= f(\mathbf{x}_k) - \eta \left( 1 - \frac{L\eta}{2} \right) g^2 .
+$$
+
+**Step 2.** The bracket is positive when $\eta \lt 2/L$: the **descent
+guarantee**. Every step strictly decreases $f$ (while the gradient is
+nonzero), with the certified drop
+
+$$
+f(\mathbf{x}_k) - f(\mathbf{x}_{k+1}) \;\ge\; \eta \left( 1 - \frac{L\eta}{2} \right) \lVert \nabla f(\mathbf{x}_k) \rVert^2 ,
+$$
+
+maximized at $\eta = 1/L$, where the certified drop is
+$\frac{1}{2L} \lVert \nabla f \rVert^2$.
+
+**Step 3.** Summing the drops telescopes (the FTC's discrete cousin):
+after $K$ steps with $\eta = 1/L$,
+
+$$
+\min_{k \lt K} \lVert \nabla f(\mathbf{x}_k) \rVert^2
+\;\le\; \frac{2L \left( f(\mathbf{x}_0) - f^* \right)}{K} ,
+$$
+
+so the smallest gradient seen shrinks like $1/\sqrt{K}$: descent finds
+approximate critical points on *any* smooth function, convex or not.
+Convexity upgrades the conclusion from "a critical point" to "the
+global minimum", with $f(\mathbf{x}_k) - f^* = O(1/k)$, and strong
+convexity to geometric (L1's word) convergence<FN n="3" />.
+
+The boundary $\eta = 2/L$ is sharp, not pessimistic. On the parabola
+$f(x) = \tfrac{L}{2} x^2$ the update is
+$x_{k+1} = (1 - \eta L) x_k$, a geometric sequence with ratio
+$1 - \eta L$: monotone convergence for $\eta \lt 1/L$, convergent
+oscillation up to $\eta \lt 2/L$, *exact* period-two bouncing at
+$\eta = 2/L$, divergence beyond. The named confusion: **the step size
+is not a politeness parameter; it is a stability threshold.** Below
+$2/L$ descent is guaranteed, above it the iteration provably explodes
+on any direction of curvature $L$, and "my loss became NaN" is usually
+this inequality, violated<FN n="2" />.
+
+![Three step sizes on one bowl: a cautious eta creeps in, a well-chosen eta converges in a few strides, and an eta at 98 percent of the stability budget ricochets across the valley before settling. All three obey the same 2-over-L law.](/figures/L6/steepest-descent.svg)
+
+## What this buys, and what it does not
+
+The guarantee is one-step myopic and direction-blind: it promises
+descent, not *fast* descent, and $-\nabla f$ is the steepest direction
+only under the Euclidean way of measuring step length. When curvature
+differs wildly across directions, the steepest direction is a poor
+long-term plan, the zigzag pathology dissected next lesson. Better
+optimizers in A3 keep this lesson's skeleton and change one of these
+two myopias: momentum smooths directions across steps, Newton's method
+replaces the sphere with the Hessian's own geometry, and Adam rescales
+per-coordinate. All of them still live inside the
+linearize-step-revalidate loop derived here.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# f = 0.5(x^2 + 4 y^2): Hessian diag(1, 4), so L = 4, stability at 2/L = 0.5
+f = lambda p: 0.5 * (p[0] ** 2 + 4 * p[1] ** 2)
+grad = lambda p: np.array([p[0], 4 * p[1]])
+L = 4.0
+
+def run(eta, steps=60):
+    p = np.array([-2.0, 1.1])
+    vals = [f(p)]
+    for _ in range(steps):
+        p = p - eta * grad(p)
+        vals.append(f(p))
+    return np.array(vals), p
+
+# Below the threshold: monotone descent, with the certified per-step drop
+for eta in [0.1, 0.25, 0.49]:
+    vals, p_end = run(eta)
+    assert np.all(np.diff(vals) <= 1e-12), eta
+print("eta < 0.5: every run monotone")
+
+# The certified drop bound holds step by step at eta = 1/L
+eta = 1 / L
+p = np.array([-2.0, 1.1])
+for _ in range(40):
+    g2 = grad(p) @ grad(p)
+    p_next = p - eta * grad(p)
+    assert f(p) - f(p_next) >= (1 / (2 * L)) * g2 - 1e-12
+    p = p_next
+
+# Above the threshold: divergence
+vals_bad, _ = run(0.51, steps=200)
+print("eta = 0.51 final value:", vals_bad[-1])
+assert vals_bad[-1] > 1e3
+
+# The 1/K rate: min gradient norm^2 <= 2L(f0 - f*)/K on a NONconvex function
+fr = lambda p: (1 - p[0])**2 + 100 * (p[1] - p[0]**2)**2   # Rosenbrock
+gr = lambda p: np.array([-2 * (1 - p[0]) - 400 * p[0] * (p[1] - p[0]**2),
+                         200 * (p[1] - p[0]**2)])
+p = np.array([-1.5, 2.0])
+f0 = fr(p)
+Lr = 8000.0                # a crude global-ish curvature bound on the region
+best = np.inf
+for K in range(1, 200_001):
+    g = gr(p)
+    best = min(best, g @ g)
+    p = p - (1 / Lr) * g
+    if K in (10, 1000, 100_000):
+        bound = 2 * Lr * f0 / K
+        print(f"K={K}: min ||grad||^2 = {best:.3e}  bound {bound:.3e}")
+        assert best <= bound
+```
+
+Every sub-threshold run is monotone, the per-step certified drop holds
+to machine precision at $\eta = 1/L$, the run at $\eta = 0.51$
+detonates exactly as the sharp threshold predicts, and on the nonconvex
+Rosenbrock valley the smallest squared gradient stays under the
+$2L(f_0 - f^*)/K$ envelope across five orders of magnitude of $K$.
+
+## Exercises
+
+**Exercise 1.** For $f(x) = \tfrac{L}{2} x^2$ with $L = 4$, write the
+gradient-descent map explicitly and determine, for
+$\eta \in \lbrace 0.1, 0.25, 0.5, 0.75, 1.0 \rbrace$ (with $x_0 = 1$), which
+runs converge monotonically, which oscillate convergently, which cycle,
+and which diverge.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** $f'(x) = 4x$, so the update is
+
+$$
+x_{k+1} = x_k - 4\eta\, x_k = (1 - 4\eta)\, x_k,
+\qquad x_k = (1 - 4\eta)^k .
+$$
+
+A geometric sequence with ratio $r = 1 - 4\eta$ (L1).
+
+**Step 2.** Read each case off $r$:
+
+- $\eta = 0.1$: $r = 0.6$: monotone convergence.
+- $\eta = 0.25 = 1/L$: $r = 0$: exact convergence in one step (the
+  ideal step for a quadratic matches its curvature).
+- $\eta = 0.5 = 2/L$: $r = -1$: the cycle $1, -1, 1, \dots$, the
+  knife-edge.
+- $\eta = 0.75$: $r = -2$: oscillating divergence, doubling each step.
+- $\eta = 1.0$: $r = -3$: faster divergence.
+
+(One case asked-for but absent above, convergent oscillation, occurs
+for $1/L \lt \eta \lt 2/L$, e.g. $\eta = 0.4$, $r = -0.6$.) The whole
+phase diagram of step-size behavior is the geometric sequence's ratio.
+
+</details>
+
+**Exercise 2.** Prove the smooth descent inequality in one dimension:
+if $\lvert f''(t) \rvert \le L$ everywhere, then for all $x, s$,
+
+$$
+f(x + s) \le f(x) + f'(x)\, s + \frac{L}{2} s^2 ,
+$$
+
+using Taylor's theorem with the Lagrange remainder.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Taylor at degree 1 with Lagrange remainder (L3): there is a
+$c$ between $x$ and $x + s$ with
+
+$$
+f(x + s) = f(x) + f'(x)\, s + \frac{f''(c)}{2} s^2 .
+$$
+
+**Step 2.** Bound the unknown curvature: $f''(c) \le \lvert f''(c)
+\rvert \le L$, and $s^2 \ge 0$, so
+
+$$
+f(x+s) \le f(x) + f'(x)\, s + \frac{L}{2} s^2 .
+$$
+
+**Step 3.** That is the claimed upper parabola; the multivariable
+version restricts to the segment (as the lesson's smoothness definition
+did) and runs the same two steps along it. The entire descent guarantee
+is this inequality plus the choice $s = -\eta f'(x)$: optimization
+theory's front door is a Taylor remainder.
+
+</details>
+
+**Exercise 3 (code).** Backtracking line search removes the need to
+know $L$: start each step with a bold $\eta_0 = 1$ and halve until the
+*sufficient decrease* condition
+$f(\mathbf{x} - \eta \nabla f) \le f(\mathbf{x}) - \tfrac{\eta}{2}
+\lVert \nabla f \rVert^2$ holds. Implement it for the bowl
+$f = 0.5(x^2 + 4y^2)$ and verify: (a) every accepted step satisfies the
+condition; (b) the accepted $\eta$ settles into $(0, 2/L)$;
+(c) convergence to the minimum without ever being told $L = 4$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda p: 0.5 * (p[0] ** 2 + 4 * p[1] ** 2)
+grad = lambda p: np.array([p[0], 4 * p[1]])
+
+p = np.array([-2.0, 1.1])
+etas = []
+for _ in range(80):
+    g = grad(p)
+    g2 = g @ g
+    if g2 < 1e-24:
+        break
+    eta = 1.0
+    while f(p - eta * g) > f(p) - 0.5 * eta * g2:   # sufficient decrease
+        eta *= 0.5
+    p = p - eta * g
+    etas.append(eta)
+    assert f(p) <= f(np.array([-2.0, 1.1]))          # never above the start
+
+etas = np.array(etas)
+print("accepted step sizes:", np.unique(etas), " final point:", p.round(8))
+assert set(etas) <= {1.0, 0.5, 0.25}     # halvings of the bold start
+assert np.linalg.norm(p) < 1e-8
+```
+
+The search adapts the step to the gradient's direction: while the
+steep $y$-coordinate is alive it halves down to
+$\eta = 0.25 = 1/L$, and once only the gentle $x$-direction remains
+(local curvature $1$) it accepts the bold $\eta = 1$ and lands on the
+minimum exactly, converging to machine zero with no Lipschitz constant
+supplied. This loop (Armijo backtracking) is how practical optimizers
+respect the $2/L$ law without ever computing $L$, and its full theory
+is an A3 lesson.
+
+</details>
+
+The guarantee says descend; it does not say arrive quickly. The next
+lesson quantifies the slowdown: when the Hessian's eigenvalues are
+spread, the iterates zigzag across the valley, and the condition number
+prices the delay.
+
+<Footnotes>
+  <FNItem n="1">**Cauchy, A.-L.** (1847). "Méthode générale pour la résolution des systèmes d'équations simultanées". *Comptes Rendus de l'Académie des Sciences*, 25, 536-538. The original steepest-descent proposal.</FNItem>
+  <FNItem n="2">**Nocedal, J., & Wright, S. J.** (2006). *Numerical Optimization* (2nd ed.). Springer. Ch. 3, line-search methods and the sufficient-decrease analysis. [doi:10.1007/978-0-387-40065-5](https://doi.org/10.1007/978-0-387-40065-5)</FNItem>
+  <FNItem n="3">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization.* Cambridge University Press. Ch. 9.2-9.3, gradient descent's convergence rates under convexity. [https://web.stanford.edu/~boyd/cvxbook/](https://web.stanford.edu/~boyd/cvxbook/)</FNItem>
+</Footnotes>

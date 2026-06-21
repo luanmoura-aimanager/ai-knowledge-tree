@@ -38,6 +38,7 @@ PILLAR = {
     "I": "#9ece6a",
     "J": "#c0caf5",
     "K": "#b48ead",
+    "L": "#c3e88d",
 }
 
 # Surface chrome (mirror of globals.css :root).

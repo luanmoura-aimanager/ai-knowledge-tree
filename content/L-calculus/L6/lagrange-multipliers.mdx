@@ -1,0 +1,296 @@
+---
+title: "Constrained optimization and Lagrange multipliers"
+pillar: L
+subId: L6
+lessonId: lagrange-multipliers
+order: 3
+estimatedMinutes: 33
+goal: "Derive the condition that the objective's gradient is a multiple of the constraint's gradient from the geometry of tangent level sets, and solve equality-constrained problems by hand."
+prerequisites: ["critical-points", "L4/gradient-directional"]
+---
+
+Real optimization rarely roams free: maximize return *subject to* a risk
+budget, maximize entropy *subject to* the probabilities summing to one,
+maximize likelihood *subject to* parameters living on a sphere. Setting
+the gradient to zero is the wrong condition when movement is restricted
+to a constraint surface; what replaces it is a tangency condition between
+two gradient fields, discovered by Lagrange, that converts every
+equality-constrained problem back into an unconstrained equation hunt.
+
+## The geometry: walk the constraint, watch the contours
+
+The problem: optimize $f(\mathbf{x})$ subject to
+$g(\mathbf{x}) = c$. The feasible set is one level set of $g$, a curve
+in 2D, a surface in 3D, and the optimizer may only walk along it.
+
+Walking along the constraint, $f$ changes at rate
+$\nabla f \cdot \mathbf{u}$ for the walking direction $\mathbf{u}$ (L4).
+At a constrained optimum that rate must be zero in every *feasible*
+direction; otherwise a step along the constraint (or its reverse) would
+improve $f$. Feasible directions are exactly those tangent to the level
+set of $g$, i.e. perpendicular to $\nabla g$ (L4's orthogonality). So
+$\nabla f$ must kill every vector perpendicular to $\nabla g$, which
+forces $\nabla f$ to be *parallel* to $\nabla g$:
+
+$$
+\nabla f(\mathbf{x}^*) = \lambda \, \nabla g(\mathbf{x}^*)
+$$
+
+for some scalar $\lambda$, the **Lagrange multiplier** (assuming
+$\nabla g(\mathbf{x}^*) \neq \mathbf{0}$). Equivalently: at the optimum,
+the contour of $f$ through the point is *tangent* to the constraint.
+While contours still *cross* the constraint, sliding along it climbs;
+only at tangency is there nothing left to gain<FN n="1" />.
+
+![Contours of the objective xy with the circular constraint: at the four marked points the constraint curve is tangent to a contour, the two gradient arrows align, and those four tangencies are the constrained extrema.](/figures/L6/lagrange-multipliers.svg)
+
+The bookkeeping form defines the **Lagrangian**
+
+$$
+\mathcal{L}(\mathbf{x}, \lambda) = f(\mathbf{x}) - \lambda \left( g(\mathbf{x}) - c \right),
+$$
+
+whose unconstrained critical points
+($\nabla_{\mathbf{x}} \mathcal{L} = \mathbf{0}$ recovering the
+parallel-gradients equation, $\partial \mathcal{L}/\partial \lambda = 0$
+recovering the constraint) are precisely the candidates. One new
+variable per constraint, and the constrained problem becomes equation
+solving; with several constraints,
+$\nabla f = \sum_j \lambda_j \nabla g_j$.
+
+## Worked example: extremes of $xy$ on the circle
+
+Maximize and minimize $f(x,y) = xy$ on $g(x,y) = x^2 + y^2 = 1$.
+
+**Step 1 (the system).** $\nabla f = (y, x)$,
+$\nabla g = (2x, 2y)$:
+
+$$
+y = 2\lambda x, \qquad x = 2 \lambda y, \qquad x^2 + y^2 = 1 .
+$$
+
+**Step 2 (solve).** Substituting the first into the second:
+$x = 4\lambda^2 x$, so $x = 0$ or $\lambda = \pm \tfrac12$. If
+$x = 0$ the first equation gives $y = 0$, violating the constraint:
+discard. With $\lambda = \tfrac12$: $y = x$, and the constraint gives
+$x = \pm \tfrac{1}{\sqrt2}$; with $\lambda = -\tfrac12$: $y = -x$,
+similarly.
+
+**Step 3 (compare values).** The four candidates:
+$\pm\left( \tfrac{1}{\sqrt2}, \tfrac{1}{\sqrt2} \right)$ with
+$f = \tfrac12$, and $\pm\left( \tfrac{1}{\sqrt2}, -\tfrac{1}{\sqrt2}
+\right)$ with $f = -\tfrac12$. Maximum $\tfrac12$, minimum
+$-\tfrac12$ (the EVT guarantees both exist on the compact circle, so
+comparing candidate values finishes the job; the multiplier condition,
+like the free first-order condition, only shortlists).
+
+The multiplier is not a bystander: $\lambda$ measures **sensitivity**,
+$\lambda = \frac{d f^*}{dc}$, the rate at which the optimal value
+improves per unit of constraint relaxation. Economics reads it as a
+shadow price (the value of one more unit of budget); ML reads every
+regularization weight through the same lens, since penalty and
+constraint formulations trade places via $\lambda$<FN n="3" />. Here
+$\lambda = \tfrac12$: growing the circle's *squared* radius $c$ from 1
+lifts the maximum $f^* = c/2$ at exactly rate $\tfrac12$.
+
+## Worked example: maximum entropy
+
+The most important constrained problem in this tree: maximize
+$H(p) = -\sum_{i=1}^n p_i \ln p_i$ subject to $\sum_i p_i = 1$.
+
+**Step 1.** Lagrangian conditions, one per coordinate:
+
+$$
+\frac{\partial}{\partial p_i} \left[ -\sum_k p_k \ln p_k - \lambda \left( \sum_k p_k - 1 \right) \right]
+= -\ln p_i - 1 - \lambda = 0 .
+$$
+
+**Step 2.** Solve: $p_i = e^{-1-\lambda}$, the *same value for every
+$i$*: the optimum is uniform. The constraint then forces
+$p_i = 1/n$.
+
+**Step 3.** Conclusion: the uniform distribution maximizes entropy,
+with $H = \ln n$, re-deriving A2's Jensen-based bound by pure calculus.
+Adding a mean constraint $\sum_i p_i E_i = \bar E$ to the same
+calculation produces $p_i \propto e^{-\beta E_i}$: the Boltzmann/softmax
+distribution, which is why exponential-family and maximum-entropy
+arguments throughout the tree are Lagrange computations in
+disguise<FN n="2" />.
+
+The named caution: **the condition fails where
+$\nabla g = \mathbf{0}$.** At such points the constraint surface has no
+well-defined tangent (a cusp, a crossing), feasible directions are not
+captured by "perpendicular to $\nabla g$", and an optimum can hide
+there without satisfying the multiplier equation. Honest solving checks
+those degenerate points separately, the constrained analogue of "check
+where the derivative does not exist" from one-variable optimization.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Extremes of xy on the unit circle, by brute force over the constraint
+t = np.linspace(0, 2 * np.pi, 4_000_001)
+x, y = np.cos(t), np.sin(t)
+vals = x * y
+i_max, i_min = vals.argmax(), vals.argmin()
+assert abs(vals[i_max] - 0.5) < 1e-12
+assert abs(vals[i_min] + 0.5) < 1e-12
+
+# At the maximizer, gradients are parallel: cross product ~ 0
+px, py = x[i_max], y[i_max]
+grad_f = np.array([py, px])
+grad_g = np.array([2 * px, 2 * py])
+cross = grad_f[0] * grad_g[1] - grad_f[1] * grad_g[0]
+lam = grad_f[0] / grad_g[0]
+print("maximizer:", (round(px, 6), round(py, 6)), " lambda:", round(lam, 6))
+assert abs(cross) < 1e-6
+assert abs(lam - 0.5) < 1e-6
+
+# Sensitivity: f*(c) = c/2 for constraint x^2+y^2 = c, slope = lambda
+for c in [1.0, 1.21, 1.44]:
+    r = np.sqrt(c)
+    f_star = (r * np.cos(t[::100]) * r * np.sin(t[::100])).max()
+    assert abs(f_star - c / 2) < 1e-9
+print("f*(c) = c/2 confirmed: d f*/dc =", 0.5, "= lambda")
+
+# Max entropy on the simplex: random distributions never beat uniform
+rng = np.random.default_rng(0)
+n = 6
+raw = rng.random((200_000, n))
+P = raw / raw.sum(axis=1, keepdims=True)
+H = -(P * np.log(P)).sum(axis=1)
+assert H.max() <= np.log(n) + 1e-9
+print("max sampled entropy:", round(H.max(), 6), " ln(6):", round(np.log(n), 6))
+```
+
+Brute force over four million constraint points lands the extremes at
+$\pm\tfrac12$ exactly where the gradients align with
+$\lambda = \tfrac12$, the optimal value grows at slope $\lambda$ as the
+constraint relaxes, and two hundred thousand random distributions never
+out-entropy the uniform's $\ln 6$: three Lagrange predictions, three
+confirmations.
+
+## Exercises
+
+**Exercise 1.** Find the points on the ellipse $x^2 + 4y^2 = 4$ closest
+to and farthest from the origin, by optimizing the squared distance
+$f(x,y) = x^2 + y^2$ with a multiplier.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** System: $\nabla f = (2x, 2y)$,
+$\nabla g = (2x, 8y)$:
+
+$$
+2x = \lambda \cdot 2x, \qquad 2y = \lambda \cdot 8y, \qquad x^2 + 4y^2 = 4 .
+$$
+
+**Step 2.** First equation: $x = 0$ or $\lambda = 1$. If
+$\lambda = 1$, the second forces $y = 0$, then $x = \pm 2$. If
+$x = 0$, the constraint gives $y = \pm 1$ (and $\lambda = \tfrac14$).
+
+**Step 3.** Values of $f$: at $(\pm 2, 0)$, $f = 4$ (distance 2,
+farthest); at $(0, \pm 1)$, $f = 1$ (distance 1, closest). The ellipse's
+semi-axes, recovered by tangency: the distance contours (circles) kiss
+the ellipse exactly at its axis endpoints.
+
+</details>
+
+**Exercise 2.** A rectangular box with no top must have volume 32.
+Minimize its surface area $A = xy + 2xz + 2yz$ subject to $xyz = 32$,
+and verify the answer's proportions before computing numbers (symmetry
+suggests $x = y$).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** System ($g = xyz$):
+
+$$
+y + 2z = \lambda yz, \qquad x + 2z = \lambda xz, \qquad 2x + 2y = \lambda xy .
+$$
+
+**Step 2.** Subtract the first two: $(y - x) = \lambda z (y - x)$, so
+$x = y$ or $\lambda z = 1$. The branch $\lambda z = 1$ inserted into
+the first equation gives $y + 2z = y$, forcing $z = 0$: infeasible. So
+$x = y$.
+
+**Step 3.** With $x = y$, the third equation gives
+$4x = \lambda x^2$, so $\lambda = 4/x$; the first gives
+$x + 2z = \lambda x z = 4z$, so $x = 2z$. Proportions:
+$x = y = 2z$, a box twice as wide as tall (no top to pay for, so
+height is cheap to shrink).
+
+**Step 4.** Constraint: $x \cdot x \cdot \tfrac{x}{2} = 32$, so
+$x^3 = 64$, $x = y = 4$, $z = 2$, area
+$A = 16 + 16 + 16 = 48$. Any perturbation respecting the volume (try
+$5 \times 4 \times 1.6$: area $A = 20 + 16 + 12.8 = 48.8$) does worse.
+
+</details>
+
+**Exercise 3 (code).** Projected gradient descent solves constrained
+problems numerically: take a free gradient step, then project back onto
+the constraint. For maximizing $f = xy$ on the unit circle, implement
+ascent steps $p \leftarrow p + 0.1 \nabla f$ followed by
+$p \leftarrow p / \lVert p \rVert$, from 100 random starts. Verify every
+run converges to one of the two maximizers
+$\pm(1,1)/\sqrt{2}$, and that at convergence the residual
+$\nabla f - \lambda \nabla g$ (with $\lambda$ fit by least squares) is
+numerically zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+grad_f = lambda p: np.array([p[1], p[0]])
+grad_g = lambda p: 2 * p
+
+rng = np.random.default_rng(0)
+s = 1 / np.sqrt(2)
+targets = np.array([[s, s], [-s, -s]])
+
+for _ in range(100):
+    p = rng.normal(size=2)
+    p /= np.linalg.norm(p)
+    if abs(p[0] + p[1]) < 1e-3:        # knife-edge start between basins
+        p = np.array([1.0, 0.0])
+    for _ in range(500):
+        p = p + 0.1 * grad_f(p)        # free ascent step
+        p = p / np.linalg.norm(p)      # project back to the circle
+
+    # Converged to one of the two maximizers
+    assert min(np.linalg.norm(p - targets[0]),
+               np.linalg.norm(p - targets[1])) < 1e-6
+
+    # Multiplier condition: grad f = lambda * grad g at the endpoint
+    gf, gg = grad_f(p), grad_g(p)
+    lam = (gf @ gg) / (gg @ gg)        # least-squares lambda
+    assert np.linalg.norm(gf - lam * gg) < 1e-6
+    assert abs(lam - 0.5) < 1e-6
+print("100 projected-ascent runs: all reach a tangency point with lambda = 1/2")
+```
+
+Every projected run terminates where the residual
+$\nabla f - \lambda \nabla g$ vanishes with $\lambda = \tfrac12$: the
+algorithm never saw the multiplier equation, yet its fixed points are
+exactly Lagrange's tangencies, because "no feasible ascent direction
+remains" and "gradients parallel" are the same statement. Projection
+methods in A3 (and weight constraints in training) scale this loop up.
+
+</details>
+
+Constraints handled, the discipline turns to its namesake algorithm: the
+next lesson derives gradient descent from the first-order Taylor model
+and proves the step-size rule that makes a smooth loss provably
+decrease.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 3.4, constrained extrema and Lagrange multipliers.</FNItem>
+  <FNItem n="2">**Cover, T. M., & Thomas, J. A.** (2006). *Elements of Information Theory* (2nd ed.). Wiley. Ch. 12, maximum entropy distributions via multipliers. [doi:10.1002/047174882X](https://doi.org/10.1002/047174882X)</FNItem>
+  <FNItem n="3">**Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization.* Cambridge University Press. Ch. 5, duality: where the multiplier story leads next. [https://web.stanford.edu/~boyd/cvxbook/](https://web.stanford.edu/~boyd/cvxbook/)</FNItem>
+</Footnotes>

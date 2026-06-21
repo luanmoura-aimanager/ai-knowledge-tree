@@ -4,12 +4,38 @@ Canonical backlog of upcoming work for `ai-knowledge-tree`. When asked "what are
 the next steps?", read this file. As items ship, check them off or remove them so
 the list never claims work that's already done.
 
-Last reviewed: 2026-06-11 (exercises campaign started; intuition-examples
-campaign + remark-gfm both shipped).
+Last reviewed: 2026-06-12 (Calculus pillar L shipped; Causal Inference ML
+remains queued).
 
 ## Backlog
 
-_Empty._ Three efforts shipped:
+### New pillars to author
+
+- **Causal Inference / Machine Learning pillar.** A new top-level pillar covering
+  causal inference and causal ML (e.g. potential outcomes, DAGs & do-calculus,
+  confounding & adjustment, instrumental variables, propensity scores & matching,
+  difference-in-differences, regression discontinuity, structural causal models,
+  causal discovery, heterogeneous treatment effects / uplift modeling,
+  double/debiased ML, causal forests). Follow the standard pillar workflow in
+  CLAUDE.md ("Author a complete pillar"): add subsections + topics to
+  `src/lib/dag.ts`, author `src/lib/curriculum/<Letter>.ts`, write all lesson MDX
+  (each with figures + exercises per STYLE.md), wire cross-pillar `CONNECTIONS`,
+  then `npm run build`/`npm run lint`, open a PR, run `/code-review`, and print the
+  PR link.
+---
+
+Four efforts shipped:
+
+- **Calculus pillar L** (2026-06-12). New top-level pillar with 6 subsections
+  (L1 limits & continuity, L2 differentiation, L3 integration & series, L4
+  multivariable differentiation, L5 vector calculus & multiple integrals, L6
+  multivariable optimization & the ML bridge), 35 lessons, all per STYLE.md:
+  derivations, an SVG figure per lesson (figures/gen/L1-L6.py), >=3 exercises
+  with hidden solutions, and 2-3 verified references each. 12 cross-pillar
+  CONNECTIONS express that L underpins A/B/D/F/H; pillar A's "single-variable
+  calculus" prerequisites now point at L; new "Calculus for ML" learning path.
+  All 70 runnable python blocks executed under python3; render-check
+  --exercises 35/35; figures byte-deterministic.
 
 - **Exercises campaign** (PRs #85–#95, merged, 2026-06-11/12). Every lesson now
   ends with an `## Exercises` section: at least 3 difficulty-laddered exercises

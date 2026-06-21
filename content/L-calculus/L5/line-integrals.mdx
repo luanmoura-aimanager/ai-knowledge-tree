@@ -1,0 +1,304 @@
+---
+title: "Vector fields, line integrals, and potentials"
+pillar: L
+subId: L5
+lessonId: line-integrals
+order: 3
+estimatedMinutes: 33
+goal: "Integrate a vector field along a curve to compute work, characterize conservative fields by path independence, and recover potentials via the gradient theorem."
+prerequisites: ["L4/gradient-directional", "L3/integration-techniques"]
+---
+
+A **vector field** assigns an arrow to every point: wind on a weather map,
+force in a gravity well, the negative gradient of a loss at every
+parameter setting. The natural integral along a *path* through such a
+field asks: how much does the field help or hinder a traveler? That is
+**work**, and the question of when it depends only on the endpoints, not
+the route, splits all fields into two families. The gradient fields, the
+family where the route is irrelevant, are exactly the landscapes that
+optimization lives on<FN n="2" />.
+
+## Line integrals of vector fields
+
+Take a field $\mathbf{F}$ and a curve $C$ traced by
+$\mathbf{r}(t)$, $a \le t \le b$. Chop the curve into small displacement
+steps $d\mathbf{r}$; on each, the field's useful component is the part
+along the step (a dot product, as in L4's directional derivative); sum
+and refine:
+
+$$
+\int_C \mathbf{F} \cdot d\mathbf{r}
+= \int_a^b \mathbf{F}(\mathbf{r}(t)) \cdot \mathbf{r}'(t) \, dt ,
+$$
+
+an ordinary one-variable integral once the parametrization is inserted.
+Physically: force dotted with velocity is power, integrated over time
+gives work. Reversing the direction of travel flips the sign; the speed
+of traversal does not matter (substitution shows any reparametrization
+gives the same value), only the oriented geometric path.
+
+**Worked example 1.** $\mathbf{F}(x,y) = (-y, x)$ (the rotation field),
+along the quarter-circle from $(1, 0)$ to $(0, 1)$:
+$\mathbf{r}(t) = (\cos t, \sin t)$, $t \in [0, \pi/2]$.
+
+**Step 1.** $\mathbf{r}'(t) = (-\sin t, \cos t)$ and
+$\mathbf{F}(\mathbf{r}(t)) = (-\sin t, \cos t)$.
+
+**Step 2.** Dot and integrate:
+
+$$
+\int_0^{\pi/2} \left( \sin^2 t + \cos^2 t \right) dt = \int_0^{\pi/2} 1 \, dt = \frac{\pi}{2} .
+$$
+
+The field is everywhere tangent to the circle, full assistance the whole
+way.
+
+**Worked example 2 (same endpoints, different path).** The straight
+chord from $(1,0)$ to $(0,1)$: $\mathbf{r}(t) = (1 - t, \, t)$,
+$t \in [0, 1]$, $\mathbf{r}' = (-1, 1)$,
+$\mathbf{F}(\mathbf{r}) = (-t, 1 - t)$:
+
+$$
+\int_0^1 \left[ (-t)(-1) + (1-t)(1) \right] dt = \int_0^1 1 \, dt = 1 .
+$$
+
+Same start, same end, work $\pi/2 \approx 1.571$ by the arc and $1$ by
+the chord. For this field, **the route matters**.
+
+![The rotation field with two routes between the same endpoints: the quarter-circle arc, everywhere aligned with the field, collects work pi over 2; the straight chord collects only 1. Path dependence in one picture.](/figures/L5/line-integrals.svg)
+
+## Conservative fields and the gradient theorem
+
+Now integrate a *gradient* field $\mathbf{F} = \nabla f$ along any curve
+from $\mathbf{A}$ to $\mathbf{B}$. The multivariable chain rule (L4)
+recognizes the integrand as an exact time derivative:
+
+$$
+\mathbf{F}(\mathbf{r}(t)) \cdot \mathbf{r}'(t)
+= \nabla f(\mathbf{r}(t)) \cdot \mathbf{r}'(t)
+= \frac{d}{dt} f(\mathbf{r}(t)) ,
+$$
+
+so the FTC (L3) collapses the whole integral:
+
+$$
+\int_C \nabla f \cdot d\mathbf{r} = f(\mathbf{B}) - f(\mathbf{A}) .
+$$
+
+This is the **gradient theorem** (the FTC for line integrals): for
+gradient fields, work depends only on the endpoint values of $f$, the
+**potential**. Consequences, each immediate:
+
+- **Path independence**: every route from $\mathbf{A}$ to $\mathbf{B}$
+  costs the same.
+- **Zero circulation**: around any closed loop,
+  $\oint \nabla f \cdot d\mathbf{r} = f(\mathbf{A}) - f(\mathbf{A}) = 0$.
+
+Fields with these properties are **conservative** (energy is conserved:
+whatever the field takes on the way out it returns on the way back), and
+on reasonable domains the implication reverses: path-independent fields
+*are* gradients of some potential<FN n="1" />.
+
+The rotation field flunks instantly: around the full unit circle its
+circulation is $4 \times \frac{\pi}{2} = 2\pi \neq 0$, so no potential
+function exists, which is why the two worked examples could disagree. A
+quick necessary test in 2D comes from Clairaut (L4): if
+$(P, Q) = \nabla f$ then $P_y = f_{xy} = f_{yx} = Q_x$. For
+$(-y, x)$: $P_y = -1 \neq 1 = Q_x$, failure confirmed by inspection.
+
+**Worked example 3 (recovering a potential).** Is
+$\mathbf{F} = (2xy + 1, \; x^2 + 3y^2)$ conservative? The test:
+$P_y = 2x = Q_x$. Passes; integrate to find $f$.
+
+**Step 1.** $f_x = 2xy + 1$ integrates (in $x$) to
+$f = x^2 y + x + g(y)$, the "constant" being any function of $y$.
+
+**Step 2.** Differentiate in $y$ and match:
+$f_y = x^2 + g'(y) \overset{!}{=} x^2 + 3y^2$, so $g'(y) = 3y^2$,
+$g = y^3$.
+
+**Step 3.** $f(x,y) = x^2 y + x + y^3$ (plus any constant). Work from
+$(0,0)$ to $(1,2)$, by any path whatsoever:
+$f(1,2) - f(0,0) = (2 + 1 + 8) - 0 = 11$.
+
+The ML resonance: a loss landscape *is* a potential, and its negative
+gradient field is automatically conservative. Sampling methods in F6
+(Hamiltonian Monte Carlo, Langevin dynamics) work precisely because the
+log-density's gradient field has a potential to flow along<FN n="3" />; fields
+*without* potentials (like the rotation field) are what those samplers
+must never accidentally simulate, and the no-curl condition is checked
+there in exactly this lesson's form.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+def line_integral(F, r, rp, t0, t1, n=2_000_001):
+    t = np.linspace(t0, t1, n)
+    mid = (t[:-1] + t[1:]) / 2
+    Fx, Fy = F(*r(mid))
+    vx, vy = rp(mid)
+    return np.sum(Fx * vx + Fy * vy) * (t[1] - t[0])
+
+# The rotation field: arc vs chord between (1,0) and (0,1)
+F_rot = lambda x, y: (-y, x)
+arc = line_integral(F_rot, lambda t: (np.cos(t), np.sin(t)),
+                    lambda t: (-np.sin(t), np.cos(t)), 0, np.pi / 2)
+chord = line_integral(F_rot, lambda t: (1 - t, t),
+                      lambda t: (-np.ones_like(t), np.ones_like(t)), 0, 1)
+print("arc:", round(arc, 9), " chord:", round(chord, 9))
+assert abs(arc - np.pi / 2) < 1e-9 and abs(chord - 1.0) < 1e-9
+
+# The conservative field from worked example 3: both paths give f(B) - f(A)
+F_con = lambda x, y: (2 * x * y + 1, x**2 + 3 * y**2)
+f_pot = lambda x, y: x**2 * y + x + y**3
+straight = line_integral(F_con, lambda t: (t, 2 * t),
+                         lambda t: (np.ones_like(t), 2 * np.ones_like(t)), 0, 1)
+wiggly = line_integral(F_con,
+                       lambda t: (t, 2 * t + 0.5 * np.sin(2 * np.pi * t)),
+                       lambda t: (np.ones_like(t),
+                                  2 + np.pi * np.cos(2 * np.pi * t)), 0, 1)
+target = f_pot(1, 2) - f_pot(0, 0)
+print("straight:", round(straight, 9), " wiggly:", round(wiggly, 9),
+      " f(B)-f(A):", target)
+assert abs(straight - target) < 1e-9
+assert abs(wiggly - target) < 1e-7
+
+# Closed-loop circulation: ~0 for the gradient field, 2 pi for rotation
+loop_con = line_integral(F_con, lambda t: (np.cos(t), np.sin(t)),
+                         lambda t: (-np.sin(t), np.cos(t)), 0, 2 * np.pi)
+loop_rot = line_integral(F_rot, lambda t: (np.cos(t), np.sin(t)),
+                         lambda t: (-np.sin(t), np.cos(t)), 0, 2 * np.pi)
+assert abs(loop_con) < 1e-9
+assert abs(loop_rot - 2 * np.pi) < 1e-9
+```
+
+The rotation field charges $\pi/2$ on the arc and $1$ on the chord, while
+the conservative field charges exactly $f(\mathbf{B}) - f(\mathbf{A}) =
+11$ on a straight path and on a sinusoidally wiggling one alike; around
+the closed loop the potential field nets zero and the rotation field
+nets $2\pi$, each family true to its theorem.
+
+## Exercises
+
+**Exercise 1.** Compute the work done by
+$\mathbf{F}(x, y) = (y^2, \, 2xy)$ along the parabola
+$\mathbf{r}(t) = (t, t^2)$ from $(0,0)$ to $(2, 4)$, then show the field
+is conservative and re-derive the answer from a potential.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (direct).** $\mathbf{r}' = (1, 2t)$,
+$\mathbf{F}(\mathbf{r}) = (t^4, \, 2t^3)$:
+
+$$
+\int_0^2 \left( t^4 \cdot 1 + 2t^3 \cdot 2t \right) dt
+= \int_0^2 5 t^4 \, dt = \left[ t^5 \right]_0^2 = 32 .
+$$
+
+**Step 2 (test).** $P_y = 2y = Q_x$: conservative.
+
+**Step 3 (potential).** $f_x = y^2$ gives $f = x y^2 + g(y)$; matching
+$f_y = 2xy + g'(y) = 2xy$ forces $g' = 0$. So $f = x y^2$, and
+
+$$
+W = f(2, 4) - f(0, 0) = 2 \cdot 16 = 32 ,
+$$
+
+agreeing with the parametrized slog, in one substitution.
+
+</details>
+
+**Exercise 2.** The field
+$\mathbf{F} = \left( \dfrac{-y}{x^2+y^2}, \dfrac{x}{x^2+y^2} \right)$
+(defined away from the origin) *passes* the Clairaut test
+$P_y = Q_x$ everywhere it is defined, yet its circulation around the
+unit circle is $2\pi$. Verify both claims and explain what breaks.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (test passes).** Differentiating,
+
+$$
+P_y = \frac{-(x^2+y^2) + y \cdot 2y}{(x^2+y^2)^2} = \frac{y^2 - x^2}{(x^2+y^2)^2} ,
+\qquad
+Q_x = \frac{(x^2+y^2) - x \cdot 2x}{(x^2+y^2)^2} = \frac{y^2 - x^2}{(x^2+y^2)^2} .
+$$
+
+Equal at every point of the domain.
+
+**Step 2 (circulation).** On the unit circle, $x^2 + y^2 = 1$, so the
+field reduces to the rotation field $(-y, x)$ there, whose circulation
+was computed as $2\pi$. Nonzero loop integral: not conservative.
+
+**Step 3 (the catch).** The implication "test passed, hence
+conservative" requires a domain with no holes (simply connected). This
+field's domain is the punctured plane, and the unit circle wraps around
+the puncture: the would-be potential is the angle $\theta$, which cannot
+be defined continuously all the way around (it jumps by $2\pi$). The
+Clairaut test is local; conservativity is global, and topology is the gap
+between them. Loops that avoid enclosing the origin do integrate to zero.
+
+</details>
+
+**Exercise 3 (code).** For the loss-gradient field
+$\mathbf{F} = -\nabla f$ with $f(x, y) = \tfrac12 x^2 + y^2$ (the L4
+bowl), verify numerically: (a) the work done by $\mathbf{F}$ along the
+gradient-descent trajectory from $(2, 1.5)$ to (near) the origin equals
+$f(\text{start}) - f(\text{end})$; (b) the work is positive (the field
+pushes the descent along); (c) around a closed circle, the work is zero.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda p: 0.5 * p[0] ** 2 + p[1] ** 2
+gradf = lambda p: np.array([p[0], 2 * p[1]])
+
+# (a) integrate F . dr along the actual descent polyline
+p = np.array([2.0, 1.5])
+work = 0.0
+for _ in range(400):
+    g = gradf(p)
+    step = -0.05 * g
+    midp = p + step / 2                       # midpoint of the segment
+    work += (-gradf(midp)) @ step             # F = -grad f, dotted with dr
+    p = p + step
+
+drop = f(np.array([2.0, 1.5])) - f(p)
+print("work:", round(work, 8), " f-drop:", round(drop, 8))
+assert abs(work - drop) < 1e-4                # gradient theorem on a polyline
+assert work > 0                               # (b) the field assists descent
+
+# (c) closed loop: zero net work for a gradient field
+t = np.linspace(0, 2 * np.pi, 2_000_001)
+mid = (t[:-1] + t[1:]) / 2
+x, y = 1.3 * np.cos(mid), 1.3 * np.sin(mid)
+vx, vy = -1.3 * np.sin(mid), 1.3 * np.cos(mid)
+loop = np.sum((-x) * vx + (-2 * y) * vy) * (t[1] - t[0])
+assert abs(loop) < 1e-9
+```
+
+The work accumulated along the descent trajectory equals the potential
+drop to four decimals (the discretization is the only slack), it is
+positive because descent moves with the force, and the closed loop nets
+zero: training a model is a walk through a conservative field, paying and
+collecting potential exactly.
+
+</details>
+
+Path dependence turned out to hinge on whether circulation around loops
+vanishes; the next lesson builds the pointwise versions of circulation
+and outflow, curl and divergence, the local quantities the big integral
+theorems will then sum up.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 7.1-7.2 and 8.3, line integrals, conservative fields, and potentials.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 16.1-16.3, vector fields, line integrals, and the fundamental theorem for line integrals.</FNItem>
+  <FNItem n="3">**Neal, R. M.** (2011). "MCMC using Hamiltonian dynamics". In *Handbook of Markov Chain Monte Carlo*. Chapman & Hall. Gradient fields with potentials as the engine of HMC. [arXiv:1206.1901](https://arxiv.org/abs/1206.1901)</FNItem>
+</Footnotes>

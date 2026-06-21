@@ -1,0 +1,253 @@
+---
+title: "Functions of several variables"
+pillar: L
+subId: L4
+lessonId: multivariable-functions
+order: 1
+estimatedMinutes: 30
+goal: "Visualize scalar fields through graphs, level sets, and contour maps, and extend limits and continuity to n dimensions, where approach along every path replaces two-sided approach."
+prerequisites: ["L1/continuity"]
+---
+
+A loss function eats a million weights and returns one number. Temperature
+eats a location and returns one number. Both are **scalar fields**, functions
+$f : \mathbb{R}^n \to \mathbb{R}$, and the whole second half of this pillar
+is their calculus. Before differentiating them, two preliminaries: how to
+*see* such functions, and what limits mean when an input can approach a
+point from infinitely many directions instead of two<FN n="2" />.
+
+## Graphs and level sets
+
+For $n = 2$ there are two complementary pictures.
+
+The **graph** is the surface $z = f(x, y)$ floating over the plane: hills
+where $f$ is large, basins where it is small. It uses up a third dimension
+to show the values, so it dies at $n = 3$.
+
+The **level set** (contour) at height $c$ is the set
+$\lbrace (x, y) : f(x, y) = c \rbrace$, drawn in the *input* plane. A family
+of level sets at evenly spaced heights is a **contour map**, the
+topographer's trick: where contours crowd together the surface is steep
+(crossing many heights in a short walk), where they spread it is flat. The
+contour map needs no extra dimension, so it scales conceptually to any $n$
+(level sets become surfaces, then hypersurfaces), and it is the picture in
+which the gradient's geometry will be visible two lessons from now.
+
+![The same two-bump scalar field twice: as a surface over the plane, and as a contour map of its level sets. Tight contour rings are steep slopes; the two closed-ring families are the two peaks.](/figures/L4/multivariable-functions.svg)
+
+Reading practice on the canonical examples:
+
+- $f(x,y) = x^2 + y^2$: contours are concentric circles (level set at $c$
+  is the circle of radius $\sqrt{c}$), tightening as $c$ grows: a bowl,
+  steeper farther out.
+- $f(x,y) = x^2 - y^2$: contours are hyperbolas, with the two lines
+  $y = \pm x$ as the level set at $0$: a saddle. Walk east and you climb;
+  walk north and you descend.
+- $f(x,y) = 2x + 3y$: contours are parallel lines $2x + 3y = c$, evenly
+  spaced: a tilted plane, the "linear field" that every differentiable
+  field will locally resemble.
+
+## Limits in $\mathbb{R}^n$
+
+The definition transplants cleanly. With distance
+$\lVert \mathbf{x} - \mathbf{a} \rVert = \sqrt{\sum_i (x_i - a_i)^2}$,
+
+$$
+\lim_{\mathbf{x} \to \mathbf{a}} f(\mathbf{x}) = L
+$$
+
+means: for every $\varepsilon \gt 0$ there is $\delta \gt 0$ such that
+$0 \lt \lVert \mathbf{x} - \mathbf{a} \rVert \lt \delta$ implies
+$\lvert f(\mathbf{x}) - L \rvert \lt \varepsilon$. The window around $a$
+became a disk (ball); everything else is L1 verbatim, and the limit laws
+carry over with the same proofs.
+
+What changes is the *geometry of approach*. On the line, $x$ can come from
+the left or the right, and matching one-sided limits settle everything. In
+the plane, $\mathbf{x}$ can approach along the $x$-axis, the $y$-axis, any
+line, any spiral, any drunken walk, and the definition quantifies over
+**all** of them at once: the disk $\lVert \mathbf{x} - \mathbf{a} \rVert \lt
+\delta$ contains every path's tail.
+
+That asymmetry has a practical edge and a trap. The edge: to *disprove* a
+limit, two paths with different outcomes suffice. The trap, and the named
+confusion of this lesson: **agreeing along many paths proves nothing.**
+
+**Worked example (two paths kill it).** $f(x,y) = \dfrac{xy}{x^2 + y^2}$ at
+the origin. Along the $x$-axis ($y = 0$): $f = 0$ identically, so the path
+limit is $0$. Along the diagonal $y = x$:
+$f = \frac{x^2}{2x^2} = \frac{1}{2}$, path limit $\tfrac12$. Two paths, two
+answers: no limit exists. (In polar form, $f = \tfrac12 \sin 2\theta$: the
+value depends on the approach *angle* and never settles.)
+
+**Worked example (every line agrees, the limit still fails).**
+$g(x,y) = \dfrac{x^2 y}{x^4 + y^2}$ at the origin. Along *any* line
+$y = mx$:
+
+$$
+g = \frac{m x^3}{x^4 + m^2 x^2} = \frac{m x}{x^2 + m^2} \longrightarrow 0 ,
+$$
+
+so every straight path gives $0$. But along the parabola $y = x^2$:
+$g = \frac{x^4}{2x^4} = \frac{1}{2}$. The limit does not exist, and no
+finite family of paths could have certified that it did<FN n="1" />.
+
+To *prove* a 2D limit, the squeeze is the standard tool. For
+$h(x,y) = \frac{x^2 y}{x^2 + y^2}$: since $x^2 \le x^2 + y^2$,
+
+$$
+\lvert h(x, y) \rvert = \frac{x^2}{x^2+y^2} \, \lvert y \rvert \le \lvert y \rvert
+\le \lVert (x,y) \rVert \longrightarrow 0 ,
+$$
+
+so $h \to 0$ at the origin: a bound in terms of the distance alone covers
+every path simultaneously.
+
+## Continuity
+
+$f$ is **continuous at $\mathbf{a}$** if
+$\lim_{\mathbf{x} \to \mathbf{a}} f(\mathbf{x}) = f(\mathbf{a})$, exactly as
+in L1, and sums, products, quotients (nonzero denominator), and
+compositions of continuous functions are continuous. Polynomials in several
+variables and all the elementary builds like $e^{-(x^2+y^2)}$ are
+continuous everywhere; quotients like the two counterexamples above are
+continuous everywhere *except* where their denominators vanish, which is
+why all the drama concentrated at the origin.
+
+The L1 existence theorems generalize on schedule: a continuous $f$ on a
+**closed and bounded** subset of $\mathbb{R}^n$ attains its maximum and
+minimum (EVT), the statement that will guarantee minimizers exist in L6,
+and connected domains give an IVT analogue along any continuous path.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# f = xy/(x^2+y^2): different angles of approach give different values
+f = lambda x, y: x * y / (x**2 + y**2)
+r = 10.0 ** -np.arange(1, 9)
+print("along x-axis :", f(r, 0 * r)[:3])
+print("along y = x  :", f(r, r)[:3])
+assert np.allclose(f(r, 0 * r), 0.0)
+assert np.allclose(f(r, r), 0.5)
+
+# g = x^2 y/(x^4+y^2): every LINE gives 0, the parabola gives 1/2
+g = lambda x, y: x**2 * y / (x**4 + y**2)
+for m in [1.0, -2.0, 17.0]:
+    assert abs(g(r, m * r)[-1]) < 1e-6           # lines: limit 0
+assert np.allclose(g(r, r**2), 0.5)              # parabola: 1/2
+print("g along y = 17x:", g(r, 17 * r)[:3], " along y = x^2:", g(r, r**2)[:3])
+
+# h = x^2 y/(x^2+y^2): the squeeze bound |h| <= ||(x,y)|| holds on random rays
+rng = np.random.default_rng(0)
+theta = rng.uniform(0, 2 * np.pi, 1000)
+for rad in [1e-2, 1e-4, 1e-6]:
+    x, y = rad * np.cos(theta), rad * np.sin(theta)
+    h = x**2 * y / (x**2 + y**2)
+    assert np.all(np.abs(h) <= rad + 1e-18)
+print("squeeze bound verified on 3000 random approach directions")
+```
+
+The angle-dependent quotient gives $0$ on the axis and $\tfrac12$ on the
+diagonal, the sneakier example passes every line test and fails the
+parabola, and the squeezed function stays inside the shrinking distance
+bound along a thousand random directions at once.
+
+## Exercises
+
+**Exercise 1.** Describe the level sets of (a) $f(x,y) = y - x^2$ and
+(b) $f(x,y,z) = x^2 + y^2 + z^2$, and explain what the spacing of (a)'s
+contours says about the surface.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** The level set $y - x^2 = c$ is $y = x^2 + c$: the standard parabola
+shifted vertically by $c$. The contour map is a family of identical
+parabolas stacked at unit spacing. Equal spacing everywhere means the
+surface has the same steepness in the $y$-direction at every point
+(indeed $\partial f / \partial y = 1$ identically, next lesson's
+language): it is a parabolic trough tilted at constant grade along $y$.
+
+**(b)** In three inputs, the level set $x^2+y^2+z^2 = c$ is a *sphere* of
+radius $\sqrt{c}$ for $c \gt 0$, the single origin point at $c = 0$, and
+empty for $c \lt 0$. Level sets are concentric shells: one dimension up
+from the bowl's concentric circles, with no graph picture available since
+that would need four dimensions.
+
+</details>
+
+**Exercise 2.** Determine whether
+$\displaystyle \lim_{(x,y) \to (0,0)} \frac{x^3 + y^3}{x^2 + y^2}$ exists,
+and prove your answer (squeeze it, or exhibit disagreeing paths).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Test a path or two: along $y = 0$ the quotient is $x \to 0$;
+along $y = x$ it is $\frac{2x^3}{2x^2} = x \to 0$. Agreement so far, which
+proves nothing; try to squeeze.
+
+**Step 2.** Bound each cube by the distance
+$r = \sqrt{x^2 + y^2}$: $\lvert x \rvert \le r$ and $\lvert y \rvert \le r$,
+so $\lvert x^3 + y^3 \rvert \le \lvert x \rvert^3 + \lvert y \rvert^3 \le 2 r^3$.
+
+**Step 3.** Therefore
+
+$$
+\left\lvert \frac{x^3 + y^3}{x^2 + y^2} \right\rvert \le \frac{2 r^3}{r^2} = 2r
+\longrightarrow 0 ,
+$$
+
+a bound depending only on the distance. The squeeze theorem (its 2D
+version) gives the limit: it exists and equals $0$. The difference from the
+failed examples: here the numerator's degree (3) beats the denominator's
+(2), leaving one power of $r$ to kill the angle dependence.
+
+</details>
+
+**Exercise 3 (code).** For $g(x, y) = \dfrac{x^2 y}{x^4 + y^2}$, scan the
+paths $y = m x$ for 100 random slopes $m$ and the paths $y = k x^2$ for
+$k \in \lbrace 0.5, 1, 2 \rbrace$, computing the value at distance
+$10^{-6}$ along each. Confirm all lines give nearly $0$ while each
+parabola gives its own constant $\frac{k}{1 + k^2}$, demonstrating that
+the "limit" depends on the curve family chosen.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+g = lambda x, y: x**2 * y / (x**4 + y**2)
+x = 1e-6
+
+rng = np.random.default_rng(0)
+slopes = rng.uniform(-50, 50, 100)
+line_vals = g(x, slopes * x)
+print("max |g| over 100 lines:", np.abs(line_vals).max())
+assert np.abs(line_vals).max() < 1e-3
+
+for k in [0.5, 1.0, 2.0]:
+    v = g(x, k * x**2)
+    expected = k / (1 + k**2)
+    print(f"parabola y = {k}x^2: g = {v:.6f}, k/(1+k^2) = {expected:.6f}")
+    assert np.isclose(v, expected, atol=1e-9)
+```
+
+Every straight approach reports "limit zero" while the three parabolas
+report three different values ($0.4$, $0.5$, $0.4$), one per curve: the
+function genuinely has no limit, and on the parabola family the formula
+$g(x, kx^2) = \frac{k}{1+k^2}$ explains each constant exactly.
+
+</details>
+
+Seeing and limiting are settled; differentiation begins the obvious way, by
+freezing all variables but one, which is the next lesson's partial
+derivative.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 2.1-2.2, scalar fields, level sets, and limits in several variables, including the lines-versus-parabola counterexample.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 14.1-14.2, functions of several variables, limits, and continuity.</FNItem>
+</Footnotes>

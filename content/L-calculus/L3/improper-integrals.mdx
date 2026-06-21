@@ -1,0 +1,278 @@
+---
+title: "Improper integrals"
+pillar: L
+subId: L3
+lessonId: improper-integrals
+order: 4
+estimatedMinutes: 32
+goal: "Extend integration to infinite intervals and unbounded integrands, test convergence by comparison, and meet the Gaussian integral that normalizes the normal density."
+prerequisites: ["integration-techniques", "L1/growth-rates"]
+---
+
+A probability density must integrate to $1$ over the *whole real line*, and
+the Riemann integral as defined stops at finite intervals with bounded
+integrands. **Improper integrals** lift both restrictions the only honest
+way available: integrate over a finite piece, then take a limit as the
+piece grows. Whether the limit exists is a convergence question, and the
+growth-rate instincts from L1 answer it.
+
+## Infinite intervals
+
+Define
+
+$$
+\int_a^{\infty} f(x)\, dx = \lim_{t \to \infty} \int_a^t f(x)\, dx ,
+$$
+
+**convergent** if the limit is finite, **divergent** otherwise. (Both ends
+infinite: split at any point and require both halves to converge.)
+
+The calibration family is the $p$-integrals<FN n="2" />. For $p \neq 1$,
+
+$$
+\int_1^t \frac{dx}{x^p} = \left[ \frac{x^{1-p}}{1-p} \right]_1^t
+= \frac{t^{1-p} - 1}{1 - p} ,
+$$
+
+and the limit as $t \to \infty$ is finite exactly when the exponent
+$1 - p$ is negative. For $p = 1$ the antiderivative is $\ln t \to \infty$.
+So:
+
+$$
+\int_1^{\infty} \frac{dx}{x^p}
+\;\; \text{converges} \iff p \gt 1,
+\qquad \text{with value } \frac{1}{p - 1} .
+$$
+
+The boundary case is the headline: $1/x$ and $1/x^2$ look nearly identical
+on a plot, but the first encloses infinite area past any point while the
+second encloses exactly $1$. Convergence is a race between the tail's decay
+and the interval's growth, decided at the exponent. This is the continuous
+twin of the harmonic-versus-geometric contrast from L1, and the same
+confusion transfers: **the integrand going to zero is necessary but nowhere
+near sufficient.** $1/x \to 0$, and its integral still diverges.
+
+![Two tails on the same axes: 1 over x and 1 over x squared. The shaded squared tail totals exactly 1; the thin extra sliver the slower tail adds is enough to diverge. Right panel: the Gaussian, whose tail beats every power and encloses the square root of pi.](/figures/L3/improper-integrals.svg)
+
+## Unbounded integrands
+
+The second impropriety: $f$ blows up at an endpoint. Same medicine,
+
+$$
+\int_0^1 \frac{dx}{\sqrt{x}} = \lim_{s \to 0^+} \int_s^1 x^{-1/2}\, dx
+= \lim_{s \to 0^+} \left( 2 - 2\sqrt{s} \right) = 2 :
+$$
+
+an unbounded function with finite area, the spike at $0$ being thin enough
+to enclose only $2$. The mirror-image $p$-test holds at a finite endpoint:
+$\int_0^1 x^{-p} dx$ converges exactly when $p \lt 1$, the inequality
+*reversed* relative to the tail test (near zero, the danger is the spike's
+fatness; near infinity, the tail's slowness).
+
+This definition also retroactively justifies the warning from the FTC
+lesson: $\int_{-1}^1 x^{-2} dx$ must be split at the interior blowup, and
+each half, e.g. $\lim_{s \to 0^+} \int_s^1 x^{-2} dx = \lim (1/s - 1)$,
+diverges. The honest answer is "divergent", not the $-2$ the formula
+produced when its hypotheses were ignored.
+
+## The comparison test
+
+Most integrands have no convenient antiderivative, and convergence must be
+decided without one. The tool is **comparison**: if
+$0 \le f(x) \le g(x)$ for $x \ge a$, then
+
+$$
+\int_a^\infty g \text{ converges} \Rightarrow \int_a^\infty f \text{ converges},
+\qquad
+\int_a^\infty f \text{ diverges} \Rightarrow \int_a^\infty g \text{ diverges}.
+$$
+
+(The accumulation of $f$ is increasing and bounded above by $g$'s total:
+monotone convergence from L1, in integral form.) The art is choosing the
+comparison partner, and the $p$-family plus the exponential are almost
+always the partners.
+
+**Worked example.** Does
+$\displaystyle \int_1^{\infty} \frac{dx}{x^4 + x + 1}$ converge?
+
+**Step 1.** For $x \ge 1$: $x^4 + x + 1 \ge x^4$, so the integrand is at
+most $x^{-4}$.
+
+**Step 2.** $\int_1^\infty x^{-4} dx$ converges ($p = 4 \gt 1$, value
+$\tfrac13$). By comparison, the original converges, and its value is at most
+$\tfrac13$. No antiderivative was ever found; none was needed.
+
+## The Gaussian integral
+
+The most important improper integral in this tree has no elementary
+antiderivative at all:
+
+$$
+I = \int_{-\infty}^{\infty} e^{-x^2}\, dx = \sqrt{\pi} .
+$$
+
+That it *converges* is a comparison: for $\lvert x \rvert \ge 1$,
+$e^{-x^2} \le e^{-\lvert x \rvert}$ (since $x^2 \ge \lvert x \rvert$ there), and the
+exponential tail integrates to a finite $2/e$ per side; the L1 hierarchy
+(exponentials beat everything) made this a foregone conclusion. The exact
+value $\sqrt{\pi}$ requires a two-dimensional trick, squaring $I$ and
+switching to polar coordinates, that belongs to L5's change-of-variables
+lesson; here the value is taken as the destination and verified numerically
+below<FN n="1" />.
+
+Rescaling by substitution ($u = x / (\sigma\sqrt2)$) gives
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2 / (2\sigma^2)}\, dx = \sigma \sqrt{2\pi},
+$$
+
+so dividing by $\sigma\sqrt{2\pi}$ produces a function with total integral
+$1$: the **normal density**. Its famous constant exists to make an improper
+integral equal one, and every appearance of $\frac{1}{\sigma\sqrt{2\pi}}$
+in A2 is this lesson's computation being quietly reused<FN n="3" />.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+def tail(fn, a, t, n=400_001):
+    x = np.linspace(a, t, n)
+    return np.sum(fn((x[:-1] + x[1:]) / 2)) * (x[1] - x[0])
+
+# p-test calibration: 1/x grows like ln t, 1/x^2 saturates at 1
+for t in [10.0, 100.0, 1000.0]:
+    print(f"t={t:>6}: ∫1/x = {tail(lambda u: 1/u, 1, t):.4f} (ln t = {np.log(t):.4f}), "
+          f"∫1/x² = {tail(lambda u: 1/u**2, 1, t):.6f}")
+assert abs(tail(lambda u: 1 / u, 1, 1000.0) - np.log(1000)) < 1e-4
+assert abs(tail(lambda u: 1 / u**2, 1, 1000.0) - (1 - 1 / 1000)) < 1e-5
+
+# Unbounded integrand: 1/sqrt(x) on (0, 1] has area 2 despite the spike
+# (the spike makes the midpoint rule sweat; ~1e-3 accuracy at this n)
+s = 1e-9
+assert abs(tail(lambda u: 1 / np.sqrt(u), s, 1.0) - (2 - 2 * np.sqrt(s))) < 1e-2
+
+# Comparison bound: integrand below x^-4 stays below 1/3
+v = tail(lambda u: 1 / (u**4 + u + 1), 1, 2000.0)
+print("∫ 1/(x^4+x+1) =", round(v, 6), " (bound 1/3)")
+assert v < 1 / 3
+
+# The Gaussian: integral over [-8, 8] already matches sqrt(pi) to 9 digits
+g = tail(lambda u: np.exp(-(u**2)), -8.0, 8.0)
+print("Gaussian:", g, " sqrt(pi):", np.sqrt(np.pi))
+assert abs(g - np.sqrt(np.pi)) < 1e-9
+```
+
+The $1/x$ accumulation tracks $\ln t$ upward without limit while $1/x^2$
+saturates, the spike integral hits its closed form $2$, the comparison
+integral respects its $1/3$ ceiling, and sixteen units of Gaussian already
+deliver $\sqrt{\pi}$ to nine digits, the tail beyond being astronomically
+small.
+
+## Exercises
+
+**Exercise 1.** Decide convergence and, where convergent, compute:
+(a) $\displaystyle \int_0^{\infty} e^{-3x} dx$;
+(b) $\displaystyle \int_2^{\infty} \frac{dx}{x \ln x}$.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Antiderivative $-\tfrac13 e^{-3x}$:
+
+$$
+\lim_{t \to \infty} \left[ -\tfrac13 e^{-3x} \right]_0^t
+= 0 - \left( -\tfrac13 \right) = \tfrac13 .
+$$
+
+Convergent, value $1/3$ (the normalization of the rate-3 exponential
+density, up to the factor 3).
+
+**(b)** Substitute $u = \ln x$, $du = dx/x$:
+
+$$
+\int_2^t \frac{dx}{x \ln x} = \int_{\ln 2}^{\ln t} \frac{du}{u}
+= \ln(\ln t) - \ln(\ln 2) \longrightarrow \infty .
+$$
+
+Divergent, but at a doubly logarithmic crawl: the accumulation reaches just
+$\ln\ln(10^{100}) - \ln\ln 2 \approx 5.4 + 0.37 \approx 5.8$ by a googol.
+Divergence does not require ever *looking* divergent on any plot you could
+draw.
+
+</details>
+
+**Exercise 2.** Use comparison to decide whether
+$\displaystyle \int_1^{\infty} \frac{2 + \sin x}{x^2}\, dx$ and
+$\displaystyle \int_1^{\infty} \frac{2 + \sin x}{x}\, dx$ converge.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Bound the numerator: $1 \le 2 + \sin x \le 3$ for all $x$.
+
+**Step 2 (first integral).** From above:
+$\frac{2+\sin x}{x^2} \le \frac{3}{x^2}$, and
+$\int_1^\infty 3 x^{-2} dx = 3$ converges ($p = 2$). By comparison the
+integral converges (to something between $1$ and $3$).
+
+**Step 3 (second integral).** From below:
+$\frac{2+\sin x}{x} \ge \frac{1}{x}$, and $\int_1^\infty \frac{dx}{x}$
+diverges ($p = 1$). By the divergence direction of comparison, the integral
+diverges. The oscillating numerator changes neither verdict; the exponent
+on $x$ decides both.
+
+</details>
+
+**Exercise 3 (code).** The standard normal density is
+$\phi(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2/2}$. Verify numerically that
+(a) $\int_{-\infty}^{\infty} \phi = 1$ (truncate at $\pm 10$),
+(b) the truncation error beyond $\pm 5$ is below $10^{-6}$ (the
+"five-sigma" tail), and (c) the value $\sqrt{2\pi}$ emerges as the
+normalizing constant: the unnormalized integral over $[-10, 10]$ equals
+$\sqrt{2\pi}$ to 10 digits.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+def integral(fn, a, b, n=400_001):
+    x = np.linspace(a, b, n)
+    return np.sum(fn((x[:-1] + x[1:]) / 2)) * (x[1] - x[0])
+
+phi = lambda x: np.exp(-x**2 / 2) / np.sqrt(2 * np.pi)
+
+# (a) total probability 1
+total = integral(phi, -10, 10)
+print("total:", total)
+assert abs(total - 1.0) < 1e-9
+
+# (b) five-sigma tails: less than 1e-6 of mass lives beyond |x| = 5
+core = integral(phi, -5, 5)
+print("mass beyond 5 sigma:", 1 - core)
+assert 0 < 1 - core < 1e-6
+
+# (c) the constant: unnormalized Gaussian integrates to sqrt(2 pi)
+raw = integral(lambda x: np.exp(-x**2 / 2), -10, 10)
+print("raw:", raw, " sqrt(2 pi):", np.sqrt(2 * np.pi))
+assert abs(raw - np.sqrt(2 * np.pi)) < 1e-10
+```
+
+The density integrates to one, fewer than one part in a million lives
+outside five sigmas (the discovery threshold of particle physics is this
+tail), and the raw integral *is* $\sqrt{2\pi}$: the constant in every
+normal density is an improper integral's value, cached.
+
+</details>
+
+Improper integrals tamed infinity in the domain; the next lesson returns to
+approximation and extends L2's tangent line to polynomials of any degree,
+with an exact handle on the error.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 7.8, improper integrals and the comparison test.</FNItem>
+  <FNItem n="2">**Apostol, T. M.** (1967). *Calculus, Vol. 1* (2nd ed.). Wiley. Ch. 10.23-10.24, improper integrals with the p-test calibration.</FNItem>
+  <FNItem n="3">**Cover, T. M., & Thomas, J. A.** (2006). *Elements of Information Theory* (2nd ed.). Wiley. Ch. 8 uses the Gaussian's normalization as the basis of differential entropy. [doi:10.1002/047174882X](https://doi.org/10.1002/047174882X)</FNItem>
+</Footnotes>

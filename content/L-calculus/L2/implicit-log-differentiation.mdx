@@ -1,0 +1,296 @@
+---
+title: "Implicit and logarithmic differentiation"
+pillar: L
+subId: L2
+lessonId: implicit-log-differentiation
+order: 4
+estimatedMinutes: 30
+goal: "Differentiate relations not given as y = f(x) by implicit differentiation, and tame products and variable powers with the logarithmic trick."
+prerequisites: ["chain-rule"]
+---
+
+Not every curve hands you a formula $y = f(x)$. The unit circle
+$x^2 + y^2 = 1$ defines $y$ only up to a sign, and solving messier relations
+for $y$ can be impossible outright. **Implicit differentiation** extracts
+$dy/dx$ without solving, by differentiating the relation as it stands.
+The same chain-rule move, applied through a logarithm, untangles sprawling
+products and the variable-power expressions like $x^x$ that no earlier rule
+touches.
+
+## Implicit differentiation
+
+The idea: along the curve, $y$ *is* some differentiable function of $x$
+(locally, wherever the curve passes the vertical line test in a small
+window). Differentiate both sides of the relation with respect to $x$,
+treating every appearance of $y$ as that function, so each $y$-term emits a
+factor $y'$ by the chain rule. Then solve the resulting *linear* equation for
+$y'$.
+
+**Worked example: the circle.** Differentiate $x^2 + y^2 = 1$ term by term
+with respect to $x$:
+
+**Step 1.** $\frac{d}{dx} x^2 = 2x$, and
+$\frac{d}{dx} y^2 = 2y \cdot y'$ (chain rule: outer square, inner $y(x)$).
+The right side, a constant, gives $0$:
+
+$$
+2x + 2y\,y' = 0 .
+$$
+
+**Step 2.** Solve for $y'$:
+
+$$
+y' = -\frac{x}{y} .
+$$
+
+One formula covers both semicircles at once. At
+$(\tfrac{3}{5}, \tfrac{4}{5})$ the slope is $-\tfrac{3}{4}$; at
+$(\tfrac{3}{5}, -\tfrac{4}{5})$, on the lower arc, it is $+\tfrac{3}{4}$.
+Where $y = 0$ (the points $(\pm 1, 0)$) the formula divides by zero, and the
+geometry agrees: the tangents there are vertical. The result also reads
+geometrically: $-x/y$ is the negative reciprocal of $y/x$, the radius's
+slope, so tangent and radius are perpendicular, recovering Euclid by
+calculus.
+
+![Tangent lines on the unit circle computed from the implicit slope -x/y. No branch was ever solved for; one differentiated relation serves every point, and the vertical tangents appear exactly where the formula's denominator vanishes.](/figures/L2/implicit-log-differentiation.svg)
+
+**Worked example: a curve with no explicit form.** The relation
+$y^3 + y = x^2$ cannot be solved for $y$ with elementary functions, yet
+differentiation is routine:
+
+$$
+3y^2 \, y' + y' = 2x
+\quad \Longrightarrow \quad
+y' = \frac{2x}{3y^2 + 1} .
+$$
+
+The denominator is always at least $1$, so the curve has a well-defined
+finite slope everywhere; $y'$ just has to be evaluated at a known point
+$(x, y)$ *on* the curve. At $(\sqrt{2}, 1)$ (check: $1 + 1 = 2$), the slope
+is $2\sqrt{2}/4 = \sqrt{2}/2 \approx 0.707$.
+
+This is also how the power rule extends to fractional exponents, closing a
+promise from two lessons back. If $y = x^{p/q}$ then $y^q = x^p$;
+differentiating implicitly, $q y^{q-1} y' = p x^{p-1}$, and solving gives
+$y' = \tfrac{p}{q} x^{p/q - 1}$: the power rule, now for any rational
+exponent.
+
+## Logarithmic differentiation
+
+Two situations make the ordinary rules miserable: long products of factors,
+and exponents that contain the variable. The logarithm fixes both, because
+$\ln$ turns products into sums and exponents into multipliers, and its
+derivative is the simple $1/x$<FN n="2" />.
+
+The recipe: take $\ln$ of both sides, differentiate implicitly (the left
+side becomes $y'/y$ by the chain rule), then multiply back by $y$.
+
+**Worked example: a product of three factors.**
+$y = \dfrac{x^3 \sqrt{x^2+1}}{(x+2)^5}$.
+
+**Step 1.** Logarithm of both sides, splitting with the log laws (L1):
+
+$$
+\ln y = 3 \ln x + \tfrac12 \ln(x^2 + 1) - 5 \ln(x + 2) .
+$$
+
+**Step 2.** Differentiate both sides; each term is a chain rule through
+$\ln$:
+
+$$
+\frac{y'}{y} = \frac{3}{x} + \frac{x}{x^2+1} - \frac{5}{x+2} .
+$$
+
+**Step 3.** Multiply by $y$ (its original expression):
+
+$$
+y' = \frac{x^3 \sqrt{x^2+1}}{(x+2)^5}
+\left( \frac{3}{x} + \frac{x}{x^2+1} - \frac{5}{x+2} \right) .
+$$
+
+Three quotient-and-product rules' worth of algebra, done in three lines. The
+intermediate quantity $y'/y$ has its own name, the **logarithmic
+derivative**: the *relative* (percent) rate of change. Under a product,
+relative rates add, which is the content of Step 2 and the reason log-scale
+plots turn growth comparisons into slope comparisons<FN n="1" />.
+
+**Worked example: the variable power.** $y = x^x$ for $x \gt 0$. This is
+neither a power function (exponent moves) nor an exponential (base moves);
+neither old rule applies. But
+
+$$
+\ln y = x \ln x,
+$$
+
+and the right side is an ordinary product:
+
+$$
+\frac{y'}{y} = 1 \cdot \ln x + x \cdot \frac{1}{x} = \ln x + 1,
+\qquad
+y' = x^x \, (\ln x + 1) .
+$$
+
+The slope is zero where $\ln x = -1$, i.e. $x = 1/e \approx 0.368$, the
+minimum of $x^x$ (value $e^{-1/e} \approx 0.692$). The named trap here:
+**treating $x^x$ as a power function**, which would give the wrong
+$x \cdot x^{x-1} = x^x$; that misses the $\ln x$ term entirely and is wrong
+at every point except the single $x$ where $\ln x + 1 = 1$. When base and
+exponent both move, both contributions appear, and the log keeps the books.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+h = 1e-6
+
+# Circle: numeric slope along the parametrized upper arc matches -x/y
+t = np.linspace(0.3, np.pi - 0.3, 9)
+xc, yc = np.cos(t), np.sin(t)
+slope_num = (np.sqrt(1 - (xc + h) ** 2) - np.sqrt(1 - (xc - h) ** 2)) / (2 * h)
+assert np.allclose(slope_num, -xc / yc, rtol=1e-5)
+
+# y^3 + y = x^2: get y on the curve by bisection, then check dy/dx
+def y_on_curve(xv):
+    lo, hi = -3.0, 3.0
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if mid**3 + mid < xv**2 else (lo, mid)
+    return 0.5 * (lo + hi)
+
+xs = np.array([0.5, 1.0, np.sqrt(2.0), 2.0])
+ys = np.array([y_on_curve(v) for v in xs])
+slope_num = np.array([(y_on_curve(v + h) - y_on_curve(v - h)) / (2 * h) for v in xs])
+assert np.allclose(slope_num, 2 * xs / (3 * ys**2 + 1), rtol=1e-4)
+
+# x^x: the log formula, against central differences and against the wrong rule
+xs = np.linspace(0.2, 2.0, 10)
+fxx = lambda v: v**v
+num = (fxx(xs + h) - fxx(xs - h)) / (2 * h)
+good = xs**xs * (np.log(xs) + 1)
+bad = xs * xs ** (xs - 1)                 # "power rule" misuse: equals x^x
+assert np.allclose(num, good, rtol=1e-5)
+assert not np.allclose(num, bad)
+print("minimum of x^x at x = 1/e:", 1 / np.e, " slope there:",
+      float(np.interp(1 / np.e, xs, good).round(4)))
+```
+
+The implicit slopes match numerical differentiation on both curves, including
+the one nobody can solve in closed form, and the logarithmic formula for
+$x^x$ agrees with the numbers while the power-rule misuse does not.
+
+## Exercises
+
+**Exercise 1.** Find $y'$ on the ellipse $\dfrac{x^2}{9} + \dfrac{y^2}{4} = 1$
+by implicit differentiation, and compute the tangent slope at the point
+$\left(\tfrac{3\sqrt{2}}{2}, \sqrt{2}\right)$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Differentiate term by term:
+
+$$
+\frac{2x}{9} + \frac{2y\,y'}{4} = 0 .
+$$
+
+**Step 2.** Solve for $y'$:
+
+$$
+y' = -\frac{4x}{9y} .
+$$
+
+**Step 3.** Verify the point is on the ellipse:
+$\frac{(3\sqrt2/2)^2}{9} + \frac{(\sqrt2)^2}{4} = \frac{9/2}{9} + \frac{2}{4}
+= \tfrac12 + \tfrac12 = 1$. Then
+
+$$
+y' = -\frac{4 \cdot \tfrac{3\sqrt2}{2}}{9 \sqrt 2} = -\frac{6\sqrt2}{9\sqrt2} = -\frac{2}{3} .
+$$
+
+</details>
+
+**Exercise 2.** Differentiate $y = (\sin x)^{\cos x}$ on an interval where
+$\sin x \gt 0$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Base and exponent both move: logarithmic differentiation.
+
+$$
+\ln y = \cos x \, \ln(\sin x) .
+$$
+
+**Step 2.** Differentiate the right side with the product rule; both factors
+are chains:
+
+$$
+\frac{y'}{y} = -\sin x \, \ln(\sin x) + \cos x \cdot \frac{\cos x}{\sin x} .
+$$
+
+**Step 3.** Multiply back by $y$:
+
+$$
+y' = (\sin x)^{\cos x} \left( \frac{\cos^2 x}{\sin x} - \sin x \, \ln(\sin x) \right) .
+$$
+
+Both characteristic terms are present: the exponent-times-log term from the
+moving base, and the log-of-base term from the moving exponent. Dropping
+either is the $x^x$ trap again.
+
+</details>
+
+**Exercise 3 (code).** The curve $x^3 + y^3 = 9xy$ (the folium of Descartes)
+passes through $(2, 4)$. Derive $y'$ implicitly, evaluate it at $(2, 4)$, and
+confirm numerically by tracking the curve: perturb $x$ to $2 \pm 10^{-5}$,
+re-solve for the nearby $y$ by bisection around $4$, and compare slopes.
+
+<details>
+<summary>Solution</summary>
+
+**Derivation.** $3x^2 + 3y^2 y' = 9y + 9x y'$, so
+$y'(3y^2 - 9x) = 9y - 3x^2$ and
+
+$$
+y' = \frac{3y - x^2}{y^2 - 3x} .
+$$
+
+At $(2, 4)$: $y' = \dfrac{12 - 4}{16 - 6} = \dfrac{8}{10} = 0.8$.
+
+```python
+import numpy as np
+
+def y_near_4(xv):
+    g = lambda yv: xv**3 + yv**3 - 9 * xv * yv     # root in y near 4
+    lo, hi = 3.0, 5.0
+    assert g(lo) < 0 < g(hi)
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if g(mid) < 0 else (lo, mid)
+    return 0.5 * (lo + hi)
+
+assert abs(y_near_4(2.0) - 4.0) < 1e-12             # (2,4) is on the curve
+
+h = 1e-5
+slope_num = (y_near_4(2 + h) - y_near_4(2 - h)) / (2 * h)
+slope_imp = (3 * 4 - 2**2) / (4**2 - 3 * 2)
+print("numeric:", round(slope_num, 6), " implicit:", slope_imp)
+assert np.isclose(slope_num, 0.8, atol=1e-6)
+```
+
+Bisection confirms $(2,4)$ sits on the folium, and the tracked slope matches
+the implicit $0.8$ to six decimals: the formula differentiates a curve whose
+explicit $y(x)$ nobody wants to write down.
+
+</details>
+
+The derivative now handles explicit, implicit, and logarithmic forms; the
+next lesson proves the mean value theorem, the bridge from derivative signs
+to global statements about monotonicity, and uses it to crack $0/0$ limits
+with L'Hopital's rule.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 3.5-3.6, implicit and logarithmic differentiation.</FNItem>
+  <FNItem n="2">**Apostol, T. M.** (1967). *Calculus, Vol. 1* (2nd ed.). Wiley. Ch. 6 develops the logarithm and its differentiation properties from the integral definition.</FNItem>
+</Footnotes>

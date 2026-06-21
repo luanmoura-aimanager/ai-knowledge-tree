@@ -1,0 +1,245 @@
+---
+title: "Continuity and the intermediate value theorem"
+pillar: L
+subId: L1
+lessonId: continuity
+order: 4
+estimatedMinutes: 32
+goal: "Define continuity at a point, classify removable, jump, and infinite discontinuities, and use the IVT and extreme value theorem to guarantee roots and extrema exist."
+prerequisites: ["limit-laws"]
+---
+
+The previous lessons kept stressing that a limit at $a$ ignores the value at
+$a$. **Continuity** is the property that the two agree anyway, and it is what
+lets you compute a limit by plugging in. Beyond convenience, continuity buys
+two existence guarantees, the intermediate and extreme value theorems, that
+underwrite root-finding and the very idea that a loss function has a minimum to
+find.
+
+## The definition
+
+$f$ is **continuous at $a$** if
+
+$$
+\lim_{x \to a} f(x) = f(a) .
+$$
+
+Unpacked, that single equation makes three demands: $f(a)$ exists, the limit
+exists, and they are equal. A function continuous at every point of an
+interval is continuous on that interval; informally, its graph over the
+interval can be drawn without lifting the pen.
+
+The limit laws translate directly: sums, products, and quotients (away from
+zero denominators) of continuous functions are continuous, and so are
+compositions, because $\lim_{x \to a} f(g(x)) = f(\lim_{x \to a} g(x))$ when
+$f$ is continuous at the inner limit. Polynomials, rational functions on their
+domains, $e^x$, $\ln x$ on $(0, \infty)$, $\sin$, $\cos$, and $\sqrt{x}$ on
+$[0, \infty)$ are all continuous<FN n="1" />. This is why "plug in" worked
+through the last lesson: it is a theorem, not a habit.
+
+## The three failure modes
+
+Each demand of the definition can fail on its own, and the failures have
+names.
+
+- **Removable.** The limit exists but disagrees with $f(a)$ (or $f(a)$ is
+  missing). The function $(x^2 - 9)/(x - 3)$ has a hole at $x = 3$: limit $6$,
+  no value. Redefining one point repairs it, hence "removable".
+- **Jump.** Both one-sided limits exist but differ. The step function at $0$
+  jumps from $0$ to $1$; no single-point repair can reconcile two different
+  one-sided approaches.
+- **Infinite.** The function blows up: $1/(x - 3)$ near $3$ leaves every
+  bounded band. The line $x = 3$ is a vertical asymptote.
+
+![One curve, three ways to break: a removable hole (the limit exists, the value was moved), a jump (left and right limits disagree), and an infinite discontinuity at a vertical asymptote.](/figures/L1/continuity.svg)
+
+A worked classification. Take
+
+$$
+f(x) = \frac{x^2 - 1}{x - 1} \;\; (x \neq 1), \qquad f(1) = 5 .
+$$
+
+**Step 1.** Away from $1$, $f(x) = x + 1$ after factoring, so
+$\lim_{x \to 1} f(x) = 2$.
+
+**Step 2.** The value is $f(1) = 5 \neq 2$. Limit exists, value disagrees:
+removable discontinuity. Resetting $f(1) = 2$ makes $f$ the continuous line
+$x + 1$.
+
+## The intermediate value theorem
+
+Continuity converts "no tearing" into an existence machine.
+
+**IVT.** If $f$ is continuous on $[a, b]$ and $y$ is any value strictly
+between $f(a)$ and $f(b)$, then there exists $c \in (a, b)$ with $f(c) = y$.
+A continuous function cannot get from one value to another without passing
+through everything in between<FN n="2" />.
+
+The workhorse special case is root-finding: if $f$ is continuous and
+$f(a) \lt 0 \lt f(b)$, some $c$ between them has $f(c) = 0$.
+
+Worked example: $p(x) = x^3 + x - 1$ has a root in $(0, 1)$.
+
+**Step 1.** $p$ is a polynomial, hence continuous everywhere.
+
+**Step 2.** $p(0) = -1 \lt 0$ and $p(1) = 1 \gt 0$, so $0$ lies between the
+endpoint values.
+
+**Step 3.** The IVT delivers a $c \in (0, 1)$ with $p(c) = 0$.
+
+The theorem says nothing about *where* $c$ is, but its proof idea becomes an
+algorithm: **bisection**. Evaluate $p$ at the midpoint $0.5$; the sign tells
+which half contains the root; repeat. Each step halves the interval, so after
+$n$ steps the root is pinned to width $2^{-n}$, and 50 steps give
+about 15 decimal digits. The closing code block runs it.
+
+Continuity is not decoration here. The step function $f(x) = -1$ for
+$x \lt 0$, $f(x) = +1$ for $x \ge 0$ goes from negative to positive and
+crosses zero nowhere: the jump tears past every intermediate value. The IVT's
+conclusion is purchased entirely by continuity.
+
+## The extreme value theorem
+
+**EVT.** A function continuous on a **closed, bounded** interval $[a, b]$
+attains a maximum and a minimum: there exist points $x_{\min}, x_{\max}$ in
+$[a,b]$ with $f(x_{\min}) \le f(x) \le f(x_{\max})$ for every $x$ in the
+interval<FN n="3" />.
+
+Both hypotheses earn their keep. On the *open* interval $(0, 1)$, the
+continuous function $1/x$ has no maximum: it grows without bound as $x \to
+0^+$. And on $[0, 1]$, the discontinuous function $f(x) = x$ for $x \lt 1$,
+$f(1) = 0$ never attains its supremum $1$. Closed interval, continuity: drop
+either and the guarantee dies.
+
+The EVT is the first answer to a question optimization (L6) asks constantly:
+*does a minimizer even exist?* On a closed bounded domain, continuity is
+enough. Finding it is a different problem, and the rest of the pillar builds
+the tools.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Bisection on p(x) = x^3 + x - 1, certified by the IVT on [0, 1]
+p = lambda x: x**3 + x - 1.0
+lo, hi = 0.0, 1.0
+assert p(lo) < 0 < p(hi)                  # sign change: a root exists inside
+
+for _ in range(60):
+    mid = 0.5 * (lo + hi)
+    if p(mid) < 0:
+        lo = mid                          # root is in the right half
+    else:
+        hi = mid                          # root is in the left half
+
+root = 0.5 * (lo + hi)
+print(f"root ~ {root:.15f},  p(root) = {p(root):.2e}")
+assert abs(p(root)) < 1e-14
+assert hi - lo < 2.0 ** -50               # halved until adjacent floats
+
+# EVT on a closed interval: a dense grid pins down max and min of a
+# continuous function; both are attained at actual points of [0, 2pi]
+x = np.linspace(0, 2 * np.pi, 1_000_001)
+f = np.sin(x) + 0.3 * np.sin(3 * x)
+print("max", f.max().round(6), "at x ~", x[f.argmax()].round(4))
+print("min", f.min().round(6), "at x ~", x[f.argmin()].round(4))
+assert np.isfinite(f.max()) and np.isfinite(f.min())
+```
+
+Bisection converges because every iteration preserves the IVT's sign-change
+certificate, and the grid search attains its extremes at concrete points, the
+EVT in numerical form.
+
+## Exercises
+
+**Exercise 1.** Classify the discontinuity of each function at the given
+point: (a) $f(x) = \dfrac{\sin x}{x}$ at $x = 0$;
+(b) $g(x) = \dfrac{\lvert x \rvert}{x}$ at $x = 0$;
+(c) $h(x) = \dfrac{1}{(x-2)^2}$ at $x = 2$.
+
+<details>
+<summary>Solution</summary>
+
+**(a)** From the previous lesson, $\lim_{x \to 0} \sin(x)/x = 1$ exists, but
+$f(0)$ is undefined. Removable: defining $f(0) = 1$ produces a continuous
+function.
+
+**(b)** For $x \gt 0$, $g(x) = x/x = 1$; for $x \lt 0$, $g(x) = -x/x = -1$.
+The one-sided limits are $+1$ and $-1$: they exist but disagree, so this is a
+jump discontinuity of height $2$. No single-point repair exists.
+
+**(c)** As $x \to 2$ from either side, $(x-2)^2 \to 0^+$ and the quotient
+grows beyond every bound: an infinite discontinuity with vertical asymptote
+$x = 2$.
+
+</details>
+
+**Exercise 2.** Show that the equation $\cos x = x$ has a solution in
+$(0, 1)$, and explain why the IVT applies.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Recast as a root problem: define $f(x) = \cos x - x$, so a
+solution of $\cos x = x$ is a root of $f$.
+
+**Step 2.** $f$ is continuous on $[0, 1]$: $\cos x$ is continuous, $x$ is
+continuous, and differences of continuous functions are continuous (limit
+laws).
+
+**Step 3.** Check the endpoint signs:
+
+$$
+f(0) = \cos 0 - 0 = 1 \gt 0, \qquad f(1) = \cos 1 - 1 \approx 0.540 - 1 = -0.460 \lt 0 .
+$$
+
+**Step 4.** $0$ lies between $f(0)$ and $f(1)$, so the IVT gives a
+$c \in (0, 1)$ with $f(c) = 0$, i.e. $\cos c = c$. (Bisection locates it at
+$c \approx 0.739$, the famous fixed point of repeatedly pressing the cosine
+button on a calculator.)
+
+</details>
+
+**Exercise 3 (code).** Use bisection to find the solution of $\cos x = x$ from
+Exercise 2 to within $10^{-12}$, and assert that the residual
+$\lvert \cos(c) - c \rvert$ is below $10^{-12}$.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+f = lambda x: np.cos(x) - x
+lo, hi = 0.0, 1.0
+assert f(lo) > 0 > f(hi)                 # IVT certificate (signs flipped vs text: f decreasing)
+
+for _ in range(50):                      # 50 halvings: width 2^-50 ~ 9e-16
+    mid = 0.5 * (lo + hi)
+    if f(mid) > 0:
+        lo = mid                         # root is to the right
+    else:
+        hi = mid
+
+c = 0.5 * (lo + hi)
+print(f"fixed point c ~ {c:.12f}")
+assert abs(np.cos(c) - c) < 1e-12
+assert abs(c - 0.7390851332) < 1e-9      # the Dottie number
+```
+
+Each iteration keeps one endpoint where $f \gt 0$ and one where $f \lt 0$, so
+the IVT guarantee never lapses, and 50 halvings shrink the bracket below the
+requested tolerance.
+
+</details>
+
+Functions indexed by a continuous variable are one face of limits; the next
+lesson studies the other face, sequences indexed by integers, where
+convergence becomes a statement about tails.
+
+<Footnotes>
+  <FNItem n="1">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 2.5, continuity and its consequences.</FNItem>
+  <FNItem n="2">**Spivak, M.** (2008). *Calculus* (4th ed.). Publish or Perish. Ch. 7, the intermediate value theorem proved from completeness.</FNItem>
+  <FNItem n="3">**Abbott, S.** (2015). *Understanding Analysis* (2nd ed.). Springer. Ch. 4.3-4.4, continuity, the EVT, and why both hypotheses are needed. [doi:10.1007/978-1-4939-2712-8](https://doi.org/10.1007/978-1-4939-2712-8)</FNItem>
+</Footnotes>

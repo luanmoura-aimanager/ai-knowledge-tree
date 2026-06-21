@@ -1,0 +1,301 @@
+---
+title: "Green, Stokes, and the divergence theorem"
+pillar: L
+subId: L5
+lessonId: integral-theorems
+order: 5
+estimatedMinutes: 34
+goal: "Use the three big integral theorems and read them as one statement: the integral of a derivative over a region equals the integral over its boundary."
+prerequisites: ["divergence-curl", "multiple-integrals"]
+---
+
+The fundamental theorem of calculus said: integrate a derivative over an
+interval and only the boundary values survive, $\int_a^b F' = F(b) -
+F(a)$. This lesson is that sentence, promoted twice. Integrate the curl
+over a surface and only the boundary circulation survives; integrate the
+divergence over a solid and only the boundary flux survives. Three named
+theorems, one principle, and together they close the vector-calculus
+story this discipline opened<FN n="1" />.
+
+## Green's theorem
+
+For a region $R$ in the plane with boundary curve $\partial R$ traversed
+counterclockwise, and a continuously differentiable field
+$\mathbf{F} = (P, Q)$:
+
+$$
+\oint_{\partial R} \mathbf{F} \cdot d\mathbf{r}
+= \iint_R \left( \frac{\partial Q}{\partial x} - \frac{\partial P}{\partial y} \right) dA :
+$$
+
+boundary circulation equals the integral of the scalar curl, with the
+counterclockwise orientation of $\partial R$ part of the
+statement<FN n="2" />. The proof
+idea *is* the picture: tile $R$ with small cells, and give each cell its
+own tiny counterclockwise circulation, which is (curl)$\times$(area) by
+last lesson. Every interior edge is traversed twice in opposite
+directions by its two adjacent cells, so all interior contributions
+cancel, and the sum telescopes to the outer boundary alone, the 2D
+version of how $\sum \left[ F(x_{i+1}) - F(x_i) \right]$ telescopes to
+$F(b) - F(a)$.
+
+![A region tiled with small circulating cells: every interior edge is shared by two cells running it in opposite directions and cancels, leaving only the outer boundary's circulation. Green's theorem is this cancellation in the limit.](/figures/L5/integral-theorems.svg)
+
+**Worked example 1.** The rotation field $(-y, x)$ around the unit
+circle. Left side, computed in the line-integrals lesson: $2\pi$. Right
+side: scalar curl $= 2$ (constant), integrated over the disk of area
+$\pi$: also $2\pi$. The theorem also runs in reverse as a trick: with
+$\mathbf{F} = \tfrac12 (-y, x)$ the curl is exactly $1$, so
+
+$$
+\operatorname{area}(R) = \frac{1}{2} \oint_{\partial R} (x\, dy - y\, dx) ,
+$$
+
+area measured by walking the fence. This is how a planimeter (and the
+shoelace formula already used in the L4 Jacobian code) computes area
+from a boundary traversal.
+
+Green's theorem also settles last lesson's loose end: in a region with
+no holes, zero curl forces zero circulation around *every* loop (the
+loop bounds a region inside the domain, and the right side vanishes),
+hence conservativity. The punctured-plane vortex evaded this only
+because its loop encircled a point outside the domain: the hypothesis
+"the loop's interior lies in the domain" failed, not the theorem.
+
+## Stokes' theorem
+
+Lift the picture out of the plane: let $S$ be an oriented surface in
+$\mathbb{R}^3$ with boundary curve $\partial S$ (orientations matched by
+the right-hand rule). Then
+
+$$
+\oint_{\partial S} \mathbf{F} \cdot d\mathbf{r}
+= \iint_S (\nabla \times \mathbf{F}) \cdot \mathbf{n} \; dS :
+$$
+
+circulation around the rim equals the flux of the curl through the
+membrane. Green's theorem is the flat special case ($S$ in the
+$xy$-plane, $\mathbf{n} = \mathbf{k}$, the dot product picking out the
+scalar curl). A striking consequence: two different surfaces sharing the
+same rim (a flat disk and a hemispherical dome over the same circle)
+must give the same curl flux, because both equal the same boundary
+integral. The membrane is a bookkeeping device; only the rim is real.
+
+## The divergence theorem
+
+The same cancellation with boxes instead of cells. For a solid $W$ with
+closed boundary surface $\partial W$, outward normal $\mathbf{n}$:
+
+$$
+\oiint_{\partial W} \mathbf{F} \cdot \mathbf{n} \; dS
+= \iiint_W \nabla \cdot \mathbf{F} \; dV :
+$$
+
+total flux out through the skin equals the integral of the divergence
+inside. Tile $W$ with small boxes; each contributes (div)$\times$
+(volume) of outflow (last lesson's box argument); shared faces cancel
+(what leaves one box enters its neighbor); only the outer skin
+survives.
+
+**Worked example 2.** $\mathbf{F} = (x, y, z)$ through the sphere of
+radius $R$. Divergence $= 3$, so the right side is
+$3 \cdot \tfrac43 \pi R^3 = 4 \pi R^3$. Direct check: on the sphere,
+$\mathbf{F} = R\,\mathbf{n}$, so the flux is
+$R \cdot \operatorname{area} = R \cdot 4\pi R^2$. Equal, and the theorem
+turned a surface integral into multiplying two known constants.
+
+The three theorems in one table, with the FTC as the seed:
+
+| theorem | region | derivative inside | boundary object |
+|---|---|---|---|
+| FTC (L3) | interval | $F'$ | two endpoint values |
+| Green / Stokes | surface | curl | boundary circulation |
+| Divergence | solid | div | boundary flux |
+
+One statement, increasingly dressed: **the total of a derivative over a
+region is computable on the boundary alone.** (The gradient theorem of
+the line-integrals lesson is the same family member for curves.) In
+physics this is conservation laws (Maxwell's equations use Stokes and
+divergence forms interchangeably); in ML it surfaces wherever
+probability mass must be conserved, e.g. the continuity equation
+$\partial_t p + \nabla \cdot (p \mathbf{v}) = 0$ that underlies
+diffusion models' probability-flow analyses and normalizing flows'
+instantaneous change of variables<FN n="3" />.
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+# Green's theorem for F = (-y + 0.3 x^2, x + 0.1 y^3) on the unit disk:
+# curl_z = 1 - (-1) = 2 (the polynomial extras have symmetric curls: check!)
+# curl_z = dQ/dx - dP/dy = 1 - (-1) = 2 exactly (x^2 and y^3 terms drop out)
+
+# Left side: boundary circulation by midpoint rule
+n = 2_000_001
+t = np.linspace(0, 2 * np.pi, n)
+mid = (t[:-1] + t[1:]) / 2
+x, y = np.cos(mid), np.sin(mid)
+vx, vy = -np.sin(mid), np.cos(mid)
+P = -y + 0.3 * x**2
+Q = x + 0.1 * y**3
+circ = np.sum(P * vx + Q * vy) * (t[1] - t[0])
+
+# Right side: integral of the constant curl 2 over the disk = 2 pi
+print("circulation:", round(circ, 9), " 2*pi:", round(2 * np.pi, 9))
+assert abs(circ - 2 * np.pi) < 1e-9
+
+# Area by fence-walking: shoelace form of Green on an ellipse (a=2, b=1)
+a, b = 2.0, 1.0
+x, y = a * np.cos(mid), b * np.sin(mid)
+vx, vy = -a * np.sin(mid), b * np.cos(mid)
+area = 0.5 * np.sum(x * vy - y * vx) * (t[1] - t[0])
+assert abs(area - np.pi * a * b) < 1e-9            # pi a b for an ellipse
+
+# Divergence theorem for F = (x, y, z) on the unit sphere, by Monte Carlo:
+# flux = integral of F . n over the sphere; on the sphere F . n = 1 exactly,
+# so flux = area = 4 pi; volume side = 3 * (4/3) pi = 4 pi
+rng = np.random.default_rng(0)
+pts = rng.normal(size=(2_000_000, 3))
+pts /= np.linalg.norm(pts, axis=1, keepdims=True)   # uniform on the sphere
+Fdotn = np.sum(pts * pts, axis=1)                   # = 1 at every point
+flux = Fdotn.mean() * 4 * np.pi
+assert abs(flux - 4 * np.pi) < 1e-12
+print("sphere flux:", flux, " divergence side:", 3 * (4 / 3) * np.pi)
+```
+
+The decorated rotation field's circulation still comes out at $2\pi$
+(its extra terms are curl-free, so Green says they cannot contribute to
+any closed loop), the fence-walk measures the ellipse's area
+$\pi a b$ to nine digits, and the sphere's flux equals the divergence
+integral exactly, the dot product $\mathbf{F} \cdot \mathbf{n} = 1$
+making the theorem visible point by point.
+
+## Exercises
+
+**Exercise 1.** Use Green's theorem to evaluate
+$\displaystyle \oint_C \left( x^4 \, dx + x y \, dy \right)$ where $C$ is
+the counterclockwise triangle with vertices $(0,0)$, $(1, 0)$,
+$(0, 1)$. (Direct parametrization would need three separate segments.)
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Identify $P = x^4$, $Q = xy$; the scalar curl is
+
+$$
+\frac{\partial Q}{\partial x} - \frac{\partial P}{\partial y} = y - 0 = y .
+$$
+
+**Step 2.** Green converts the three-segment crawl into one double
+integral over the triangle $T$ ($0 \le x \le 1$, $0 \le y \le 1 - x$):
+
+$$
+\oint_C = \iint_T y \, dA
+= \int_0^1 \!\! \int_0^{1-x} y \, dy \, dx
+= \int_0^1 \frac{(1-x)^2}{2} dx .
+$$
+
+**Step 3.** Substitute $u = 1 - x$:
+$\frac{1}{2} \int_0^1 u^2 du = \frac{1}{6}$.
+
+The $x^4\,dx$ term contributed nothing: it is the exact differential of
+$x^5/5$, conservative on its own, and Green's right side saw that
+instantly through $\partial_y P = 0$.
+
+</details>
+
+**Exercise 2.** Two surfaces share the unit circle in the $xy$-plane as
+boundary: the flat unit disk, and the upward hemisphere of radius 1.
+For $\mathbf{F} = (z - y, \; x + z, \; e^{xy})$, Stokes' theorem
+asserts both curl fluxes equal the same boundary circulation. Compute
+the circulation directly and the disk's curl flux, confirming they
+match (the hemisphere's then matches for free).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1 (circulation).** On the rim,
+$\mathbf{r}(t) = (\cos t, \sin t, 0)$,
+$\mathbf{r}' = (-\sin t, \cos t, 0)$, and with $z = 0$ the field is
+$(-y, \, x, \, e^{xy})$, so
+
+$$
+\oint \mathbf{F} \cdot d\mathbf{r}
+= \int_0^{2\pi} \left( \sin^2 t + \cos^2 t \right) dt = 2\pi .
+$$
+
+(The third component never matters: the rim has no $z$-motion.)
+
+**Step 2 (curl).** From the formula,
+
+$$
+\nabla \times \mathbf{F}
+= \left( x e^{xy} - 1, \;\; 1 - y e^{xy}, \;\; 1 - (-1) \right)
+= \left( x e^{xy} - 1, \; 1 - y e^{xy}, \; 2 \right) .
+$$
+
+**Step 3 (disk flux).** The flat disk's normal is $\mathbf{k}$, so only
+the third component integrates:
+$\iint_{\text{disk}} 2 \, dA = 2\pi$. Match confirmed. The hemisphere
+integral, a genuinely unpleasant surface integral, is now known to be
+$2\pi$ without being computed: the rim decides, the membrane is
+irrelevant.
+
+</details>
+
+**Exercise 3 (code).** Verify the divergence theorem on the unit cube
+$[0,1]^3$ for $\mathbf{F} = (x^2, \, y z, \, z^2)$: compute the volume
+integral of $\operatorname{div} \mathbf{F} = 2x + z + 2z$ by 3D midpoint grid, and
+the total outward flux as six face integrals, checking both equal the
+exact value $\tfrac{5}{2}$.
+
+<details>
+<summary>Solution</summary>
+
+**Exact value.** $\iiint (2x + 3z)\, dV = 2 \cdot \tfrac12 + 3 \cdot
+\tfrac12 = \tfrac52$.
+
+```python
+import numpy as np
+
+n = 120                                  # 120^3 cells: a midpoint rule is exact
+u = (np.arange(n) + 0.5) / n             # on the linear integrand 2x+3z at any n
+X, Y, Z = np.meshgrid(u, u, u, indexing="ij")
+
+vol_side = np.sum(2 * X + 3 * Z) / n**3
+assert abs(vol_side - 2.5) < 1e-6
+
+# Six faces; outward normals +/- e_i. Only the component along the
+# normal contributes, evaluated on the face.
+U, V = np.meshgrid(u, u, indexing="ij")
+face = lambda arr: np.sum(arr) / n**2
+flux = (face(1.0**2 * np.ones_like(U))      # x = 1, n = +e_x: P = x^2 = 1
+        - face(0.0**2 * np.ones_like(U))    # x = 0, n = -e_x
+        + face(1.0 * V)                     # y = 1, n = +e_y: Q = yz = z
+        - face(0.0 * V)                     # y = 0
+        + face(1.0**2 * np.ones_like(U))    # z = 1, n = +e_z: R = z^2 = 1
+        - face(0.0 * np.ones_like(U)))      # z = 0
+print("volume side:", round(vol_side, 8), " flux side:", round(flux, 8))
+assert abs(flux - 2.5) < 1e-9
+```
+
+Both sides land on $2.5$: the interior's total expansion equals what
+crosses the skin, face by face. Note which faces did the work: the two
+$x$-faces and the top contributed everything, while the $y = 0$, $z =
+0$, and bottom faces shipped nothing, yet the totals balance only when
+all six are counted, the bookkeeping the theorem automates.
+
+</details>
+
+This closes the vector-calculus discipline: derivatives of fields (grad,
+div, curl) and the boundary theorems that integrate them. The final
+discipline aims the whole toolkit at one task, finding the minima of
+multivariable functions, where the gradient, Hessian, and Taylor
+expansion finally train a model.
+
+<Footnotes>
+  <FNItem n="1">**Marsden, J. E., & Tromba, A. J.** (2012). *Vector Calculus* (6th ed.). W. H. Freeman. Ch. 8, Green's, Stokes', and Gauss' theorems as one family.</FNItem>
+  <FNItem n="2">**Stewart, J.** (2015). *Calculus: Early Transcendentals* (8th ed.). Cengage Learning. Ch. 16.4-16.9, the integral theorems with orientation conventions.</FNItem>
+  <FNItem n="3">**Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S., & Poole, B.** (2021). "Score-based generative modeling through stochastic differential equations". *ICLR*. The continuity equation and probability flow behind diffusion models. [arXiv:2011.13456](https://arxiv.org/abs/2011.13456)</FNItem>
+</Footnotes>
