@@ -127,17 +127,21 @@ the next lesson, which forbid creating a new cycle or a new v-structure.
 
 The fraction of edges left undirected is not small. The figure samples random
 DAGs over a fixed variable order at several edge densities and counts the
-**reversible** edges, those whose reversal keeps the skeleton and v-structures
-unchanged. An edge $X \to Y$ is reversible exactly when $X$ and $Y$ have the same
-other parents, so reversing it creates no new immorality. Sparse graphs leave a
-large fraction of edges undirected; even dense graphs leave a noticeable share.
+**covered** edges, those whose reversal keeps the skeleton and v-structures of
+that DAG unchanged. An edge $X \to Y$ is covered exactly when $X$ and $Y$ have
+the same other parents, so reversing it creates no new immorality. A covered edge
+is locally free to flip; whether it is finally left undirected in the CPDAG also
+depends on whether the orientation rules compel it from elsewhere, so this count
+is an intuition for the ambiguity, not the exact CPDAG undirected-edge fraction.
+Sparse graphs leave a large fraction of edges flippable; even dense graphs leave
+a noticeable share.
 
-![Fraction of edges left undirected (reversible) in random DAGs as a function of edge density.](/figures/M1/mec-size.svg)
+![Fraction of edges that are covered (locally reversible) in random DAGs as a function of edge density.](/figures/M1/mec-size.svg)
 
 A concrete reading: at edge probability $p = 0.3$ over eight variables, roughly a
-fifth of the edges are reversible, so a discovery algorithm that returns the
-CPDAG hands back about a fifth of its edges as "direction unknown". Background
-knowledge or interventional data is what closes that gap.
+quarter of the edges are covered, the kind of local ambiguity a CPDAG records as
+"direction unknown". Background knowledge or interventional data is what closes
+that gap.
 
 ## A worked check
 

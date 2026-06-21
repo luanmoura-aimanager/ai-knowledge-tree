@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import ACCENT, FG_DIM, GOOD, GRID, HOT, apply_style, color, save
+from _style import ACCENT, FG_DIM, GOOD, HOT, apply_style, color, save
 
 SUB = "M2"
 C = color(SUB)  # pillar-M accent (#ee7de0)
