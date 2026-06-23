@@ -1,4 +1,4 @@
-"""Figures for pillar C10 (model evaluation). See figures/gen/_style.py."""
+"""Figures for pillar C9 (model evaluation). See figures/gen/_style.py."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 
 from _style import ACCENT, FG_MUTE, HOT, apply_style, color, save
 
-SUB = "C10"
+SUB = "C9"
 C = color(SUB)  # pillar-C accent
 
 

@@ -1,4 +1,4 @@
-"""Figures for pillar C8 (recommenders). See figures/gen/_style.py."""
+"""Figures for pillar N2 (recommenders: MF & embeddings). See figures/gen/_style.py."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import numpy as np
 
 from _style import FG_DIM, GRID, apply_style, color, save
 
-SUB = "C8"
-C = color(SUB)  # pillar-C accent
+SUB = "N2"
+C = color(SUB)  # pillar-N accent
 
 
 def matrix_factorization() -> None:
