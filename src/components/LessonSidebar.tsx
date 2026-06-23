@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import type { Lesson, Pillar, PathSidebar } from "@/lib/types";
 import type { ProgressStatus } from "@/lib/progress";
 import { groupLabelOf } from "@/lib/path-groups";
+import { pathStepHref, resolveActiveStep } from "@/lib/path-url";
 
 const STORAGE_KEY = "lessonSidebarCollapsed";
 
@@ -260,14 +261,9 @@ function PathSidebarView({
     );
   }
 
-  // The active step: the explicit `?i=` index when present, else the first step
+  // The active step: the explicit `?i=` index when valid, else the first step
   // whose route matches (a path may revisit a lesson, so `?i=` disambiguates).
-  const idxNum = index != null && index !== "" ? Number(index) : NaN;
-  const activeIdx = Number.isInteger(idxNum)
-    ? idxNum
-    : path.steps.findIndex(
-        (s) => `/pillar/${s.letter}/${s.subId}/${s.lessonId}` === pathname,
-      );
+  const activeIdx = resolveActiveStep(path.steps, index, pathname);
 
   return (
     <aside className="w-full lg:w-[280px] lg:flex-shrink-0">
@@ -312,8 +308,7 @@ function PathSidebarView({
             const showHeader =
               group !== "" &&
               (i === 0 || groupLabelOf(path.steps[i - 1]) !== group);
-            const base = `/pillar/${step.letter}/${step.subId}/${step.lessonId}`;
-            const href = `${base}?path=${path.slug}&i=${i}`;
+            const href = pathStepHref(path.slug, step, i);
             const active = i === activeIdx;
             return (
               <div key={`${step.subId}/${step.lessonId}/${i}`}>

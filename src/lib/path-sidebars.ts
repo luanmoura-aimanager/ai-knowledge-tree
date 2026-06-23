@@ -14,14 +14,27 @@ import { PATHS, getSubsectionById } from "./dag";
 import { getLesson } from "./curriculum";
 import { lessonContentStatus } from "./content";
 import { expandPathSteps } from "./paths";
-import type { PathSidebar } from "./types";
+import { pathSlug } from "./path-url";
+import type { PathSidebar, PathSidebarStep, PathStep } from "./types";
 
-/** Stable, url-safe slug for a path name (strips emoji/symbols, kebab-cases). */
-export function pathSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+/**
+ * Resolve one curated `PathStep` to its linkable view-model (pillar letter/color,
+ * title, availability). The single source for step resolution: `getPathSidebars`
+ * here and `LearningPaths` both build their per-step view-model from this.
+ */
+export function resolvePathStep(s: PathStep): PathSidebarStep {
+  const sub = getSubsectionById(s.subId);
+  const lesson = getLesson(s.subId, s.lessonId);
+  return {
+    letter: sub?.pillar.letter ?? "",
+    subId: s.subId,
+    lessonId: s.lessonId,
+    title: lesson?.title ?? s.lessonId,
+    color: sub?.pillar.color ?? "var(--fg-dim)",
+    available: lessonContentStatus(s.subId, s.lessonId) === "available",
+    section: s.section,
+    note: s.note,
+  };
 }
 
 /**
@@ -34,61 +47,11 @@ export const getPathSidebars = cache((): PathSidebar[] =>
     slug: pathSlug(p.name),
     name: p.name,
     color: p.color,
-    steps: expandPathSteps(p.steps!).map((s) => {
-      const sub = getSubsectionById(s.subId);
-      const lesson = getLesson(s.subId, s.lessonId);
-      return {
-        letter: sub?.pillar.letter ?? "",
-        subId: s.subId,
-        lessonId: s.lessonId,
-        title: lesson?.title ?? s.lessonId,
-        color: sub?.pillar.color ?? "var(--fg-dim)",
-        available: lessonContentStatus(s.subId, s.lessonId) === "available",
-        section: s.section,
-        note: s.note,
-      };
-    }),
+    steps: expandPathSteps(p.steps!).map(resolvePathStep),
   })),
 );
 
-/** A neighbor lesson in a path's expanded sequence (for path-order prev/next). */
-export interface PathNeighbor {
-  letter: string;
-  subId: string;
-  lessonId: string;
-  title: string;
-  index: number;
-}
-
-/**
- * The lessons immediately before/after step `index` in the path `slug`'s expanded
- * sequence, or null at the ends. Returns `{ prev: null, next: null }` when the
- * slug or index doesn't resolve, so the caller falls back to discipline order.
- */
-export function getPathPrevNext(
-  slug: string,
-  index: number,
-): { prev: PathNeighbor | null; next: PathNeighbor | null } {
-  const path = getPathSidebars().find((p) => p.slug === slug);
-  if (
-    !path ||
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index >= path.steps.length
-  ) {
-    return { prev: null, next: null };
-  }
-  const at = (j: number): PathNeighbor | null => {
-    const s = path.steps[j];
-    return s
-      ? {
-          letter: s.letter,
-          subId: s.subId,
-          lessonId: s.lessonId,
-          title: s.title,
-          index: j,
-        }
-      : null;
-  };
-  return { prev: at(index - 1), next: at(index + 1) };
+/** The expanded sidebar for one path, by slug (undefined if the slug is unknown). */
+export function getPathSidebar(slug: string): PathSidebar | undefined {
+  return getPathSidebars().find((p) => p.slug === slug);
 }

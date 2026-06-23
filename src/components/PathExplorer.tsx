@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathHighlight } from "@/components/PathHighlightProvider";
 import { groupLabelOf } from "@/lib/path-groups";
+import { pathStepHref } from "@/lib/path-url";
 
 /** Per-pillar chip in a path: an ordered subsection with its rolled-up state. */
 export interface PathChip {
@@ -209,7 +210,7 @@ function PathSteps({ steps, slug }: { steps: PathStepView[]; slug: string }) {
                 </div>
               )}
               <Link
-                href={`/pillar/${step.letter}/${step.subId}/${step.lessonId}?path=${slug}&i=${i}`}
+                href={pathStepHref(slug, step, i)}
                 className="flex items-center gap-2 px-2 py-1 rounded no-underline hover:bg-[var(--card-2)] transition-colors group"
                 title={`${step.subId}/${step.lessonId}`}
               >

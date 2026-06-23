@@ -1,8 +1,8 @@
 import { PATHS, getSubsectionById } from "@/lib/dag";
-import { getLesson, lessonKey, pillarProgress } from "@/lib/curriculum";
+import { lessonKey, pillarProgress } from "@/lib/curriculum";
 import { expandPathSteps, distinctSubIds } from "@/lib/paths";
-import { pathSlug } from "@/lib/path-sidebars";
-import { lessonContentStatus } from "@/lib/content";
+import { pathSlug } from "@/lib/path-url";
+import { resolvePathStep } from "@/lib/path-sidebars";
 import type { ProgressMap } from "@/lib/progress";
 import {
   PathExplorer,
@@ -50,8 +50,6 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
       .filter((c): c is NonNullable<typeof c> => c !== null);
 
     const steps: PathStepView[] | undefined = expandedSteps?.map((s) => {
-      const sub = getSubsectionById(s.subId);
-      const lesson = getLesson(s.subId, s.lessonId);
       const raw = prog.get(lessonKey(s.subId, s.lessonId));
       const state =
         raw === "studied"
@@ -59,17 +57,7 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
           : raw === "in-progress"
             ? "in-progress"
             : "untouched";
-      return {
-        subId: s.subId,
-        lessonId: s.lessonId,
-        letter: sub?.pillar.letter ?? "",
-        color: sub?.pillar.color ?? "var(--fg-dim)",
-        title: lesson?.title ?? s.lessonId,
-        note: s.note,
-        section: s.section,
-        available: lessonContentStatus(s.subId, s.lessonId) === "available",
-        state,
-      };
+      return { ...resolvePathStep(s), state };
     });
 
     // Lesson-stepped paths roll progress over their steps; others over pillars.
