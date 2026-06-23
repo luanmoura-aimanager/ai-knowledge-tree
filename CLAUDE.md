@@ -305,15 +305,30 @@ paths), not just a `pillars[]` chip list:
   detail, so **keep same-`section` steps contiguous**. (The LLM Theory path omits
   `section` and instead groups by the ai-math-theory chapter parsed from `note`;
   that `note`-based fallback exists for it alone.)
-- **`pillars[]`**: set it to the **distinct step subsections, in step order**. It
-  drives the discipline chips and the connections-graph highlight, so it must
-  match what `steps[]` traverses.
+- **`pillars[]`**: set it to the **distinct step subsections, in step order**.
+  For stepped paths the discipline chips and graph highlight are actually derived
+  from the *expanded* steps (see below), so `pillars[]` is a fallback (used by
+  any path without `steps[]`); still keep it accurate to what `steps[]` traverses.
 - **Validate every id resolves**: each `subId/lessonId` must exist in
   `src/lib/curriculum`, and each `pillars[]` (and any new `CONNECTIONS`) id must
   be a real subsection. Dangling ids silently render raw slugs or broken links
   rather than failing the build, so check them.
 
-Run `npm run build` and `npm run lint` before committing; both must be clean.
+**Prerequisite closure is automatic.** A curated `steps[]` is a *highlight reel* —
+list only the lessons that tell the path's story; you do **not** need to include
+their prerequisites. At render time `expandPathSteps` (`src/lib/paths.ts`) inserts
+each lesson's transitive prerequisites **just before the first step that needs
+them**, so the rendered path is prerequisite-closed and ordered (its first lesson
+is always prerequisite-free) and the chips/graph reflect every subsection the
+expanded path traverses. Inserted prereqs inherit the puller's `section` (or the
+`note` chapter) so they fold into the same group. This invariant holds for all
+paths: `B5/potential-outcomes` opening a path drags in its `B1`/`A2` chain.
+
+The guard **`npm run check:paths`** (`scripts/check-path-prereqs.ts`, run via
+`tsx`; also chained into `prebuild`) fails if any path's expansion isn't
+prerequisite-closed/ordered or if a lesson references a prerequisite id that
+doesn't exist. Run `npm run build` and `npm run lint` before committing; all must
+be clean.
 
 ### Run / build / deploy
 ```bash

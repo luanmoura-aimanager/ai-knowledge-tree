@@ -1,5 +1,6 @@
 import { PATHS, getSubsectionById } from "@/lib/dag";
 import { getLesson, lessonKey, pillarProgress } from "@/lib/curriculum";
+import { expandPathSteps, distinctSubIds } from "@/lib/paths";
 import { lessonContentStatus } from "@/lib/content";
 import type { ProgressMap } from "@/lib/progress";
 import {
@@ -23,9 +24,17 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
   const prog = progress ?? new Map();
 
   const views: PathView[] = PATHS.map((path) => {
-    const pp = pillarProgress(path.pillars, prog);
+    // Lesson-stepped paths are expanded to their prerequisite closure (each
+    // lesson's transitive prerequisites inserted just before it) so the path can
+    // be followed top to bottom. The discipline chips and graph highlight then
+    // reflect every subsection the expanded path actually traverses.
+    const expandedSteps = path.steps ? expandPathSteps(path.steps) : undefined;
+    const pillarIds = expandedSteps
+      ? distinctSubIds(expandedSteps)
+      : path.pillars;
+    const pp = pillarProgress(pillarIds, prog);
 
-    const chips = path.pillars
+    const chips = pillarIds
       .map((id) => {
         const sub = getSubsectionById(id);
         if (!sub) return null;
@@ -39,7 +48,7 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
       })
       .filter((c): c is NonNullable<typeof c> => c !== null);
 
-    const steps: PathStepView[] | undefined = path.steps?.map((s) => {
+    const steps: PathStepView[] | undefined = expandedSteps?.map((s) => {
       const sub = getSubsectionById(s.subId);
       const lesson = getLesson(s.subId, s.lessonId);
       const raw = prog.get(lessonKey(s.subId, s.lessonId));
