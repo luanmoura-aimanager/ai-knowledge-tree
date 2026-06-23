@@ -31,7 +31,7 @@ interface Graph {
 let GRAPH: Graph | null = null;
 
 /** Normalize a prereq token for a lesson living in `ownSubId` (mirrors page.tsx). */
-function normalize(token: string, ownSubId: string): Key {
+export function normalizePrereq(token: string, ownSubId: string): Key {
   return token.includes("/") ? token : `${ownSubId}/${token}`;
 }
 
@@ -44,7 +44,7 @@ function buildGraph(): Graph {
     exists.add(key);
     prereqs.set(
       key,
-      (l.prerequisites ?? []).map((t) => normalize(t, l.subId)),
+      (l.prerequisites ?? []).map((t) => normalizePrereq(t, l.subId)),
     );
     rank.set(key, i);
   });
@@ -183,9 +183,14 @@ export function expandPathSteps(steps: PathStep[]): PathStep[] {
 
 /** Distinct subsection ids in first-occurrence order (for chips / graph highlight). */
 export function distinctSubIds(steps: PathStep[]): string[] {
-  const seen: string[] = [];
-  for (const s of steps) if (!seen.includes(s.subId)) seen.push(s.subId);
-  return seen;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of steps)
+    if (!seen.has(s.subId)) {
+      seen.add(s.subId);
+      out.push(s.subId);
+    }
+  return out;
 }
 
 export interface PathPrereqIssue {
