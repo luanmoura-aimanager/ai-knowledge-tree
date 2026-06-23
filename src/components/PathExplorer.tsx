@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathHighlight } from "@/components/PathHighlightProvider";
+import { groupLabelOf } from "@/lib/path-groups";
 
 /** Per-pillar chip in a path: an ordered subsection with its rolled-up state. */
 export interface PathChip {
@@ -29,6 +30,8 @@ export interface PathStepView {
 /** A fully-computed path view-model handed down from the server component. */
 export interface PathView {
   name: string;
+  /** Stable slug carried in the `?path=` query when opening a step's lesson. */
+  slug: string;
   desc: string;
   color: string;
   studied: number;
@@ -38,39 +41,6 @@ export interface PathView {
   pctGap: number;
   chips: PathChip[];
   steps?: PathStepView[];
-}
-
-/** amt chapter labels, keyed by the chapter number parsed from a step's note. */
-const AMT_CHAPTERS: Record<string, string> = {
-  "0": "Ch0 · Math foundations",
-  "1": "Ch1 · Linear models & the perceptron",
-  "2": "Ch2 · MLPs & backprop",
-  "3": "Ch3 · Optimization & regularization",
-  "4": "Ch4 · CNN bridge",
-  "5": "Ch5 · Sequence modeling & embeddings",
-  "6": "Ch6 · Attention & the Transformer",
-  "7": "Ch7 · Training language models",
-  "8": "Ch8 · Modern LLM architectures",
-  "9": "Ch9 · Alignment",
-  "10": "Ch10 · Inference & decoding",
-  "11": "Ch11 · Interpretability & the frontier",
-  "12": "Ch12 · Capstone: build a tiny GPT",
-};
-
-function chapterOf(note?: string): string {
-  const m = note?.match(/\d+/);
-  return m ? m[0] : "";
-}
-
-/**
- * The heading a step is grouped under. An explicit `section` wins (curated
- * role-paths); otherwise fall back to the ai-math-theory chapter parsed from the
- * note (the LLM Theory mirror). Empty string means "no header".
- */
-function groupLabelOf(step: PathStepView): string {
-  if (step.section) return step.section;
-  const ch = chapterOf(step.note);
-  return AMT_CHAPTERS[ch] ?? ch;
 }
 
 /**
@@ -201,7 +171,9 @@ function PathDetail({
         </div>
       </div>
 
-      {path.steps && path.steps.length > 0 && <PathSteps steps={path.steps} />}
+      {path.steps && path.steps.length > 0 && (
+        <PathSteps steps={path.steps} slug={path.slug} />
+      )}
 
       <div className="mt-6">
         <div className="text-xs text-[var(--fg-mute)] mb-1">
@@ -218,7 +190,7 @@ function PathDetail({
 }
 
 /** The ordered lesson sequence, grouped by amt chapter, with per-step links. */
-function PathSteps({ steps }: { steps: PathStepView[] }) {
+function PathSteps({ steps, slug }: { steps: PathStepView[]; slug: string }) {
   return (
     <div className="mt-6">
       <h4 className="text-xs uppercase tracking-wider text-[var(--fg-dim)] mb-2 font-semibold">
@@ -237,7 +209,7 @@ function PathSteps({ steps }: { steps: PathStepView[] }) {
                 </div>
               )}
               <Link
-                href={`/pillar/${step.letter}/${step.subId}/${step.lessonId}`}
+                href={`/pillar/${step.letter}/${step.subId}/${step.lessonId}?path=${slug}&i=${i}`}
                 className="flex items-center gap-2 px-2 py-1 rounded no-underline hover:bg-[var(--card-2)] transition-colors group"
                 title={`${step.subId}/${step.lessonId}`}
               >

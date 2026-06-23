@@ -13,6 +13,7 @@ import {
   lessonKey,
 } from "@/lib/curriculum";
 import { getProgressMap, isSignedIn } from "@/lib/progress";
+import { getPathPrevNext } from "@/lib/path-sidebars";
 import { MdxContent } from "@/components/mdx/MdxContent";
 import { StudyProgressControls } from "@/components/StudyProgressControls";
 
@@ -46,10 +47,13 @@ function PrereqLink({ token }: { token: string }) {
 
 export default async function LessonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ letter: string; subId: string; lessonId: string }>;
+  searchParams: Promise<{ path?: string; i?: string }>;
 }) {
   const { letter, subId, lessonId } = await params;
+  const { path: pathSlug, i: pathIndex } = await searchParams;
   const pillar = getPillarByLetter(letter);
   const sub = getSubsectionById(subId);
   const lesson = getLesson(subId, lessonId);
@@ -63,7 +67,37 @@ export default async function LessonPage({
 
   const loaded = loadLesson(subId, lessonId);
   const fm = loaded?.frontmatter;
-  const { prev, next } = getLessonPrevNext(subId, lessonId);
+
+  // When following a path (`?path=<slug>&i=<step>`), prev/next walk the path's
+  // expanded sequence (carrying the query so the next page stays in path mode);
+  // otherwise they move within the current discipline.
+  const pathNav = pathSlug
+    ? getPathPrevNext(pathSlug, Number(pathIndex))
+    : { prev: null, next: null };
+  const query = (i: number) => `?path=${pathSlug}&i=${i}`;
+  const fallback = getLessonPrevNext(subId, lessonId);
+  const prev = pathNav.prev
+    ? {
+        href: `/pillar/${pathNav.prev.letter}/${pathNav.prev.subId}/${pathNav.prev.lessonId}${query(pathNav.prev.index)}`,
+        title: pathNav.prev.title,
+      }
+    : fallback.prev
+      ? {
+          href: `/pillar/${pillar.letter}/${fallback.prev.subId}/${fallback.prev.id}`,
+          title: fallback.prev.title,
+        }
+      : null;
+  const next = pathNav.next
+    ? {
+        href: `/pillar/${pathNav.next.letter}/${pathNav.next.subId}/${pathNav.next.lessonId}${query(pathNav.next.index)}`,
+        title: pathNav.next.title,
+      }
+    : fallback.next
+      ? {
+          href: `/pillar/${pillar.letter}/${fallback.next.subId}/${fallback.next.id}`,
+          title: fallback.next.title,
+        }
+      : null;
 
   const key = lessonKey(subId, lessonId);
   const showControls = await isSignedIn();
@@ -120,7 +154,7 @@ export default async function LessonPage({
       <nav className="flex justify-between gap-4 mt-12 pt-6 border-t border-[var(--border)]">
         {prev ? (
           <Link
-            href={`/pillar/${pillar.letter}/${prev.subId}/${prev.id}`}
+            href={prev.href}
             className="card p-4 no-underline flex-1 max-w-[48%]"
           >
             <div className="text-xs text-[var(--fg-mute)]">← Previous</div>
@@ -133,7 +167,7 @@ export default async function LessonPage({
         )}
         {next ? (
           <Link
-            href={`/pillar/${pillar.letter}/${next.subId}/${next.id}`}
+            href={next.href}
             className="card p-4 no-underline flex-1 max-w-[48%] text-right"
           >
             <div className="text-xs text-[var(--fg-mute)]">Next →</div>

@@ -1,6 +1,7 @@
 import { PATHS, getSubsectionById } from "@/lib/dag";
 import { getLesson, lessonKey, pillarProgress } from "@/lib/curriculum";
 import { expandPathSteps, distinctSubIds } from "@/lib/paths";
+import { pathSlug } from "@/lib/path-sidebars";
 import { lessonContentStatus } from "@/lib/content";
 import type { ProgressMap } from "@/lib/progress";
 import {
@@ -85,6 +86,7 @@ export function LearningPaths({ progress }: { progress?: ProgressMap }) {
 
     return {
       name: path.name,
+      slug: pathSlug(path.name),
       desc: path.desc,
       color: path.color,
       studied,
