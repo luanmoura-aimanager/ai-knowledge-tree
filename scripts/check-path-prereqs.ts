@@ -19,8 +19,26 @@ import {
   validatePathClosure,
   normalizePrereq,
 } from "@/lib/paths";
+import { pathSlug } from "@/lib/path-url";
 
 let failed = false;
+
+// 0. Path slugs (derived from the name, carried in `?path=`) must be unique: two
+// names that collapse to the same slug would make one path unreachable and the
+// other's lessons render under the wrong path's sidebar.
+const slugSeen = new Map<string, string>();
+for (const path of PATHS) {
+  const slug = pathSlug(path.name);
+  const prev = slugSeen.get(slug);
+  if (prev) {
+    failed = true;
+    console.log(
+      `✗ duplicate path slug "${slug}": "${prev}" and "${path.name}"`,
+    );
+  } else {
+    slugSeen.set(slug, path.name);
+  }
+}
 
 // 1. Global: no lesson may reference a prerequisite that doesn't exist.
 const exists = new Set(allLessons().map((l) => `${l.subId}/${l.id}`));

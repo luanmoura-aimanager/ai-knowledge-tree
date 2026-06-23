@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSubsectionById } from "@/lib/dag";
@@ -13,8 +14,10 @@ import {
   lessonKey,
 } from "@/lib/curriculum";
 import { getProgressMap, isSignedIn } from "@/lib/progress";
+import { getPathSidebars } from "@/lib/path-sidebars";
 import { MdxContent } from "@/components/mdx/MdxContent";
 import { StudyProgressControls } from "@/components/StudyProgressControls";
+import { LessonPrevNext, PrevNextNav } from "@/components/LessonPrevNext";
 
 export function generateStaticParams() {
   return allLessons().flatMap((l) => {
@@ -63,7 +66,16 @@ export default async function LessonPage({
 
   const loaded = loadLesson(subId, lessonId);
   const fm = loaded?.frontmatter;
-  const { prev, next } = getLessonPrevNext(subId, lessonId);
+
+  // Discipline-order prev/next, computed here; the client LessonPrevNext swaps to
+  // path order when the lesson was opened from a path (`?path=`). Path mode is
+  // resolved client-side (like the sidebar) so it works even when this page is
+  // statically prerendered and the server can't see the query.
+  const fallback = getLessonPrevNext(subId, lessonId);
+  const discLink = (l: { subId: string; id: string; title: string } | null) =>
+    l
+      ? { href: `/pillar/${pillar.letter}/${l.subId}/${l.id}`, title: l.title }
+      : null;
 
   const key = lessonKey(subId, lessonId);
   const showControls = await isSignedIn();
@@ -117,34 +129,20 @@ export default async function LessonPage({
         </div>
       )}
 
-      <nav className="flex justify-between gap-4 mt-12 pt-6 border-t border-[var(--border)]">
-        {prev ? (
-          <Link
-            href={`/pillar/${pillar.letter}/${prev.subId}/${prev.id}`}
-            className="card p-4 no-underline flex-1 max-w-[48%]"
-          >
-            <div className="text-xs text-[var(--fg-mute)]">← Previous</div>
-            <div className="text-sm font-semibold text-[var(--fg)]">
-              {prev.title}
-            </div>
-          </Link>
-        ) : (
-          <span className="flex-1 max-w-[48%]" />
-        )}
-        {next ? (
-          <Link
-            href={`/pillar/${pillar.letter}/${next.subId}/${next.id}`}
-            className="card p-4 no-underline flex-1 max-w-[48%] text-right"
-          >
-            <div className="text-xs text-[var(--fg-mute)]">Next →</div>
-            <div className="text-sm font-semibold text-[var(--fg)]">
-              {next.title}
-            </div>
-          </Link>
-        ) : (
-          <span className="flex-1 max-w-[48%]" />
-        )}
-      </nav>
+      <Suspense
+        fallback={
+          <PrevNextNav
+            prev={discLink(fallback.prev)}
+            next={discLink(fallback.next)}
+          />
+        }
+      >
+        <LessonPrevNext
+          paths={getPathSidebars()}
+          disciplinePrev={discLink(fallback.prev)}
+          disciplineNext={discLink(fallback.next)}
+        />
+      </Suspense>
     </article>
   );
 }

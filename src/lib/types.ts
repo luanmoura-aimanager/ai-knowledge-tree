@@ -125,6 +125,31 @@ export interface Lesson {
 /** A lesson plus the subsection it belongs to (returned by curriculum helpers). */
 export type LessonWithSub = Lesson & { subId: string };
 
+/** One resolved lesson stop in a path's expanded sequence, for the lesson sidebar. */
+export interface PathSidebarStep {
+  letter: string;
+  subId: string;
+  lessonId: string;
+  title: string;
+  /** The pillar color of this step's subsection (steps cross pillars). */
+  color: string;
+  available: boolean;
+  section?: string;
+  note?: string;
+}
+
+/**
+ * A path's prerequisite-closed lesson sequence, handed to the lesson sidebar so a
+ * reader following a path sees the path's lessons (not the current discipline's).
+ */
+export interface PathSidebar {
+  /** Stable slug derived from the path name; carried in the `?path=` query. */
+  slug: string;
+  name: string;
+  color: string;
+  steps: PathSidebarStep[];
+}
+
 /** Frontmatter schema for a lesson MDX file (`content/<slug>/<subId>/<lessonId>.mdx`). */
 export interface LessonFrontmatter {
   title: string;
