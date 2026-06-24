@@ -23,7 +23,6 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
 
   useEffect(() => {
     const q = query.toLowerCase().trim();
-    const filtering = filter !== "all" || q !== "";
     const topics = document.querySelectorAll<HTMLElement>(".topic");
     topics.forEach((el) => {
       const status = el.dataset.status ?? "";
@@ -32,17 +31,12 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
       if (show && q && !name.includes(q)) show = false;
       el.classList.toggle("hidden", !show);
     });
+    // Hide a discipline whose lessons are all filtered out. Lessons live in the
+    // pillar detail panel that's currently open (the pillars render as a grid of
+    // cards with one expandable panel), so this acts on that open panel.
     document.querySelectorAll<HTMLElement>(".subsection").forEach((s) => {
       const v = s.querySelectorAll(".topic:not(.hidden)").length;
       s.classList.toggle("hidden", v === 0);
-    });
-    document.querySelectorAll<HTMLElement>(".pillar").forEach((p) => {
-      const v = p.querySelectorAll(".subsection:not(.hidden)").length;
-      p.classList.toggle("opacity-25", v === 0);
-      // Pillars are collapsed by default. While filtering, open the ones with
-      // matches (and collapse the rest) so results stay visible; when the
-      // filter clears, snap every pillar back to the collapsed default.
-      p.classList.toggle("body-collapsed", filtering ? v === 0 : true);
     });
   }, [filter, query]);
 
@@ -58,19 +52,6 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
         { id: "available", label: "Available" },
         { id: "coming-soon", label: "Coming soon" },
       ];
-
-  const setAllCollapsed = (collapsed: boolean) => {
-    document
-      .querySelectorAll<HTMLElement>(".pillar")
-      .forEach((p) => p.classList.toggle("body-collapsed", collapsed));
-    // Expanding a pillar should reveal everything inside it, so also clear any
-    // per-subsection collapse left over from manual h4 toggles.
-    if (!collapsed) {
-      document
-        .querySelectorAll<HTMLElement>(".subsection")
-        .forEach((s) => s.classList.remove("collapsed"));
-    }
-  };
 
   return (
     <div className="bg-[var(--bg)] border-b border-[var(--border)] py-3">
@@ -92,14 +73,6 @@ export function FilterBar({ signedIn = false }: { signedIn?: boolean }) {
               {f.label}
             </button>
           ))}
-        </div>
-        <div className="flex gap-1.5 ml-auto">
-          <button className="btn" onClick={() => setAllCollapsed(false)}>
-            ▾ Expand all
-          </button>
-          <button className="btn" onClick={() => setAllCollapsed(true)}>
-            ▸ Collapse all
-          </button>
         </div>
       </div>
     </div>

@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { PILLARS, getSubsectionById } from "@/lib/dag";
+import { getSubsectionById } from "@/lib/dag";
 import { allLessons, getLesson } from "@/lib/curriculum";
 import { lessonContentStatus } from "@/lib/content";
 import { Hero } from "@/components/Hero";
 import { DashboardStats } from "@/components/DashboardStats";
 import { FilterBar } from "@/components/FilterBar";
 import { CollapseController } from "@/components/CollapseController";
-import { PillarCard } from "@/components/PillarCard";
+import { PillarsSection } from "@/components/PillarsSection";
 import { ConnectionsGraph } from "@/components/ConnectionsGraph";
 import { LearningPaths } from "@/components/LearningPaths";
 import { PathHighlightProvider } from "@/components/PathHighlightProvider";
@@ -15,7 +15,7 @@ import { getProgressMap, getResume, isSignedIn } from "@/lib/progress";
 /**
  * Homepage = the dashboard. Server-rendered pillar grid with client islands for
  * interactivity. When signed in, the per-subsection progress overlay and the
- * big stats reflect the user's own study state (see DashboardStats / PillarCard).
+ * big stats reflect the user's own study state (see DashboardStats / PillarsSection).
  */
 export default async function HomePage() {
   const signedIn = await isSignedIn();
@@ -67,16 +67,7 @@ export default async function HomePage() {
         availableLessons={availableLessons}
       />
 
-      <div className="max-w-[1280px] mx-auto px-6 pt-4 pb-4">
-        {PILLARS.map((p) => (
-          <PillarCard
-            key={p.letter}
-            pillar={p}
-            progress={progress}
-            signedIn={signedIn}
-          />
-        ))}
-      </div>
+      <PillarsSection progress={progress} signedIn={signedIn} />
 
       <PathHighlightProvider>
         <LearningPaths progress={progress} />

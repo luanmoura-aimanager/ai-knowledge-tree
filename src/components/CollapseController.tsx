@@ -3,14 +3,13 @@
 import { useEffect } from "react";
 
 /**
- * Wires the two click-to-collapse levels by event delegation (renders nothing).
+ * Wires the per-discipline collapse by event delegation (renders nothing).
  *
- * - Clicking a subsection `h4` toggles `.collapsed` on its `.subsection`.
- * - Clicking a `.pillar-header` toggles `.body-collapsed` on its `.pillar`.
+ * Clicking a subsection `h4` (in the open pillar detail panel) toggles
+ * `.collapsed` on its `.subsection`, hiding that discipline's lesson list.
  *
  * Links inside the header (the subsection name) call stopPropagation, so
- * navigating to the study page does not also collapse. Global expand/collapse
- * lives in FilterBar and mutates `.subsection` classes directly.
+ * navigating to the study page does not also collapse.
  */
 export function CollapseController() {
   useEffect(() => {
@@ -23,12 +22,6 @@ export function CollapseController() {
       const h4 = target.closest(".subsection h4");
       if (h4) {
         h4.closest(".subsection")?.classList.toggle("collapsed");
-        return;
-      }
-
-      const header = target.closest(".pillar-header");
-      if (header) {
-        header.closest(".pillar")?.classList.toggle("body-collapsed");
       }
     };
 
