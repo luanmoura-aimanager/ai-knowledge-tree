@@ -293,43 +293,6 @@ export const C_CURRICULUM: Record<string, Lesson[]> = {
   ],
   C8: [
     {
-      id: "collaborative-filtering",
-      title: "Collaborative filtering",
-      goal: "Recommend items by item-item or user-user neighborhoods over the rating matrix.",
-    },
-    {
-      id: "matrix-factorization",
-      title: "Matrix factorization (SVD, ALS)",
-      goal: "Factor the rating matrix into low-rank user and item embeddings, fit with ALS or SGD.",
-      prerequisites: ["A1/low-rank-pca"],
-    },
-    {
-      id: "implicit-feedback",
-      title: "Implicit feedback and weighted MF",
-      goal: "Handle clicks and views (not ratings) with weighted alternating least squares.",
-      prerequisites: ["matrix-factorization"],
-    },
-    {
-      id: "nmf",
-      title: "Non-negative matrix factorization",
-      goal: "Restrict factors to be nonnegative and get parts-based representations of users and items.",
-      prerequisites: ["matrix-factorization"],
-    },
-    {
-      id: "two-tower",
-      title: "Two-tower and neural collaborative filtering",
-      goal: "Embed users and items with neural nets and score with a dot product, the basis of modern retrieval.",
-      prerequisites: ["matrix-factorization"],
-    },
-    {
-      id: "sequential-rec",
-      title: "Sequential recommendation",
-      goal: "Model user histories as sequences (SASRec, BERT4Rec) and predict the next item.",
-      prerequisites: ["two-tower"],
-    },
-  ],
-  C9: [
-    {
       id: "ann-problem",
       title: "The approximate nearest neighbor problem",
       goal: "State the ANN problem, see why exact NN is infeasible at scale, and define recall@k.",
@@ -360,7 +323,7 @@ export const C_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: ["hnsw", "ivf-pq"],
     },
   ],
-  C10: [
+  C9: [
     {
       id: "classification-metrics",
       title: "Classification metrics",

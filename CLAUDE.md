@@ -5,7 +5,7 @@ Guidance for Claude Code when working in `ai-knowledge-tree/`.
 ## What this project is
 
 A deployed study site mapping the full DAG of Data Science, Machine Learning,
-Deep Learning and AI Engineering. Each top-level **pillar** (A → J) has
+Deep Learning and AI Engineering. Each top-level **pillar** (A → N) has
 **subsections** (e.g. `A1`, `J3`); each subsection is a *discipline* taught as an
 ordered sequence of atomic **lessons** (one concept per page, with step-by-step
 derivations). Subsections in different pillars are linked by explicit
@@ -22,7 +22,7 @@ pillars A/C/D/E) and `../AI Eng Journey/` (the applied roadmap behind pillar J).
 ## The Next.js app is primary
 
 The homepage `/` **is** the dashboard, served by Next.js. It renders the hero,
-big stats, sticky filter bar, all 10 pillars with three-level collapse, the D3
+big stats, sticky filter bar, all 14 pillars with three-level collapse, the D3
 force-directed connections graph with click-to-pin panel, and the learning
 paths, the same experience the old standalone HTML had, now in React.
 
@@ -100,7 +100,7 @@ keyed `"subId/lessonId"` (see `lessonKey`).
 
 Everything structural reads from three exports:
 
-- `PILLARS: Pillar[]`. 10 pillars A → J. Each has `letter`, `slug`, `name`,
+- `PILLARS: Pillar[]`. 14 pillars A → N. Each has `letter`, `slug`, `name`,
   `shortName` (compact label for graph pills), `tagline`, `color` (hex), `subs[]`.
   Each subsection has a stable `id` (`"D4"`), `name`, and flat `topics`.
 - `CONNECTIONS: Connection[]`. Cross-pillar edges `{ from, to, label, kind }`,
@@ -290,7 +290,7 @@ This is the workflow for every new pillar. Follow it in order.
 
 ### Add a topic / subsection / connection
 Edit the relevant array in `src/lib/dag.ts`. Add `shortName` for new pillars and
-bump the graph grid (`cols`/`rows`) if you exceed 10 pillars.
+bump the graph grid (`cols`/`rows`) if you exceed the current 7×2 layout.
 
 ### Add a suggested path
 Add a `Path` to `PATHS` in `src/lib/dag.ts`. Every path **must** carry a

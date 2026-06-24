@@ -13,6 +13,7 @@ import { J_CURRICULUM } from "./J";
 import { K_CURRICULUM } from "./K";
 import { L_CURRICULUM } from "./L";
 import { M_CURRICULUM } from "./M";
+import { N_CURRICULUM } from "./N";
 
 /**
  * Lesson curriculum registry: subsection id → ordered Lesson[]. Each pillar's
@@ -33,6 +34,7 @@ const CURRICULA: Record<string, Lesson[]> = {
   ...K_CURRICULUM,
   ...L_CURRICULUM,
   ...M_CURRICULUM,
+  ...N_CURRICULUM,
 };
 
 /** Ordered lessons for a subsection (empty if none authored/planned yet). */

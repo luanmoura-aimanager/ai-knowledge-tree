@@ -1,0 +1,273 @@
+---
+title: "Hyperparameter optimization"
+pillar: C
+subId: C9
+lessonId: hpo
+order: 5
+estimatedMinutes: 24
+goal: "Search hyperparameter space with grid, random, and Bayesian methods; understand the bias/variance of the search itself."
+prerequisites: ["cv-strategies", "A3/bayesian-optimization"]
+---
+
+Almost every algorithm has hyperparameters that affect performance
+substantially. The default values are seldom optimal. **Hyperparameter
+optimization (HPO)** is the search over those parameters, with the
+evaluation done by cross-validation. The search is itself an
+optimization problem with its own pitfalls: budget, bias toward over-
+fitting on the validation set, and variance of the picked configuration.
+
+## Grid search
+
+Define a finite grid of hyperparameter values, evaluate every
+combination, pick the best.
+
+- **Pros**: simple, exhaustive, reproducible.
+- **Cons**: scales exponentially in the number of hyperparameters
+  ($K^d$). Spends compute on all dimensions equally, even the ones that
+  do not matter.
+
+Useful for 1-2 hyperparameters with few values, but quickly impractical.
+
+## Random search
+
+Sample hyperparameters from distributions (uniform on a scale, log-uniform
+on a regularization strength, categorical for choices). Evaluate $T$
+samples. Pick the best.
+
+**Random search beats grid search** (Bergstra & Bengio, 2012)<FN n="1" /> on most
+problems because real importance is concentrated in a few hyperparameters
+and grid wastes evaluations on the unimportant ones. With the same
+compute budget, random covers a wider range and finds better
+configurations.
+
+Random search is the right default when you do not want to think hard.
+
+## Bayesian optimization
+
+Build a surrogate model of "loss as a function of hyperparameters",
+typically a Gaussian process or tree-based estimator (TPE in Optuna /
+Hyperopt). Use the surrogate's posterior to choose the next
+configuration via expected improvement or similar acquisition functions<FN n="2" />.
+
+The A3 lesson on Bayesian optimization is the foundation. For HPO
+specifically:
+
+- **Sequential**: each evaluation informs the next. Inherently serial.
+- **Parallel BO** exists (Thompson sampling with parallel chains, batch
+  acquisition) but is harder.
+- **Cold start**: needs a handful of random evaluations before the
+  surrogate is useful.
+
+BO usually beats random search at moderate budgets (50-200 evaluations)
+on continuous hyperparameter spaces. For very small or very large
+budgets, random is competitive.
+
+## Successive halving and Hyperband
+
+For expensive training runs, you can save compute by **early-stopping**
+configurations that look bad after a few epochs. **Successive halving**:
+
+1. Run $T$ configurations for $r_0$ epochs (or steps).
+2. Keep the top half; run them for $2 r_0$ epochs.
+3. Continue until one survives at full budget.
+
+**Hyperband** picks multiple $T$ / $r_0$ combinations to handle the
+case where slow-starting configurations beat fast-starting ones in the
+long run.
+
+Both methods give you many more configurations per unit compute than
+naive full-budget search. Combine with random sampling for the standard
+**ASHA** (asynchronous successive halving) production setup.
+
+## The bias of repeated CV
+
+If you pick the best CV score over many configurations, the best score
+is **optimistically biased**: you implicitly searched over the noise in
+the CV estimate. The standard fix:
+
+- Estimate generalization on a held-out **test set** that the search
+  never sees.
+- Or: nested CV with the inner loop doing HPO and the outer loop
+  estimating generalization.
+
+The bias gets worse as the number of configurations grows. Bayesian
+optimization, by efficiently focusing on the good region, can paradoxically
+reduce this bias (fewer wasted evaluations means less search noise) but
+the principle still applies: keep a test set the search never touches.
+
+## How much to spend
+
+Diminishing returns set in quickly. The first 20-50 evaluations buy most
+of the gain; the next 200 buy a small extra fraction. Match HPO budget to
+the value of the marginal improvement. For most production problems, a
+few hours of random search is enough.
+
+## What to tune
+
+- **Learning rate** and **regularization strength** matter most for
+  linear and neural models.
+- **Tree depth** and **number of estimators** for tree-based models.
+- **Number of neighbors** $k$ for k-NN.
+
+Some hyperparameters look important but are not (e.g. random seeds in
+some settings). Sensitivity analysis on a small budget reveals which
+parameters are worth tuning.
+
+```mermaid
+graph TD
+  A["hyperparameter space"] --> B["sample a config:<br/>grid, random, or Bayesian"]
+  B --> C["train and cross-validate"]
+  C -->|update search| B
+  C --> D["pick best config"]
+  D --> E["final test-set eval"]
+```
+
+## Check it on arrays
+
+A minimal random search + Bayesian-ish refinement for a single
+hyperparameter.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Synthetic CV-like objective: cv_score as a function of hyperparameter lambda
+# (something with one clear optimum, plus noise per evaluation)
+def cv_eval(lam, noise=0.02, rng=rng):
+    true = -0.5 + 0.3 * (np.log10(lam) + 1)**2
+    return true + noise * rng.normal()
+
+# Grid search
+lams_grid = np.logspace(-3, 2, 11)
+grid_scores = [cv_eval(l) for l in lams_grid]
+best_grid = lams_grid[int(np.argmin(grid_scores))]
+print(f"grid search:        best lambda = {best_grid:.3f}, score = {min(grid_scores):.3f}, evals = {len(lams_grid)}")
+
+# Random search with same compute budget
+lams_rand = 10**(rng.uniform(-3, 2, 11))
+rand_scores = [cv_eval(l) for l in lams_rand]
+best_rand = lams_rand[int(np.argmin(rand_scores))]
+print(f"random search:      best lambda = {best_rand:.3f}, score = {min(rand_scores):.3f}, evals = {len(lams_rand)}")
+
+# "BO": after a few random init points, sample near the best
+lams_bo = list(10**(rng.uniform(-3, 2, 5)))
+bo_scores = [cv_eval(l) for l in lams_bo]
+for _ in range(6):
+    best_so_far = lams_bo[int(np.argmin(bo_scores))]
+    new_lam = best_so_far * 10**rng.normal(0, 0.5)        # explore around best
+    new_lam = max(min(new_lam, 100), 1e-3)
+    lams_bo.append(new_lam); bo_scores.append(cv_eval(new_lam))
+best_bo = lams_bo[int(np.argmin(bo_scores))]
+print(f"BO-like local:      best lambda = {best_bo:.3f}, score = {min(bo_scores):.3f}, evals = {len(lams_bo)}")
+```
+
+All three methods land near the optimum; BO-like local refinement gets
+slightly tighter than the others at the same evaluation budget.
+
+## Exercises
+
+**Exercise 1.** A model has $5$ hyperparameters. You can afford $32$
+evaluations. With grid search, how many distinct values per hyperparameter
+can you test if every combination is evaluated? Contrast this with what
+random search lets you explore for the two hyperparameters that actually
+matter, and state the lesson's reason random search usually wins.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** A full grid with $v$ values on each of $5$ axes costs $v^5$
+evaluations. Solving $v^5 \le 32$ gives $v \le 32^{1/5} = 2$. So the budget
+buys only $2$ values per hyperparameter, the coarsest possible grid.
+
+**Step 2.** Random search draws $32$ joint samples from the full space. The
+projection onto any single hyperparameter yields $32$ distinct values
+(generically), not $2$. So along each of the two important axes, random
+search probes $32$ points instead of $2$.
+
+**Step 3.** Real performance is dominated by a few hyperparameters
+(Bergstra and Bengio). The grid spends most of its $32$ evaluations varying
+the unimportant axes, wasting resolution where it does not matter; random
+search reallocates that resolution onto the axes that do, which is why it
+finds better configurations at equal budget.
+
+</details>
+
+**Exercise 2.** Explain why reporting the best cross-validation score over
+many tried configurations is optimistically biased, even when every
+configuration has the same true performance. Sketch the mechanism in terms
+of the maximum of noisy estimates.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Each configuration's CV score is its true score plus zero-mean
+estimation noise from the particular folds: $\hat s_j = s_j + \varepsilon_j$.
+
+**Step 2.** Suppose every $s_j$ equals the same value $s$. Selecting the best
+configuration reports $\max_j \hat s_j = s + \max_j \varepsilon_j$. The
+expectation of a maximum of zero-mean noise terms is strictly positive and
+grows with the number of configurations, so $\mathbb{E}[\max_j \hat s_j] > s$.
+
+**Step 3.** The search has implicitly fit the noise: it picked the
+configuration that got the luckiest fold draw, not a genuinely better one.
+The reported score therefore overstates true performance, and the overstatement
+worsens as more configurations are tried.
+
+**Step 4.** The fix is the lesson's: estimate generalization on a test set
+the search never touched, or use nested CV so the outer loop scores
+configurations chosen on separate inner data.
+
+</details>
+
+**Exercise 3 (code).** Quantify the selection bias of Exercise 2. Give every
+configuration the identical true score $0$ and pure CV noise, select the
+best by CV, then score the winner on a fresh independent draw. Show the gap
+between the winning CV score and the honest fresh score grows with the
+number of configurations.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+trials = 4000
+
+def selection_gap(n_configs):
+    gaps = []
+    for _ in range(trials):
+        cv = rng.normal(0.0, 1.0, n_configs)   # noisy CV, true score 0 for all
+        winner = int(cv.argmax())
+        honest = rng.normal(0.0, 1.0)          # fresh independent estimate of winner
+        gaps.append(cv[winner] - honest)
+    return float(np.mean(gaps))
+
+g1 = selection_gap(1)
+g10 = selection_gap(10)
+g100 = selection_gap(100)
+print(f"1 config:   gap = {g1:.3f}")
+print(f"10 configs: gap = {g10:.3f}")
+print(f"100 configs:gap = {g100:.3f}")
+assert g1 < g10 < g100
+```
+
+With one configuration the gap is about $0$ (nothing was selected over);
+with $10$ it is about $1.5$ and with $100$ about $2.5$. The reported CV
+score of the winner runs further above its honest performance the more
+configurations the search compares, which is the selection bias made
+numerical.
+
+</details>
+
+The final C9 lesson visualizes the model's behavior across training-set
+sizes: learning curves.
+
+<Footnotes>
+  <FNItem n="1">**Bergstra, J., & Bengio, Y.** (2012). "Random search for
+    hyper-parameter optimization". *Journal of Machine Learning Research*, 13, 281-305.</FNItem>
+  <FNItem n="2">**Snoek, J., Larochelle, H., & Adams, R. P.** (2012). "Practical
+    Bayesian optimization of machine learning algorithms". *NeurIPS*.
+    [arXiv:1206.2944](https://arxiv.org/abs/1206.2944)</FNItem>
+</Footnotes>

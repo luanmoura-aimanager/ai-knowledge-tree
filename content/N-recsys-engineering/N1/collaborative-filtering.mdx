@@ -1,0 +1,272 @@
+---
+title: "Collaborative filtering"
+pillar: N
+subId: N1
+lessonId: collaborative-filtering
+order: 2
+estimatedMinutes: 26
+goal: "Recommend items by item-item or user-user neighborhoods over the rating matrix."
+prerequisites: []
+---
+
+**Collaborative filtering** recommends items based on the behavior of other
+users: "people who liked what you liked also liked these". It needs only an
+interaction matrix (users × items) with no content features, which made it
+the dominant rec-sys approach in the early Netflix and Amazon era. The
+neighborhood version is the most direct: find similar users or similar items
+and aggregate their ratings.
+
+## The setup
+
+A **rating matrix** $R \in \mathbb{R}^{n_u \times n_i}$ has rows for users
+and columns for items; $R_{ui}$ is user $u$'s rating of item $i$. Most
+entries are missing (each user has rated few items). The goal: predict the
+missing entries, then recommend high-predicted items per user.
+
+## User-user CF
+
+To predict $R_{ui}$:
+
+1. Find a set $N_u$ of users similar to $u$ (typically the $k$ most similar
+   who have rated item $i$).
+2. Predict the rating as a similarity-weighted average:
+   $$
+   \hat R_{ui} = \bar R_u + \frac{\sum_{v \in N_u} \text{sim}(u, v)\,(R_{vi} - \bar R_v)}{\sum_{v \in N_u} |\text{sim}(u, v)|}.
+   $$
+
+Subtracting per-user means removes the "harsh rater" vs "easy rater" bias.
+Common similarities:
+
+- **Pearson correlation** over the items both rated (after centering).
+- **Cosine similarity** over the raw or centered rows.
+- **Jaccard** for implicit data (no explicit ratings).
+
+## Item-item CF
+
+Symmetric story: find a set $N_i$ of items similar to $i$ that user $u$ has
+rated, then
+
+$$
+\hat R_{ui} = \frac{\sum_{j \in N_i} \text{sim}(i, j)\, R_{uj}}{\sum_{j \in N_i} |\text{sim}(i, j)|}.
+$$
+
+In practice, **item-item is the workhorse**. Items typically have more
+ratings each than users, so the item-item similarity matrix is more stable.
+Items also change more slowly than users, so the similarity matrix can be
+precomputed once and reused for many queries.
+
+The trick that made item-item CF a production reality (Sarwar et al., 2001;
+Amazon)<FN n="1" />: precompute the item-item similarity matrix offline, then
+recommendations at query time are a sparse matrix-vector product with the
+user's history.
+
+## Cold-start problem
+
+Neighborhood CF needs *some* ratings for a user or item. New users and new
+items break it:
+
+- **New user**: no ratings, no similar users. Mitigation: ask for explicit
+  preferences on signup, or use content features as a fallback.
+- **New item**: no ratings, no similar items. Mitigation: content-based
+  features (genre, embeddings, metadata).
+- **Sparse data**: most users and items have few ratings each; neighborhoods
+  are small and noisy.
+
+Cold-start is the central design constraint of any practical rec-sys.
+
+## Limits
+
+- **Sparsity**: with millions of users and items, the rating matrix is
+  hugely sparse, and most pairwise similarities are dominated by noise.
+- **Popularity bias**: popular items appear in many neighborhoods and are
+  over-recommended.
+- **No personalization beyond ratings**: cannot leverage demographics, item
+  content, or context.
+
+The matrix-factorization methods of the next lesson address sparsity and
+generalization more effectively<FN n="2" />.
+
+```mermaid
+graph LR
+  R["user-item<br/>rating matrix"] --> S["similarity:<br/>cosine or Pearson"]
+  S --> N["nearest neighbors<br/>of user or item"]
+  N --> P["weighted average<br/>of neighbor ratings"]
+  P --> Y["predicted rating"]
+```
+
+## Check it on arrays
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# Toy rating matrix: 50 users x 30 items, sparse with about 8% filled
+n_u, n_i = 50, 30
+density = 0.08
+R = np.zeros((n_u, n_i))
+mask = rng.random((n_u, n_i)) < density
+R[mask] = rng.integers(1, 6, size=mask.sum())          # ratings 1-5
+
+# Item-item cosine similarity, only over users who rated both
+def item_item_sim(R):
+    n_i = R.shape[1]
+    S = np.zeros((n_i, n_i))
+    for i in range(n_i):
+        for j in range(i, n_i):
+            both = (R[:, i] > 0) & (R[:, j] > 0)
+            if both.sum() < 2:
+                S[i, j] = S[j, i] = 0
+            else:
+                num = np.dot(R[both, i], R[both, j])
+                den = np.linalg.norm(R[both, i]) * np.linalg.norm(R[both, j])
+                S[i, j] = S[j, i] = num / den if den > 0 else 0
+    return S
+
+S = item_item_sim(R)
+print(f"item-item similarity range: [{S[np.triu_indices(n_i, k=1)].min():.2f}, "
+      f"{S[np.triu_indices(n_i, k=1)].max():.2f}]")
+
+# Predict missing ratings with item-item CF, k=5
+def predict_iicf(R, S, u, i, k=5):
+    rated = np.where(R[u] > 0)[0]
+    if len(rated) == 0: return np.nan
+    sims = S[i, rated]
+    if (np.abs(sims) > 0).sum() == 0: return R[u, rated].mean()
+    top = np.argsort(-np.abs(sims))[:k]
+    num = np.sum(sims[top] * R[u, rated[top]])
+    den = np.sum(np.abs(sims[top]))
+    return num / den if den > 0 else R[u, rated].mean()
+
+# Predict on held-out cells: hide 20% of ratings, predict, compute RMSE
+known = list(zip(*np.where(R > 0)))
+rng.shuffle(known)
+val = known[: len(known) // 5]
+R_train = R.copy()
+true_vals = []
+for u, i in val:
+    true_vals.append(R[u, i])
+    R_train[u, i] = 0
+
+S_train = item_item_sim(R_train)
+pred_vals = [predict_iicf(R_train, S_train, u, i, k=5) for u, i in val]
+pred_arr = np.array(pred_vals)
+true_arr = np.array(true_vals)
+ok = ~np.isnan(pred_arr)
+rmse = np.sqrt(np.mean((pred_arr[ok] - true_arr[ok])**2))
+print(f"item-item CF held-out RMSE: {rmse:.3f}  (over {ok.sum()} predictable cells)")
+```
+
+The held-out RMSE shows how well item-item CF predicts unseen ratings on a
+small synthetic table.
+
+## Exercises
+
+**Exercise 1.** Two items $i$ and $j$ are rated by the same three users, with
+ratings $R_{\cdot i} = (4, 5, 3)$ and $R_{\cdot j} = (2, 1, 3)$. Compute their
+cosine similarity over these three common users (raw, uncentered).
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Cosine similarity is the dot product over the product of norms:
+$\text{sim}(i, j) = \frac{\sum_u R_{ui} R_{uj}}{\lVert R_{\cdot i}\rVert\,\lVert R_{\cdot j}\rVert}$.
+
+**Step 2.** Numerator: $4\cdot 2 + 5\cdot 1 + 3\cdot 3 = 8 + 5 + 9 = 22$.
+
+**Step 3.** Norms: $\lVert R_{\cdot i}\rVert = \sqrt{16 + 25 + 9} = \sqrt{50}$
+and $\lVert R_{\cdot j}\rVert = \sqrt{4 + 1 + 9} = \sqrt{14}$. So
+
+$$
+\text{sim}(i, j) = \frac{22}{\sqrt{50}\,\sqrt{14}} = \frac{22}{\sqrt{700}} \approx \frac{22}{26.458} \approx 0.832.
+$$
+
+The two items point in fairly similar directions despite the ratings differing
+in scale, which is the property cosine measures: angle, not magnitude.
+
+</details>
+
+**Exercise 2.** User-user CF predicts $R_{ui}$ with the mean-centered formula
+$\hat R_{ui} = \bar R_u + \frac{\sum_v \text{sim}(u, v)(R_{vi} - \bar R_v)}{\sum_v |\text{sim}(u, v)|}$.
+User $u$ has mean rating $\bar R_u = 3$. Two neighbors rate item $i$: neighbor
+$a$ with $\text{sim} = 0.8$, $R_{ai} = 5$, $\bar R_a = 4$; neighbor $b$ with
+$\text{sim} = 0.5$, $R_{bi} = 2$, $\bar R_b = 3$. Predict $\hat R_{ui}$.
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Center each neighbor's rating: $R_{ai} - \bar R_a = 5 - 4 = 1$ and
+$R_{bi} - \bar R_b = 2 - 3 = -1$.
+
+**Step 2.** Weight by similarity and sum the numerator:
+$0.8 \cdot 1 + 0.5 \cdot (-1) = 0.8 - 0.5 = 0.3$.
+
+**Step 3.** Normalize by the sum of absolute similarities,
+$|0.8| + |0.5| = 1.3$, and add back the user mean:
+
+$$
+\hat R_{ui} = 3 + \frac{0.3}{1.3} = 3 + 0.2308 \approx 3.231.
+$$
+
+Centering matters here: neighbor $a$ rates item $i$ above its own average while
+$b$ rates it below, so the small positive net pushes the prediction just above
+$u$'s baseline of 3.
+
+</details>
+
+**Exercise 3 (code).** Build a small explicit rating matrix where two items are
+near-duplicates (one a noisy copy of the other). Compute item-item cosine
+similarity over co-rating users and verify that the duplicate pair scores higher
+than the average off-diagonal similarity.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+n_u, n_i = 40, 6
+R = np.zeros((n_u, n_i))
+mask = rng.random((n_u, n_i)) < 0.5
+R[mask] = rng.integers(1, 6, size=mask.sum()).astype(float)
+
+# Make item 1 a noisy duplicate of item 0 wherever both could be rated
+dup_users = (R[:, 0] > 0)
+R[dup_users, 1] = np.clip(R[dup_users, 0] + rng.integers(-1, 2, dup_users.sum()), 1, 5)
+
+def item_item_sim(R):
+    n_i = R.shape[1]
+    S = np.zeros((n_i, n_i))
+    for i in range(n_i):
+        for j in range(n_i):
+            both = (R[:, i] > 0) & (R[:, j] > 0)
+            if both.sum() < 2:
+                continue
+            num = R[both, i] @ R[both, j]
+            den = np.linalg.norm(R[both, i]) * np.linalg.norm(R[both, j])
+            S[i, j] = num / den if den > 0 else 0.0
+    return S
+
+S = item_item_sim(R)
+dup_sim = S[0, 1]
+off_diag = S[np.triu_indices(n_i, k=1)]
+mean_off = off_diag.mean()
+
+assert dup_sim > mean_off
+print(f"duplicate pair sim: {dup_sim:.3f}  mean off-diagonal: {mean_off:.3f}")
+```
+
+The near-duplicate item scores above the average pairwise similarity, which is
+the signal item-item CF exploits: similar items have similar co-rating patterns.
+
+</details>
+
+The next lesson generalizes the approach with a latent-factor model that
+gracefully handles sparsity.
+
+<Footnotes>
+  <FNItem n="1">**Sarwar, B., Karypis, G., Konstan, J., & Riedl, J.** (2001). "Item-based collaborative filtering recommendation algorithms". *WWW*. [doi:10.1145/371920.372071](https://doi.org/10.1145/371920.372071). The item-item algorithm and offline precomputation that made neighborhood CF a production reality.</FNItem>
+  <FNItem n="2">**Koren, Y., Bell, R., & Volinsky, C.** (2009). "Matrix factorization techniques for recommender systems". *IEEE Computer*, 42(8), 30-37. [doi:10.1109/MC.2009.263](https://doi.org/10.1109/MC.2009.263). Why latent-factor models outperform neighborhood methods on sparse data.</FNItem>
+</Footnotes>

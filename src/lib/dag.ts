@@ -3,7 +3,7 @@
  *
  * Two exports:
  *
- *   PILLARS     : array of 12 top-level pillars (A → L), each with subsections
+ *   PILLARS     : array of 14 top-level pillars (A → N), each with subsections
  *                  and topics. Coverage status reflects what AI ML Theory
  *                  already covers; `hot` flags frontier material.
  *
@@ -384,27 +384,6 @@ export const PILLARS: Pillar[] = [
       },
       {
         id: "C8",
-        name: "Recommendation systems",
-        intro:
-          "Recommendation systems decide what to show next: products, movies, songs, posts. The core problem is filling in a vast, mostly empty matrix of user-item interactions and ranking what a person is most likely to want. It is one of the highest-leverage applications of machine learning in industry, quietly driving a large fraction of engagement and revenue on the platforms you use daily.\n\nYou will start with neighborhood-based collaborative filtering, then factor the rating matrix into low-rank user and item embeddings with SVD and ALS, extend it to implicit feedback (clicks and views) with weighted least squares, and get parts-based representations from non-negative matrix factorization. From there you will move to neural recommenders: two-tower and neural collaborative filtering models that embed users and items and score them with a dot product, and sequential models like SASRec and BERT4Rec that read user history as a sequence.\n\nThe matrix-factorization and embedding ideas here are the same retrieval substrate behind modern dense retrieval and RAG, and the two-tower architecture is now standard far beyond recommendations.",
-        prerequisites: [
-          "A1 Linear algebra: the SVD, low-rank factorization, PCA.",
-          "A3 Optimization: gradient descent and alternating minimization (ALS).",
-          "Working Python with numpy; D Deep learning basics help for the neural lessons.",
-        ],
-        topics: [
-          { name: "Collaborative filtering", status: "gap" },
-          { name: "Matrix factorization (SVD, ALS, NMF)", status: "gap" },
-          { name: "Two-tower / neural CF", status: "gap", hot: true },
-          {
-            name: "Sequential rec (SASRec, BERT4Rec)",
-            status: "gap",
-            hot: true,
-          },
-        ],
-      },
-      {
-        id: "C9",
         name: "Approximate nearest neighbor",
         intro:
           "Approximate nearest neighbor search is how you find the closest vectors to a query when there are millions or billions of them and exact comparison is hopeless. By trading a sliver of accuracy for orders-of-magnitude speed, ANN methods make similarity search practical at scale, and they have quietly become critical infrastructure behind retrieval, recommendation, and every RAG pipeline.\n\nYou will state the ANN problem and the recall@k metric, then build the major index families: locality-sensitive hashing (with MinHash for Jaccard and SimHash for cosine), inverted-file partitioning with product quantization for billion-scale compressed search, and HNSW small-world graphs that support near-logarithmic greedy traversal. You will close by comparing FAISS, pgvector, and managed vector databases along recall, throughput, and operational cost.\n\nThis is the engine room of modern semantic search: embeddings from any model become useful only once you can query them fast, which is why these structures sit underneath LLM retrieval, deduplication, and large-scale recommendation alike.",
@@ -424,7 +403,7 @@ export const PILLARS: Pillar[] = [
         ],
       },
       {
-        id: "C10",
+        id: "C9",
         name: "Evaluation & selection",
         intro:
           "Evaluation and model selection are how you find out whether a model is actually good or just lucky, and how you choose among competing models without fooling yourself. This is the most underrated discipline in machine learning: a wrong metric or a leaky validation split can make a useless model look brilliant right up until it meets real data.\n\nYou will define classification metrics (precision, recall, F1, ROC and AUC) and regression metrics (MSE, MAE, R-squared, MAPE, quantile losses), learning when each one misleads. You will diagnose whether predicted probabilities are trustworthy with reliability diagrams and Brier scores, recalibrate with Platt scaling and isotonic regression, choose the right cross-validation scheme (stratified, group, or time-series) for the test distribution you actually face, and tune hyperparameters with grid, random, and Bayesian search while watching the bias and variance of the search itself.\n\nEvery other subsection in this pillar, and every pillar after it, ultimately reports a number from here. Getting evaluation right is what separates a credible result from a misleading one.",
@@ -791,7 +770,7 @@ export const PILLARS: Pillar[] = [
           "LLM agents and retrieval is where a language model stops being a closed box and starts using external knowledge and tools. It solves the model's two biggest limitations, a fixed knowledge cutoff and an inability to act, by grounding generation in retrieved documents and letting the model call functions to do things in the world.\n\nYou will build a retrieval-augmented generation pipeline (chunk, embed, index, retrieve, generate), train dense bi-encoders with contrastive loss and search them with FAISS, and add advanced techniques like HyDE, cross-encoder rerankers, and GraphRAG. On the agent side you will implement structured tool calling, few-shot chain-of-thought with self-consistency voting, and the ReAct and Reflexion loops that interleave reasoning with actions. The discipline finishes with test-time compute scaling behind o1 and DeepSeek-R1, and multi-agent orchestration patterns.\n\nThis is the conceptual backbone of applied AI engineering: the RAG, tool use, and agent patterns here are exactly what pillar J builds into production systems.",
         prerequisites: [
           "E3 Transformer LMs: decoder-only generation and prompting.",
-          "E1 Information retrieval (TF-IDF, BM25) and C9 approximate nearest neighbor search.",
+          "E1 Information retrieval (TF-IDF, BM25) and C8 approximate nearest neighbor search.",
           "Comfortable Python and access to an LLM API for the applied agent lessons.",
         ],
         topics: [
@@ -2074,6 +2053,189 @@ export const PILLARS: Pillar[] = [
       },
     ],
   },
+  {
+    letter: "N",
+    slug: "N-recsys-engineering",
+    name: "Recommender Systems",
+    shortName: "RecSys",
+    tagline:
+      "Retrieval, ranking, evaluation, debiasing, and serving recommendations at scale",
+    color: "#2ac3de",
+    intro:
+      "Recommendation is one of the highest-leverage applications of machine learning in industry: it quietly drives a large fraction of the engagement and revenue of every platform you use. This pillar is the recommender-systems engineer's track. It does not stop at fitting a model to a ratings matrix; it follows a recommendation from a raw interaction log all the way to a served, monitored, A/B-tested production system.\n\nYou will start with the classical foundations (content-based and collaborative filtering, similarity neighborhoods, popularity baselines, hybrids, and cold-start), then move to matrix factorization and the embeddings it gave us, and from there to deep retrieval (two-tower models, embedding tables, negative sampling, sequential and graph recommenders). The middle of the pillar is the part most courses skip: the retrieval → ranking → re-ranking funnel, learning-to-rank (pointwise, pairwise, listwise) and the deep CTR architectures (Wide&Deep, DeepFM, DCN, DLRM), the evaluation discipline (nDCG and friends, offline/online testing, counterfactual evaluation), and the bias and fairness problems that logged feedback creates. It closes with the engineering reality (feature stores, ANN serving, real-time features, retraining, monitoring, production bandits) and the frontier (contrastive, causal, generative, and LLM-based recommenders).\n\nThe pillar reuses the rest of the tree rather than re-deriving it: the linear algebra of A, the approximate-nearest-neighbor indexes of C8, the evaluation metrics of C9, the transformers of E, the bandits of H4, the feature stores and experiment tracking of I, and the causal machinery of B5 and M all show up here as load-bearing parts of a real recommender.",
+    prerequisites: [
+      "A1 Linear algebra: low-rank factorization, inner products, and the SVD.",
+      "C8 approximate nearest neighbor and C9 evaluation metrics (the retrieval and scoring substrate).",
+      "Comfort with Python and numpy; D deep-learning basics and E transformers help for the neural lessons.",
+    ],
+    subs: [
+      {
+        id: "N1",
+        name: "Recommendation foundations",
+        intro:
+          "Before any embedding or neural network, recommendation is a data problem: a vast, mostly empty matrix of who interacted with what, and a question about what to show next. This discipline builds the classical toolkit that still underpins (and often out-competes) fancier models, and the baselines every later lesson must beat.\n\nYou will recommend from item features alone (content-based filtering), from interaction patterns across users (collaborative filtering and its similarity neighborhoods), and from the brutally strong popularity and recency baselines. You will then combine signals in hybrid recommenders and confront the cold-start problem that breaks every collaborative method when a user or item is new.\n\nThis is the conceptual floor of the pillar: the vocabulary of users, items, interactions, and similarity that the rest of the disciplines specialize.",
+        prerequisites: [
+          "A1 inner products and cosine similarity.",
+          "Basic probability and comfort with numpy.",
+        ],
+        topics: [
+          { name: "Content-based filtering", status: "gap" },
+          { name: "Collaborative filtering", status: "gap" },
+          { name: "Similarity & neighborhoods", status: "gap" },
+          { name: "Popularity baselines", status: "gap" },
+          { name: "Hybrid recommenders", status: "gap" },
+          { name: "Cold-start", status: "gap" },
+        ],
+      },
+      {
+        id: "N2",
+        name: "Matrix factorization & embeddings",
+        intro:
+          "Matrix factorization is the idea that turned recommendation into representation learning: explain the interaction matrix as a product of low-rank user and item embeddings, and the same few latent factors that reconstruct the observed entries also predict the missing ones. This discipline is the bridge from neighborhood methods to everything neural.\n\nYou will factor the rating matrix with SVD and ALS, extend it to implicit feedback (clicks and views) with weighted least squares, get interpretable parts-based factors from non-negative matrix factorization, read regularization as Bayesian inference, generalize to arbitrary features with factorization machines, and learn how to regularize and initialize embedding tables so they actually generalize.\n\nThe embeddings built here are the same retrieval substrate behind dense retrieval and RAG, and the dot-product scoring is exactly what the two-tower retrieval of N3 makes neural.",
+        prerequisites: [
+          "A1 the SVD and low-rank factorization (low-rank-pca).",
+          "N1 collaborative filtering; A3 optimization (ALS and SGD).",
+        ],
+        topics: [
+          { name: "Matrix factorization (SVD, ALS)", status: "gap" },
+          { name: "Implicit feedback & weighted MF", status: "gap" },
+          { name: "Non-negative matrix factorization", status: "gap" },
+          { name: "Bayesian MF", status: "gap" },
+          { name: "Factorization machines", status: "gap" },
+          { name: "Embedding regularization", status: "gap" },
+        ],
+      },
+      {
+        id: "N3",
+        name: "Deep learning for retrieval",
+        intro:
+          "When you replace the linear embeddings of matrix factorization with neural encoders, you get the two-tower architecture that now powers retrieval far beyond recommendation. This discipline is the candidate-generation half of a modern recommender: encode users and items into a shared space and pull the top matches with an ANN index in milliseconds.\n\nYou will build the two-tower / neural-CF model, engineer the features each tower consumes, size and serve the embedding tables, and train with in-batch and hard negatives. You will then read user histories as sequences (SASRec, BERT4Rec), encode the user-item graph with LightGCN and PinSage, and represent a user with multiple interests via cross-attention.\n\nThis is where the pillar meets pillar E's transformers, pillar D's graph networks, and the ANN indexes of C8: the output is a fast retriever that hands a few hundred candidates to the ranking stage of N4.",
+        prerequisites: [
+          "N2 matrix factorization and embeddings.",
+          "D deep-learning basics; E3 self-attention for the sequential and multi-interest lessons.",
+        ],
+        topics: [
+          { name: "Two-tower / neural CF", status: "gap", hot: true },
+          { name: "Tower feature engineering", status: "gap" },
+          { name: "Embedding tables & serving", status: "gap" },
+          { name: "Hard & in-batch negatives", status: "gap" },
+          {
+            name: "Sequential rec (SASRec, BERT4Rec)",
+            status: "gap",
+            hot: true,
+          },
+          { name: "GNN recsys (LightGCN, PinSage)", status: "gap", hot: true },
+          { name: "Multi-interest towers", status: "gap", hot: true },
+        ],
+      },
+      {
+        id: "N4",
+        name: "Ranking & learning-to-rank",
+        intro:
+          "Retrieval narrows billions of items to hundreds; ranking decides the order the user actually sees, and it is where most of the modeling value lives. This discipline is the part of recommendation most generic ML courses never reach: turning a candidate set into a calibrated, well-ordered list.\n\nYou will separate retrieval from ranking and see why two stages win, then learn the three learning-to-rank families (pointwise click models, pairwise BPR/RankNet, listwise ApproxNDCG) and the deep click-through architectures that dominate industry (Wide&Deep, DeepFM, DCN, DLRM). You will engineer the cross- and context-features the ranker depends on, optimize several objectives at once (clicks, conversions, dwell), and distill the heavy model into something you can actually serve.\n\nRanking is scored with the metrics of N5, fed by the retrieval of N3, and constrained by the bias corrections of N6.",
+        prerequisites: [
+          "N3 two-tower retrieval; C9 classification metrics.",
+          "D1 MLPs and training for the deep ranking models.",
+        ],
+        topics: [
+          { name: "Retrieval vs ranking", status: "gap" },
+          { name: "Pointwise ranking", status: "gap" },
+          { name: "Pairwise ranking (BPR, RankNet)", status: "gap" },
+          { name: "Listwise & ApproxNDCG", status: "gap" },
+          { name: "Wide&Deep / DeepFM / DCN / DLRM", status: "gap", hot: true },
+          { name: "Ranking feature engineering", status: "gap" },
+          { name: "Multi-task ranking", status: "gap", hot: true },
+          { name: "Distillation for serving", status: "gap" },
+        ],
+      },
+      {
+        id: "N5",
+        name: "Evaluation & experimentation",
+        intro:
+          "A recommender is only as trustworthy as the number you use to judge it, and recommendation evaluation is full of traps: the right metric is position-aware, the right split respects time, and the offline winner often loses online. This discipline is the measurement backbone of the pillar.\n\nYou will define the relevance metrics (nDCG, MAP, MRR, recall@k, hit-rate) and the beyond-accuracy ones (diversity, coverage, novelty, serendipity), design leakage-free time-aware offline splits, run trustworthy online A/B tests and interleaving, evaluate on logged feedback with counterfactual / off-policy estimators, and diagnose the offline-online gap that decides whether your metric means anything.\n\nThese metrics score the ranking of N4 and the retrieval of N3, and the counterfactual lesson borrows the propensity machinery of B5.",
+        prerequisites: [
+          "C9 classification metrics and cross-validation strategies.",
+          "B5 propensity scores (for counterfactual evaluation); I2 experiment tracking.",
+        ],
+        topics: [
+          { name: "Ranking metrics (nDCG, MAP, MRR)", status: "gap" },
+          { name: "Diversity, coverage, novelty", status: "gap" },
+          { name: "Offline evaluation & splits", status: "gap" },
+          { name: "Online A/B & interleaving", status: "gap", hot: true },
+          {
+            name: "Counterfactual / off-policy eval",
+            status: "gap",
+            hot: true,
+          },
+          { name: "The offline-online gap", status: "gap" },
+        ],
+      },
+      {
+        id: "N6",
+        name: "Fairness, bias & trust",
+        intro:
+          "Recommenders learn from feedback they themselves shaped, which makes bias the default rather than the exception: popular items get more exposure, top positions get more clicks, and the model amplifies both. This discipline is the honesty layer of the pillar, the recommendation analogue of pillar M's robustness work.\n\nYou will trace how popularity, exposure, and selection bias enter logged data, correct position bias with click models and inverse-propensity weighting, define and enforce provider/consumer fairness, weigh engagement against the diversity that prevents filter bubbles, and calibrate scores so recommendations match real user taste.\n\nThe propensity-weighting here is the same tool as the counterfactual evaluation of N5, and the diversity goals connect back to the beyond-accuracy metrics.",
+        prerequisites: [
+          "N1 popularity baselines and N5 beyond-accuracy metrics.",
+          "C9 probability calibration; B5 propensity scores.",
+        ],
+        topics: [
+          { name: "Popularity bias & amplification", status: "gap" },
+          { name: "Exposure & selection bias", status: "gap" },
+          { name: "Position bias & IPW", status: "gap", hot: true },
+          { name: "Fairness in recommendation", status: "gap", hot: true },
+          { name: "Filter bubbles & diversity", status: "gap" },
+          { name: "Calibration", status: "gap" },
+        ],
+      },
+      {
+        id: "N7",
+        name: "Production systems & serving",
+        intro:
+          "Everything earlier in the pillar is a model; this discipline is the system that serves it under a latency budget, keeps its features consistent, retrains it, and notices when it breaks. It is what makes the pillar an engineer's track rather than a modeler's.\n\nYou will assemble the retrieval → ranking → re-ranking funnel, serve point-in-time-correct features from a feature store, run ANN retrieval at p99 latency, compute session features in real time, choose a retraining cadence (batch vs streaming, incremental embedding updates), budget end-to-end latency, monitor coverage/CTR/embedding drift, and explore safely in production with contextual bandits.\n\nThis discipline leans hardest on the rest of the tree: the feature stores and drift detection of I1, the experiment tracking of I2, the serving infrastructure of I3, the ANN indexes of C8, and the bandits of H4.",
+        prerequisites: [
+          "N4 the ranking funnel; I1 feature stores and drift detection.",
+          "C8 ANN indexes (HNSW/IVF); I3 serving; H4 bandits and exploration.",
+        ],
+        topics: [
+          { name: "Multi-stage funnel", status: "gap" },
+          { name: "Feature stores for recsys", status: "gap" },
+          { name: "ANN serving at latency", status: "gap" },
+          { name: "Real-time features", status: "gap" },
+          { name: "Retraining & online learning", status: "gap" },
+          { name: "Serving infra & latency", status: "gap" },
+          { name: "Monitoring & drift", status: "gap" },
+          { name: "Contextual bandits in prod", status: "gap", hot: true },
+        ],
+      },
+      {
+        id: "N8",
+        name: "Frontier & generative recsys",
+        intro:
+          "The research edge of recommendation is moving fast, and most of it is recombining the rest of this tree in new ways. This discipline surveys where recommendation is going: self-supervised, causal, graph-structured, and increasingly generative.\n\nYou will pretrain recommenders with contrastive self-supervision, treat recommendation as a causal intervention and estimate uplift instead of correlation, generate item ids directly with semantic IDs and TIGER-style sequence models, use LLMs for zero/few-shot and conversational recommendation, enrich sparse signals with knowledge graphs, and transfer models across domains to cold-start new platforms.\n\nThis is where the pillar meets the contrastive learning of D5, the causal inference of B5 and pillar M, the transformers and RAG of E, and the graph networks of D6, pointed at the recommendation problem.",
+        prerequisites: [
+          "N2 embeddings and N3 sequential retrieval.",
+          "D5 contrastive learning, B5 causal inference, E transformers and RAG, D6 graphs.",
+        ],
+        topics: [
+          {
+            name: "Contrastive / self-supervised recsys",
+            status: "gap",
+            hot: true,
+          },
+          { name: "Causal recommendation", status: "gap", hot: true },
+          {
+            name: "Generative retrieval (semantic IDs, TIGER)",
+            status: "gap",
+            hot: true,
+          },
+          { name: "LLM-based recommenders", status: "gap", hot: true },
+          { name: "Knowledge-graph recsys", status: "gap" },
+          { name: "Cross-domain & transfer", status: "gap" },
+        ],
+      },
+    ],
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -2087,7 +2249,7 @@ export const CONNECTIONS: Connection[] = [
   { from: "A1", to: "C5", label: "SVD ⇒ PCA", kind: "uses" },
   {
     from: "A1",
-    to: "C8",
+    to: "N2",
     label: "Matrix factorization for rec sys",
     kind: "uses",
   },
@@ -2149,10 +2311,10 @@ export const CONNECTIONS: Connection[] = [
     kind: "generalizes",
   },
   { from: "C7", to: "G2", label: "XGBoost on time series", kind: "uses" },
-  { from: "C8", to: "C9", label: "Rec sys uses ANN search", kind: "uses" },
-  { from: "C9", to: "E6", label: "Vector DBs power RAG", kind: "uses" },
+  { from: "N2", to: "C8", label: "Rec sys uses ANN search", kind: "uses" },
+  { from: "C8", to: "E6", label: "Vector DBs power RAG", kind: "uses" },
   {
-    from: "C9",
+    from: "C8",
     to: "J5",
     label: "Vector infra in data platform",
     kind: "uses",
@@ -2485,6 +2647,46 @@ export const CONNECTIONS: Connection[] = [
     label: "Unconfoundedness ⇒ sensitivity analysis",
     kind: "generalizes",
   },
+
+  // ---- N. Recommender Systems wiring into the rest of the tree ----
+  {
+    from: "E3",
+    to: "N3",
+    label: "Transformers power sequential rec",
+    kind: "uses",
+  },
+  {
+    from: "D6",
+    to: "N3",
+    label: "GNNs for recsys (LightGCN, PinSage)",
+    kind: "uses",
+  },
+  { from: "N4", to: "C9", label: "Ranking uses eval metrics", kind: "uses" },
+  {
+    from: "B5",
+    to: "N5",
+    label: "Counterfactual eval uses propensity",
+    kind: "uses",
+  },
+  { from: "I1", to: "N7", label: "Feature stores serve recsys", kind: "uses" },
+  {
+    from: "H4",
+    to: "N7",
+    label: "Bandits explore in production",
+    kind: "uses",
+  },
+  {
+    from: "E6",
+    to: "N8",
+    label: "LLM recommenders build on RAG",
+    kind: "uses",
+  },
+  {
+    from: "B5",
+    to: "N8",
+    label: "Causal recommendation",
+    kind: "shared-concept",
+  },
 ];
 
 // -------------------------------------------------------------------------
@@ -2799,7 +3001,7 @@ export const PATHS: Path[] = [
   {
     name: "🤖 AI Agent Engineer",
     desc: "Agentic AI: RAG, tool use, MCP, multi-agent orchestration, and eval design. The fastest-growing 2026 role family.",
-    pillars: ["E6", "J1", "J2", "J4", "C10", "E8"],
+    pillars: ["E6", "J1", "J2", "J4", "C9", "E8"],
     color: "var(--ph)",
     steps: [
       { subId: "E6", lessonId: "rag-fundamentals", section: "RAG & retrieval" },
@@ -2846,18 +3048,18 @@ export const PATHS: Path[] = [
       },
       { subId: "J2", lessonId: "llm-as-judge", section: "Evaluation & safety" },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "classification-metrics",
         section: "Evaluation & safety",
       },
-      { subId: "C10", lessonId: "calibration", section: "Evaluation & safety" },
+      { subId: "C9", lessonId: "calibration", section: "Evaluation & safety" },
       { subId: "E8", lessonId: "circuits", section: "Evaluation & safety" },
     ],
   },
   {
     name: "🛡️ Responsible AI & Governance",
     desc: "Alignment, evaluation, validation, monitoring, and governance for safe, compliant AI (EU AI Act, NIST AI RMF).",
-    pillars: ["E8", "C10", "B3", "I4", "J7"],
+    pillars: ["E8", "C9", "B3", "I4", "J7"],
     color: "var(--pa)",
     steps: [
       {
@@ -2881,12 +3083,12 @@ export const PATHS: Path[] = [
         section: "Interpretability & alignment",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "classification-metrics",
         section: "Evaluation & validation",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "calibration",
         section: "Evaluation & validation",
       },
@@ -3007,7 +3209,7 @@ export const PATHS: Path[] = [
   {
     name: "⚙️ Machine Learning Engineer",
     desc: "Ship models end to end: train and evaluate, engineer features, package and deploy, serve, and monitor and retrain in production.",
-    pillars: ["C1", "C3", "C10", "I1", "I2", "D7", "I3", "E5", "I4"],
+    pillars: ["C1", "C3", "C9", "I1", "I2", "D7", "I3", "E5", "I4"],
     color: "var(--pi)",
     steps: [
       {
@@ -3021,12 +3223,12 @@ export const PATHS: Path[] = [
         section: "Model & evaluate",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "classification-metrics",
         section: "Model & evaluate",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "calibration",
         section: "Model & evaluate",
       },
@@ -3220,7 +3422,7 @@ export const PATHS: Path[] = [
   {
     name: "📊 Classical ML / Data Scientist",
     desc: "The canonical starting roadmap: stats foundations → supervised learners (linear, trees, kernels) → unsupervised → ensembles → rigorous evaluation.",
-    pillars: ["A2", "B1", "C1", "C3", "C2", "C4", "C5", "C7", "C10"],
+    pillars: ["A2", "B1", "C1", "C3", "C2", "C4", "C5", "C7", "C9"],
     color: "var(--pc)",
     steps: [
       { subId: "A2", lessonId: "mle", section: "Statistical foundations" },
@@ -3281,21 +3483,21 @@ export const PATHS: Path[] = [
       },
       { subId: "C7", lessonId: "stacking", section: "Ensembles & evaluation" },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "classification-metrics",
         section: "Ensembles & evaluation",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "calibration",
         section: "Ensembles & evaluation",
       },
       {
-        subId: "C10",
+        subId: "C9",
         lessonId: "cv-strategies",
         section: "Ensembles & evaluation",
       },
-      { subId: "C10", lessonId: "hpo", section: "Ensembles & evaluation" },
+      { subId: "C9", lessonId: "hpo", section: "Ensembles & evaluation" },
     ],
   },
   {
