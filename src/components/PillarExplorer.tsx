@@ -75,6 +75,21 @@ export function PillarExplorer({ pillars }: { pillars: PillarView[] }) {
     window.dispatchEvent(new Event("pillarpanelchange"));
   }, [selected]);
 
+  // Open the matching pillar when navigated to `#<letter>` — the Hero quick-nav
+  // chips (and any deep link) point at a card's id, which also scrolls to it.
+  // A non-matching hash is ignored, so it never closes an already-open panel.
+  useEffect(() => {
+    const openFromHash = () => {
+      const letter = window.location.hash.slice(1);
+      if (!letter) return;
+      const idx = pillars.findIndex((p) => p.letter === letter);
+      if (idx >= 0) setSelected(idx);
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [pillars]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
