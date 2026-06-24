@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 /** Rolled-up study state shared by pillars, subsections and lessons. */
@@ -67,13 +67,7 @@ export interface PillarView {
 export function PillarExplorer({ pillars }: { pillars: PillarView[] }) {
   const [selected, setSelected] = useState(-1);
   const active = selected >= 0 ? pillars[selected] : null;
-
-  // Opening/closing a panel swaps which lessons are in the DOM. Notify FilterBar
-  // (a sibling island) so it re-applies any active filter to the new rows. Runs
-  // after paint, so the panel's `.topic` nodes already exist when it fires.
-  useEffect(() => {
-    window.dispatchEvent(new Event("pillarpanelchange"));
-  }, [selected]);
+  const didMount = useRef(false);
 
   // Open the matching pillar when navigated to `#<letter>` — the Hero quick-nav
   // chips (and any deep link) point at a card's id, which also scrolls to it.
@@ -89,6 +83,27 @@ export function PillarExplorer({ pillars }: { pillars: PillarView[] }) {
     window.addEventListener("hashchange", openFromHash);
     return () => window.removeEventListener("hashchange", openFromHash);
   }, [pillars]);
+
+  useEffect(() => {
+    // Opening/closing a panel swaps which lessons are in the DOM. Notify
+    // FilterBar (a sibling island) so it re-applies any active filter to the
+    // new rows. Runs after paint, so the `.topic` nodes already exist.
+    window.dispatchEvent(new Event("pillarpanelchange"));
+
+    // Mirror the open panel into the URL hash so it always reflects the current
+    // selection: closing clears the hash, opening sets it. That keeps re-clicking
+    // a chip working — once a panel is closed the hash is gone, so the next click
+    // on the same chip changes the hash again and re-fires `hashchange`. Skip the
+    // first run so an incoming deep link (e.g. `/#M`) isn't wiped before it opens.
+    // replaceState avoids history spam / scroll jumps and never fires hashchange.
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    const base = window.location.pathname + window.location.search;
+    const hash = selected >= 0 ? `#${pillars[selected].letter}` : "";
+    window.history.replaceState(null, "", base + hash);
+  }, [selected, pillars]);
 
   return (
     <div className="flex flex-col gap-4">
