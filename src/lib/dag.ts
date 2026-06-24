@@ -3814,6 +3814,122 @@ export const PATHS: Path[] = [
       },
     ],
   },
+  {
+    name: "🎬 Recommender Systems Engineer",
+    desc: "Build a recommender end to end: collaborative and content foundations, matrix-factorization embeddings, deep two-tower retrieval, learning-to-rank, honest offline/online evaluation, debiasing and fairness, production serving, and the generative frontier.",
+    pillars: ["N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8"],
+    color: "var(--pn)",
+    steps: [
+      {
+        subId: "N1",
+        lessonId: "collaborative-filtering",
+        section: "Foundations",
+      },
+      {
+        subId: "N1",
+        lessonId: "content-based-filtering",
+        section: "Foundations",
+      },
+      { subId: "N1", lessonId: "cold-start", section: "Foundations" },
+      {
+        subId: "N2",
+        lessonId: "matrix-factorization",
+        section: "Embeddings & matrix factorization",
+      },
+      {
+        subId: "N2",
+        lessonId: "implicit-feedback",
+        section: "Embeddings & matrix factorization",
+      },
+      {
+        subId: "N2",
+        lessonId: "factorization-machines",
+        section: "Embeddings & matrix factorization",
+      },
+      { subId: "N3", lessonId: "two-tower", section: "Deep retrieval" },
+      { subId: "N3", lessonId: "negative-sampling", section: "Deep retrieval" },
+      { subId: "N3", lessonId: "sequential-rec", section: "Deep retrieval" },
+      {
+        subId: "N4",
+        lessonId: "retrieval-vs-ranking",
+        section: "Ranking & learning-to-rank",
+      },
+      {
+        subId: "N4",
+        lessonId: "pairwise-ranking",
+        section: "Ranking & learning-to-rank",
+      },
+      {
+        subId: "N4",
+        lessonId: "deep-ctr-models",
+        section: "Ranking & learning-to-rank",
+      },
+      {
+        subId: "N4",
+        lessonId: "multi-task-ranking",
+        section: "Ranking & learning-to-rank",
+      },
+      {
+        subId: "N5",
+        lessonId: "ranking-metrics",
+        section: "Evaluation & experimentation",
+      },
+      {
+        subId: "N5",
+        lessonId: "offline-eval",
+        section: "Evaluation & experimentation",
+      },
+      {
+        subId: "N5",
+        lessonId: "online-ab-testing",
+        section: "Evaluation & experimentation",
+      },
+      {
+        subId: "N5",
+        lessonId: "counterfactual-eval",
+        section: "Evaluation & experimentation",
+      },
+      {
+        subId: "N6",
+        lessonId: "popularity-bias",
+        section: "Debiasing & fairness",
+      },
+      {
+        subId: "N6",
+        lessonId: "position-bias-ipw",
+        section: "Debiasing & fairness",
+      },
+      {
+        subId: "N6",
+        lessonId: "calibration-recsys",
+        section: "Debiasing & fairness",
+      },
+      {
+        subId: "N7",
+        lessonId: "multi-stage-funnel",
+        section: "Production & serving",
+      },
+      {
+        subId: "N7",
+        lessonId: "feature-stores-recsys",
+        section: "Production & serving",
+      },
+      { subId: "N7", lessonId: "ann-serving", section: "Production & serving" },
+      {
+        subId: "N7",
+        lessonId: "contextual-bandits-prod",
+        section: "Production & serving",
+      },
+      {
+        subId: "N7",
+        lessonId: "monitoring-recsys",
+        section: "Production & serving",
+      },
+      { subId: "N8", lessonId: "generative-retrieval", section: "Frontier" },
+      { subId: "N8", lessonId: "llm-recommenders", section: "Frontier" },
+      { subId: "N8", lessonId: "causal-recsys", section: "Frontier" },
+    ],
+  },
 ];
 
 // -------------------------------------------------------------------------
