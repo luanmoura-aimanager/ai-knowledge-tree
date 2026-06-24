@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 /** Rolled-up study state shared by pillars, subsections and lessons. */
@@ -67,6 +67,13 @@ export interface PillarView {
 export function PillarExplorer({ pillars }: { pillars: PillarView[] }) {
   const [selected, setSelected] = useState(-1);
   const active = selected >= 0 ? pillars[selected] : null;
+
+  // Opening/closing a panel swaps which lessons are in the DOM. Notify FilterBar
+  // (a sibling island) so it re-applies any active filter to the new rows. Runs
+  // after paint, so the panel's `.topic` nodes already exist when it fires.
+  useEffect(() => {
+    window.dispatchEvent(new Event("pillarpanelchange"));
+  }, [selected]);
 
   return (
     <div className="flex flex-col gap-4">
