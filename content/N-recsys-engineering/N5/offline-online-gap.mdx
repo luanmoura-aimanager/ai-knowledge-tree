@@ -24,7 +24,7 @@ and those choices become the next training set. An item the system ranks high ge
 shown, accumulates interactions, and looks even better next time; an item it ranks low
 is shown rarely, never accumulates evidence, and stays buried regardless of its true
 quality. The data is a closed loop, where the model's past decisions shape the
-feedback used to evaluate its future decisions. The result is **exposure bias**: the
+feedback used to evaluate its future decisions<FN n="1" />. The result is **exposure bias**: the
 logs over-represent what the incumbent liked, so they cannot fairly judge a policy
 that would have made different choices.
 
@@ -57,7 +57,7 @@ The gap is managed, not eliminated, by feeding online truth back into the offlin
 process. Inject **randomized exploration** so the logs contain unbiased feedback on
 items the model would not otherwise show (the same randomization that makes
 off-policy evaluation valid). Trust **online A/B and interleaving** as the arbiter when
-offline and online disagree. And treat offline metrics as a *filter* that removes
+offline and online disagree<FN n="2" />. And treat offline metrics as a *filter* that removes
 clearly worse models cheaply, never as the final verdict. The discipline is to know
 which signal to believe: when a careful online test contradicts a strong offline
 number, the online test is right.

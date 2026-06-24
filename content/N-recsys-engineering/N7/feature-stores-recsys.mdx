@@ -13,7 +13,7 @@ A recommender's features come from many places: a user's click history, an item'
 rolling popularity, a creator's recent engagement. The same feature must be computed
 identically when training offline and when serving online, or the model sees one world
 in training and another in production, the **training/serving skew** that silently
-degrades a launched model. The feature store is the shared system that guarantees this
+degrades a launched model<FN n="1" />. The feature store is the shared system that guarantees this
 consistency, and its hardest job is **point-in-time correctness**: making sure a
 training example only ever sees feature values that were known *before* its label.
 
@@ -21,7 +21,7 @@ training example only ever sees feature values that were known *before* its labe
 
 A feature store has an **offline** side (a columnar warehouse holding the full history,
 used to build training sets) and an **online** side (a low-latency key-value store
-holding the latest values, queried at serving time). The non-negotiable requirement is
+holding the latest values, queried at serving time)<FN n="2" />. The non-negotiable requirement is
 that both are populated from the *same* feature definition, so "user's 7-day click
 count" means the same computation in both. When they diverge, even subtly (a different
 window boundary, a different null handling), the model trained offline behaves

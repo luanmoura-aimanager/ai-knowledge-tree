@@ -52,7 +52,7 @@ one batched forward pass rather than looping.
 **Quantization** shrinks both latency and memory: serving the model (and the embedding
 tables) in int8 instead of float32 cuts memory traffic and uses faster integer kernels,
 trading a small accuracy loss for a large throughput gain, the same technique that fits
-the ANN index into RAM.
+the ANN index into RAM<FN n="2" />.
 
 ## Precompute everything you can
 
@@ -60,7 +60,7 @@ The cheapest request-time work is work done before the request. Item embeddings,
 popularity scores, and slow-moving features are all precomputed and cached, leaving the
 request path to do only the genuinely per-request work (encode this user, score these
 candidates). Pushing computation off the critical path into offline jobs is the single
-most effective latency lever, which is why the architecture is built around it.
+most effective latency lever, which is why the architecture is built around it<FN n="1" />.
 
 ```mermaid
 graph LR

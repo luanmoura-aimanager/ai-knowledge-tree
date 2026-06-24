@@ -14,7 +14,7 @@ and a few hundred milliseconds of budget, running a rich model over the whole
 catalog is impossible, but running a cheap model over the whole catalog throws
 away accuracy. The resolution is to use both, in stages: a cheap model narrows the
 catalog to a few hundred candidates, then an expensive model ranks only those. This
-funnel is the backbone architecture of every large-scale recommender, and this
+funnel is the backbone architecture of every large-scale recommender<FN n="1" />, and this
 lesson is about why the split exists and what each stage optimizes.
 
 ## The cost problem
@@ -31,7 +31,7 @@ $$
 
 The retrieval model is cheap because it is a **two-tower dot product** backed by an
 approximate-nearest-neighbor index, so it never explicitly scores most items: the
-index returns the top $k$ in sublinear time. The ranker is expensive because it
+index returns the top $k$ in sublinear time<FN n="2" />. The ranker is expensive because it
 reads cross features and runs a deep network, but it only ever sees $k$ items.
 
 ## Different stages optimize different things

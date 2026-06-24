@@ -13,7 +13,7 @@ Some features cannot wait for a batch job. What a user clicked five seconds ago 
 strongest signal for what they want next, but a feature pipeline that refreshes hourly
 would serve it as if those five seconds never happened. **Real-time features** are
 computed from the live event stream as the request arrives, and they are what let a
-recommender respond *within* a session rather than to yesterday's behavior. This lesson
+recommender respond *within* a session rather than to yesterday's behavior<FN n="2" />. This lesson
 is about which features need to be real-time, how they are computed, and the cost of
 getting their freshness wrong.
 
@@ -39,7 +39,7 @@ The architecture is a **streaming pipeline**: user events (clicks, views, add-to
 flow into a stream processor that maintains running aggregates per user and per item in
 a low-latency store. A windowed count like "items clicked in the last 10 minutes" is
 maintained incrementally as events arrive and expire, so the value is always current when
-the serving path reads it. The same definition must still match the offline training
+the serving path reads it<FN n="1" />. The same definition must still match the offline training
 computation (the point-in-time correctness of the feature store), which is why streaming
 features are the hardest to keep skew-free: the offline pipeline has to *replay* the
 stream to reconstruct what each value was at each historical moment.

@@ -51,6 +51,20 @@ share the template: an explicit interaction component plus a deep component,
 combined into one logit trained with the pointwise cross-entropy of the previous
 lessons.
 
+```mermaid
+graph TD
+  X["sparse features<br/>(user, item, context)"] --> E["shared embeddings"]
+  E --> CROSS["explicit interaction component"]
+  E --> DEEP["deep MLP tower"]
+  CROSS -->|"Wide&Deep: hand-crafted crosses"| C1[" "]
+  CROSS -->|"DeepFM: FM second-order"| C1
+  CROSS -->|"DCN: stacked cross layers"| C1
+  CROSS -->|"DLRM: all pairwise dot products"| C1
+  C1 --> SUM["sum logits"]
+  DEEP --> SUM
+  SUM --> P["σ → click probability"]
+```
+
 ## The DeepFM shape
 
 ```python-static
