@@ -130,6 +130,8 @@ The update gate $z_t$ interpolates between the previous hidden state and the new
 The reset gate $r_t$ modulates how much the previous state influences the candidate.
 
 ```python
+import numpy as np
+
 class GRUCell:
     def __init__(self, d, m, seed=1):
         rng = np.random.default_rng(seed)
@@ -153,6 +155,7 @@ class GRUCell:
         return 1.0 / (1.0 + np.exp(-np.clip(x, -10, 10)))
 
 gru = GRUCell(d=4, m=8)
+xs = np.random.default_rng(0).normal(size=(10, 4))  # 10-step sequence
 h = np.zeros(8)
 for x in xs:
     h = gru.forward(x, h)
