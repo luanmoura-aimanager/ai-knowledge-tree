@@ -138,12 +138,19 @@ intact and interactions instant. Match this pattern for new filters/toggles.
 
 ### Connections graph
 
-`ConnectionsGraph.tsx` builds a D3 force simulation: pillars anchored to a 5×2
-grid (top row `y=240`, bottom `y=height-180`), `forceY` strength `0.32`, pillar
+`ConnectionsGraph.tsx` builds a D3 force simulation: pillars anchored to a 7×2
+grid (top row `y=240`, bottom `y=HEIGHT-180`), `forceY` strength `0.32`, pillar
 **pill labels** (rect sized to text bbox, using `shortName`), within-pillar
 sequence links + cross-pillar `CONNECTIONS`. Hover/click highlights a node + its
 neighbors via CSS classes; the click-to-pin side panel is tinted with the active
 pillar color and links to `/pillar/<letter>/<sub-id>`.
+
+The layout is settled synchronously on mount and the SVG `viewBox` is fitted to
+it, so zoom scale 1 is always the full graph at any card size. The wheel is left
+to the page: zoom is button-only (`−` / `+` / `Fit`), and panning is enabled only
+while zoomed in. Signed-in pages pass `study` (`studyMap(progress)`), which adds
+the **Studied graph** view: each node's opacity runs from the dim look at 0% to
+full color at 100% (an in-progress lesson counts for half), with a ring at 100%.
 
 ## Authoring conventions
 

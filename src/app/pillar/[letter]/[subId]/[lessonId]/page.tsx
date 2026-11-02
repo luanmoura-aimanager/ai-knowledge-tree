@@ -16,7 +16,10 @@ import {
 import { getProgressMap, isSignedIn } from "@/lib/progress";
 import { getPathSidebars } from "@/lib/path-sidebars";
 import { MdxContent } from "@/components/mdx/MdxContent";
-import { StudyProgressControls } from "@/components/StudyProgressControls";
+import {
+  StudyProgressControls,
+  StudyProgressProvider,
+} from "@/components/StudyProgressControls";
 import { LessonPrevNext, PrevNextNav } from "@/components/LessonPrevNext";
 
 export function generateStaticParams() {
@@ -117,17 +120,19 @@ export default async function LessonPage({
         )}
       </div>
 
-      {showControls && (
-        <StudyProgressControls itemKey={key} initial={myStatus} />
-      )}
+      <StudyProgressProvider key={key} itemKey={key} initial={myStatus}>
+        {showControls && <StudyProgressControls />}
 
-      {loaded ? (
-        <MdxContent source={loaded.body} />
-      ) : (
-        <div className="card p-6 text-[var(--fg-dim)]">
-          This lesson has not been written yet. Planned goal: {lesson.goal}
-        </div>
-      )}
+        {loaded ? (
+          <MdxContent source={loaded.body} />
+        ) : (
+          <div className="card p-6 text-[var(--fg-dim)]">
+            This lesson has not been written yet. Planned goal: {lesson.goal}
+          </div>
+        )}
+
+        {showControls && loaded && <StudyProgressControls />}
+      </StudyProgressProvider>
 
       <Suspense
         fallback={

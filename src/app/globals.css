@@ -152,6 +152,15 @@ body {
 .conn-graph .link.kind-generalizes    { stroke: var(--good);     }
 
 .conn-graph .node.active circle { stroke: var(--fg); stroke-width: 3; }
+.conn-graph.zoomed { cursor: grab; }
+
+/* Studied view: each node's --study-opacity (set inline) runs from the dimmed
+   look at 0% to full color at 100%. Hover/selection still take over. */
+.conn-graph.studied-view .node { opacity: var(--study-opacity); }
+.conn-graph.studied-view .node.active { opacity: 1; }
+.conn-graph.studied-view .node.dim { opacity: 0.18; }
+.conn-graph.studied-view .link:not(.highlight) { stroke-opacity: 0.12; }
+.conn-graph .node.complete circle { stroke: var(--fg); stroke-width: 3; }
 
 /* Route overlay connecting a selected suggested path's nodes in order. Color is
    set inline (the path's color); a flowing dash hints at sequence direction. */

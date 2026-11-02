@@ -1,9 +1,13 @@
 import { ConnectionsGraph } from "@/components/ConnectionsGraph";
+import { studyMap } from "@/lib/curriculum";
 import { CONNECTIONS, PILLARS } from "@/lib/dag";
+import { getProgressMap, isSignedIn } from "@/lib/progress";
 
-export default function ConnectionsPage() {
+export default async function ConnectionsPage() {
   const nNodes = PILLARS.reduce((n, p) => n + p.subs.length, 0);
   const nCross = CONNECTIONS.length;
+  const signedIn = await isSignedIn();
+  const study = signedIn ? studyMap(await getProgressMap()) : undefined;
 
   return (
     <div className="max-w-[1280px] mx-auto px-6 py-12">
@@ -17,7 +21,7 @@ export default function ConnectionsPage() {
         depends on another.
       </p>
 
-      <ConnectionsGraph />
+      <ConnectionsGraph study={study} />
     </div>
   );
 }

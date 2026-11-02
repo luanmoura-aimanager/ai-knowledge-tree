@@ -1,20 +1,39 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { setStatus, clearStatus } from "@/app/actions/progress";
 import type { ProgressStatus } from "@/lib/progress";
 
+interface StudyProgressValue {
+  status: ProgressStatus | null;
+  failed: boolean;
+  pending: boolean;
+  apply: (next: ProgressStatus | null) => void;
+}
+
+const StudyProgressContext = createContext<StudyProgressValue | null>(null);
+
 /**
- * "Mark as studied" controls on a lesson page. `itemKey` is the global
- * progress key ("subId/lessonId"). Calls the progress server actions and
- * reflects the new state optimistically. Only rendered for signed-in users.
+ * Holds a lesson's study status so every StudyProgressControls on the page (top
+ * and bottom) shows the same state. `itemKey` is the global progress key
+ * ("subId/lessonId"). Calls the progress server actions and reflects the new
+ * state optimistically.
  */
-export function StudyProgressControls({
+export function StudyProgressProvider({
   itemKey,
   initial,
+  children,
 }: {
   itemKey: string;
   initial: ProgressStatus | null;
+  children: ReactNode;
 }) {
   const [status, setLocal] = useState<ProgressStatus | null>(initial);
   const [failed, setFailed] = useState(false);
@@ -39,6 +58,22 @@ export function StudyProgressControls({
       }
     });
   };
+
+  return (
+    <StudyProgressContext.Provider value={{ status, failed, pending, apply }}>
+      {children}
+    </StudyProgressContext.Provider>
+  );
+}
+
+/**
+ * "Mark as studied" controls on a lesson page. Must sit inside a
+ * StudyProgressProvider. Only rendered for signed-in users.
+ */
+export function StudyProgressControls() {
+  const progress = useContext(StudyProgressContext);
+  if (!progress) return null;
+  const { status, failed, pending, apply } = progress;
 
   return (
     <div className="flex items-center gap-2 my-6 flex-wrap">

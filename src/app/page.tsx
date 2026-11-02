@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSubsectionById } from "@/lib/dag";
-import { allLessons, getLesson } from "@/lib/curriculum";
+import { allLessons, getLesson, studyMap } from "@/lib/curriculum";
 import { lessonContentStatus } from "@/lib/content";
 import { Hero } from "@/components/Hero";
 import { DashboardStats } from "@/components/DashboardStats";
@@ -77,11 +77,12 @@ export default async function HomePage() {
             Cross-pillar connections
           </h2>
           <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
-            Force-directed graph of subsections. Drag nodes, scroll to zoom, and
-            click to pin a subsection and see its connections. Selecting a
-            suggested path above lights up its subsections here.
+            Force-directed graph of subsections. Drag nodes, use the + / −
+            buttons to zoom, and click to pin a subsection and see its
+            connections. Selecting a suggested path above lights up its
+            subsections here.
           </p>
-          <ConnectionsGraph />
+          <ConnectionsGraph study={signedIn ? studyMap(progress) : undefined} />
         </section>
       </PathHighlightProvider>
 
