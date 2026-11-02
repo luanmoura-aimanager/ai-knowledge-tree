@@ -77,9 +77,9 @@ export default async function HomePage() {
             Cross-pillar connections
           </h2>
           <p className="text-[var(--fg-dim)] text-sm max-w-2xl mb-6">
-            Force-directed graph of subsections. Drag nodes, use the + / −
-            buttons to zoom, and click to pin a subsection and see its
-            connections. Selecting a suggested path above lights up its
+            Force-directed graph of subsections. Use the + / − buttons to zoom,
+            drag nodes with a mouse, and click or tap to pin a subsection and
+            see its connections. Selecting a suggested path above lights up its
             subsections here.
           </p>
           <ConnectionsGraph study={signedIn ? studyMap(progress) : undefined} />

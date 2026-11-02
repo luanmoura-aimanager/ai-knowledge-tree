@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import * as d3 from "d3";
 import { PILLARS, CONNECTIONS, getSubsectionById } from "@/lib/dag";
-import type { SubProgress } from "@/lib/curriculum";
+import {
+  MAX_ZOOM,
+  studyFraction,
+  studyOpacity,
+  zoomLimitAt,
+  type StudyMap,
+  type ZoomLimit,
+} from "@/lib/study-graph";
 import type { Pillar, Connection } from "@/lib/types";
 import { usePathHighlight } from "@/components/PathHighlightProvider";
 
@@ -17,9 +24,9 @@ import { usePathHighlight } from "@/components/PathHighlightProvider";
  *
  * Pillars are anchored to a 7×2 grid via forceX/forceY so the clusters stay
  * readable, but nodes can settle organically inside their cluster. The layout
- * is settled up front and the SVG viewBox is fitted to it, so the whole graph
- * always shows. The wheel is left to the page: zoom is button-only. Drag to
- * reposition, click for details.
+ * is settled once the card nears the viewport and the SVG viewBox is fitted to
+ * it, so the whole graph always shows. The wheel is left to the page: zoom is
+ * button-only. Drag to reposition, click for details.
  *
  * Signed-in callers pass `study` (per-subsection progress), which adds a
  * "Studied graph" view shading each node from dim (0%) to full color (100%).
@@ -29,21 +36,7 @@ import { usePathHighlight } from "@/components/PathHighlightProvider";
 const WIDTH = 1232;
 const HEIGHT = 720;
 const FIT_PADDING = 24;
-const MAX_ZOOM = 5;
 const ZOOM_STEP = 1.6;
-
-export type StudyMap = Record<string, SubProgress>;
-
-/** Share of a subsection done; an in-progress lesson counts for half. */
-function studyFraction(p: SubProgress | undefined): number {
-  if (!p || p.total === 0) return 0;
-  return (p.studied + 0.5 * p.inProgress) / p.total;
-}
-
-/** 0% keeps the dimmed look; the floor keeps a first lesson visibly distinct. */
-function studyOpacity(fraction: number): number {
-  return fraction === 0 ? 0.18 : 0.38 + 0.62 * fraction;
-}
 
 type Node = d3.SimulationNodeDatum & {
   id: string;
@@ -65,8 +58,11 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
   );
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [zoomLimit, setZoomLimit] = useState<"min" | "max" | null>("min");
+  const [zoomLimit, setZoomLimit] = useState<ZoomLimit>("min");
+  const [nearViewport, setNearViewport] = useState(false);
   const [studiedView, setStudiedView] = useState(false);
+  // `study` can go away while mounted (signing out redirects to the same route).
+  const showStudied = studiedView && Boolean(study);
 
   // The suggested path the user picked (null when none). Its ids light up the
   // matching nodes and its consecutive pairs are drawn as a route overlay.
@@ -105,9 +101,25 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
     return set;
   }, []);
 
-  // Render the graph once on mount
+  // Settling the layout blocks the main thread, so wait until the card is about
+  // to scroll into view instead of doing it during page hydration.
   useEffect(() => {
     if (!svgRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(svgRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Render the graph once
+  useEffect(() => {
+    if (!nearViewport || !svgRef.current) return;
     const svgNode = svgRef.current;
 
     // ----- nodes & links --------------------------------------------------
@@ -329,8 +341,8 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
       drawPathLinks();
     };
 
-    // Settle the layout before the first paint: the fit below needs the final
-    // positions. Ticks after this only come from drags re-heating the sim.
+    // Settle the layout up front: the fit below needs the final positions.
+    // Ticks after this only come from drags re-heating the sim.
     sim.stop();
     sim.tick(
       Math.ceil(Math.log(sim.alphaMin()) / Math.log(1 - sim.alphaDecay())),
@@ -361,13 +373,15 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
       // swipes through to the page.
       .filter(
         (event) =>
-          !event.ctrlKey && !event.button && d3.zoomTransform(svgNode).k > 1,
+          !event.ctrlKey &&
+          !event.button &&
+          zoomLimitAt(d3.zoomTransform(svgNode).k) !== "min",
       )
       .on("zoom", (event) => {
-        const { k } = event.transform;
+        const limit = zoomLimitAt(event.transform.k);
         root.attr("transform", event.transform.toString());
-        svg.classed("zoomed", k > 1);
-        setZoomLimit(k <= 1 ? "min" : k >= MAX_ZOOM ? "max" : null);
+        svg.classed("zoomed", limit !== "min");
+        setZoomLimit(limit);
       });
     // Wheel and double-click stay with the page; zoom goes through the buttons.
     svg.call(zoom).on("wheel.zoom", null).on("dblclick.zoom", null);
@@ -401,13 +415,13 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
     return () => {
       sim.stop();
     };
-  }, []);
+  }, [nearViewport]);
 
   // React to hover/select (or a picked suggested path) by toggling CSS classes
   // on existing DOM nodes. A hovered/clicked node always wins; otherwise, if a
   // suggested path is active, light up exactly its subsections.
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!nearViewport || !svgRef.current) return;
     const svg = d3.select(svgRef.current);
     const linkEnd = (e: string | number | Node) => (e as Node).id ?? e;
 
@@ -427,6 +441,7 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
     svg
       .selectAll<SVGGElement, Node>(".node")
       .classed("dim", (d) => anyHighlight && !set.has(d.id))
+      .classed("linked", (d) => set.has(d.id))
       .classed("active", (d) => (active ? d.id === active : set.has(d.id)));
 
     svg
@@ -446,28 +461,40 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
         const t = linkEnd(d.target);
         return s !== active && t !== active;
       });
-  }, [hovered, selected, highlightSet, pathIds, pathPairs, pathColor]);
+  }, [
+    nearViewport,
+    hovered,
+    selected,
+    highlightSet,
+    pathIds,
+    pathPairs,
+    pathColor,
+  ]);
 
   // Shade nodes by study progress on the existing DOM (the CSS only applies
   // --study-opacity under .studied-view), without rebuilding the simulation.
   useEffect(() => {
-    if (!svgRef.current) return;
-    const svg = d3.select(svgRef.current).classed("studied-view", studiedView);
-    const fraction = (d: Node) => studyFraction(study?.[d.id]);
+    if (!nearViewport || !svgRef.current) return;
+    const svg = d3.select(svgRef.current).classed("studied-view", showStudied);
 
     svg
       .selectAll<SVGGElement, Node>(".node")
-      .classed("complete", (d) => studiedView && fraction(d) === 1)
-      .style("--study-opacity", (d) => String(studyOpacity(fraction(d))));
+      .classed(
+        "complete",
+        (d) => showStudied && study?.[d.id]?.state === "done",
+      )
+      .style("--study-opacity", (d) =>
+        studyOpacity(studyFraction(study?.[d.id])),
+      );
 
     svg.selectAll<SVGTitleElement, Node>(".node title").text((d) => {
       const base = `${d.id}: ${d.name}`;
       const p = study?.[d.id];
-      if (!studiedView || !p) return base;
+      if (!showStudied || !p) return base;
       const started = p.inProgress > 0 ? `, ${p.inProgress} in progress` : "";
       return `${base}: ${p.studied}/${p.total} studied${started}`;
     });
-  }, [studiedView, study]);
+  }, [nearViewport, showStudied, study]);
 
   const selectedSub = selected ? getSubsectionById(selected) : null;
 
@@ -476,15 +503,15 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
       {study && (
         <div className="flex justify-end gap-2">
           <button
-            className={`btn ${studiedView ? "" : "active"}`}
-            aria-pressed={!studiedView}
+            className={`btn ${showStudied ? "" : "active"}`}
+            aria-pressed={!showStudied}
             onClick={() => setStudiedView(false)}
           >
             Connections
           </button>
           <button
-            className={`btn ${studiedView ? "active" : ""}`}
-            aria-pressed={studiedView}
+            className={`btn ${showStudied ? "active" : ""}`}
+            aria-pressed={showStudied}
             onClick={() => setStudiedView(true)}
           >
             Studied graph
@@ -497,7 +524,7 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
         style={{ aspectRatio: "12 / 7", maxHeight: "85vh", minHeight: 320 }}
       >
         <svg ref={svgRef} className="conn-graph w-full h-full" />
-        <div className="hidden sm:block absolute bottom-3 left-3 text-xs text-[var(--fg-mute)] bg-[var(--bg)]/80 px-2 py-1 rounded backdrop-blur">
+        <div className="hidden sm:pointer-fine:block absolute bottom-3 left-3 text-xs text-[var(--fg-mute)] bg-[var(--bg)]/80 px-2 py-1 rounded backdrop-blur">
           💡 drag nodes · + / − to zoom · click for details
         </div>
         <div className="absolute bottom-3 right-3 flex gap-1.5">
@@ -528,7 +555,7 @@ export function ConnectionsGraph({ study }: { study?: StudyMap }) {
         </div>
       </div>
 
-      {studiedView && study ? <StudiedLegend study={study} /> : <Legend />}
+      {showStudied && study ? <StudiedLegend study={study} /> : <Legend />}
 
       {selectedSub && (
         <SidePanel sub={selectedSub} onClose={() => setSelected(null)} />

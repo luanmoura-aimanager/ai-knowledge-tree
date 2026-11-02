@@ -1,13 +1,24 @@
+import { unstable_rethrow } from "next/navigation";
 import { ConnectionsGraph } from "@/components/ConnectionsGraph";
 import { studyMap } from "@/lib/curriculum";
 import { CONNECTIONS, PILLARS } from "@/lib/dag";
 import { getProgressMap, isSignedIn } from "@/lib/progress";
 
+/** The overlay is optional: if progress can't load, show the plain graph. */
+async function loadStudy() {
+  try {
+    return (await isSignedIn()) ? studyMap(await getProgressMap()) : undefined;
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error("Loading study progress failed", err);
+    return undefined;
+  }
+}
+
 export default async function ConnectionsPage() {
   const nNodes = PILLARS.reduce((n, p) => n + p.subs.length, 0);
   const nCross = CONNECTIONS.length;
-  const signedIn = await isSignedIn();
-  const study = signedIn ? studyMap(await getProgressMap()) : undefined;
+  const study = await loadStudy();
 
   return (
     <div className="max-w-[1280px] mx-auto px-6 py-12">

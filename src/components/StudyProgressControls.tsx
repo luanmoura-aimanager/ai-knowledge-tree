@@ -46,11 +46,18 @@ export function StudyProgressProvider({
     setLocal(next);
     setFailed(false);
     startTransition(async () => {
-      const res =
-        next === null
-          ? await clearStatus(itemKey)
-          : await setStatus(itemKey, next);
-      if (res.ok) {
+      let ok = false;
+      try {
+        const res =
+          next === null
+            ? await clearStatus(itemKey)
+            : await setStatus(itemKey, next);
+        ok = res.ok;
+      } catch (err) {
+        // The call itself can reject: offline, or a tab left open over a deploy.
+        console.error("Saving study progress failed", err);
+      }
+      if (ok) {
         confirmed.current = next;
       } else {
         setLocal(confirmed.current); // revert so the UI never lies
