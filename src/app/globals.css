@@ -129,6 +129,7 @@ body {
 .statbar .seg.gap { background: var(--gap); opacity: 0.4; }
 
 /* ----- Connections graph SVG --------------------------------------------- */
+.conn-graph { --dim-opacity: 0.18; }
 .conn-graph .node { cursor: pointer; transition: 0.15s; }
 .conn-graph .node circle { stroke: var(--bg); stroke-width: 2; }
 .conn-graph .node text {
@@ -137,7 +138,7 @@ body {
   pointer-events: none;
   font-weight: 600;
 }
-.conn-graph .node.dim { opacity: 0.18; }
+.conn-graph .node.dim { opacity: var(--dim-opacity); }
 .conn-graph .link {
   stroke: var(--fg-mute);
   stroke-opacity: 0.35;
@@ -152,6 +153,14 @@ body {
 .conn-graph .link.kind-generalizes    { stroke: var(--good);     }
 
 .conn-graph .node.active circle { stroke: var(--fg); stroke-width: 3; }
+.conn-graph.zoomed { cursor: grab; }
+
+/* Studied view: each node's --study-opacity (set inline) runs from the dimmed
+   look at 0% to full color at 100%. Hover/selection still take over. */
+.conn-graph.studied-view .node:not(.dim) { opacity: var(--study-opacity); }
+.conn-graph.studied-view .node.linked { opacity: 1; }
+.conn-graph.studied-view .link:not(.highlight):not(.dim) { stroke-opacity: 0.12; }
+.conn-graph .node.complete circle { stroke: var(--fg); stroke-width: 3; }
 
 /* Route overlay connecting a selected suggested path's nodes in order. Color is
    set inline (the path's color); a flowing dash hints at sequence direction. */

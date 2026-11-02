@@ -79,7 +79,8 @@ ai-knowledge-tree/
 │   │   ├── curriculum/{index,A,…}.ts  # per-subsection ordered Lesson[] (the lesson list)
 │   │   ├── content.ts              # lesson resolve/load, lessonContentStatus, prev/next
 │   │   ├── db.ts                   # guarded Neon pool (null when no DATABASE_URL)
-│   │   └── progress.ts             # getProgressMap / getResume / isSignedIn (keyed subId/lessonId)
+│   │   ├── progress.ts             # getProgressMap / getResume / isSignedIn (keyed subId/lessonId)
+│   │   └── study-graph.ts          # graph zoom limits + Studied view shading (pure, tested)
 │   ├── auth.ts                     # Auth.js config (guarded)
 │   └── types/next-auth.d.ts        # Session.user.id augmentation
 └── public/figures/<sub>/<name>.svg # generated plot assets (see Figures)
@@ -138,12 +139,19 @@ intact and interactions instant. Match this pattern for new filters/toggles.
 
 ### Connections graph
 
-`ConnectionsGraph.tsx` builds a D3 force simulation: pillars anchored to a 5×2
-grid (top row `y=240`, bottom `y=height-180`), `forceY` strength `0.32`, pillar
+`ConnectionsGraph.tsx` builds a D3 force simulation: pillars anchored to a 7×2
+grid (top row `y=240`, bottom `y=HEIGHT-180`), `forceY` strength `0.32`, pillar
 **pill labels** (rect sized to text bbox, using `shortName`), within-pillar
 sequence links + cross-pillar `CONNECTIONS`. Hover/click highlights a node + its
 neighbors via CSS classes; the click-to-pin side panel is tinted with the active
 pillar color and links to `/pillar/<letter>/<sub-id>`.
+
+The layout is settled once the card nears the viewport (settling blocks the main
+thread) and the SVG `viewBox` is fitted to it, so zoom scale 1 is always the full
+graph at any card size. The wheel is left to the page: zoom is button-only
+(`−` / `+` / `Fit`), and panning is enabled only while zoomed in. Signed-in pages
+pass `study` (`studyMap(progress)`), which adds the **Studied graph** view: each node's opacity runs from the dim look at 0% to
+full color at 100% (an in-progress lesson counts for half), with a ring at 100%.
 
 ## Authoring conventions
 
@@ -336,6 +344,7 @@ npm install
 npm run dev        # http://localhost:3000  (anonymous-only without env)
 npm run build
 npm run lint
+npm test
 ```
 Auth + progress activate when `DATABASE_URL` + `AUTH_*` are set. See
 `.env.example` and `DEPLOY.md` (deploy steps are user-run; Vercel CLI required).
@@ -356,7 +365,9 @@ there too — it is the single source of truth for planned work.
 - **Stale single-file content.** Earlier seed files `content/<slug>/<subId>.mdx`
   (A1–A5, E3, I3) predate the lesson model and are no longer read by any route;
   mine them when splitting their discipline into lessons, then remove.
-- **No tests yet**: add them when behavior (not just rendering) is introduced.
+- **Few tests.** `npm test` (`node:test` via `tsx`, chained into `prebuild`) runs
+  `src/lib/*.test.ts`, covering pure logic only. Add tests there when behavior
+  (not just rendering) is introduced; there is no component test setup yet.
 
 ## Pointers to related work
 

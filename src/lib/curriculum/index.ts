@@ -124,3 +124,8 @@ export function pillarProgress(subIds: string[], progress: ProgressMap) {
   const pct = total > 0 ? Math.round((studied / total) * 100) : 0;
   return { total, studied, inProgress, untouched, pct, subs };
 }
+
+/** Every subsection's progress, keyed by id (the graph's Studied view). */
+export function studyMap(progress: ProgressMap): Record<string, SubProgress> {
+  return pillarProgress(Object.keys(CURRICULA), progress).subs;
+}
