@@ -69,6 +69,7 @@ npm install
 npm run dev        # http://localhost:3000  (anonymous-only without env)
 npm run build
 npm run lint
+npm test
 ```
 
 With no environment variables, the dashboard and every study page work; sign-in
@@ -109,7 +110,8 @@ ai-knowledge-tree/
 │   │   ├── curriculum/{index,A,...}.ts  # per-subsection ordered Lesson[]
 │   │   ├── content.ts              # lesson resolve/load, prev/next
 │   │   ├── db.ts                   # guarded Neon pool
-│   │   └── progress.ts             # getProgressMap / getResume / isSignedIn
+│   │   ├── progress.ts             # getProgressMap / getResume / isSignedIn
+│   │   └── study-graph.ts          # graph zoom limits + Studied view shading
 │   ├── auth.ts                     # Auth.js config (guarded)
 │   └── types/next-auth.d.ts
 └── public/figures/<sub>/<name>.svg # generated plot assets

@@ -79,7 +79,8 @@ ai-knowledge-tree/
 │   │   ├── curriculum/{index,A,…}.ts  # per-subsection ordered Lesson[] (the lesson list)
 │   │   ├── content.ts              # lesson resolve/load, lessonContentStatus, prev/next
 │   │   ├── db.ts                   # guarded Neon pool (null when no DATABASE_URL)
-│   │   └── progress.ts             # getProgressMap / getResume / isSignedIn (keyed subId/lessonId)
+│   │   ├── progress.ts             # getProgressMap / getResume / isSignedIn (keyed subId/lessonId)
+│   │   └── study-graph.ts          # graph zoom limits + Studied view shading (pure, tested)
 │   ├── auth.ts                     # Auth.js config (guarded)
 │   └── types/next-auth.d.ts        # Session.user.id augmentation
 └── public/figures/<sub>/<name>.svg # generated plot assets (see Figures)
