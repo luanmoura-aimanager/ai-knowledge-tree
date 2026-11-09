@@ -367,4 +367,43 @@ export const D_CURRICULUM: Record<string, Lesson[]> = {
       codeExempt: true,
     },
   ],
+
+  D8: [
+    {
+      id: "event-sequence-tokenization",
+      title: "Tokenizing transactions and event sequences",
+      goal: "Turn heterogeneous event records (amounts, merchants, text, timestamps) into transformer tokens, choosing bucketing and layouts by their entropy, error, and attention-cost consequences.",
+      prerequisites: ["D3/transformer-arch", "E1/tokenization"],
+    },
+    {
+      id: "continuous-time-rope",
+      title: "Rotary encodings over continuous time",
+      goal: "Drive RoPE with warped timestamps instead of integer positions, prove that attention scores then depend only on time differences, and pick frequencies that neither alias nor blur.",
+      prerequisites: ["event-sequence-tokenization", "E3/positional-encodings"],
+    },
+    {
+      id: "masked-event-modeling",
+      title: "Pretraining objectives: masked and next-event modeling",
+      goal: "Compare bidirectional masked event modeling with causal next-event prediction, derive the per-field losses, and explain why event-level masking blocks the within-event shortcut.",
+      prerequisites: ["continuous-time-rope", "D5/mlm"],
+    },
+    {
+      id: "llm-backbones-for-events",
+      title: "LLM backbones for event data (Qwen and friends)",
+      goal: "Adapt a pretrained decoder such as Qwen to event sequences by textualizing events or feeding learned event embeddings, budget the context and LoRA parameters, and pool a user embedding correctly.",
+      prerequisites: ["masked-event-modeling", "E3/decoder-only", "E4/lora"],
+    },
+    {
+      id: "transaction-fm-downstream",
+      title: "Using transaction embeddings downstream",
+      goal: "Evaluate a transaction foundation model honestly: linear probes, LoRA, fusion with tabular features, out-of-time splits, leakage, and reading relative PR-AUC lifts.",
+      prerequisites: ["llm-backbones-for-events", "C9/classification-metrics", "C1/logistic-regression"],
+    },
+    {
+      id: "tabular-foundation-models",
+      title: "Tabular foundation models: TabPFN",
+      goal: "Derive why training a transformer on synthetic datasets from a prior yields an approximate posterior predictive, and know where TabPFN beats and loses to gradient-boosted trees.",
+      prerequisites: ["transaction-fm-downstream", "B2/posterior-predictive", "C3/xgboost-lightgbm"],
+    },
+  ],
 };
