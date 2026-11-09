@@ -15,7 +15,7 @@ retried after a decline, a classic fraud signal) or 5 months apart (a dormant ac
 waking up). An integer position index treats both pairs identically. The model needs
 attention scores that know how much **real time** separates two events. This lesson takes
 the rotary position encoding (RoPE) from the E3 lesson, feeds it timestamps instead of
-indices, and works out what that buys and what it costs. PRAGMA encodes time in exactly this
+indices, and works out what that buys and what it costs. PRAGMA encodes time this
 way, applying RoPE to log-seconds in its history and profile encoders<FN n="1" />.
 
 ## RoPE in one derivation
@@ -109,8 +109,8 @@ scale of warped coordinates:
 |---|---|---|---|---|---|---|---|
 | $\varphi(a)$ | 0.94 | 17.1 | 48.9 | 74.3 | 89.9 | 101.5 | 127.4 |
 
-The whole 25-month history fits in about 127 warped units, and half of that range is spent
-on the most recent hour.
+The whole 25-month history fits in about 127 warped units, and the most recent hour alone
+takes 48.9 of them, almost 40% of the range.
 
 A named confusion is worth stating here. "RoPE is a relative encoding" means relative **in
 whatever coordinate drives it**. With warped age, scores depend on $\varphi(a_m) - \varphi(a_n)$,
@@ -292,8 +292,11 @@ so $R = 8 \ln(1 + 1.578 \times 10^8 / 8) = 8 \ln(1.972 \times 10^7) = 8 \times 1
 **Step 2.** $b^\star = (2R/\pi)^{128/126} = (85.55)^{1.01587}$. Taking logs,
 $\ln b^\star = 1.01587 \times 4.449 = 4.520$, so $b^\star \approx 91.8$.
 
-Doubling the history barely moves $R$ (the warp is logarithmic), so the base barely moves
-either.
+This exercise changed two things at once, so compare carefully. Holding $d = 64$ fixed, the
+longer history gives $b^\star = (85.55)^{64/62} \approx 98.8$, up from 93 for 25 months: a
+longer range still needs a larger base, but only slightly, because the warp is logarithmic
+and more than doubling the history moves $R$ only from 127.4 to 134.4. The drop to 91.8 comes
+from the larger head dimension, which spreads the frequencies further toward the slow end.
 
 </details>
 

@@ -9,7 +9,7 @@ goal: "Evaluate a transaction foundation model honestly: linear probes, LoRA, fu
 prerequisites: ["llm-backbones-for-events", "C9/classification-metrics", "C1/logistic-regression"]
 ---
 
-A pretrained transaction model is worth exactly what it adds to the decisions a bank already
+A pretrained transaction model is worth what it adds to the decisions a bank already
 makes: who gets credit, which payment is blocked, which customer receives an offer. Those
 decisions already run on gradient-boosted trees over hand-built features, and the trees are
 good. This lesson covers how embeddings are plugged into downstream models, how to build an
@@ -87,7 +87,9 @@ probability is $1/2$ at any prevalence.
 each is positive with probability $\pi$, so the expected precision at every $k$ is $\pi$.
 
 **Step 3: Average precision.** Average precision is the mean of precision at the ranks of the
-positives, so its expectation is (approximately, for large samples) $\pi$ as well.
+positives, so its expectation is approximately $\pi$ as well. In finite samples it sits
+slightly above $\pi$ (the first positive found contributes a precision well above the base
+rate), and the gap closes as the number of positives grows.
 
 The floor of PR-AUC moves with prevalence, and for rare outcomes it sits near zero, so a
 modest absolute gain becomes a large ratio. A contrasting pair on one credit model at 2%
@@ -109,7 +111,7 @@ people: anti-money-laundering rings move funds through chains of accounts that e
 normal alone. PRAGMA reports this as a limitation: a linear probe on its largest model scored
 47.1% *below* the production anti-money-laundering baseline on F0.5, which the authors
 attribute to cross-record relational structure that per-record embeddings cannot
-capture<FN n="1" />. Those problems call for graph models (pillar D6) over the transaction
+capture<FN n="1" />. Those problems call for graph neural networks (subsection D6) over the transaction
 network, with per-user embeddings as node features.
 
 ## Check it on arrays
@@ -163,7 +165,7 @@ prev = y[te].mean()
 rand = np.array([[roc_auc(s, y[te]), avg_precision(s, y[te])]
                  for s in rng.random((200, len(y[te])))]).mean(0)
 print(f"random scorer: ROC-AUC {rand[0]:.3f}, PR-AUC {rand[1]:.3f}, prevalence {prev:.3f}")
-assert abs(rand[0] - 0.5) < 0.01 and abs(rand[1] - prev) < 0.01
+assert abs(rand[0] - 0.5) < 0.01 and 0 <= rand[1] - prev < 0.02   # small upward finite-sample bias
 ```
 
 The fused model beats both single sources because raw income and behavioural embedding
@@ -220,8 +222,9 @@ rng = np.random.default_rng(0)
 n, d, n_pre = 6000, 8, 30
 z, w = rng.normal(size=n), rng.normal(size=n)
 y = (rng.random(n) < 1 / (1 + np.exp(-(z + w - 3.0)))).astype(float)
-u_dir = rng.normal(size=d); rng.normal(size=d)
+u_dir = rng.normal(size=d); rng.normal(size=d)            # v_dir (unused here)
 pre = w[:, None, None] * u_dir + rng.normal(scale=3.0, size=(n, n_pre, d))
+rng.normal(scale=3.0, size=(n, 10, d))                     # post noise: keeps the RNG stream aligned
 raw = (-z + rng.normal(scale=0.5, size=n))[:, None]
 
 def fit_logreg(X, y, steps=500, lr=0.5):
@@ -243,7 +246,7 @@ assert out[30] > out[5]
 ```
 
 With 5 events the embedding's estimate of the behavioural risk is noisier (the noise in a mean
-of $k$ events shrinks like $1/\sqrt k$), so the fused ROC-AUC drops (about 0.83 to 0.81 here).
+of $k$ events shrinks like $1/\sqrt k$), so the fused ROC-AUC drops (0.830 to 0.816 here).
 History length is a lever on embedding quality, which is one reason PRAGMA keeps thousands of
 events per user.
 

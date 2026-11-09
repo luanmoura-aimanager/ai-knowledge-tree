@@ -84,7 +84,7 @@ of amounts, set $b_i = F^{-1}(i/B)$, the $i/B$ quantile. Then each bucket holds 
 $F(b_{i+1}) - F(b_i) = 1/B$, so quantile buckets attain the bound.
 
 With $B = 16$ the quantile scheme carries $\log_2 16 = 4$ bits per amount token, against
-**0.07 bits** for the uniform scheme on the same data. PRAGMA uses exactly this: percentile
+**0.07 bits** for the uniform scheme on the same data. PRAGMA uses this scheme: percentile
 buckets whose boundaries are learned from the training data, plus a dedicated bucket for
 zero<FN n="1" />.
 
@@ -108,7 +108,7 @@ is largest at the ends of that interval: $\sqrt r - 1$ when $v = b_i$, and $1 - 
 
 A ratio of $r = 2$ (one bucket per doubling) gives at most 41.4% error; $r = 1.25$ gives at
 most 11.8%, at the cost of $\log_{1.25} 2 \approx 3.1$ times as many buckets per decade. The
-trade is resolution against vocabulary size, and the bound tells you exactly what you buy.
+trade is resolution against vocabulary size, and the bound states what each extra bucket buys.
 
 ## High-cardinality fields: top-K, hashing, or learned tables
 

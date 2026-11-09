@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, PARTIAL, apply_style, color, save
+from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, LEGEND_BG, PARTIAL, apply_style, color, save
 
 SUB = "D8"
 C = color(SUB)  # pillar-D accent (blue)
@@ -105,7 +105,7 @@ def masking_patterns() -> None:
     evt = np.zeros((E, F)); evt[[2, 7], :] = 1
     key = np.zeros((E, F)); key[:, 1] = 1
     fields = ["amount", "MCC", "merchant", "currency", "channel", "text"]
-    cmap = ListedColormap(["#1a2040", HOT])
+    cmap = ListedColormap([LEGEND_BG, HOT])
 
     fig, axes = plt.subplots(1, 3, figsize=(8.6, 3.9), sharey=True)
     for ax, m, title in ((axes[0], tok, "token-level (15%)"),

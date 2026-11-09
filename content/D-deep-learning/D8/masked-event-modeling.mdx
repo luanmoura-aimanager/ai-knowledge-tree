@@ -180,17 +180,23 @@ for u in range(n_users):
     merch[u] = np.where(pick_fav, rng.choice(in_fav, n_events), rng.integers(0, n_merch, n_events))
 mcc = mcc_of[merch]
 
-# Token masking: hide MCC of event 0, merchant visible -> lookup gives exact answer.
-loss_token = -np.mean(np.log(np.where(mcc_of[merch[:, 0]] == mcc[:, 0], 1.0, 1e-12)))
+train, test = slice(0, 1500), slice(1500, None)
 
-# Event masking: hide the whole event 0; best guess is the user's empirical MCC mix.
-counts = np.stack([np.bincount(m[1:], minlength=n_cat) for m in mcc]) + 0.5
+# Token masking: MCC of event 0 hidden, merchant visible. Fit a merchant -> MCC table on
+# training users' events, then score the masked MCC of held-out users with it.
+table = np.full((n_merch, n_cat), 0.01)
+np.add.at(table, (merch[train].ravel(), mcc[train].ravel()), 1.0)
+table /= table.sum(1, keepdims=True)
+loss_token = -np.mean(np.log(table[merch[test, 0], mcc[test, 0]]))
+
+# Event masking: the whole event 0 hidden; best guess is the user's empirical MCC mix.
+counts = np.stack([np.bincount(m[1:], minlength=n_cat) for m in mcc[test]]) + 0.5
 p_hist = counts / counts.sum(1, keepdims=True)
-loss_event = -np.mean(np.log(p_hist[np.arange(n_users), mcc[:, 0]]))
+loss_event = -np.mean(np.log(p_hist[np.arange(len(p_hist)), mcc[test, 0]]))
 loss_uniform = np.log(n_cat)
-print(f"token-mask loss {abs(loss_token):.3f}, event-mask loss {loss_event:.3f}, "
-      f"no-history loss {loss_uniform:.3f} nats")
-assert loss_token < 1e-6 < loss_event < loss_uniform
+print(f"token-mask loss {loss_token:.3f}, event-mask loss {loss_event:.3f}, "
+      f"no-history loss {loss_uniform:.3f} nats (held-out users)")
+assert loss_token < 0.05 < loss_event < loss_uniform
 
 # Label smoothing: direct formula vs expanded form
 p = np.array([0.7, 0.2, 0.05, 0.05]); y, eps, V = 0, 0.1, 4
@@ -215,8 +221,8 @@ ce = -np.log(np.exp(logits - logits.max())[0] / np.exp(logits - logits.max()).su
 assert np.isclose(infonce, ce)
 ```
 
-The synthetic run shows the shortcut in numbers: with the merchant visible, the masked MCC
-costs essentially 0 nats; with the whole event hidden, the history-based guess costs more
+The synthetic run shows the shortcut in numbers: with the merchant visible, a merchant-to-MCC
+table learned on other users prices the masked MCC of held-out users at nearly 0 nats; with the whole event hidden, the history-based guess costs more
 than 0 but well under the $\ln 8 = 2.08$ nats of a guess with no history. The other checks
 confirm the label-smoothing expansion, the Gaussian NLL minimizers, and InfoNCE as
 cross-entropy over $K + 1$ candidates.

@@ -630,8 +630,8 @@ export const PILLARS: Pillar[] = [
         intro:
           "Most data in banks, payment networks, and marketplaces is neither text nor images: it is long sequences of typed events (transactions, logins, transfers) and tables of per-customer attributes. Foundation models for this data pretrain one transformer on billions of events and reuse its embeddings for credit, fraud, churn, and recommendation, replacing hundreds of hand-built aggregate features.\n\nYou will learn how to tokenize heterogeneous event records, how to give attention a sense of real elapsed time by driving rotary encodings with timestamps, and how masked event modeling (PRAGMA-style encoders) compares with causal next-event prediction (nuFormer and TREASURE-style decoders). You will then adapt a pretrained LLM backbone such as Qwen to event data, evaluate the resulting embeddings without leakage, and close with TabPFN, the tabular foundation model that learns to do Bayesian prediction in context.\n\nThe track sits between D3 sequence modeling, E3/E4 LLM architecture and fine-tuning, C3 gradient boosting (the baseline to beat), and N3 sequential recommendation, which models user histories with the same machinery.",
         prerequisites: [
-          "D3 Transformer architecture and positional encodings",
-          "E3 RoPE and decoder-only transformers; E4 LoRA",
+          "D3 Transformer architecture",
+          "E3 Positional encodings (RoPE) and decoder-only transformers; E4 LoRA",
           "C3 Gradient boosting and C9 classification metrics",
           "B2 Posterior predictive distribution (for TabPFN)",
         ],
