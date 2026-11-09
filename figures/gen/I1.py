@@ -81,6 +81,7 @@ def missing_values() -> None:
     rng = np.random.default_rng(0)
     N = 20000
     x = rng.normal(50, 10, N)
+    _y = 0.8 * (x - 50) / 10 + rng.normal(0, 0.6, N)  # keep the lesson's rng stream
     miss = rng.random(N) < 0.3
     fill = x[~miss].mean()
     xi = np.where(miss, fill, x)
@@ -122,7 +123,7 @@ def categorical_encoding_production() -> None:
         sim.append(np.mean(shares))
     grid = np.linspace(0, 2.0, 200)
     fig, ax = plt.subplots(figsize=(7.0, 4.0))
-    ax.plot(grid, 1 - np.exp(-grid), color=C, label="derived: 1 - exp(-(K-1)/m)")
+    ax.plot(grid, 1 - np.exp(-(grid * m - 1) / m), color=C, label="derived: 1 - exp(-(K-1)/m)")
     ax.plot(loads, sim, "o", color=HOT, ms=6, label="simulated (m = 4096)")
     ax.set_xlabel("load factor K / m")
     ax.set_ylabel("share of levels that collide")

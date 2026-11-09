@@ -48,11 +48,18 @@ graph LR
   CH -.->|"rollback: move it back"| V6
 ```
 
-Because the server follows the alias, promoting v7 and rolling back to v6 are each
-a single, audited write to the registry: no redeploy, no rebuild. The registry's
-history of alias assignments (who moved what, when) is the governance record an
-auditor or an [incident review](/pillar/I/I4/slos-and-error-budgets) reads to
-reconstruct which model served a given request.
+Promotion and rollback are both one write to the registry, followed by the
+consumers picking it up. A consumer resolves the alias when it **loads** the
+model, not continuously: a batch job reads `@champion` at the start of its next
+run, while a long-running server or a managed serving endpoint keeps the version
+it loaded until it reloads or its configuration is updated. A deployment job
+therefore usually pairs the alias move with an endpoint update (or a restart) that
+re-resolves it. What the indirection removes is the rebuild and the retrain: the
+artifact for v6 or v7 already exists, and every consumer finds the right one by
+name. The [incident review](/pillar/I/I4/slos-and-error-budgets) question, which
+model served a given request, is answered by the
+[inference log](/pillar/I/I4/sliced-monitoring), which records the version each
+request actually used.
 
 Aliases are free-form and a version can carry several (`champion` and `v2025-q4`
 at once), so a team names them after the roles its pipeline actually has. Facts
@@ -102,9 +109,9 @@ and never mutates an existing one. The previous good artifact, v6, is still pres
 and untouched when v7 is registered.
 
 **Step 3.** The serving layer loads `models:/<name>@champion` rather than a
-hard-coded filename. Rollback is moving `champion` from v7 back to v6, a single
-audited metadata write, with no rebuild and no retrain, and the registry's history
-records who did it and when.
+hard-coded filename. Rollback is moving `champion` from v7 back to v6 and then
+having the server re-resolve the alias (a reload or an endpoint update). No
+rebuild and no retrain are needed, because v6 still exists exactly as it was.
 
 </details>
 
@@ -139,7 +146,7 @@ aliases, which are pointers, never in the versions.
 **Exercise 3.** Design the aliases, tags, and gates for a team that needs a human
 sign-off before any model reaches users, on top of the automated CI checks. Say
 which alias moves are automated and which require a person, and explain how the
-registry's history supports a later incident review that asks "which model served
+audit trail supports a later incident review that asks "which model served
 request X at time T, and who approved it".
 
 <details>
@@ -158,12 +165,14 @@ This move is the human sign-off, so it is not automated. Rollback moves
 `champion` back to a prior version, itself an audited (and optionally approved)
 alias change.
 
-**Step 3.** Every alias assignment is recorded with version, alias, timestamp, and
-actor. Because serving follows `champion`, the timeline of which version held
-`champion` answers "which model served request X at time T": find the version
-`champion` pointed at, at time T. If the serving layer also logs the version it
-used on each request in the inference log, the answer is direct. The
-`approved_by` tag on that version names who approved it, giving the incident
+**Step 3.** A registry stores the *current* alias-to-version mapping, not
+necessarily a history of it (MLflow's registry, for instance, keeps only the
+current mapping). The history has to be built: the pipeline writes an entry
+(version, alias, timestamp, actor) to an audit table each time it moves an alias,
+or the platform's audit logs capture the registry API calls. The most direct
+answer to "which model served request X at time T" is the inference log, where
+the serving layer records the version it used on every request. The
+`approved_by` tag on that version then names who approved it, giving the incident
 review both the model identity and the accountable person.
 
 </details>
