@@ -70,8 +70,60 @@ def multi_fidelity_hpo() -> None:
     save(fig, SUB, "multi-fidelity-hpo")
 
 
+
+def tpe() -> None:
+    """One TPE step on the lesson's 1-D loss: 30 trials split at the best 20%, the
+    Parzen densities l(x) and g(x), and the ratio whose argmax is the next trial.
+    rng(0)."""
+    import matplotlib.pyplot as plt
+
+    def loss(x):
+        return 0.05 * (x - 7.0) ** 2 + 0.3 * np.sin(3 * x) + 0.3
+
+    def parzen(points, h, x):
+        z = (x[:, None] - points[None, :]) / h
+        return np.exp(-0.5 * z ** 2).mean(axis=1) / (h * np.sqrt(2 * np.pi))
+
+    rng = np.random.default_rng(0)
+    X = rng.uniform(0, 10, 30)
+    Y = loss(X)
+    order = np.argsort(Y)
+    n_good = int(np.ceil(0.2 * len(X)))
+    good, bad = X[order[:n_good]], X[order[n_good:]]
+    h = 0.1 * 10 * len(X) ** (-0.2)
+    grid = np.linspace(0, 10, 600)
+    l, g = parzen(good, h, grid), parzen(bad, h, grid)
+    ratio = l / (g + 1e-12)
+    x_next = grid[np.argmax(ratio)]
+
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(7.2, 5.6), sharex=True)
+    a1.plot(grid, loss(grid), color=FG_MUTE, lw=1.4, label="validation loss")
+    a1.plot(bad, loss(bad), "o", color=FG_MUTE, ms=5, label="bad trials")
+    a1.plot(good, loss(good), "o", color=C, ms=7, label="good trials (best 20%)")
+    a1.set_ylabel("loss")
+    a1.set_title("TPE: model where good trials are, not the loss itself")
+    a1.legend(loc="upper right", fontsize=8)
+    a2.plot(grid, l, color=C, label="l(x): good-trial density")
+    a2.plot(grid, g, color=FG_MUTE, label="g(x): bad-trial density")
+    a2b = a2.twinx()
+    a2b.plot(grid, ratio, color=HOT, lw=1.4, ls="--", label="l(x) / g(x)")
+    a2b.set_ylabel("ratio", color=HOT)
+    a2b.tick_params(axis="y", colors=HOT)
+    a2b.grid(False)
+    a2.axvline(x_next, color=HOT, lw=1.0, ls=":")
+    a2.text(x_next - 0.15, a2.get_ylim()[1] * 0.92, "next trial", color=HOT, fontsize=9, va="top", ha="right")
+    a2.set_xlabel("hyperparameter x")
+    a2.set_ylabel("density")
+    h1, l1 = a2.get_legend_handles_labels()
+    h2, l2 = a2b.get_legend_handles_labels()
+    a2.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "tpe")
+
+
 def main() -> None:
     apply_style()
+    tpe()
     hyperparameter_search()
     multi_fidelity_hpo()
 

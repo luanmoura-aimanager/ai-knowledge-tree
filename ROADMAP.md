@@ -4,8 +4,8 @@ Canonical backlog of upcoming work for `ai-knowledge-tree`. When asked "what are
 the next steps?", read this file. As items ship, check them off or remove them so
 the list never claims work that's already done.
 
-Last reviewed: 2026-06-20 (Advanced Causal ML pillar M shipped; backlog of new
-pillars now empty).
+Last reviewed: 2026-11-09 (Databricks-course gap lessons added to pillar I;
+backlog of new pillars empty).
 
 ## Backlog
 
@@ -15,7 +15,21 @@ Add new agreed next steps here.
 
 ---
 
-Five efforts shipped:
+Six efforts shipped:
+
+- **Pillar I gap lessons from the Databricks ML Associate courses** (2026-11-09).
+  The four Databricks Academy courses (Data Prep, Model Development, Model
+  Deployment, MLOps) were checked against every existing lesson; 9 concepts had
+  no coverage and became new vendor-neutral lessons: I1 `missing-values`,
+  `categorical-encoding-production`; I2 `deploy-code-vs-model`,
+  `declarative-deployment`, `tpe`; I3 `inference-modes`, `model-packaging`; I4
+  `drift-distances`, `sliced-monitoring`. `I2/model-registry` was rewritten
+  around aliases (MLflow deprecated stages; Unity Catalog supports only
+  aliases). Six new figures (figures/gen/I1-I4.py), handoffs of the preceding
+  lessons updated, and all 9 added to the Machine Learning Engineer path. All
+  runnable blocks pass under python3; render-check --exercises 34/34.
+
+Five earlier efforts shipped:
 
 - **Advanced Causal Machine Learning pillar M** (2026-06-20). New top-level pillar,
   the ML frontier sitting on top of B5's causal foundations (cross-linked, not
