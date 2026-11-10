@@ -5,7 +5,8 @@ the next steps?", read this file. As items ship, check them off or remove them s
 the list never claims work that's already done.
 
 Last reviewed: 2026-11-09 (2025-26 modern-algorithms gap pass shipped: D8 tabular &
-event foundation models plus 9 new architecture/training lessons).
+event foundation models plus 9 new architecture/training lessons; Databricks-course
+gap lessons added to pillar I).
 
 ## Backlog
 
@@ -19,7 +20,20 @@ Add new agreed next steps here.
 
 ---
 
-Latest shipped (2026-11-09): **modern-algorithms gap pass** (2025-26 techniques).
+Latest shipped (2026-11-09): **modern-algorithms gap pass** (2025-26 techniques) and the
+**pillar I Databricks-course gap lessons**.
+
+- **Pillar I gap lessons from the Databricks ML Associate courses** (2026-11-09).
+  The four Databricks Academy courses (Data Prep, Model Development, Model
+  Deployment, MLOps) were checked against every existing lesson; 9 concepts had
+  no coverage and became new vendor-neutral lessons: I1 `missing-values`,
+  `categorical-encoding-production`; I2 `deploy-code-vs-model`,
+  `declarative-deployment`, `tpe`; I3 `inference-modes`, `model-packaging`; I4
+  `drift-distances`, `sliced-monitoring`. `I2/model-registry` was rewritten
+  around aliases (MLflow deprecated stages; Unity Catalog supports only
+  aliases). Six new figures (figures/gen/I1-I4.py), handoffs of the preceding
+  lessons updated, and all 9 added to the Machine Learning Engineer path. All
+  runnable blocks pass under python3; render-check --exercises 34/34.
 
 - **D8 Tabular & event foundation models** (PR #109): new subsection, 6 lessons on
   transaction/event-sequence foundation models (PRAGMA, nuFormer, TREASURE): tokenization,

@@ -71,8 +71,72 @@ def feature_engineering() -> None:
     save(fig, SUB, "feature-engineering")
 
 
+
+def missing_values() -> None:
+    """Mean imputation under MCAR: the imputed column keeps the observed mean but
+    piles 30% of rows onto it, shrinking the variance by (1 - p). rng(0), same
+    data as the lesson's first python block."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    N = 20000
+    x = rng.normal(50, 10, N)
+    _y = 0.8 * (x - 50) / 10 + rng.normal(0, 0.6, N)  # keep the lesson's rng stream
+    miss = rng.random(N) < 0.3
+    fill = x[~miss].mean()
+    xi = np.where(miss, fill, x)
+    bins = np.linspace(15, 85, 71)
+
+    fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.8), sharey=True)
+    axes[0].hist(x[~miss], bins=bins, color=C, alpha=0.85)
+    axes[0].set_title(f"observed values (var {x[~miss].var():.0f})")
+    axes[1].hist(xi, bins=bins, color=C, alpha=0.85)
+    axes[1].axvline(fill, color=HOT, ls="--", lw=1.4)
+    spike = int(miss.sum())
+    axes[1].set_ylim(0, 900)
+    axes[1].annotate(f"spike of {spike:,} rows\n(clipped)", xy=(fill, 880), xytext=(fill + 6, 780),
+                     color=HOT, fontsize=9, va="top",
+                     arrowprops=dict(arrowstyle="->", color=HOT, lw=1.2))
+    axes[1].set_title(f"after mean imputation (var {xi.var():.0f})")
+    for ax in axes:
+        ax.set_xlabel("feature value")
+    axes[0].set_ylabel("rows")
+    fig.tight_layout()
+    save(fig, SUB, "missing-values")
+
+
+def categorical_encoding_production() -> None:
+    """Share of levels sharing a hash bucket vs load factor K/m: simulation (points)
+    against the derived 1 - exp(-(K-1)/m) (line). rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    m = 4096
+    loads = np.array([0.02, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0])
+    sim = []
+    for load in loads:
+        K = int(load * m)
+        shares = []
+        for _ in range(40):
+            b = rng.integers(0, m, K)
+            shares.append((np.bincount(b, minlength=m)[b] > 1).mean())
+        sim.append(np.mean(shares))
+    grid = np.linspace(0, 2.0, 200)
+    fig, ax = plt.subplots(figsize=(7.0, 4.0))
+    ax.plot(grid, 1 - np.exp(-(grid * m - 1) / m), color=C, label="derived: 1 - exp(-(K-1)/m)")
+    ax.plot(loads, sim, "o", color=HOT, ms=6, label="simulated (m = 4096)")
+    ax.set_xlabel("load factor K / m")
+    ax.set_ylabel("share of levels that collide")
+    ax.set_title("Hashing trick: collisions grow with the load factor")
+    ax.legend(loc="lower right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "categorical-encoding-production")
+
+
 def main() -> None:
     apply_style()
+    missing_values()
+    categorical_encoding_production()
     drift_detection()
     feature_engineering()
 

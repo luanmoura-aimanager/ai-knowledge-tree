@@ -3279,6 +3279,16 @@ export const PATHS: Path[] = [
       },
       {
         subId: "I1",
+        lessonId: "missing-values",
+        section: "Feature & data engineering",
+      },
+      {
+        subId: "I1",
+        lessonId: "categorical-encoding-production",
+        section: "Feature & data engineering",
+      },
+      {
+        subId: "I1",
         lessonId: "pipeline-paradigms",
         section: "Feature & data engineering",
       },
@@ -3304,14 +3314,39 @@ export const PATHS: Path[] = [
       },
       {
         subId: "I2",
+        lessonId: "tpe",
+        section: "Experiment & train",
+      },
+      {
+        subId: "I2",
         lessonId: "model-registry",
         section: "Experiment & train",
       },
       { subId: "I2", lessonId: "ml-cicd", section: "Experiment & train" },
+      {
+        subId: "I2",
+        lessonId: "deploy-code-vs-model",
+        section: "Experiment & train",
+      },
+      {
+        subId: "I2",
+        lessonId: "declarative-deployment",
+        section: "Experiment & train",
+      },
       { subId: "D7", lessonId: "data-parallel", section: "Experiment & train" },
       {
         subId: "I3",
         lessonId: "latency-throughput",
+        section: "Package & deploy",
+      },
+      {
+        subId: "I3",
+        lessonId: "inference-modes",
+        section: "Package & deploy",
+      },
+      {
+        subId: "I3",
+        lessonId: "model-packaging",
         section: "Package & deploy",
       },
       {
@@ -3330,6 +3365,16 @@ export const PATHS: Path[] = [
       {
         subId: "I4",
         lessonId: "production-drift",
+        section: "Monitor & retrain",
+      },
+      {
+        subId: "I4",
+        lessonId: "drift-distances",
+        section: "Monitor & retrain",
+      },
+      {
+        subId: "I4",
+        lessonId: "sliced-monitoring",
         section: "Monitor & retrain",
       },
       {

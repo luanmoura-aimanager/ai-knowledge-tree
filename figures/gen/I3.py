@@ -111,8 +111,37 @@ def deployment_strategies() -> None:
     save(fig, SUB, "deployment-strategies")
 
 
+
+def inference_modes() -> None:
+    """Daily cost vs requests per day: flat batch line over a 20M population, and a
+    real-time staircase with a one-replica floor (lesson's cost model)."""
+    import matplotlib.pyplot as plt
+
+    N, c_b = 20e6, 2e-6
+    pi, mu, rho = 1.0, 100.0, 0.6
+    Q = np.logspace(5, 7.7, 2000)
+    replicas = np.maximum(1, np.ceil(Q / 86400 / (rho * mu)))
+    rt = 24 * pi * replicas
+    batch = np.full_like(Q, N * c_b)
+    be = rho * mu * 86400
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(Q / 1e6, rt, color=C, label="real-time endpoint (replicas x hours)")
+    ax.plot(Q / 1e6, batch, color=FG_MUTE, ls="--", label="daily batch over 20M customers")
+    ax.axvline(be / 1e6, color=HOT, ls=":", lw=1.4)
+    ax.text(be / 1e6 * 1.08, 110, "one replica\nfull", color=HOT, fontsize=9)
+    ax.set_xscale("log")
+    ax.set_xlabel("requests per day (millions, log scale)")
+    ax.set_ylabel("cost per day")
+    ax.set_title("Batch pays for the population, real-time for capacity")
+    ax.legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "inference-modes")
+
+
 def main() -> None:
     apply_style()
+    inference_modes()
     deployment_strategies()
     distillation_pruning()
     latency_throughput()

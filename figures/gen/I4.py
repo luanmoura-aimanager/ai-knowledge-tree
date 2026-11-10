@@ -124,8 +124,83 @@ def automated_retraining() -> None:
     save(fig, SUB, "automated-retraining")
 
 
+
+def drift_distances() -> None:
+    """KS saturates at 1 while Wasserstein-1 grows with the shift, for a
+    standard-normal reference. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 5000
+    ref = rng.normal(0, 1, n)
+    shifts = np.linspace(0, 8, 33)
+    ks, w1 = [], []
+    for d in shifts:
+        cur = rng.normal(d, 1, n)
+        grid = np.sort(np.concatenate([ref, cur]))
+        Fa = np.searchsorted(np.sort(ref), grid, side="right") / n
+        Fb = np.searchsorted(np.sort(cur), grid, side="right") / n
+        ks.append(np.max(np.abs(Fa - Fb)))
+        w1.append(np.mean(np.abs(np.sort(ref) - np.sort(cur))))
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(shifts, ks, color=FG_MUTE, label="KS statistic (left)")
+    ax.set_ylabel("KS statistic")
+    ax.set_ylim(0, 1.1)
+    ax2 = ax.twinx()
+    ax2.plot(shifts, w1, color=C, label="Wasserstein-1 (right)")
+    ax2.set_ylabel("Wasserstein-1 (feature units)", color=C)
+    ax2.tick_params(axis="y", colors=C)
+    ax2.grid(False)
+    ax.set_xlabel("mean shift (standard deviations)")
+    ax.set_title("KS saturates; Wasserstein keeps measuring how far")
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, loc="center right", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "drift-distances")
+
+
+def sliced_monitoring() -> None:
+    """Weekly accuracy per slice and in aggregate: one 5% slice degrades from 0.90 to
+    0.70 after week 6 while the aggregate falls by about a point. rng(0)."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    w = np.array([0.20, 0.15, 0.15, 0.10, 0.10, 0.08, 0.07, 0.05, 0.05, 0.05])
+    weeks = np.arange(12)
+    n = 20000
+    per_slice = np.zeros((len(weeks), len(w)))
+    agg = np.zeros(len(weeks))
+    for t in weeks:
+        acc = np.full(len(w), 0.90)
+        if t >= 6:
+            acc[7] = 0.90 - 0.20 * min(1.0, (t - 5) / 3)
+        s = rng.choice(len(w), n, p=w)
+        ok = rng.random(n) < acc[s]
+        agg[t] = ok.mean()
+        per_slice[t] = [ok[s == k].mean() for k in range(len(w))]
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    for k in range(len(w)):
+        if k != 7:
+            ax.plot(weeks, per_slice[:, k], color=FG_MUTE, lw=1.0, alpha=0.6)
+    ax.plot([], [], color=FG_MUTE, lw=1.0, label="other slices")
+    ax.plot(weeks, per_slice[:, 7], color=HOT, lw=2.0, label="slice 7 (5% of traffic)")
+    ax.plot(weeks, agg, color=C, lw=2.6, label="aggregate")
+    ax.set_ylim(0.6, 0.97)
+    ax.set_xlabel("week")
+    ax.set_ylabel("accuracy")
+    ax.set_title("A failing slice barely moves the aggregate")
+    ax.legend(loc="lower left", fontsize=9)
+    fig.tight_layout()
+    save(fig, SUB, "sliced-monitoring")
+
+
 def main() -> None:
     apply_style()
+    drift_distances()
+    sliced_monitoring()
     automated_retraining()
     cost_monitoring()
     production_drift()
