@@ -252,7 +252,8 @@ def word_embeddings() -> None:
 def gated_deltanet() -> None:
     """Mean retrieval error ||S k_j - v_j|| / ||v_j|| after writing n key-value pairs
     (unit random keys, d = 32) into a fast-weight memory, for plain linear-attention
-    accumulation vs the delta rule (beta = 1). Same simulation as the lesson's code."""
+    accumulation vs the delta rule (beta = 1). Same setup as the lesson's code (separate
+    random draws and a finer n grid, so values differ slightly)."""
     import matplotlib.pyplot as plt
 
     ns, lin, dlt = _delta_recall()
@@ -297,6 +298,7 @@ def main() -> None:
     word_embeddings()
 
     gated_deltanet()
+
 
 if __name__ == "__main__":
     main()

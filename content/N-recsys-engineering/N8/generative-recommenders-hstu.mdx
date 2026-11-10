@@ -197,21 +197,24 @@ saturates. Pointwise attention carries it directly at every gap.
 
 </details>
 
-**Exercise 2.** A cascade spends 40% of its serving budget on retrieval, 45% on ranking and 15%
-on re-ranking. OneRec reports an OPEX of 10.6% of the traditional pipeline. If the cascade cost
-1,000 GPU-hours per day, what does OneRec cost, and how many times more GPU efficiency does it
-need to deliver its larger model?
+**Exercise 2.** OneRec reports an operating expense of 10.6% of the traditional pipeline and an
+inference MFU rising from 11.2% to 28.8%. If the cascade cost 1,000 GPU-hours per day, what does
+OneRec cost, what overall cost reduction factor is that, and how much of it can the MFU gain
+alone explain?
 
 <details>
 <summary>Solution</summary>
 
-**Step 1.** OneRec costs $0.106 \times 1{,}000 = 106$ GPU-hours per day (the stage split does not
-matter for the total).
+**Step 1.** OneRec costs $0.106 \times 1{,}000 = 106$ GPU-hours per day, a reduction by a factor
+of $1/0.106 = 9.43$.
 
-**Step 2.** The reported MFU rises from 11.2% to 28.8% in inference, a $2.57\times$ gain: every
-GPU-hour does about 2.6 times more useful compute. The rest of the saving comes from replacing
-many feature-heavy stage models with one model whose work is dominated by dense matrix
-multiplication.
+**Step 2.** The MFU gain is $28.8 / 11.2 = 2.57$: each GPU-hour does 2.57 times more useful
+compute, so the same work would cost $1/2.57 = 38.9\%$ of before.
+
+**Step 3.** The remaining factor, $9.43 / 2.57 = 3.67$, must come from doing less work in total:
+one model replacing several feature-heavy stage models, so fewer FLOPs and lookups per request.
+On a log scale utilization explains about 42% of the saving
+($\ln 2.57 / \ln 9.43 = 0.42$), and less total work explains the remaining 58%.
 
 </details>
 

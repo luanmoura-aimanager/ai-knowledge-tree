@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_MUTE, GOOD, GRID, HOT, PARTIAL, apply_style, color, save
 
 SUB = "E4"
 C = color(SUB)  # pillar-E accent (purple)
@@ -82,7 +82,6 @@ def grpo_variants() -> None:
     the per-token penalty on long wrong answers; DAPO's token-level normalization and
     Dr. GRPO's constant normalizer do not."""
     import matplotlib.pyplot as plt
-    from _style import PARTIAL
 
     G, total, Lmax = 8, 4000, 4096
     ell = np.arange(50, 2001, 10)
@@ -108,6 +107,7 @@ def main() -> None:
     scaling_laws()
 
     grpo_variants()
+
 
 if __name__ == "__main__":
     main()

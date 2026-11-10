@@ -86,10 +86,10 @@ map drives every singular value toward 1.
 
 Muon's coefficients, $(a, b, c) = (3.4445, -4.7750, 2.0315)$, are tuned for speed rather than
 exact convergence: the large slope $a$ lifts small singular values quickly, and five steps
-suffice<FN n="1" />. After five steps every singular value from about 0.05 to 1 lands in roughly
+suffice<FN n="1" />. After five steps every singular value from about 0.0015 to 1 lands in roughly
 $[0.68, 1.20]$, which is close enough to orthogonal for an optimizer step.
 
-![The quintic Newton-Schulz map applied 1 to 5 times. Small singular values are pushed up fast; after five steps everything above about 0.05 sits in roughly [0.68, 1.20].](/figures/D1/muon-newton-schulz.svg)
+![The quintic Newton-Schulz map applied 1 to 5 times. Small singular values are pushed up fast; after five steps everything above about 0.0015 sits in roughly [0.68, 1.20].](/figures/D1/muon-newton-schulz.svg)
 
 Muon is meant only for the 2D weight matrices of hidden layers. Embeddings, the output head,
 and scalar or vector parameters (norm gains, biases) stay on AdamW<FN n="1" />.
@@ -131,7 +131,7 @@ Since a logit is bilinear in $W_q$ and $W_k$, scaling each by $\sqrt{\gamma_h}$ 
 by exactly $\gamma_h$, which brings the maximum back to $\tau$. (For MLA, the shared rotary key
 is left alone and the rotary query takes the full $\gamma_h$.) Kimi K2 used $\tau = 100$ and was
 pretrained on 15.5 trillion tokens with zero loss spikes<FN n="3" />. This is the weight-space
-counterpart of QK-norm from the E3 attention-stability lesson.
+counterpart of QK-norm from the [attention-stability lesson](/pillar/E/E3/attention-stability).
 
 ```mermaid
 graph LR
@@ -245,8 +245,8 @@ assert steps == 4
 
 Near zero, $p(\sigma) \approx 3.4445\,\sigma$, so the value grows about 3.4 times per step:
 0.034, 0.118, 0.40, then 1.09 at step 4, after which it oscillates between about 0.69 and
-1.12 instead of settling at 1. Five steps lift anything above roughly
-$0.5 / 3.4445^5 \approx 0.001$ into that band, which covers all but the weakest directions after
+1.12 instead of settling at 1. Five steps lift anything above about 0.0015 into the
+$[0.68, 1.20]$ band (a value of 0.001 still ends at only 0.47), which covers all but the weakest directions after
 Frobenius normalization; more steps would cost matrix multiplications without making the update
 more orthogonal, because the tuned polynomial trades exact convergence for speed.
 

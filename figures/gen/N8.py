@@ -14,7 +14,7 @@ def hstu_pointwise() -> None:
     """Attention output magnitude for a query that matches n of 64 history items:
     softmax normalizes the output to a convex combination, so it barely changes with n;
     HSTU's pointwise SiLU aggregation grows with n, so the model can see how many
-    relevant actions there were. Same setup as the lesson's code."""
+    relevant actions there were. Same setup as the lesson's code (separate random draws)."""
     import matplotlib.pyplot as plt
 
     ns, soft, point = _count_sensitivity()

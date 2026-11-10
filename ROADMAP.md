@@ -9,6 +9,10 @@ event foundation models plus 9 new architecture/training lessons).
 
 ## Backlog
 
+- [ ] **Further 2025-26 lesson candidates** (from the 2026-11 gap pass, not yet authored):
+  multi-token prediction (DeepSeek-V3 MTP), FP8/MXFP4 training, manifold-constrained
+  hyper-connections (DeepSeek-V4), and KV sharing / per-layer embeddings (Gemma 4).
+
 _No new pillars queued._ The causal-inference work is shipped: foundations live
 in pillar B (B5), and the advanced machine-learning frontier is pillar M below.
 Add new agreed next steps here.
@@ -29,8 +33,6 @@ Latest shipped (2026-11-09): **modern-algorithms gap pass** (2025-26 techniques)
 - Refreshes: G3 time-series foundation models (Chronos-2, TimesFM 2.5/3.0, Moirai 2.0, Toto),
   forward links from E3 positional encodings / GQA-MoE (DeepSeek-V3 expert counts corrected),
   D3 hybrids, E8 frontier, and the handoffs of each subsection's former last lesson.
-- Candidates not yet done: multi-token prediction (DeepSeek-V3 MTP), FP8/MXFP4 training,
-  manifold-constrained hyper-connections (DeepSeek-V4), KV-sharing (Gemma 4).
 
 Five efforts shipped:
 

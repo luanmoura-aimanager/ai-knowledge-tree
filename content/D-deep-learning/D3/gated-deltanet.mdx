@@ -97,12 +97,14 @@ dimensions of the memory forget at different rates<FN n="2" />. Training is not 
 token: the recurrence is rearranged into chunks so that most of the work becomes matrix
 multiplications that run in parallel on a GPU<FN n="4" />.
 
-![Retrieval error after writing n key-value pairs (unit random keys, d_k = 32). The delta rule's error stays well below plain linear attention's, but both degrade as n approaches and passes the state dimension.](/figures/D3/delta-rule-recall.svg)
+![Retrieval error after writing n key-value pairs (unit random keys, d_k = 32). The delta rule's error stays below plain linear attention's at every load, but with overlapping random keys both rise steadily as more pairs are written.](/figures/D3/delta-rule-recall.svg)
 
 ## Why hybrids keep a few attention layers
 
-A $d_v \times d_k$ state holds at most about $d_k$ well-separated associations: the figure shows
-both rules degrading as the number of stored pairs passes $d_k$. Full softmax attention has no
+A $d_v \times d_k$ state can store at most $d_k$ associations exactly, and only when their keys
+are orthogonal; with real, overlapping keys every write disturbs earlier pairs, so the figure
+shows recall error rising steadily with the number of stored pairs for both rules, with the
+delta rule's error lower at every load. Full softmax attention has no
 such limit, because it keeps every key, so it remains better at exact recall from far back.
 The 2025 answer is a fixed ratio of the two.
 
@@ -166,6 +168,14 @@ for n in (8, 16, 32, 64):
     print(f"n = {n:2d}: linear error {err(S_lin):.2f}, delta error {err(S_dlt):.2f}")
     assert err(S_dlt) < err(S_lin)
 
+# 3b) With orthogonal keys the delta rule stores up to d_k pairs exactly
+Ko = np.linalg.qr(rng.normal(size=(d, d)))[0].T          # 32 orthonormal keys
+Vo = rng.normal(size=(d, d)); S_o = np.zeros((d, d))
+for kk, vv in zip(Ko, Vo):
+    S_o += np.outer(vv - S_o @ kk, kk)
+assert np.allclose(Ko @ S_o.T, Vo)
+print("orthogonal keys: all 32 pairs recalled exactly")
+
 # 4) Gating: alpha < 1 decays old memories geometrically
 alpha, S = 0.9, np.outer(v1, k)
 for _ in range(20):
@@ -180,7 +190,8 @@ print(f"state {dk * dv:,} numbers vs KV cache {2 * L * dk:,} ({2 * L * dk / (dk 
 
 The first check confirms the delta rule is the SGD step derived above; the second shows the
 overwrite behaviour that plain accumulation lacks; the third shows the delta rule's lower recall
-error at every load, with both rules degrading past $n = d_k = 32$; the fourth shows a gate of
+error at every load, with both rising steadily as $n$ grows because random keys overlap, while orthogonal keys
+are recalled exactly by the delta rule up to $n = d_k$; the fourth shows a gate of
 0.9 leaving 12% of an association after 20 steps; and the last shows a 128 by 128 state taking
 512 times less memory than a 32K-token KV cache for one head.
 

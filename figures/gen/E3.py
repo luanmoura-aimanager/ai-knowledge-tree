@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, PARTIAL, apply_style, color, save
 
 SUB = "E3"
 C = color(SUB)  # pillar-E accent
@@ -170,7 +170,6 @@ def rope_scaling() -> None:
     pair by 1/s, the NTK-aware base change keeps the fastest pair and interpolates the
     slowest, and YaRN's ramp (alpha=1, beta=32) keeps fast pairs exactly."""
     import matplotlib.pyplot as plt
-    from _style import PARTIAL
 
     d, b, L, s = 128, 1e4, 4096, 8.0
     i = np.arange(d // 2)
@@ -190,6 +189,7 @@ def rope_scaling() -> None:
     ax.legend(fontsize=8)
     fig.tight_layout()
     save(fig, SUB, "rope-scaling")
+
 
 def attention_stability() -> None:
     """Entropy of softmax attention over 512 keys as the logit scale grows: unbounded
@@ -215,10 +215,11 @@ def attention_stability() -> None:
     fig.tight_layout()
     save(fig, SUB, "attention-entropy")
 
+
 def modern_moe() -> None:
     """Expert load (share of top-2 assignments) for 16 experts with skewed affinities,
     before and after 1,000 steps of loss-free bias balancing (u = 0.001). Same
-    simulation as the lesson's code."""
+    setup as the lesson's code (separate random draws, so values differ slightly)."""
     import matplotlib.pyplot as plt
 
     loads0, loads1 = _moe_balance()
@@ -256,12 +257,12 @@ def _moe_balance():
     loads1 = loads(batch_scores(), bias)
     return loads0, loads1
 
+
 def sparse_attention() -> None:
     """Share of softmax attention mass captured by the top-k of 8,192 keys, for a peaked
     score distribution (std 3) and a flat one (std 0.5): sparse attention is nearly
     lossless only when attention is concentrated."""
     import matplotlib.pyplot as plt
-    from _style import PARTIAL
 
     rng = np.random.default_rng(0)
     L = 8192
@@ -292,6 +293,7 @@ def main() -> None:
     attention_stability()
     modern_moe()
     sparse_attention()
+
 
 if __name__ == "__main__":
     main()
