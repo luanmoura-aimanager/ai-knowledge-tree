@@ -428,10 +428,10 @@ export const PILLARS: Pillar[] = [
     slug: "D-deep-learning",
     name: "Deep Learning: Core & Tracks",
     shortName: "Deep Learning",
-    tagline: "MLPs, CV, sequence, generative, SSL, GNN, training systems",
+    tagline: "MLPs, CV, sequence, generative, SSL, GNN, training systems, tabular & event FMs",
     color: "#7aa2f7",
     intro:
-      "Deep learning is what happens when you stack differentiable building blocks and let optimization do the feature engineering for you. Instead of hand-crafting what matters in the data, you define an architecture, a loss, and a gradient, and the representations emerge from training. This pillar builds the core mechanics first, then branches into the major application tracks.\n\nYou will start with the core building blocks (layers, activations, backpropagation, normalization, and regularization), then work through computer vision (CNNs from LeNet to ConvNeXt, detection, and neural rendering), sequence modeling (recurrent networks, attention, and state space models like Mamba), and generative modeling (autoencoders, GANs, and the diffusion models behind modern image generation). The track widens further into self-supervised learning and graph neural networks, and closes with the training systems (mixed precision, distributed training, and compilation) that make billion-parameter models trainable at all.\n\nThis is the hinge of the whole tree: NLP, modern RL, and most of AI engineering downstream assume you are fluent here.",
+      "Deep learning is what happens when you stack differentiable building blocks and let optimization do the feature engineering for you. Instead of hand-crafting what matters in the data, you define an architecture, a loss, and a gradient, and the representations emerge from training. This pillar builds the core mechanics first, then branches into the major application tracks.\n\nYou will start with the core building blocks (layers, activations, backpropagation, normalization, and regularization), then work through computer vision (CNNs from LeNet to ConvNeXt, detection, and neural rendering), sequence modeling (recurrent networks, attention, and state space models like Mamba), and generative modeling (autoencoders, GANs, and the diffusion models behind modern image generation). The track widens further into self-supervised learning and graph neural networks, covers the training systems (mixed precision, distributed training, and compilation) that make billion-parameter models trainable at all, and closes with foundation models for tabular and event data (transaction sequences and TabPFN).\n\nThis is the hinge of the whole tree: NLP, modern RL, and most of AI engineering downstream assume you are fluent here.",
     prerequisites: [
       "A1 Linear algebra, A2 probability, and A3 optimization (backprop is just the chain rule plus gradient descent).",
       "C Classical ML for the modeling mindset (loss functions, over/underfitting, evaluation).",
@@ -458,6 +458,7 @@ export const PILLARS: Pillar[] = [
           { name: "Normalization (BN, LN, RMSNorm)", status: "covered" },
           { name: "Regularization (dropout, weight decay)", status: "covered" },
           { name: "Optimizers (SGD, Adam, AdamW)", status: "covered" },
+          { name: "Muon optimizer (Newton-Schulz, QK-Clip)", status: "gap", hot: true },
         ],
       },
       {
@@ -521,6 +522,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "RWKV, Hyena, RetNet", status: "gap", hot: true },
           { name: "Hybrid arch (Jamba, Griffin)", status: "gap", hot: true },
+          { name: "Delta rule and Gated DeltaNet (Qwen3-Next, Kimi Linear)", status: "gap", hot: true },
         ],
       },
       {
@@ -554,6 +556,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "Flow matching, rectified flow", status: "gap", hot: true },
           { name: "Consistency models", status: "gap", hot: true },
+          { name: "Diffusion language models (LLaDA, MDLM)", status: "gap", hot: true },
         ],
       },
       {
@@ -622,6 +625,26 @@ export const PILLARS: Pillar[] = [
             hot: true,
           },
           { name: "FlashAttention v1/v2/v3", status: "gap", hot: true },
+        ],
+      },
+      {
+        id: "D8",
+        name: "Tabular & event foundation models",
+        intro:
+          "Most data in banks, payment networks, and marketplaces is neither text nor images: it is long sequences of typed events (transactions, logins, transfers) and tables of per-customer attributes. Foundation models for this data pretrain one transformer on billions of events and reuse its embeddings for credit, fraud, churn, and recommendation, replacing hundreds of hand-built aggregate features.\n\nYou will learn how to tokenize heterogeneous event records, how to give attention a sense of real elapsed time by driving rotary encodings with timestamps, and how masked event modeling (PRAGMA-style encoders) compares with causal next-event prediction (nuFormer and TREASURE-style decoders). You will then adapt a pretrained LLM backbone such as Qwen to event data, evaluate the resulting embeddings without leakage, and close with TabPFN, the tabular foundation model that learns to do Bayesian prediction in context.\n\nThe track sits between D3 sequence modeling, E3/E4 LLM architecture and fine-tuning, C3 gradient boosting (the baseline to beat), and N3 sequential recommendation, which models user histories with the same machinery.",
+        prerequisites: [
+          "D3 Transformer architecture",
+          "E3 Positional encodings (RoPE) and decoder-only transformers; E4 LoRA",
+          "C3 Gradient boosting and C9 classification metrics",
+          "B2 Posterior predictive distribution (for TabPFN)",
+        ],
+        topics: [
+          { name: "Event and transaction tokenization", status: "gap", hot: true },
+          { name: "Continuous-time RoPE", status: "gap", hot: true },
+          { name: "Masked event modeling vs next-event prediction", status: "gap", hot: true },
+          { name: "LLM backbones for events (Qwen + LoRA)", status: "gap", hot: true },
+          { name: "Embeddings downstream: probes, fusion, leakage", status: "gap" },
+          { name: "Tabular foundation models (TabPFN)", status: "gap", hot: true },
         ],
       },
     ],
@@ -710,6 +733,10 @@ export const PILLARS: Pillar[] = [
             status: "gap",
             hot: true,
           },
+          { name: "Long-context RoPE scaling (PI, NTK-aware, YaRN)", status: "gap", hot: true },
+          { name: "Attention sinks, QK-norm, gated attention", status: "gap", hot: true },
+          { name: "Fine-grained + shared experts, loss-free balancing", status: "gap", hot: true },
+          { name: "Sparse attention (NSA, DeepSeek DSA)", status: "gap", hot: true },
         ],
       },
       {
@@ -739,6 +766,7 @@ export const PILLARS: Pillar[] = [
             status: "gap",
             hot: true,
           },
+          { name: "GRPO variants (Dr. GRPO, DAPO, GSPO)", status: "gap", hot: true },
         ],
       },
       {
@@ -2232,6 +2260,7 @@ export const PILLARS: Pillar[] = [
           { name: "LLM-based recommenders", status: "gap", hot: true },
           { name: "Knowledge-graph recsys", status: "gap" },
           { name: "Cross-domain & transfer", status: "gap" },
+          { name: "Generative recommenders (HSTU, OneRec)", status: "gap", hot: true },
         ],
       },
     ],
@@ -2687,6 +2716,17 @@ export const CONNECTIONS: Connection[] = [
     label: "Causal recommendation",
     kind: "shared-concept",
   },
+  // ---- D8. Tabular & event foundation models ----
+  { from: "D8", to: "N3", label: "User event histories as sequences", kind: "shared-concept" },
+  { from: "D8", to: "C3", label: "GBDT baseline and fusion", kind: "alternative" },
+  { from: "D8", to: "E3", label: "RoPE driven by timestamps", kind: "uses" },
+  { from: "D8", to: "G3", label: "Foundation models for temporal data", kind: "shared-concept" },
+  { from: "D8", to: "E4", label: "LoRA adaptation of LLM backbones", kind: "uses" },
+  { from: "D8", to: "B2", label: "TabPFN approximates the posterior predictive", kind: "uses" },
+  // ---- 2025-26 architecture & training updates ----
+  { from: "D1", to: "E4", label: "Muon optimizer for LLM pretraining", kind: "uses" },
+  { from: "D4", to: "E3", label: "Diffusion LMs vs autoregressive decoders", kind: "alternative" },
+  { from: "N8", to: "E3", label: "HSTU: transformer scaling for recsys", kind: "shared-concept" },
 ];
 
 // -------------------------------------------------------------------------

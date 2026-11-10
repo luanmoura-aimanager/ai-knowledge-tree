@@ -76,6 +76,32 @@ well-tuned classical model on a clean stationary series can still win. The pract
 value is as a **strong default**: a good forecast on a new series with zero
 engineering, to beat or build on.
 
+## The 2025-26 generation
+
+The open issue of covariates is where the newest models moved first, and the field converged
+on a few shared choices: decoder-only or encoder backbones over patches, quantile outputs instead
+of parametric distributions, and synthetic data to teach structure real corpora lack.
+
+- **Chronos-2** (Amazon, October 2025, 120M parameters) goes from univariate to univariate,
+  multivariate, and covariate-informed forecasting in one model. A **group attention** mechanism
+  lets related series (the variates of one multivariate series, or a target and its covariates)
+  attend to each other, so the model learns their relations in context, and it is trained partly
+  on synthetic data that imposes multivariate structure on univariate series<FN n="3" />.
+- **TimesFM 2.5** (Google, September 2025) shrank the TimesFM decoder from 500M to 200M
+  parameters while raising the context from 2,048 to 16K points, with an optional 30M quantile
+  head for probabilistic forecasts. **TimesFM 3.0** (August 2026) added native multivariate and
+  covariate support; note that its released weights carry a non-commercial license, unlike the
+  Apache-2.0 weights up to 2.5<FN n="4" />.
+- **Moirai 2.0** (Salesforce) replaced Moirai 1.0's masked encoder, multi-patch inputs, and mixture
+  outputs with a decoder-only model, a single patch size, and a quantile loss with multi-token
+  prediction, and reports being thirty times smaller than Moirai 1.0-Large while ranking among the
+  top pretrained models on GIFT-Eval<FN n="5" />.
+- **Toto** (Datadog, 151M parameters) is a decoder-only model specialized for observability
+  metrics, released with BOOM, a benchmark of 2,807 real production telemetry series<FN n="6" />.
+
+The trend mirrors language models: once one architecture works, gains come from data (synthetic
+and domain-specific), context length, and conditioning on more of the surrounding signal.
+
 ```python
 import numpy as np
 
@@ -193,4 +219,8 @@ starting with classical statistical anomaly tests.
 <Footnotes>
   <FNItem n="1">**Das, A., Kong, W., Sen, R., & Zhou, Y.** (2024). "A decoder-only foundation model for time-series forecasting (TimesFM)". *ICML*. [arXiv:2310.10688](https://arxiv.org/abs/2310.10688). A pretrained decoder-only model that forecasts unseen series zero-shot, with scaling that drives transfer.</FNItem>
   <FNItem n="2">**Ansari, A. F., et al.** (2024). "Chronos: learning the language of time series". *TMLR*. [arXiv:2403.07815](https://arxiv.org/abs/2403.07815). Value tokenization that lets an LLM architecture forecast time series.</FNItem>
+  <FNItem n="3">**Ansari, A. F., Shchur, O., Küken, J., et al.** (2025). "Chronos-2: From Univariate to Universal Forecasting". [arXiv:2510.15821](https://arxiv.org/abs/2510.15821)</FNItem>
+  <FNItem n="4">**Google Research** (2026). TimesFM repository and release notes (TimesFM 2.5, September 2025; TimesFM 3.0, August 2026). GitHub. [github.com/google-research/timesfm](https://github.com/google-research/timesfm)</FNItem>
+  <FNItem n="5">**Liu, C., Aksu, T., Liu, J., et al.** (2025). "Moirai 2.0: When Less Is More for Time Series Forecasting". [arXiv:2511.11698](https://arxiv.org/abs/2511.11698)</FNItem>
+  <FNItem n="6">**Cohen, B., Khwaja, E., Doubli, Y., et al.** (2025). "This Time is Different: An Observability Perspective on Time Series Foundation Models". [arXiv:2505.14766](https://arxiv.org/abs/2505.14766)</FNItem>
 </Footnotes>

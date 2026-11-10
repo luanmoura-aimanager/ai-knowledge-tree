@@ -150,9 +150,10 @@ gating probability assigned to expert $e$. This loss encourages uniform routing.
 | DeepSeek-V3 | 256 | 8 | 671B | 37B |
 | GPT-4 (rumored) | ~16 | 2 | unknown | ~55B |
 
-DeepSeek-V3 uses **expert specialization** (each expert tends to handle specific types
-of tokens) and **shared experts** (2 experts always active, 6 routed) -- a refinement
-that improves learning stability.
+DeepSeek-V3 uses **fine-grained experts** (many small experts, so each can specialize) and a
+**shared expert** that every token passes through, alongside 8 routed experts per token, and it
+balances load without an auxiliary loss. Those three refinements are derived in
+[fine-grained experts, shared experts, and loss-free balancing](modern-moe).
 
 ## Exercises
 

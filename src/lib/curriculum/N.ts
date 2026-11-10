@@ -342,5 +342,11 @@ export const N_CURRICULUM: Record<string, Lesson[]> = {
       goal: "Transfer embeddings and models across domains and cold-start new platforms.",
       prerequisites: ["N2/matrix-factorization"],
     },
+    {
+      id: "generative-recommenders-hstu",
+      title: "Generative recommenders: HSTU and OneRec",
+      goal: "Recast recommendation as sequential transduction with HSTU's pointwise attention, and see how OneRec replaces the retrieve-then-rank cascade with one generative model.",
+      prerequisites: ["generative-retrieval", "N3/sequential-rec"],
+    },
   ],
 };

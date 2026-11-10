@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, apply_style, color, save
+from _style import FG_DIM, FG_MUTE, GOOD, GRID, HOT, PARTIAL, apply_style, color, save
 
 SUB = "E3"
 C = color(SUB)  # pillar-E accent
@@ -164,12 +164,135 @@ def swiglu_geglu() -> None:
     save(fig, SUB, "swiglu-geglu")
 
 
+def rope_scaling() -> None:
+    """Per-pair frequency multiplier theta'_i / theta_i for extending a d=128, base-10,000
+    RoPE model from 4,096 to 32,768 tokens (s = 8): position interpolation scales every
+    pair by 1/s, the NTK-aware base change keeps the fastest pair and interpolates the
+    slowest, and YaRN's ramp (alpha=1, beta=32) keeps fast pairs exactly."""
+    import matplotlib.pyplot as plt
+
+    d, b, L, s = 128, 1e4, 4096, 8.0
+    i = np.arange(d // 2)
+    theta = b ** (-2 * i / d)
+    ntk = (b * s ** (d / (d - 2))) ** (-2 * i / d) / theta
+    r = L / (2 * np.pi / theta)
+    g = np.clip((r - 1) / (32 - 1), 0, 1)
+    yarn = (1 - g) / s + g
+    fig, ax = plt.subplots(figsize=(7.4, 3.9))
+    ax.plot(i, np.full_like(theta, 1 / s), color=HOT, lw=2, label="PI: every pair x 1/s")
+    ax.plot(i, ntk, color=PARTIAL, lw=2, label="NTK-aware base change")
+    ax.plot(i, yarn, color=GOOD, lw=2, label="YaRN (NTK-by-parts ramp)")
+    ax.set_yscale("log")
+    ax.set_xlabel("frequency pair i (0 = fastest)")
+    ax.set_ylabel(r"$\theta'_i / \theta_i$")
+    ax.set_title("How each method rescales RoPE frequencies (s = 8)")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "rope-scaling")
+
+
+def attention_stability() -> None:
+    """Entropy of softmax attention over 512 keys as the logit scale grows: unbounded
+    query/key norms drive attention toward one-hot (entropy -> 0), the collapse QK-norm
+    prevents by fixing the norms."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    z = rng.normal(size=(200, 512))
+    scales = np.logspace(-1, 2, 60)
+    H = []
+    for c in scales:
+        p = _softmax(c * z, axis=1)
+        H.append(-(p * np.log(p + 1e-300)).sum(1).mean())
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.plot(scales, H, color=C, lw=2)
+    ax.axhline(np.log(512), color=FG_MUTE, ls=":", lw=1)
+    ax.text(0.12, np.log(512) - 0.45, "uniform: ln 512 = 6.24 nats", color=FG_DIM, fontsize=8)
+    ax.set_xscale("log")
+    ax.set_xlabel("logit scale (grows with |q| |k|)")
+    ax.set_ylabel("attention entropy (nats)")
+    ax.set_title("Unbounded logits collapse attention to one key")
+    fig.tight_layout()
+    save(fig, SUB, "attention-entropy")
+
+
+def modern_moe() -> None:
+    """Expert load (share of top-2 assignments) for 16 experts with skewed affinities,
+    before and after 1,000 steps of loss-free bias balancing (u = 0.001). Same
+    setup as the lesson's code (separate random draws, so values differ slightly)."""
+    import matplotlib.pyplot as plt
+
+    loads0, loads1 = _moe_balance()
+    E = len(loads0)
+    fig, ax = plt.subplots(figsize=(7.4, 3.8))
+    x = np.arange(E)
+    ax.bar(x - 0.2, loads0, width=0.4, color=HOT, label="no balancing")
+    ax.bar(x + 0.2, loads1, width=0.4, color=GOOD, label="with routing bias")
+    ax.axhline(1 / E, color=FG_MUTE, ls=":", lw=1)
+    ax.set_xlabel("expert")
+    ax.set_ylabel("share of routed slots")
+    ax.set_title("Loss-free balancing evens out expert load")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "moe-balance")
+
+
+def _moe_balance():
+    rng = np.random.default_rng(0)
+    E, K, T, dim = 16, 2, 1024, 8
+    W = rng.normal(scale=0.5, size=(dim, E))
+    skew = np.linspace(-1.5, 1.5, E)
+    def batch_scores():
+        x = rng.normal(size=(T, dim))
+        return 1 / (1 + np.exp(-(x @ W + skew)))
+    def loads(s, bias):
+        top = np.argsort(-(s + bias), axis=1)[:, :K]
+        return np.bincount(top.ravel(), minlength=E) / (T * K)
+    s = batch_scores()
+    loads0 = loads(s, np.zeros(E))
+    bias = np.zeros(E)
+    for _ in range(1000):
+        c = loads(batch_scores(), bias)
+        bias += 0.001 * np.sign(c.mean() - c)
+    loads1 = loads(batch_scores(), bias)
+    return loads0, loads1
+
+
+def sparse_attention() -> None:
+    """Share of softmax attention mass captured by the top-k of 8,192 keys, for a peaked
+    score distribution (std 3) and a flat one (std 0.5): sparse attention is nearly
+    lossless only when attention is concentrated."""
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    L = 8192
+    ks = np.unique(np.logspace(0, np.log10(L), 50).astype(int))
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    for sd, col, lab in ((3.0, GOOD, "peaked scores (std 3)"), (0.5, PARTIAL, "flat scores (std 0.5)")):
+        p = np.sort(_softmax(rng.normal(scale=sd, size=L)))[::-1]
+        ax.plot(ks, np.cumsum(p)[ks - 1], color=col, lw=2, label=lab)
+    ax.axvline(2048, color=FG_MUTE, ls=":", lw=1)
+    ax.text(2150, 0.08, "k = 2048 (DSA)", color=FG_DIM, fontsize=8)
+    ax.set_xscale("log")
+    ax.set_xlabel("keys kept per query (k)")
+    ax.set_ylabel("attention mass captured")
+    ax.set_title("Top-k sparse attention over 8,192 keys")
+    ax.legend(fontsize=8, loc="upper left")
+    fig.tight_layout()
+    save(fig, SUB, "sparse-topk-mass")
+
+
 def main() -> None:
     apply_style()
     self_attention()
     multi_head_attention()
     positional_encodings()
     swiglu_geglu()
+
+    rope_scaling()
+    attention_stability()
+    modern_moe()
+    sparse_attention()
 
 
 if __name__ == "__main__":
