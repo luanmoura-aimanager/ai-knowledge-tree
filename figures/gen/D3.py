@@ -249,6 +249,44 @@ def word_embeddings() -> None:
     save(fig, SUB, "word-embeddings")
 
 
+def gated_deltanet() -> None:
+    """Mean retrieval error ||S k_j - v_j|| / ||v_j|| after writing n key-value pairs
+    (unit random keys, d = 32) into a fast-weight memory, for plain linear-attention
+    accumulation vs the delta rule (beta = 1). Same setup as the lesson's code (separate
+    random draws and a finer n grid, so values differ slightly)."""
+    import matplotlib.pyplot as plt
+
+    ns, lin, dlt = _delta_recall()
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.plot(ns, lin, color=HOT, lw=2, label="linear attention: S += v k^T")
+    ax.plot(ns, dlt, color=GOOD, lw=2, label="delta rule: S += (v - S k) k^T")
+    ax.axvline(32, color=FG_MUTE, ls=":", lw=1)
+    ax.text(33, 0.05, "n = d_k", color=FG_DIM, fontsize=8)
+    ax.set_xlabel("pairs written (n)")
+    ax.set_ylabel("relative retrieval error")
+    ax.set_title("Associative recall in a 32 x 32 state")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "delta-rule-recall")
+
+
+def _delta_recall():
+    rng = np.random.default_rng(0)
+    d = 32
+    ns = np.arange(2, 65, 2)
+    lin, dlt = [], []
+    for n in ns:
+        K = rng.normal(size=(n, d)); K /= np.linalg.norm(K, axis=1, keepdims=True)
+        V = rng.normal(size=(n, d))
+        S_lin = V.T @ K
+        S = np.zeros((d, d))
+        for k, v in zip(K, V):
+            S += np.outer(v - S @ k, k)
+        err = lambda M: np.mean(np.linalg.norm(K @ M.T - V, axis=1) / np.linalg.norm(V, axis=1))
+        lin.append(err(S_lin)); dlt.append(err(S))
+    return ns, np.array(lin), np.array(dlt)
+
+
 def main() -> None:
     apply_style()
     rnn()
@@ -258,6 +296,8 @@ def main() -> None:
     linear_attention()
     state_space_models()
     word_embeddings()
+
+    gated_deltanet()
 
 
 if __name__ == "__main__":

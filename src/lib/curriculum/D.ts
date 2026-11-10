@@ -61,6 +61,12 @@ export const D_CURRICULUM: Record<string, Lesson[]> = {
       goal: "Move from SGD with momentum to Adam, AdamW, and learning-rate schedulers in the deep-learning regime.",
       prerequisites: ["A3/adaptive-methods", "regularization"],
     },
+    {
+      id: "muon-optimizer",
+      title: "Muon: orthogonalized updates for weight matrices",
+      goal: "Derive Muon's update as steepest descent under the spectral norm, approximate the polar factor with Newton-Schulz, and stabilize it at scale with RMS matching and QK-Clip.",
+      prerequisites: ["dl-optimizers", "A1/svd"],
+    },
   ],
   D2: [
     {
@@ -188,6 +194,12 @@ export const D_CURRICULUM: Record<string, Lesson[]> = {
       prerequisites: ["state-space-models", "linear-attention"],
       codeExempt: true,
     },
+    {
+      id: "gated-deltanet",
+      title: "The delta rule and Gated DeltaNet",
+      goal: "Treat linear attention as a fast-weight memory, derive the delta rule as online regression, add gating, and see why hybrids like Qwen3-Next keep a few full-attention layers.",
+      prerequisites: ["linear-attention", "state-space-models"],
+    },
   ],
   D4: [
     {
@@ -247,6 +259,12 @@ export const D_CURRICULUM: Record<string, Lesson[]> = {
       goal: "Train continuous-time generators by matching vector fields (flow matching, rectified flow) and distill them into one-step samplers (consistency models).",
       prerequisites: ["diffusion", "normalizing-flows"],
       codeExempt: true,
+    },
+    {
+      id: "diffusion-language-models",
+      title: "Diffusion language models",
+      goal: "Train a masked diffusion language model (LLaDA, MDLM), derive the 1/t-weighted loss, and quantify what parallel unmasking costs when tokens are dependent.",
+      prerequisites: ["diffusion", "D5/mlm"],
     },
   ],
   D5: [

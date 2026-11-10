@@ -205,6 +205,26 @@ def normalizing_flows() -> None:
     save(fig, SUB, "normalizing-flows")
 
 
+def dlm_parallel() -> None:
+    """Total-variation distance between the true joint of two masked binary tokens and
+    the product of their marginals (what one parallel unmasking step samples), as their
+    correlation grows. At perfect correlation half the samples are incoherent."""
+    import matplotlib.pyplot as plt
+
+    rho = np.linspace(0, 1, 101)
+    # symmetric pair: P(1,1)=P(0,0)=(1+rho)/4, P(0,1)=P(1,0)=(1-rho)/4; marginals 1/2
+    tv = 0.5 * (2 * np.abs((1 + rho) / 4 - 0.25) + 2 * np.abs((1 - rho) / 4 - 0.25))
+    fig, ax = plt.subplots(figsize=(7.0, 3.8))
+    ax.plot(rho, tv, color=C, lw=2)
+    ax.plot([1], [0.5], "o", color=HOT)
+    ax.text(0.62, 0.47, '"New Francisco" regime', color=FG_DIM, fontsize=8)
+    ax.set_xlabel("correlation between the two masked tokens")
+    ax.set_ylabel("TV(joint, product of marginals)")
+    ax.set_title("What parallel unmasking gets wrong")
+    fig.tight_layout()
+    save(fig, SUB, "dlm-parallel-error")
+
+
 def main() -> None:
     apply_style()
     vae()
@@ -213,6 +233,8 @@ def main() -> None:
     autoencoders()
     flow_matching()
     normalizing_flows()
+
+    dlm_parallel()
 
 
 if __name__ == "__main__":

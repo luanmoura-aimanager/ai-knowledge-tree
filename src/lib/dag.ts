@@ -458,6 +458,7 @@ export const PILLARS: Pillar[] = [
           { name: "Normalization (BN, LN, RMSNorm)", status: "covered" },
           { name: "Regularization (dropout, weight decay)", status: "covered" },
           { name: "Optimizers (SGD, Adam, AdamW)", status: "covered" },
+          { name: "Muon optimizer (Newton-Schulz, QK-Clip)", status: "gap", hot: true },
         ],
       },
       {
@@ -521,6 +522,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "RWKV, Hyena, RetNet", status: "gap", hot: true },
           { name: "Hybrid arch (Jamba, Griffin)", status: "gap", hot: true },
+          { name: "Delta rule and Gated DeltaNet (Qwen3-Next, Kimi Linear)", status: "gap", hot: true },
         ],
       },
       {
@@ -554,6 +556,7 @@ export const PILLARS: Pillar[] = [
           },
           { name: "Flow matching, rectified flow", status: "gap", hot: true },
           { name: "Consistency models", status: "gap", hot: true },
+          { name: "Diffusion language models (LLaDA, MDLM)", status: "gap", hot: true },
         ],
       },
       {
@@ -730,6 +733,10 @@ export const PILLARS: Pillar[] = [
             status: "gap",
             hot: true,
           },
+          { name: "Long-context RoPE scaling (PI, NTK-aware, YaRN)", status: "gap", hot: true },
+          { name: "Attention sinks, QK-norm, gated attention", status: "gap", hot: true },
+          { name: "Fine-grained + shared experts, loss-free balancing", status: "gap", hot: true },
+          { name: "Sparse attention (NSA, DeepSeek DSA)", status: "gap", hot: true },
         ],
       },
       {
@@ -759,6 +766,7 @@ export const PILLARS: Pillar[] = [
             status: "gap",
             hot: true,
           },
+          { name: "GRPO variants (Dr. GRPO, DAPO, GSPO)", status: "gap", hot: true },
         ],
       },
       {
@@ -2252,6 +2260,7 @@ export const PILLARS: Pillar[] = [
           { name: "LLM-based recommenders", status: "gap", hot: true },
           { name: "Knowledge-graph recsys", status: "gap" },
           { name: "Cross-domain & transfer", status: "gap" },
+          { name: "Generative recommenders (HSTU, OneRec)", status: "gap", hot: true },
         ],
       },
     ],
@@ -2714,6 +2723,10 @@ export const CONNECTIONS: Connection[] = [
   { from: "D8", to: "G3", label: "Foundation models for temporal data", kind: "shared-concept" },
   { from: "D8", to: "E4", label: "LoRA adaptation of LLM backbones", kind: "uses" },
   { from: "D8", to: "B2", label: "TabPFN approximates the posterior predictive", kind: "uses" },
+  // ---- 2025-26 architecture & training updates ----
+  { from: "D1", to: "E4", label: "Muon optimizer for LLM pretraining", kind: "uses" },
+  { from: "D4", to: "E3", label: "Diffusion LMs vs autoregressive decoders", kind: "alternative" },
+  { from: "N8", to: "E3", label: "HSTU: transformer scaling for recsys", kind: "shared-concept" },
 ];
 
 // -------------------------------------------------------------------------

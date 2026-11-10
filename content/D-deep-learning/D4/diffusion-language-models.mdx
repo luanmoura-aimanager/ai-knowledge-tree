@@ -1,0 +1,242 @@
+---
+title: "Diffusion language models"
+pillar: D
+subId: D4
+lessonId: diffusion-language-models
+order: 10
+estimatedMinutes: 32
+goal: "Train a masked diffusion language model (LLaDA, MDLM), derive the 1/t-weighted loss, and quantify what parallel unmasking costs when tokens are dependent."
+prerequisites: ["diffusion", "D5/mlm"]
+---
+
+Every language model in pillar E writes left to right, one token per forward pass. Diffusion
+models for images work differently: they start from noise and refine the whole canvas at once.
+Text is discrete, so "noise" cannot mean Gaussian perturbations, but it can mean **masking**:
+corrupt a sentence by hiding tokens, and train a model to restore them. A **masked diffusion
+language model** generates by starting from a fully masked sequence and unmasking many
+positions per step. LLaDA showed in 2025 that this recipe, trained from scratch at 8B
+parameters on 2.3 trillion tokens, is competitive with autoregressive models of similar size
+and handles the "reversal curse" better than GPT-4o on a reversal poem-completion
+task<FN n="1" />. Commercial systems such as Google's Gemini Diffusion and Inception's Mercury
+followed. This lesson derives the training objective and the one structural cost of generating
+in parallel.
+
+## The forward process: mask with probability t
+
+Let $x_0 = (x_0^1, \dots, x_0^L)$ be a clean sequence. Draw a noise level
+$t \sim \mathrm{Uniform}(0, 1)$, and produce $x_t$ by replacing each token independently with
+a mask token $\mathrm{M}$ with probability $t$, leaving it unchanged with probability
+$1 - t$<FN n="1" />. At $t = 0$ nothing is masked; at $t = 1$ everything is.
+
+The reverse model is a **mask predictor**: a transformer *without* a causal mask that reads
+$x_t$ and outputs, for every masked position $i$, a distribution $p_\theta(x_0^i \mid x_t)$ over
+the vocabulary. All masked positions are predicted at once from the same forward pass.
+
+## The loss and its 1/t weight
+
+LLaDA trains with
+
+$$
+\mathcal{L}(\theta) = -\,\mathbb{E}_{t,\, x_0,\, x_t}\left[\frac{1}{t} \sum_{i=1}^{L} \mathbb{1}[x_t^i = \mathrm{M}]\, \log p_\theta(x_0^i \mid x_t)\right],
+$$
+
+computed only on masked positions, and this loss is an upper bound on the model's negative
+log-likelihood, so minimizing it is principled maximum-likelihood training<FN n="1" />. MDLM
+derives the same structure as a continuous-time evidence bound and describes it as a weighted
+average of masked-language-modeling losses<FN n="2" />.
+
+Why the $1/t$? It makes every noise level count the same.
+
+**Step 1: Count the masked tokens.** Each of the $L$ positions is masked with probability $t$,
+so $\mathbb{E}\big[\sum_i \mathbb{1}[x_t^i = \mathrm{M}] \,\big|\, t\big] = tL$.
+
+**Step 2: Suppose every masked token costs the same $c$ nats.** Then the bracket's expected
+value at level $t$ is $\frac1t \cdot tL \cdot c = Lc$, independent of $t$.
+
+**Step 3: Interpret.** Without the weight, low-$t$ samples (few masks) would contribute almost
+nothing and high-$t$ samples would dominate. With it, each noise level contributes a
+sequence-sized loss, the same scale an autoregressive model's $L$-token NLL has.
+
+**A named confusion: this is not BERT.** BERT masks a fixed 15% and has no $1/t$ weight. Because
+it never sees heavily masked inputs, it cannot start from an all-masked sequence, so it is not a
+generative model. A masked diffusion model trains on every masking rate from 0 to 1, including
+the all-masked state it will start sampling from.
+
+## Sampling: unmask, then remask
+
+To generate $L$ tokens in $N$ steps:
+
+1. Start with $x_1 = (\mathrm{M}, \dots, \mathrm{M})$.
+2. At each step, run the mask predictor and fill every masked position with a sampled token.
+3. Re-mask a fraction of the filled positions so that the expected mask rate falls to the next,
+   lower noise level; keep the rest.
+4. After $N$ steps nothing is masked.
+
+Which positions to re-mask is a choice. The theoretically matched rule is random, but LLaDA
+adopts **low-confidence remasking**: keep the predictions the model is most confident about and
+re-mask the least confident ones<FN n="1" />. Each step commits about $L/N$ tokens, so a
+1,024-token answer in 64 steps needs 64 forward passes instead of 1,024.
+
+```mermaid
+graph LR
+  A["M M M M M M"] -->|"predict all, keep confident"| B["The M M is M M"]
+  B --> C["The capital M is M big"]
+  C --> D["The capital city is very big"]
+```
+
+## The cost of parallel unmasking
+
+Filling several masked positions in one step samples each from its own **marginal**
+$p_\theta(x_0^i \mid x_t)$, independently. When the masked tokens depend on each other, the
+product of marginals is not the joint distribution.
+
+**A contrasting pair.** Suppose the context makes two completions equally likely, "New York" and
+"San Francisco". The marginals are 50/50 for the first token (New, San) and 50/50 for the second
+(York, Francisco).
+
+- **One step for both tokens:** the four combinations each get probability 1/4, so "New
+  Francisco" and "San York" appear half the time.
+- **Two steps:** unmask the first token (say "San"); the second is now predicted *given* it, and
+  the model picks "Francisco" with certainty. The error vanishes.
+
+For two binary tokens with uniform marginals and correlation $\rho$, the joint puts
+$(1 + \rho)/4$ on each agreeing pair and $(1 - \rho)/4$ on each disagreeing pair, while the product
+of marginals puts $1/4$ on each. Their total-variation distance is
+
+$$
+\mathrm{TV} = \tfrac12 \sum \big|p - q\big| = \tfrac12\left(2 \cdot \tfrac{\rho}{4} + 2 \cdot \tfrac{\rho}{4}\right) = \frac{\rho}{2},
+$$
+
+which reaches $1/2$ at perfect correlation. Fewer steps buy speed at the price of this error, which
+is why diffusion LMs expose the number of steps as a quality-latency dial, and why confident
+positions (whose marginals are nearly certain, so independence costs little) are committed first.
+
+![TV distance between the true joint of two masked tokens and the product of their marginals, as their correlation grows: it equals ρ/2, so perfectly coupled tokens are wrong half the time when unmasked together.](/figures/D4/dlm-parallel-error.svg)
+
+## Check it on arrays
+
+```python
+import numpy as np
+from itertools import product
+
+rng = np.random.default_rng(0)
+
+# 1) The 1/t weight: expected weighted masked count equals L at every noise level
+L = 256
+for t in (0.05, 0.3, 0.9):
+    counts = (rng.random((20_000, L)) < t).sum(1)
+    print(f"t = {t}: E[(1/t) * #masked] = {np.mean(counts / t):.1f} (L = {L})")
+    assert abs(np.mean(counts / t) - L) < 2
+
+# 2) Product of marginals vs joint for coupled tokens: TV = rho / 2
+for rho in (0.0, 0.6, 1.0):
+    joint = np.array([(1 + rho) / 4, (1 - rho) / 4, (1 - rho) / 4, (1 + rho) / 4])
+    tv = 0.5 * np.abs(joint - 0.25).sum()
+    assert np.isclose(tv, rho / 2)
+print("TV(joint, product) = rho / 2 confirmed")
+
+# 3) A toy language: exact denoiser, k tokens unmasked per step
+valid = [("new", "york", "is", "big"), ("san", "francisco", "is", "foggy"),
+         ("new", "delhi", "is", "hot"), ("san", "diego", "is", "sunny")]
+def marginals(x):
+    consistent = [v for v in valid if all(a is None or a == b for a, b in zip(x, v))]
+    return [{w: sum(v[i] == w for v in consistent) / len(consistent) for w in {v[i] for v in consistent}}
+            for i in range(4)]
+def sample(k):
+    x = [None] * 4
+    while None in x:
+        m = marginals(x)
+        masked = [i for i in range(4) if x[i] is None]
+        for i in rng.permutation(masked)[:k]:          # unmask k positions independently
+            words, probs = zip(*m[i].items())
+            x[i] = words[rng.choice(len(words), p=probs)]
+        if not any(all(a is None or a == b for a, b in zip(x, v)) for v in valid):
+            return False
+    return tuple(x) in valid
+for k in (1, 2, 4):
+    ok = np.mean([sample(k) for _ in range(4000)])
+    print(f"{k} token(s) per step: {100 * (1 - ok):.1f}% incoherent")
+assert np.mean([sample(1) for _ in range(500)]) == 1.0
+```
+
+The first check confirms that $1/t$ turns every noise level into an $L$-token-sized loss; the
+second confirms $\mathrm{TV} = \rho/2$; the third runs an exact denoiser on a four-sentence
+language and shows that unmasking one token per step never produces an invalid sentence, while
+unmasking two or four at a time produces "new francisco"-style errors at a rate that grows with
+the number of tokens committed per step.
+
+## Exercises
+
+**Exercise 1.** Two masked binary tokens have uniform marginals and correlation $\rho = 0.6$.
+What fraction of one-step samples are disagreeing pairs, and how does that compare with the
+true model?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** The product of marginals puts $1/4$ on each of the two disagreeing pairs: $1/2$ in
+total.
+
+**Step 2.** The joint puts $(1 - 0.6)/4 = 0.1$ on each, $0.2$ in total.
+
+**Step 3.** One-step sampling over-produces disagreeing pairs by $0.5 - 0.2 = 0.3$, which equals
+$\mathrm{TV} = \rho/2 = 0.3$.
+
+</details>
+
+**Exercise 2.** A 1,024-token training sequence is drawn at $t = 0.25$. How many tokens are
+masked in expectation, what weight does each masked token's log-loss get, and what would
+change at $t = 0.05$?
+
+<details>
+<summary>Solution</summary>
+
+**Step 1.** Expected masked tokens: $0.25 \times 1024 = 256$, each weighted by $1/0.25 = 4$.
+
+**Step 2.** At $t = 0.05$: about $51.2$ masked tokens, each weighted by $20$. In both cases
+the weighted count is $1{,}024$ in expectation.
+
+**Step 3.** The low-$t$ case has far fewer terms, so its estimate is noisier; the weighting
+fixes the scale, not the variance.
+
+</details>
+
+**Exercise 3 (code).** Using the toy language, add a fifth sentence ("san", "jose", "is",
+"warm") and measure the incoherence rate with 4 tokens per step. Explain the change.
+
+<details>
+<summary>Solution</summary>
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(4)
+valid = [("new", "york", "is", "big"), ("san", "francisco", "is", "foggy"),
+         ("new", "delhi", "is", "hot"), ("san", "diego", "is", "sunny"),
+         ("san", "jose", "is", "warm")]
+def one_step_valid():
+    # all four positions unmasked at once from their marginals over valid sentences
+    x = tuple(valid[rng.integers(len(valid))][i] for i in range(4))
+    return x in valid
+rate = 1 - np.mean([one_step_valid() for _ in range(20_000)])
+exact = 1 - sum(np.prod([sum(v[i] == s[i] for v in valid) / len(valid) for i in range(4)])
+                for s in valid)
+print(round(rate, 3), round(exact, 3))
+assert abs(rate - exact) < 0.01
+```
+
+Sampling each position from its marginal is the same as drawing each position from an
+independently chosen sentence. With five sentences the first word is "san" 60% of the time, but
+the city word must then be one of three, so a random combination is valid only rarely: about
+90% of one-step samples are incoherent. More sentences sharing a prefix means more
+inter-token dependence, and parallel decoding pays for it.
+
+</details>
+
+This closes the D4 generative-modeling track; the next subsection (D5) turns to learning
+representations without labels.
+
+<Footnotes>
+  <FNItem n="1">**Nie, S., Zhu, F., You, Z., Zhang, X., et al.** (2025). "Large Language Diffusion Models". [arXiv:2502.09992](https://arxiv.org/abs/2502.09992)</FNItem>
+  <FNItem n="2">**Sahoo, S. S., Arriola, M., Schiff, Y., Gokaslan, A., et al.** (2024). "Simple and Effective Masked Diffusion Language Models". *NeurIPS*. [arXiv:2406.07524](https://arxiv.org/abs/2406.07524)</FNItem>
+</Footnotes>
