@@ -151,6 +151,30 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       goal: "Compress the KV cache by projecting keys and values through a shared low-rank latent, derive DeepSeek-V2's MLA, and contrast its memory and quality with GQA.",
       prerequisites: ["gqa-moe"],
     },
+    {
+      id: "rope-scaling",
+      title: "Extending context: PI, NTK-aware RoPE, and YaRN",
+      goal: "Explain why RoPE models fail past their training length, and derive position interpolation, the NTK-aware base change, and YaRN's per-frequency ramp and attention temperature.",
+      prerequisites: ["positional-encodings"],
+    },
+    {
+      id: "attention-stability",
+      title: "Attention sinks, QK-norm, and gated attention",
+      goal: "Explain why softmax attention creates sinks and logit blow-ups, bound logits with QK-norm, and show how a post-attention sigmoid gate removes the sink.",
+      prerequisites: ["transformer-block"],
+    },
+    {
+      id: "modern-moe",
+      title: "Fine-grained experts, shared experts, and loss-free balancing",
+      goal: "Count the routing combinations fine-grained experts buy, separate shared from routed experts, and balance expert load with a routing-only bias instead of an auxiliary loss.",
+      prerequisites: ["gqa-moe"],
+    },
+    {
+      id: "sparse-attention",
+      title: "Native and DeepSeek sparse attention",
+      goal: "Select a few keys per query with NSA's compressed/selected/sliding branches or DeepSeek's lightning indexer, and account for what the O(Lk) attention still costs.",
+      prerequisites: ["mla"],
+    },
   ],
 
   E4: [
@@ -210,6 +234,12 @@ export const E_CURRICULUM: Record<string, Lesson[]> = {
       title: "LoRA, QLoRA, and DoRA",
       goal: "Freeze the pretrained weights, inject low-rank adapter matrices A and B, and train only their product delta W = BA; extend to 4-bit QLoRA and magnitude-direction DoRA.",
       prerequisites: ["sft"],
+    },
+    {
+      id: "grpo-variants",
+      title: "GRPO variants: Dr. GRPO, DAPO, and GSPO",
+      goal: "Derive GRPO's length and difficulty biases, and show how Dr. GRPO, DAPO's token-level loss and clip-higher, and GSPO's sequence-level ratio change the gradient.",
+      prerequisites: ["grpo"],
     },
   ],
 

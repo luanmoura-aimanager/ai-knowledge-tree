@@ -76,12 +76,38 @@ def scaling_laws() -> None:
     save(fig, SUB, "scaling-laws")
 
 
+def grpo_variants() -> None:
+    """Per-token gradient weight on an incorrect response (advantage -1) as a function of
+    its length, in a group whose responses total 4,000 tokens: GRPO's 1/|o_i| shrinks
+    the per-token penalty on long wrong answers; DAPO's token-level normalization and
+    Dr. GRPO's constant normalizer do not."""
+    import matplotlib.pyplot as plt
+    from _style import PARTIAL
+
+    G, total, Lmax = 8, 4000, 4096
+    ell = np.arange(50, 2001, 10)
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.plot(ell, 1 / (G * ell), color=HOT, lw=2, label="GRPO: 1 / (G |o_i|)")
+    ax.plot(ell, np.full_like(ell, 1 / total, dtype=float), color=GOOD, lw=2,
+            label="DAPO: 1 / sum |o_j|")
+    ax.plot(ell, np.full_like(ell, 1 / (G * Lmax), dtype=float), color=PARTIAL, lw=2,
+            label="Dr. GRPO: 1 / (G L_max)")
+    ax.set_yscale("log")
+    ax.set_xlabel("length of the incorrect response (tokens)")
+    ax.set_ylabel("|per-token weight|")
+    ax.set_title("Who pays for a long wrong answer")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    save(fig, SUB, "grpo-length-bias")
+
+
 def main() -> None:
     apply_style()
     lora()
     reward_modeling()
     scaling_laws()
 
+    grpo_variants()
 
 if __name__ == "__main__":
     main()

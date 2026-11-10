@@ -4,8 +4,8 @@ Canonical backlog of upcoming work for `ai-knowledge-tree`. When asked "what are
 the next steps?", read this file. As items ship, check them off or remove them so
 the list never claims work that's already done.
 
-Last reviewed: 2026-06-20 (Advanced Causal ML pillar M shipped; backlog of new
-pillars now empty).
+Last reviewed: 2026-11-09 (2025-26 modern-algorithms gap pass shipped: D8 tabular &
+event foundation models plus 9 new architecture/training lessons).
 
 ## Backlog
 
@@ -14,6 +14,23 @@ in pillar B (B5), and the advanced machine-learning frontier is pillar M below.
 Add new agreed next steps here.
 
 ---
+
+Latest shipped (2026-11-09): **modern-algorithms gap pass** (2025-26 techniques).
+
+- **D8 Tabular & event foundation models** (PR #109): new subsection, 6 lessons on
+  transaction/event-sequence foundation models (PRAGMA, nuFormer, TREASURE): tokenization,
+  continuous-time RoPE, masked vs next-event pretraining, LLM backbones (Qwen + LoRA),
+  downstream evaluation and leakage, and TabPFN.
+- **9 lessons appended to existing subsections**: E3 long-context RoPE scaling (PI, NTK-aware,
+  YaRN), attention sinks / QK-norm / gated attention, fine-grained + shared experts with
+  loss-free balancing, NSA and DeepSeek sparse attention; D3 delta rule and Gated DeltaNet
+  (Qwen3-Next, Kimi Linear); D1 Muon and QK-Clip; E4 GRPO variants (Dr. GRPO, DAPO, GSPO);
+  D4 diffusion language models (LLaDA, MDLM); N8 generative recommenders (HSTU, OneRec).
+- Refreshes: G3 time-series foundation models (Chronos-2, TimesFM 2.5/3.0, Moirai 2.0, Toto),
+  forward links from E3 positional encodings / GQA-MoE (DeepSeek-V3 expert counts corrected),
+  D3 hybrids, E8 frontier, and the handoffs of each subsection's former last lesson.
+- Candidates not yet done: multi-token prediction (DeepSeek-V3 MTP), FP8/MXFP4 training,
+  manifold-constrained hyper-connections (DeepSeek-V4), KV-sharing (Gemma 4).
 
 Five efforts shipped:
 

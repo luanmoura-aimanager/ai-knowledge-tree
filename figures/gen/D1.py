@@ -227,6 +227,28 @@ def universal_approximation() -> None:
     save(fig, SUB, "universal-approximation")
 
 
+def muon_ns() -> None:
+    """The quintic Newton-Schulz map p(x) = a x + b x^3 + c x^5 with Muon's coefficients
+    (3.4445, -4.7750, 2.0315), iterated 1 to 5 times on a singular value in (0, 1]:
+    after five steps every value above about 0.05 lands in roughly [0.68, 1.20]."""
+    import matplotlib.pyplot as plt
+
+    a, b, c = 3.4445, -4.7750, 2.0315
+    x = np.linspace(0, 1, 600)
+    y = x.copy()
+    fig, ax = plt.subplots(figsize=(7.2, 3.9))
+    for k in range(1, 6):
+        y = a * y + b * y**3 + c * y**5
+        ax.plot(x, y, lw=1.2 + 0.25 * k, color=CYCLE[k % len(CYCLE)], label=f"{k} step{'s' if k > 1 else ''}")
+    ax.axhline(1, color=FG_MUTE, ls=":", lw=1)
+    ax.set_xlabel(r"input singular value $\sigma$ (after normalization)")
+    ax.set_ylabel("output singular value")
+    ax.set_title("Newton-Schulz pushes every singular value toward 1")
+    ax.legend(fontsize=8, ncol=2)
+    fig.tight_layout()
+    save(fig, SUB, "muon-newton-schulz")
+
+
 def main() -> None:
     apply_style()
     activations()
@@ -236,6 +258,7 @@ def main() -> None:
     regularization()
     universal_approximation()
 
+    muon_ns()
 
 if __name__ == "__main__":
     main()
